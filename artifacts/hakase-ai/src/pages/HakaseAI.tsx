@@ -53,6 +53,15 @@ export function HakaseAI() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
+  const [diagenOpen, setDiagenOpen] = useState(false);
+  const [diagenJobId, setDiagenJobId] = useState("");
+  const [diagenMode, setDiagenMode] = useState<"sync" | "batch" | "cascade">("sync");
+  const [diagenLoading, setDiagenLoading] = useState(false);
+  const [diagenResult, setDiagenResult] = useState<{
+    name: string; smiles: string; mw: string; uniprotId: string; targetName: string;
+    admet: { absorption: number; distribution: number; metabolism: number; excretion: number; toxicity: number };
+    qed: number; sa: number; bindingAffinity: string;
+  } | null>(null);
   const [apiImportOpen, setApiImportOpen] = useState(false);
   const [apiSource, setApiSource] = useState("chembl");
   const [apiCompoundId, setApiCompoundId] = useState("");
@@ -168,6 +177,53 @@ export function HakaseAI() {
       });
     }, 200);
   }, [activeLayer]);
+
+  const handleDiagenFetch = useCallback(() => {
+    if (!diagenJobId.trim()) return;
+    setDiagenLoading(true);
+    setDiagenResult(null);
+    const mockDb: Record<string, {
+      name: string; smiles: string; mw: string; uniprotId: string; targetName: string;
+      admet: { absorption: number; distribution: number; metabolism: number; excretion: number; toxicity: number };
+      qed: number; sa: number; bindingAffinity: string;
+    }> = {
+      "dgn-mol-0047": {
+        name: "HAK-EGFR-047", smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1",
+        mw: "499.6 Da", uniprotId: "P00533", targetName: "EGFR · Epidermal growth factor receptor",
+        admet: { absorption: 0.84, distribution: 0.71, metabolism: 0.76, excretion: 0.69, toxicity: 0.91 },
+        qed: 0.78, sa: 2.6, bindingAffinity: "9.8 nM",
+      },
+      "dgn-mol-0112": {
+        name: "HAK-KRAS-112", smiles: "CC1(C)CCC(=C1)c1cc(NC(=O)c2ccc(F)cc2)c2ncc(-c3ccncc3)cc2n1",
+        mw: "441.5 Da", uniprotId: "P01116", targetName: "KRAS · GTPase KRas",
+        admet: { absorption: 0.77, distribution: 0.65, metabolism: 0.82, excretion: 0.73, toxicity: 0.85 },
+        qed: 0.74, sa: 3.1, bindingAffinity: "14.2 nM",
+      },
+      "dgn-mol-0231": {
+        name: "HAK-CDK4-231", smiles: "C1CN(C(=O)c2cc3cc(NC(=O)c4ccc(F)cn4)ccc3[nH]2)CCC1N",
+        mw: "393.4 Da", uniprotId: "P11802", targetName: "CDK4 · Cyclin-dependent kinase 4",
+        admet: { absorption: 0.91, distribution: 0.74, metabolism: 0.68, excretion: 0.77, toxicity: 0.93 },
+        qed: 0.81, sa: 2.3, bindingAffinity: "6.1 nM",
+      },
+      "dgn-batch-2024-q1": {
+        name: "HAK-BTK-Batch-Top1", smiles: "CC(C)(Cc1ccc2c(c1)cc(NC(=O)/C=C/CN(C)C)n2-c1ccc(cc1)NC(=O)c1ccc(F)cc1)O",
+        mw: "517.6 Da", uniprotId: "Q06187", targetName: "BTK · Tyrosine-protein kinase BTK",
+        admet: { absorption: 0.79, distribution: 0.66, metabolism: 0.71, excretion: 0.74, toxicity: 0.88 },
+        qed: 0.69, sa: 3.4, bindingAffinity: "11.7 nM",
+      },
+    };
+    const delay = diagenMode === "cascade" ? 2200 : diagenMode === "batch" ? 1600 : 900;
+    setTimeout(() => {
+      const hit = mockDb[diagenJobId.toLowerCase().trim()];
+      setDiagenResult(hit ?? {
+        name: `HAK-MOL-${diagenJobId.toUpperCase()}`, smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+        mw: "206.3 Da", uniprotId: "P00533", targetName: "EGFR · Epidermal growth factor receptor",
+        admet: { absorption: 0.82, distribution: 0.68, metabolism: 0.74, excretion: 0.71, toxicity: 0.88 },
+        qed: 0.72, sa: 2.8, bindingAffinity: "12.4 nM",
+      });
+      setDiagenLoading(false);
+    }, delay);
+  }, [diagenJobId, diagenMode]);
 
   const handleProjFetch = useCallback(() => {
     if (!projImportId.trim()) return;
@@ -640,6 +696,163 @@ export function HakaseAI() {
                       <div className="grid grid-cols-2 gap-2">
                         <UploadButton label="SDF / MOL2 Upload" hint=".sdf, .mol2, .mol · 10MB" />
                         <UploadButton label="Batch CSV" hint="CSV with 'smiles' col · 500 rows" />
+                      </div>
+
+                      {/* ── Diagen Integration ── */}
+                      <div className="border border-violet-500/30 rounded-lg overflow-hidden bg-violet-950/20">
+                        <button
+                          onClick={() => { setDiagenOpen(v => !v); setDiagenResult(null); }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-violet-500/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shrink-0">
+                              <Dna className="w-3 h-3 text-white" />
+                            </div>
+                            <div className="text-left">
+                              <div className="text-[11px] font-semibold text-violet-200">Import from Diagen AI</div>
+                              <div className="text-[9px] text-violet-400/70 leading-tight">Generate → Simulate pipeline</div>
+                            </div>
+                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/20 text-violet-300 border-violet-500/30 ml-1">Hakase Ecosystem</Badge>
+                          </div>
+                          {diagenOpen ? <ChevronUp className="w-3.5 h-3.5 text-violet-400" /> : <ChevronDown className="w-3.5 h-3.5 text-violet-400" />}
+                        </button>
+
+                        {diagenOpen && (
+                          <div className="px-3 pb-3 space-y-3 border-t border-violet-500/15">
+                            {/* Mode selector */}
+                            <div className="pt-3">
+                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Integration Mode</div>
+                              <div className="grid grid-cols-3 gap-1">
+                                {([
+                                  { id: "sync",    label: "Synchronous",  hint: "Single · <30s" },
+                                  { id: "batch",   label: "Async Batch",  hint: "Webhook · ~2m" },
+                                  { id: "cascade", label: "Cascade",      hint: "L1→L2→L3" },
+                                ] as const).map(m => (
+                                  <button
+                                    key={m.id}
+                                    onClick={() => { setDiagenMode(m.id); setDiagenResult(null); }}
+                                    className={`py-1.5 px-2 rounded text-center border transition-all ${
+                                      diagenMode === m.id
+                                        ? "bg-violet-600/20 border-violet-500/50 text-violet-200"
+                                        : "border-white/8 text-slate-500 hover:border-violet-500/25"
+                                    }`}
+                                  >
+                                    <div className="text-[10px] font-semibold">{m.label}</div>
+                                    <div className="text-[9px] text-slate-600 mt-0.5">{m.hint}</div>
+                                  </button>
+                                ))}
+                              </div>
+                              {diagenMode === "cascade" && (
+                                <div className="mt-2 text-[10px] text-violet-400/70 flex items-center gap-1.5 bg-violet-500/5 rounded px-2 py-1.5 border border-violet-500/15">
+                                  <Zap className="w-3 h-3 shrink-0" />
+                                  Cascade mode runs L1 → L2 → L3 automatically. Results propagate across all layers.
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Job / Molecule ID */}
+                            <div>
+                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
+                                {diagenMode === "batch" ? "Batch Job ID" : "Molecule ID"}
+                                <span className="ml-2 text-slate-600 normal-case">e.g. DGN-MOL-0047</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                  <Input
+                                    value={diagenJobId}
+                                    onChange={e => { setDiagenJobId(e.target.value); setDiagenResult(null); }}
+                                    onKeyDown={e => e.key === "Enter" && handleDiagenFetch()}
+                                    placeholder={diagenMode === "batch" ? "DGN-BATCH-2024-Q1" : "DGN-MOL-0047"}
+                                    className="bg-white/5 border-violet-500/20 text-white text-[12px] pl-7 focus:border-violet-500/60"
+                                  />
+                                </div>
+                                <button
+                                  onClick={handleDiagenFetch}
+                                  disabled={!diagenJobId.trim() || diagenLoading}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/30 border border-violet-500/40 text-violet-200 hover:bg-violet-600/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
+                                >
+                                  {diagenLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                  {diagenLoading ? "Fetching…" : "Fetch"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Result */}
+                            {diagenResult && (
+                              <div className="bg-violet-500/5 border border-violet-500/25 rounded-lg p-3 space-y-2.5">
+                                {/* Header */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="text-[12px] font-semibold text-violet-200">{diagenResult.name}</div>
+                                    <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">{diagenResult.smiles.slice(0, 40)}…</div>
+                                    <div className="text-[10px] text-slate-600 mt-0.5">MW: {diagenResult.mw} · Target: {diagenResult.targetName}</div>
+                                  </div>
+                                </div>
+
+                                {/* Pre-scores from Diagen */}
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {[
+                                    { label: "QED", val: diagenResult.qed.toFixed(2), good: diagenResult.qed > 0.6 },
+                                    { label: "SA Score", val: diagenResult.sa.toFixed(1), good: diagenResult.sa < 4 },
+                                    { label: "Binding", val: diagenResult.bindingAffinity, good: true },
+                                  ].map(({ label, val, good }) => (
+                                    <div key={label} className="bg-white/5 rounded px-2 py-1.5 text-center border border-white/5">
+                                      <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
+                                      <div className={`text-[11px] font-semibold mt-0.5 ${good ? "text-emerald-400" : "text-yellow-400"}`}>{val}</div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* ADMET mini-bars */}
+                                <div>
+                                  <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1.5">Diagen ADMET Pre-scores</div>
+                                  <div className="space-y-1">
+                                    {(["absorption","distribution","metabolism","excretion","toxicity"] as const).map(k => (
+                                      <div key={k} className="flex items-center gap-2">
+                                        <span className="text-[9px] text-slate-500 w-16 capitalize">{k}</span>
+                                        <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                                          <div
+                                            className={`h-full rounded-full ${diagenResult.admet[k] >= 0.7 ? "bg-emerald-500" : "bg-yellow-500"}`}
+                                            style={{ width: `${diagenResult.admet[k] * 100}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 w-6 text-right">{diagenResult.admet[k].toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-2 pt-1 border-t border-violet-500/15">
+                                  <button
+                                    onClick={() => {
+                                      setSmiles(diagenResult.smiles);
+                                      setMolName(diagenResult.name);
+                                      setUniprotId(diagenResult.uniprotId);
+                                      setDiagenOpen(false);
+                                      setDiagenResult(null);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-violet-600/25 border border-violet-500/40 text-violet-200 hover:bg-violet-600/35 text-[11px] font-semibold transition-all"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" /> Import All Fields
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSmiles(diagenResult.smiles);
+                                      setMolName(diagenResult.name);
+                                      setDiagenOpen(false);
+                                      setDiagenResult(null);
+                                    }}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white text-[11px] transition-all"
+                                  >
+                                    SMILES only
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* API Import */}
