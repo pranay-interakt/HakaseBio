@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "HakaseAI — BioDigital Twin Platform"
+version = "1.0.0"
+id = "artifacts/hakase-ai"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 21237
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/hakase-ai run dev"
+
+[services.env]
+PORT = "21237"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/hakase-ai", "run", "build"]
+publicDir = "artifacts/hakase-ai/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
