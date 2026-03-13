@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ZbaPZTTRb5SzLxMw1A7f0"
+uri = "file://hakase-ai-glossary.md"
+type = "text"
+title = "HakaseAI — Full Term & Vocabulary Reference"
