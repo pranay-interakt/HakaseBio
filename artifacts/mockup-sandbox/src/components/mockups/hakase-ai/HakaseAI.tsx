@@ -1628,6 +1628,54 @@ export function HakaseAI() {
           )}
         </main>
       </div>
+
+      {viewer3DOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex flex-col bg-[#04050a]">
+          <div className="h-12 flex items-center px-4 gap-3 border-b border-white/8 bg-black/40 backdrop-blur-sm shrink-0">
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              {([
+                { id: "cinematic", label: "🎬 Cinematic", desc: "Immersive" },
+                { id: "scientific", label: "🔬 Scientific", desc: "Split Panel" },
+                { id: "explorer", label: "🧬 Explorer", desc: "Multi-Molecule" },
+              ] as const).map(({ id, label, desc }) => (
+                <button
+                  key={id}
+                  onClick={() => setViewer3DMode(id)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[12px] font-medium transition-all ${
+                    viewer3DMode === id
+                      ? "bg-violet-600/30 border border-violet-500/40 text-violet-200 shadow-sm"
+                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                  }`}
+                >
+                  {label}
+                  <span className={`text-[9px] font-normal ${viewer3DMode === id ? "text-violet-400" : "text-slate-600"}`}>{desc}</span>
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-white/10 mx-1" />
+            <div className="text-[11px] text-slate-500">
+              <span className="text-slate-400 font-medium">{molName || "Molecule"}</span>
+              {smiles && <span className="text-slate-600 ml-2 font-mono">{smiles.slice(0, 30)}{smiles.length > 30 ? "…" : ""}</span>}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Badge className="text-[9px] bg-emerald-500/10 border-emerald-500/20 text-emerald-400">Live Preview</Badge>
+              <button
+                onClick={() => setViewer3DOpen(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/8 text-slate-400 hover:text-white text-[12px] font-medium transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+                Close
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic />}
+            {viewer3DMode === "scientific" && <MolViewer3D_Scientific />}
+            {viewer3DMode === "explorer" && <MolViewer3D_Explorer />}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -2770,63 +2818,6 @@ function CostSummary() {
           </div>
         </div>
       </div>
-
-      {/* 3D Molecular Viewer Modal — portal to body to escape overflow:hidden */}
-      {viewer3DOpen && createPortal(
-        <div className="fixed inset-0 z-[100] flex flex-col bg-[#04050a]">
-          {/* Modal top bar */}
-          <div className="h-12 flex items-center px-4 gap-3 border-b border-white/8 bg-black/40 backdrop-blur-sm shrink-0">
-            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
-              {([
-                { id: "cinematic", label: "🎬 Cinematic", desc: "Immersive" },
-                { id: "scientific", label: "🔬 Scientific", desc: "Split Panel" },
-                { id: "explorer", label: "🧬 Explorer", desc: "Multi-Molecule" },
-              ] as const).map(({ id, label, desc }) => (
-                <button
-                  key={id}
-                  onClick={() => setViewer3DMode(id)}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[12px] font-medium transition-all ${
-                    viewer3DMode === id
-                      ? "bg-violet-600/30 border border-violet-500/40 text-violet-200 shadow-sm"
-                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
-                  }`}
-                >
-                  {label}
-                  <span className={`text-[9px] font-normal ${viewer3DMode === id ? "text-violet-400" : "text-slate-600"}`}>{desc}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="w-px h-5 bg-white/10 mx-1" />
-
-            <div className="text-[11px] text-slate-500">
-              <span className="text-slate-400 font-medium">{molName || "Molecule"}</span>
-              {smiles && <span className="text-slate-600 ml-2 font-mono">{smiles.slice(0, 30)}{smiles.length > 30 ? "…" : ""}</span>}
-            </div>
-
-            <div className="ml-auto flex items-center gap-2">
-              <Badge className="text-[9px] bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
-                Live Preview
-              </Badge>
-              <button
-                onClick={() => setViewer3DOpen(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/8 text-slate-400 hover:text-white text-[12px] font-medium transition-all"
-              >
-                <X className="w-3.5 h-3.5" />
-                Close
-              </button>
-            </div>
-          </div>
-
-          {/* Viewer content — fills remaining height */}
-          <div className="flex-1 overflow-hidden">
-            {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic />}
-            {viewer3DMode === "scientific" && <MolViewer3D_Scientific />}
-            {viewer3DMode === "explorer" && <MolViewer3D_Explorer />}
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
