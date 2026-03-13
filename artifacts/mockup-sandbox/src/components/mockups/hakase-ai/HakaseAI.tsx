@@ -21,7 +21,7 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3;
@@ -53,6 +53,11 @@ export function HakaseAI() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
+  const [apiImportOpen, setApiImportOpen] = useState(false);
+  const [apiSource, setApiSource] = useState("chembl");
+  const [apiCompoundId, setApiCompoundId] = useState("");
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiResult, setApiResult] = useState<{ name: string; smiles: string; mw: string } | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [pgxOpen, setPgxOpen] = useState(false);
@@ -153,6 +158,55 @@ export function HakaseAI() {
       });
     }, 200);
   }, [activeLayer]);
+
+  const handleApiFetch = useCallback(() => {
+    if (!apiCompoundId.trim()) return;
+    setApiLoading(true);
+    setApiResult(null);
+    const mockDb: Record<string, Record<string, { name: string; smiles: string; mw: string }>> = {
+      chembl: {
+        "chembl25":      { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                          mw: "180.2 Da" },
+        "chembl521":     { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                     mw: "206.3 Da" },
+        "chembl255863":  { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",      mw: "446.9 Da" },
+        "chembl1201328": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",        mw: "393.4 Da" },
+        "chembl941":     { name: "Osimertinib",smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1", mw: "499.6 Da" },
+      },
+      pubchem: {
+        "2244":   { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                        mw: "180.2 Da" },
+        "3672":   { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                   mw: "206.3 Da" },
+        "176870": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",      mw: "393.4 Da" },
+        "123631": { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",    mw: "446.9 Da" },
+        "5291":   { name: "Metformin",  smiles: "CN(C)C(=N)NC(N)=N",                             mw: "129.2 Da" },
+      },
+      drugbank: {
+        "db00945": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                        mw: "180.2 Da" },
+        "db01050": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                   mw: "206.3 Da" },
+        "db00530": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",      mw: "393.4 Da" },
+        "db00619": { name: "Imatinib",   smiles: "Cc1ccc(NC(=O)c2ccc(CN3CCN(CC3)C)cc2)cc1Nc1nccc(n1)-c1cccnc1", mw: "493.6 Da" },
+        "db00317": { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",   mw: "446.9 Da" },
+      },
+      unichem: {
+        "uci1": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                           mw: "180.2 Da" },
+        "uci2": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                      mw: "206.3 Da" },
+        "uci3": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",         mw: "393.4 Da" },
+      },
+      zinc: {
+        "zinc000003594435": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",          mw: "206.3 Da" },
+        "zinc000001530689": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",               mw: "180.2 Da" },
+        "zinc000019632618": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1", mw: "393.4 Da" },
+      },
+    };
+    setTimeout(() => {
+      const sourceDb = mockDb[apiSource] ?? {};
+      const hit = sourceDb[apiCompoundId.toLowerCase().trim()];
+      if (hit) {
+        setApiResult(hit);
+      } else {
+        setApiResult({ name: `Compound-${apiCompoundId.toUpperCase()}`, smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O", mw: "206.3 Da" });
+      }
+      setApiLoading(false);
+    }, 900);
+  }, [apiSource, apiCompoundId]);
 
   const toggleTissue = (tissue: string) => {
     setTissueTypes(prev =>
@@ -451,6 +505,103 @@ export function HakaseAI() {
                       <div className="grid grid-cols-2 gap-2">
                         <UploadButton label="SDF / MOL2 Upload" hint=".sdf, .mol2, .mol · 10MB" />
                         <UploadButton label="Batch CSV" hint="CSV with 'smiles' col · 500 rows" />
+                      </div>
+
+                      {/* API Import */}
+                      <div className="border border-white/8 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => { setApiImportOpen(v => !v); setApiResult(null); }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/3 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-3.5 h-3.5 text-violet-400" />
+                            <span className="text-[11px] font-semibold text-slate-300">Import via API</span>
+                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/10 text-violet-400 border-violet-500/20">ChEMBL · PubChem · DrugBank · more</Badge>
+                          </div>
+                          {apiImportOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
+                        </button>
+
+                        {apiImportOpen && (
+                          <div className="px-3 pb-3 space-y-3 border-t border-white/6">
+                            <div className="pt-3">
+                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Source Database</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {[
+                                  { id: "chembl",   label: "ChEMBL" },
+                                  { id: "pubchem",  label: "PubChem" },
+                                  { id: "drugbank", label: "DrugBank" },
+                                  { id: "unichem",  label: "UniChem" },
+                                  { id: "zinc",     label: "ZINC" },
+                                ].map(src => (
+                                  <button
+                                    key={src.id}
+                                    onClick={() => { setApiSource(src.id); setApiResult(null); setApiCompoundId(""); }}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
+                                      apiSource === src.id
+                                        ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                                        : "border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-400"
+                                    }`}
+                                  >
+                                    {src.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
+                                Compound ID / Name
+                                <span className="ml-2 text-slate-600 normal-case">
+                                  e.g. {apiSource === "chembl" ? "CHEMBL25" : apiSource === "pubchem" ? "3672" : apiSource === "drugbank" ? "DB01050" : apiSource === "unichem" ? "UCI2" : "ZINC000003594435"}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                  <Input
+                                    value={apiCompoundId}
+                                    onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); }}
+                                    onKeyDown={e => e.key === "Enter" && handleApiFetch()}
+                                    placeholder="Enter ID or name…"
+                                    className="bg-white/5 border-white/10 text-white text-[12px] pl-7 focus:border-violet-500/60"
+                                  />
+                                </div>
+                                <button
+                                  onClick={handleApiFetch}
+                                  disabled={!apiCompoundId.trim() || apiLoading}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
+                                >
+                                  {apiLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                  {apiLoading ? "Fetching…" : "Fetch"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {apiResult && (
+                              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[11px] font-semibold text-emerald-300">{apiResult.name}</div>
+                                    <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">{apiResult.smiles}</div>
+                                    <div className="text-[10px] text-slate-600 mt-0.5">MW: {apiResult.mw}</div>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setSmiles(apiResult.smiles);
+                                      setMolName(apiResult.name);
+                                      setApiImportOpen(false);
+                                      setApiResult(null);
+                                    }}
+                                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[11px] font-medium transition-all"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Use
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </section>
