@@ -164,11 +164,11 @@
     @apply font-sans antialiased bg-background text-foreground;
     background-color: #07080c;
     color: #f1f5f9;
+    margin: 0;
   }
 
   html, body, #root {
     height: 100%;
-    overflow: hidden;
   }
 }
 

@@ -211,7 +211,7 @@ export function HakaseAI() {
   const layerColors = ["violet", "blue", "green"] as const;
 
   return (
-    <div className="min-h-screen bg-[#07080c] text-white flex flex-col font-['Inter']" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']" style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Top Navigation Bar */}
       <header className="h-14 border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md flex items-center px-4 gap-4 shrink-0 z-50">
         {/* Logo */}
