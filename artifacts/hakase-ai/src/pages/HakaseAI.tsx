@@ -687,7 +687,27 @@ export function HakaseAI() {
                 )}
 
                 {simStatus[1] === "complete" && (
-                  <Layer1Results />
+                  <>
+                    {/* 3D Viewer launcher — always visible after simulation */}
+                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/8">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">View 3D</span>
+                      {(["cinematic","scientific","explorer"] as const).map((mode) => {
+                        const labels = { cinematic: "Cinematic", scientific: "Scientific", explorer: "Explorer" };
+                        const icons = { cinematic: "🎬", scientific: "🔬", explorer: "🧬" };
+                        return (
+                          <button
+                            key={mode}
+                            onClick={() => { setViewer3DMode(mode); setViewer3DOpen(true); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:border-violet-500/50 hover:bg-violet-500/10 transition-all group"
+                          >
+                            <span className="text-base">{icons[mode]}</span>
+                            <span className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300 transition-colors">{labels[mode]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Layer1Results />
+                  </>
                 )}
               </div>
             </div>
