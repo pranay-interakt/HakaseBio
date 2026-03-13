@@ -146,11 +146,6 @@ export function Landing() {
 
       {/* ── Hero ── */}
       <section id="platform" className="relative z-10 pt-28 pb-20 px-6 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/8 text-violet-300 text-[12px] font-medium mb-8">
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-          BioDigital Twin Platform · March 2026
-        </div>
-
         <h1 className="text-[56px] md:text-[72px] font-black tracking-tighter leading-none mb-6 max-w-4xl mx-auto">
           <span className="text-white">From Molecule</span>
           <br />
