@@ -1,4 +1,7 @@
 import { useState, useCallback } from "react";
+import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
+import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
+import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +20,7 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3;
@@ -47,6 +50,8 @@ export function HakaseAI() {
   });
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewer3DOpen, setViewer3DOpen] = useState(false);
+  const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [pgxOpen, setPgxOpen] = useState(false);
@@ -412,7 +417,7 @@ export function HakaseAI() {
                           )}
                         </div>
                         {smiles && (
-                          <div className="mt-2 bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-center h-20 text-[10px] text-slate-500">
+                          <div className="mt-2 bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between h-20 text-[10px] text-slate-500">
                             <div className="flex items-center gap-2">
                               <div className="w-12 h-12 rounded border border-emerald-500/30 bg-emerald-500/5 flex items-center justify-center">
                                 <Atom className="w-5 h-5 text-emerald-400/60" />
@@ -422,6 +427,13 @@ export function HakaseAI() {
                                 <div className="text-slate-500 text-[10px]">MW ≈ 206.3 Da · {smiles.length} chars</div>
                               </div>
                             </div>
+                            <button
+                              onClick={() => setViewer3DOpen(true)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-all text-[11px] font-medium"
+                            >
+                              <Box className="w-3.5 h-3.5" />
+                              View 3D
+                            </button>
                           </div>
                         )}
                       </FieldGroup>
@@ -627,11 +639,39 @@ export function HakaseAI() {
               {/* Output Panel — Layer 1 */}
               <div className="flex-1 overflow-y-auto p-5">
                 {simStatus[1] === "idle" && (
-                  <EmptyState
-                    icon={FlaskConical}
-                    title="No simulation results yet"
-                    description="Configure your molecular inputs on the left and run the simulation to see ADMET predictions, binding analysis, and toxicity signals."
-                  />
+                  <div className="flex flex-col items-center justify-center h-full gap-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <FlaskConical className="w-7 h-7 text-violet-400/50" />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[14px] font-medium text-slate-400">No simulation results yet</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Configure your molecular inputs on the left and run the simulation to see ADMET predictions, binding analysis, and toxicity signals.</div>
+                      </div>
+                    </div>
+
+                    {smiles && (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="text-[10px] text-slate-600 uppercase tracking-wider">Visualize Structure</div>
+                        <div className="flex gap-2">
+                          {(["cinematic","scientific","explorer"] as const).map((mode) => {
+                            const labels = { cinematic: "Cinematic", scientific: "Scientific", explorer: "Explorer" };
+                            const icons = { cinematic: "🎬", scientific: "🔬", explorer: "🧬" };
+                            return (
+                              <button
+                                key={mode}
+                                onClick={() => { setViewer3DMode(mode); setViewer3DOpen(true); }}
+                                className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-white/4 border border-white/8 hover:border-violet-500/40 hover:bg-violet-500/5 transition-all group"
+                              >
+                                <span className="text-xl">{icons[mode]}</span>
+                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300 transition-colors">{labels[mode]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {simStatus[1] === "running" && (
@@ -2709,6 +2749,62 @@ function CostSummary() {
           </div>
         </div>
       </div>
+
+      {/* 3D Molecular Viewer Modal */}
+      {viewer3DOpen && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-[#04050a]">
+          {/* Modal top bar */}
+          <div className="h-12 flex items-center px-4 gap-3 border-b border-white/8 bg-black/40 backdrop-blur-sm shrink-0">
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              {([
+                { id: "cinematic", label: "🎬 Cinematic", desc: "Immersive" },
+                { id: "scientific", label: "🔬 Scientific", desc: "Split Panel" },
+                { id: "explorer", label: "🧬 Explorer", desc: "Multi-Molecule" },
+              ] as const).map(({ id, label, desc }) => (
+                <button
+                  key={id}
+                  onClick={() => setViewer3DMode(id)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[12px] font-medium transition-all ${
+                    viewer3DMode === id
+                      ? "bg-violet-600/30 border border-violet-500/40 text-violet-200 shadow-sm"
+                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                  }`}
+                >
+                  {label}
+                  <span className={`text-[9px] font-normal ${viewer3DMode === id ? "text-violet-400" : "text-slate-600"}`}>{desc}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-white/10 mx-1" />
+
+            <div className="text-[11px] text-slate-500">
+              <span className="text-slate-400 font-medium">{molName || "Molecule"}</span>
+              {smiles && <span className="text-slate-600 ml-2 font-mono">{smiles.slice(0, 30)}{smiles.length > 30 ? "…" : ""}</span>}
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <Badge className="text-[9px] bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                Live Preview
+              </Badge>
+              <button
+                onClick={() => setViewer3DOpen(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/8 text-slate-400 hover:text-white text-[12px] font-medium transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+                Close
+              </button>
+            </div>
+          </div>
+
+          {/* Viewer content — fills remaining height */}
+          <div className="flex-1 overflow-hidden">
+            {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic />}
+            {viewer3DMode === "scientific" && <MolViewer3D_Scientific />}
+            {viewer3DMode === "explorer" && <MolViewer3D_Explorer />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
