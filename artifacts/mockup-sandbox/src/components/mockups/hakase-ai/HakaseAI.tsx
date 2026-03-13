@@ -58,6 +58,16 @@ export function HakaseAI() {
   const [apiCompoundId, setApiCompoundId] = useState("");
   const [apiLoading, setApiLoading] = useState(false);
   const [apiResult, setApiResult] = useState<{ name: string; smiles: string; mw: string } | null>(null);
+  const [projImportOpen, setProjImportOpen] = useState(false);
+  const [projImportSource, setProjImportSource] = useState("clinicaltrials");
+  const [projImportId, setProjImportId] = useState("");
+  const [projImportLoading, setProjImportLoading] = useState(false);
+  const [projImportResult, setProjImportResult] = useState<{ name: string; indication: string; phase: string; sponsor: string } | null>(null);
+  const [savedProjects, setSavedProjects] = useState([
+    { name: "CDK4/6 Inhibitor Screen", indication: "Breast Cancer", layers: 3 },
+    { name: "EGFR-T790M Mutant", indication: "NSCLC", layers: 2 },
+    { name: "KRAS G12C Series", indication: "Colorectal", layers: 1 },
+  ]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [pgxOpen, setPgxOpen] = useState(false);
@@ -158,6 +168,45 @@ export function HakaseAI() {
       });
     }, 200);
   }, [activeLayer]);
+
+  const handleProjFetch = useCallback(() => {
+    if (!projImportId.trim()) return;
+    setProjImportLoading(true);
+    setProjImportResult(null);
+    const mockDb: Record<string, Record<string, { name: string; indication: string; phase: string; sponsor: string }>> = {
+      clinicaltrials: {
+        "nct04292899": { name: "Osimertinib NSCLC Study",    indication: "Non-small-cell lung carcinoma", phase: "Phase III", sponsor: "AstraZeneca" },
+        "nct03410134": { name: "KRAS G12C Inhibitor AMG510", indication: "Colorectal / NSCLC",          phase: "Phase II", sponsor: "Amgen" },
+        "nct02395913": { name: "CDK4/6 + Letrozole HR+ BC",  indication: "Breast Cancer (HR+/HER2-)",   phase: "Phase III", sponsor: "Novartis" },
+        "nct01772004": { name: "Pembrolizumab NSCLC",        indication: "Non-small-cell lung carcinoma", phase: "Phase II", sponsor: "Merck" },
+        "nct03505866": { name: "BTK Inhibitor CLL Trial",    indication: "Chronic lymphocytic leukemia", phase: "Phase III", sponsor: "AbbVie" },
+      },
+      ehr: {
+        "pat-001": { name: "EGFR-T790M Cohort Study",   indication: "NSCLC",         phase: "Real-World",    sponsor: "Internal EHR" },
+        "pat-002": { name: "HER2+ Breast Cohort",        indication: "Breast Cancer", phase: "Real-World",    sponsor: "Internal EHR" },
+        "study-007": { name: "GI Toxicity Assessment",  indication: "Colorectal",    phase: "Observational", sponsor: "Site LIMS" },
+      },
+      lims: {
+        "lims-2024-001": { name: "Compound Library Screen A", indication: "Oncology", phase: "Pre-clinical", sponsor: "Internal R&D" },
+        "lims-2024-012": { name: "ADMET Panel Q1-2024",       indication: "Multiple",  phase: "Pre-clinical", sponsor: "DMPK Dept." },
+      },
+      pubmed: {
+        "36150754": { name: "Erlotinib Resistance Mechanisms", indication: "NSCLC",        phase: "Literature", sponsor: "Dana-Farber" },
+        "34555354": { name: "KRAS G12C Covalent Inhibitors",   indication: "Solid Tumors", phase: "Literature", sponsor: "UCSF / Nature" },
+        "33004079": { name: "Osimertinib vs Gefitinib",        indication: "EGFR+ NSCLC",  phase: "Literature", sponsor: "NEJM" },
+      },
+    };
+    setTimeout(() => {
+      const sourceDb = mockDb[projImportSource] ?? {};
+      const hit = sourceDb[projImportId.toLowerCase().trim()];
+      if (hit) {
+        setProjImportResult(hit);
+      } else {
+        setProjImportResult({ name: `Project-${projImportId.toUpperCase()}`, indication: "Oncology", phase: "Phase II", sponsor: "Imported" });
+      }
+      setProjImportLoading(false);
+    }, 800);
+  }, [projImportSource, projImportId]);
 
   const handleApiFetch = useCallback(() => {
     if (!apiCompoundId.trim()) return;
@@ -413,11 +462,7 @@ export function HakaseAI() {
               {/* Saved Projects */}
               <div className="p-3 flex-1 overflow-y-auto">
                 <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Saved Projects</div>
-                {[
-                  { name: "CDK4/6 Inhibitor Screen", indication: "Breast Cancer", layers: 3 },
-                  { name: "EGFR-T790M Mutant", indication: "NSCLC", layers: 2 },
-                  { name: "KRAS G12C Series", indication: "Colorectal", layers: 1 },
-                ].map((proj) => (
+                {savedProjects.map((proj) => (
                   <div key={proj.name} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1 group">
                     <div className="text-[11px] font-medium text-slate-300 truncate group-hover:text-white">{proj.name}</div>
                     <div className="text-[10px] text-slate-600">{proj.indication}</div>
@@ -428,9 +473,95 @@ export function HakaseAI() {
                     </div>
                   </div>
                 ))}
+
                 <button className="w-full mt-3 py-2 text-[11px] text-violet-400 hover:text-violet-300 border border-dashed border-violet-500/30 hover:border-violet-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5">
                   <Plus className="w-3 h-3" /> New Project
                 </button>
+
+                {/* Import via API */}
+                <div className="mt-2 border border-white/8 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => { setProjImportOpen(v => !v); setProjImportResult(null); }}
+                    className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-white/3 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Globe className="w-3 h-3 text-violet-400" />
+                      <span className="text-[11px] text-slate-400">Import via API</span>
+                    </div>
+                    {projImportOpen ? <ChevronUp className="w-3 h-3 text-slate-600" /> : <ChevronDown className="w-3 h-3 text-slate-600" />}
+                  </button>
+
+                  {projImportOpen && (
+                    <div className="px-2.5 pb-2.5 space-y-2 border-t border-white/6">
+                      <div className="pt-2">
+                        <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1.5">Source</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { id: "clinicaltrials", label: "ClinicalTrials" },
+                            { id: "ehr",            label: "EHR / Epic" },
+                            { id: "lims",           label: "LIMS" },
+                            { id: "pubmed",         label: "PubMed" },
+                          ].map(src => (
+                            <button
+                              key={src.id}
+                              onClick={() => { setProjImportSource(src.id); setProjImportResult(null); setProjImportId(""); }}
+                              className={`py-1 px-2 rounded text-[10px] font-medium border transition-all text-left ${
+                                projImportSource === src.id
+                                  ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                                  : "border-white/8 text-slate-500 hover:border-white/20"
+                              }`}
+                            >
+                              {src.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">
+                          {projImportSource === "clinicaltrials" ? "NCT Number" : projImportSource === "pubmed" ? "PMID" : "Study / Record ID"}
+                        </div>
+                        <div className="flex gap-1">
+                          <Input
+                            value={projImportId}
+                            onChange={e => { setProjImportId(e.target.value); setProjImportResult(null); }}
+                            onKeyDown={e => e.key === "Enter" && handleProjFetch()}
+                            placeholder={projImportSource === "clinicaltrials" ? "NCT04292899" : projImportSource === "pubmed" ? "36150754" : projImportSource === "ehr" ? "PAT-001" : "LIMS-2024-001"}
+                            className="bg-white/5 border-white/10 text-white text-[11px] focus:border-violet-500/60 h-7"
+                          />
+                          <button
+                            onClick={handleProjFetch}
+                            disabled={!projImportId.trim() || projImportLoading}
+                            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 text-[10px] font-medium transition-all"
+                          >
+                            {projImportLoading ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : <Download className="w-2.5 h-2.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {projImportResult && (
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-2">
+                          <div className="text-[11px] font-semibold text-emerald-300 leading-tight">{projImportResult.name}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{projImportResult.indication}</div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[9px] text-slate-600">{projImportResult.phase} · {projImportResult.sponsor}</span>
+                            <button
+                              onClick={() => {
+                                setSavedProjects(prev => [{ name: projImportResult.name, indication: projImportResult.indication, layers: 0 }, ...prev]);
+                                setProjImportOpen(false);
+                                setProjImportResult(null);
+                                setProjImportId("");
+                              }}
+                              className="flex items-center gap-0.5 px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[10px] font-medium transition-all"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Add
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
