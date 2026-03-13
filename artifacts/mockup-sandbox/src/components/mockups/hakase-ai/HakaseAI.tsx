@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
@@ -2750,8 +2751,8 @@ function CostSummary() {
         </div>
       </div>
 
-      {/* 3D Molecular Viewer Modal */}
-      {viewer3DOpen && (
+      {/* 3D Molecular Viewer Modal — portal to body to escape overflow:hidden */}
+      {viewer3DOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex flex-col bg-[#04050a]">
           {/* Modal top bar */}
           <div className="h-12 flex items-center px-4 gap-3 border-b border-white/8 bg-black/40 backdrop-blur-sm shrink-0">
@@ -2803,7 +2804,8 @@ function CostSummary() {
             {viewer3DMode === "scientific" && <MolViewer3D_Scientific />}
             {viewer3DMode === "explorer" && <MolViewer3D_Explorer />}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
