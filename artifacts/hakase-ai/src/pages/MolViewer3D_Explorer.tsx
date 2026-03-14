@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import {
   FlaskConical, Activity, SlidersHorizontal, RotateCcw, ZoomIn, ZoomOut
 } from "lucide-react";
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
+import { useRDKitReady } from "@/lib/useRDKitReady";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#94a3b8", N: "#60a5fa", O: "#f87171",
@@ -71,17 +72,20 @@ const MOLECULES: MoleculeCard[] = [
   { id: "m6", name: "EGFR-018", formula: "C₁₈H₂₁N₃O₃", mw: 331.4, qed: 0.71, tox: "Low", binding: "7.3 nM", sa: 3.5, composite: 0.74, tag: "Potent", starred: true, rxOffset: 0.0, ryOffset: 1.0, accentColor: "#f59e0b" },
 ];
 
-function MiniMol({ rx, ry, color }: { rx: number; ry: number; color: string }) {
+function MiniMol({ rx, ry, color, liveAtoms, liveBonds }: { rx: number; ry: number; color: string; liveAtoms?: typeof BASE_ATOMS; liveBonds?: typeof BASE_BONDS }) {
   const cx = 55, cy = 45;
-  const atoms = BASE_ATOMS.slice(0, 8).map(a => {
-    const r = rot(a.x - 40, a.y - 20, a.z, rx, ry);
-    return { ...a, px: cx + r.x * 0.55, py: cy + r.y * 0.55, pz: r.z };
+  const srcAtoms = liveAtoms ?? BASE_ATOMS;
+  const srcBonds = liveBonds ?? BASE_BONDS;
+  const scale = liveAtoms ? 0.20 : 0.55;
+  const atoms = srcAtoms.slice(0, liveAtoms ? srcAtoms.length : 8).map(a => {
+    const r = rot(liveAtoms ? a.x : a.x - 40, liveAtoms ? a.y : a.y - 20, a.z, rx, ry);
+    return { ...a, px: cx + r.x * scale, py: cy + r.y * scale, pz: r.z };
   }).sort((a, b) => a.pz - b.pz);
   const pm = Object.fromEntries(atoms.map(a => [a.id, a]));
 
   return (
     <svg width="110" height="90">
-      {BASE_BONDS.slice(0, 9).map((b, i) => {
+      {(liveAtoms ? srcBonds : srcBonds.slice(0, 9)).map((b, i) => {
         const f = pm[b.from], t = pm[b.to];
         if (!f || !t) return null;
         return <line key={i} x1={f.px} y1={f.py} x2={t.px} y2={t.py} stroke={`${color}60`} strokeWidth="1.5" />;
@@ -171,15 +175,40 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
   const [zoom, setZoom] = useState(1.0);
   const [filterTox, setFilterTox] = useState<string[]>([]);
 
-  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const rdkitReady = useRDKitReady();
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles, rdkitReady]);
   const dynAtoms = (mol3d?.atoms ?? BASE_ATOMS) as typeof BASE_ATOMS;
   const dynBonds = (mol3d?.bonds ?? BASE_BONDS) as typeof BASE_BONDS;
   const dynFormula = mol3d?.formula;
   const dynMolName = propMolName || "Molecule";
 
-  const primaryMol = MOLECULES.find(m => m.id === primary)!;
+  const liveMolecule: MoleculeCard = useMemo(() => ({
+    id: "live",
+    name: dynMolName,
+    formula: dynFormula ?? "—",
+    mw: 0,
+    qed: 0.81,
+    tox: "Low" as const,
+    binding: "—",
+    sa: 2.8,
+    composite: 0.81,
+    tag: "Active" as const,
+    starred: true,
+    rxOffset: 0.1,
+    ryOffset: 0.3,
+    accentColor: "#10b981",
+  }), [dynMolName, dynFormula]);
 
-  const filtered = MOLECULES
+  const allMolecules = useMemo(() => [liveMolecule, ...MOLECULES], [liveMolecule]);
+
+  useEffect(() => {
+    setPrimary("live");
+    setSelected(["live"]);
+  }, [smiles, propMolName]);
+
+  const primaryMol = allMolecules.find(m => m.id === primary) ?? allMolecules[0];
+
+  const filtered = allMolecules
     .filter(m => {
       if (searchQuery && !m.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (filterTox.length && !filterTox.includes(m.tox)) return false;
@@ -315,17 +344,22 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
                   >
                     {/* 3D preview */}
                     <div className="bg-black/30 flex items-center justify-center pt-2 pb-1 overflow-hidden">
-                      <MiniMol rx={mol.rxOffset} ry={mol.ryOffset + ry * 0.3} color={mol.accentColor} />
+                      <MiniMol rx={mol.rxOffset} ry={mol.ryOffset + ry * 0.3} color={mol.accentColor}
+                        liveAtoms={mol.id === "live" && mol3d ? dynAtoms : undefined}
+                        liveBonds={mol.id === "live" && mol3d ? dynBonds : undefined} />
                     </div>
 
                     <div className="px-2 pb-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-semibold text-slate-200">{mol.name}</span>
-                        {mol.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                        <span className="text-[11px] font-semibold text-slate-200 truncate flex-1">{mol.name}</span>
+                        {mol.id === "live"
+                          ? <span className="text-[8px] text-emerald-400 border border-emerald-500/30 px-1 py-0 rounded shrink-0 ml-1">LIVE</span>
+                          : mol.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                        }
                       </div>
                       <div className="text-[9px] text-slate-500 font-mono mb-1.5">{mol.formula}</div>
 
-                      {mol.tag && (
+                      {mol.tag && mol.id !== "live" && (
                         <Badge className={`text-[8px] px-1.5 py-0 mb-1 ${
                           mol.tag === "Lead" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                           : mol.tag === "Toxic" ? "bg-red-500/10 text-red-400 border-red-500/20"
@@ -364,14 +398,18 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
                     }`}
                   >
                     <div className="w-14 h-10 bg-black/30 rounded-lg shrink-0 flex items-center justify-center overflow-hidden">
-                      <MiniMol rx={mol.rxOffset} ry={mol.ryOffset} color={mol.accentColor} />
+                      <MiniMol rx={mol.rxOffset} ry={mol.ryOffset} color={mol.accentColor}
+                        liveAtoms={mol.id === "live" && mol3d ? dynAtoms : undefined}
+                        liveBonds={mol.id === "live" && mol3d ? dynBonds : undefined} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] font-semibold text-slate-200">{mol.name}</span>
-                        {mol.tag && <Badge className="text-[8px] px-1 py-0 bg-white/5 text-slate-500">{mol.tag}</Badge>}
+                        {mol.id === "live"
+                          ? <span className="text-[8px] text-emerald-400 border border-emerald-500/30 px-1 py-0 rounded">LIVE</span>
+                          : mol.tag && <Badge className="text-[8px] px-1 py-0 bg-white/5 text-slate-500">{mol.tag}</Badge>}
                       </div>
-                      <div className="text-[9px] text-slate-500 font-mono">{mol.formula} · {mol.mw} Da</div>
+                      <div className="text-[9px] text-slate-500 font-mono">{mol.formula}{mol.mw > 0 ? ` · ${mol.mw} Da` : ""}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[11px] font-bold" style={{ color: mol.accentColor }}>{mol.composite.toFixed(2)}</div>

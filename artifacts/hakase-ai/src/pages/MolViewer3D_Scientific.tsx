@@ -10,6 +10,7 @@ import {
   ChevronRight, Plus, Search, Lock, Unlock, Copy, FileText
 } from "lucide-react";
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
+import { useRDKitReady } from "@/lib/useRDKitReady";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#b0b8c8", N: "#60a5fa", O: "#f87171",
@@ -154,7 +155,8 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
   const [tab, setTab] = useState("atoms");
   const [locked, setLocked] = useState(false);
 
-  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const rdkitReady = useRDKitReady();
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles, rdkitReady]);
   const dynAtoms = mol3d?.atoms ?? FALLBACK_ATOMS;
   const dynBonds = mol3d?.bonds ?? FALLBACK_BONDS;
   const dynFormula = mol3d?.formula ?? "C₁₃H₁₈O₂";

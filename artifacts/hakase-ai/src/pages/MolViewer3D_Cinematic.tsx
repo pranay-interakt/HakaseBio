@@ -9,6 +9,7 @@ import {
   RefreshCw, SlidersHorizontal, Crosshair, Zap
 } from "lucide-react";
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
+import { useRDKitReady } from "@/lib/useRDKitReady";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#94a3b8", N: "#60a5fa", O: "#f87171",
@@ -179,15 +180,18 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
   const [showHydrogen, setShowHydrogen] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [selectedAtom, setSelectedAtom] = useState<string | null>(null);
-  const [activeLib, setActiveLib] = useState(propMolName || "Molecule");
   const animRef = useRef<number>(0);
   const ryRef = useRef(ry);
 
-  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const rdkitReady = useRDKitReady();
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles, rdkitReady]);
   const dynAtoms = mol3d?.atoms ?? FALLBACK_ATOMS;
   const dynBonds = mol3d?.bonds ?? FALLBACK_BONDS;
   const dynFormula = mol3d?.formula ?? "C₁₃H₁₈O₂";
   const dynMolName = propMolName || "Molecule";
+
+  const [activeLib, setActiveLib] = useState(dynMolName);
+  useEffect(() => { setActiveLib(dynMolName); }, [dynMolName]);
 
   useEffect(() => {
     if (!isAnimating) { cancelAnimationFrame(animRef.current); return; }
@@ -201,9 +205,9 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
   }, [isAnimating]);
 
   const molecules = [
-    { name: "Ibuprofen-Analog-001", mw: 206.3, formula: "C₁₃H₁₈O₂", score: 0.81 },
-    { name: "Ibuprofen-Analog-007", mw: 220.1, formula: "C₁₄H₂₀O₂", score: 0.76 },
-    { name: "CDK4/6-INH-004", mw: 447.5, formula: "C₂₄H₃₀N₆O", score: 0.68 },
+    { name: dynMolName, formula: dynFormula, score: 0.81, isLive: true },
+    { name: "CDK4/6-INH-004", formula: "C₂₄H₃₀N₆O", score: 0.68, isLive: false },
+    { name: "EGFR-T790M", formula: "C₁₈H₂₁N₃O₃", score: 0.74, isLive: false },
   ];
 
   return (
@@ -300,8 +304,11 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
                     <circle cx={30} cy={22} r={5} fill="url(#mini-${m.name})" />
                   </svg>
                 </div>
-                <div className="text-[10px] font-medium text-slate-300 leading-tight truncate">{m.name}</div>
-                <div className="text-[9px] text-slate-600 mt-0.5">{m.formula} · {m.mw} Da</div>
+                <div className="flex items-center gap-1 mb-0.5">
+                  <div className="text-[10px] font-medium text-slate-300 leading-tight truncate flex-1">{m.name}</div>
+                  {m.isLive && <span className="text-[8px] text-emerald-400 border border-emerald-500/30 px-1 py-0 rounded shrink-0">LIVE</span>}
+                </div>
+                <div className="text-[9px] text-slate-600 mt-0.5 font-mono">{m.formula}</div>
                 <div className="flex items-center gap-1 mt-1">
                   <div className="h-0.5 flex-1 bg-white/5 rounded-full overflow-hidden">
                     <div className="h-full bg-violet-500" style={{ width: `${m.score * 100}%` }} />
