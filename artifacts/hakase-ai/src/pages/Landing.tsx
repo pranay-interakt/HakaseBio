@@ -124,6 +124,7 @@ export function Landing() {
           <a href="#diagen" className="hover:text-white transition-colors">Diagen Integration</a>
           <a href="#privacy" className="hover:text-white transition-colors">Privacy</a>
           <a href="#why" className="hover:text-white transition-colors">Why Hakase</a>
+          <button onClick={() => navigate("/story")} className="hover:text-white transition-colors">The Story</button>
         </div>
         <div className="flex items-center gap-3">
           <button
