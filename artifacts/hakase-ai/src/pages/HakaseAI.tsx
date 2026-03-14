@@ -10,6 +10,10 @@ import {
 } from "@/lib/chemistry";
 import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
 import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
+import {
+  fetchUniProt, fetchPdbStructure, fetchAlphaFold,
+  type ProteinInfo, type PdbStructure, type AlphafoldPrediction,
+} from "@/lib/proteinApi";
 import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
 import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
 import { createPortal } from "react-dom";
@@ -144,6 +148,15 @@ export function HakaseAI() {
   const [smiles, setSmiles] = useState("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
   const [molName, setMolName] = useState("Ibuprofen-Analog-001");
   const [uniprotId, setUniprotId] = useState("P00533");
+  const [pdbId, setPdbId] = useState("4HJO");
+  const [proteinInfo, setProteinInfo] = useState<ProteinInfo | null>(null);
+  const [proteinLoading, setProteinLoading] = useState(false);
+  const [proteinError, setProteinError] = useState<string | null>(null);
+  const [pdbStructure, setPdbStructure] = useState<PdbStructure | null>(null);
+  const [pdbLoading, setPdbLoading] = useState(false);
+  const [alphafoldData, setAlphafoldData] = useState<AlphafoldPrediction | null>(null);
+  const proteinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pdbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
@@ -173,6 +186,52 @@ export function HakaseAI() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [smiles, rdkitReady]);
   // ─────────────────────────────────────────────────────────────────────
+
+  // ── UniProt auto-fetch ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = uniprotId.trim();
+    // Basic UniProt accession pattern: 6 or 10 chars starting with letter
+    if (id.length < 6) { setProteinInfo(null); setProteinError(null); return; }
+    if (proteinDebounceRef.current) clearTimeout(proteinDebounceRef.current);
+    proteinDebounceRef.current = setTimeout(async () => {
+      setProteinLoading(true);
+      setProteinError(null);
+      setAlphafoldData(null);
+      try {
+        const info = await fetchUniProt(id);
+        setProteinInfo(info);
+        // Auto-populate PDB field with first known structure if user hasn't overridden it
+        if (info.pdbIds.length && !pdbId) setPdbId(info.pdbIds[0]);
+        // Fetch AlphaFold prediction in parallel (best-effort)
+        fetchAlphaFold(id).then(af => setAlphafoldData(af ?? null)).catch(() => null);
+      } catch (err: unknown) {
+        setProteinInfo(null);
+        setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
+      } finally {
+        setProteinLoading(false);
+      }
+    }, 600);
+    return () => { if (proteinDebounceRef.current) clearTimeout(proteinDebounceRef.current); };
+  }, [uniprotId]);
+
+  // ── RCSB PDB auto-fetch ────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = pdbId.trim();
+    if (id.length < 4) { setPdbStructure(null); return; }
+    if (pdbDebounceRef.current) clearTimeout(pdbDebounceRef.current);
+    pdbDebounceRef.current = setTimeout(async () => {
+      setPdbLoading(true);
+      try {
+        const structure = await fetchPdbStructure(id);
+        setPdbStructure(structure);
+      } catch {
+        setPdbStructure(null);
+      } finally {
+        setPdbLoading(false);
+      }
+    }, 600);
+    return () => { if (pdbDebounceRef.current) clearTimeout(pdbDebounceRef.current); };
+  }, [pdbId]);
 
   const [tissueTypes, setTissueTypes] = useState<string[]>(["Liver", "Kidney", "Cardiac"]);
   const [confidenceThreshold, setConfidenceThreshold] = useState([0.70]);
@@ -1184,29 +1243,113 @@ export function HakaseAI() {
                   <section>
                     <SectionHeader icon={Dna} label="Target Protein Configuration" />
                     <div className="space-y-3">
+                      {/* UniProt ID */}
                       <FieldGroup label="Target UniProt ID" hint="Required for binding simulation">
                         <div className="relative">
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                           <Input
                             value={uniprotId}
-                            onChange={e => setUniprotId(e.target.value)}
+                            onChange={e => { setUniprotId(e.target.value); setProteinInfo(null); setProteinError(null); }}
                             className="bg-white/5 border-white/10 text-white text-[12px] pl-8 focus:border-violet-500/60"
-                            placeholder="e.g. P12345"
+                            placeholder="e.g. P00533"
                           />
+                          {proteinLoading && (
+                            <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 animate-spin" />
+                          )}
                         </div>
-                        {uniprotId && (
-                          <div className="mt-1.5 text-[10px] text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> EGFR · Epidermal growth factor receptor
+                        {/* UniProt result */}
+                        {proteinInfo && (
+                          <div className="mt-2 bg-violet-500/5 border border-violet-500/20 rounded-lg p-2.5 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span className="text-[11px] font-semibold text-emerald-300">{proteinInfo.gene} · {proteinInfo.name}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                              {[
+                                { k: "Organism",      v: proteinInfo.organism },
+                                { k: "Sequence",      v: `${proteinInfo.sequenceLength.toLocaleString()} aa` },
+                                { k: "Active sites",  v: String(proteinInfo.activeSites) },
+                                { k: "Binding sites", v: String(proteinInfo.bindingSites) },
+                                { k: "PDB entries",   v: proteinInfo.pdbIds.length ? `${proteinInfo.pdbIds.length} structures` : "None" },
+                                { k: "AlphaFold",     v: alphafoldData ? `pLDDT ${alphafoldData.meanPlddt.toFixed(0)}` : proteinInfo.alphafoldId ? "Available" : "N/A" },
+                              ].map(({ k, v }) => (
+                                <div key={k} className="flex justify-between">
+                                  <span className="text-[9px] text-slate-600">{k}</span>
+                                  <span className="text-[9px] text-slate-400 font-medium">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {/* PDB quick-picks if multiple structures */}
+                            {proteinInfo.pdbIds.length > 1 && (
+                              <div>
+                                <div className="text-[9px] text-slate-600 mb-1">Known structures</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {proteinInfo.pdbIds.slice(0, 8).map(id => (
+                                    <button key={id} onClick={() => setPdbId(id)}
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-all border ${
+                                        pdbId === id
+                                          ? "bg-violet-600/25 border-violet-500/40 text-violet-300"
+                                          : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300 hover:border-white/20"
+                                      }`}
+                                    >{id}</button>
+                                  ))}
+                                  {proteinInfo.pdbIds.length > 8 && (
+                                    <span className="text-[9px] text-slate-600 py-0.5">+{proteinInfo.pdbIds.length - 8} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {/* AlphaFold fallback note */}
+                            {proteinInfo.pdbIds.length === 0 && alphafoldData && (
+                              <div className="text-[9px] text-blue-400 flex items-center gap-1">
+                                <Info className="w-3 h-3" />
+                                No experimental structure — AlphaFold prediction available (pLDDT {alphafoldData.meanPlddt.toFixed(0)})
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {proteinError && (
+                          <div className="mt-1.5 text-[10px] text-red-400 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> {proteinError}
                           </div>
                         )}
                       </FieldGroup>
 
+                      {/* PDB Structure ID */}
                       <FieldGroup label="PDB Structure ID" hint="Overrides auto-selected structure">
-                        <Input
-                          defaultValue="4HJO"
-                          className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60"
-                          placeholder="e.g. 4HJO"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={pdbId}
+                            onChange={e => setPdbId(e.target.value.toUpperCase())}
+                            className="bg-white/5 border-white/10 text-white text-[12px] font-mono focus:border-violet-500/60 uppercase"
+                            placeholder="e.g. 4HJO"
+                            maxLength={4}
+                          />
+                          {pdbLoading && (
+                            <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 animate-spin" />
+                          )}
+                        </div>
+                        {pdbStructure && (
+                          <div className="mt-2 bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3 h-3 text-blue-400 shrink-0" />
+                              <span className="text-[10px] font-medium text-blue-300 leading-tight">{pdbStructure.title}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                              {[
+                                { k: "Method",     v: pdbStructure.method.replace(" DIFFRACTION","") },
+                                { k: "Resolution", v: pdbStructure.resolution != null ? `${pdbStructure.resolution.toFixed(2)} Å` : "—" },
+                                { k: "Chains",     v: String(pdbStructure.chains) },
+                                { k: "Released",   v: pdbStructure.releaseDate },
+                              ].map(({ k, v }) => (
+                                <div key={k} className="flex justify-between">
+                                  <span className="text-[9px] text-slate-600">{k}</span>
+                                  <span className="text-[9px] text-slate-400 font-medium">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </FieldGroup>
 
                       <FieldGroup label="Therapeutic Area Preset">
