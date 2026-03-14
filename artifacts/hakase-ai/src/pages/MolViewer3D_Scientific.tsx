@@ -10,6 +10,7 @@ import {
   ChevronRight, Plus, Search, Lock, Unlock, Copy, FileText
 } from "lucide-react";
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
+import { getMolecularProperties } from "@/lib/chemistry";
 import { useRDKitReady } from "@/lib/useRDKitReady";
 
 const ATOM_COLORS: Record<string, string> = {
@@ -157,6 +158,7 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
 
   const rdkitReady = useRDKitReady();
   const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles, rdkitReady]);
+  const molProps = useMemo(() => smiles ? getMolecularProperties(smiles) : null, [smiles, rdkitReady]);
   const dynAtoms = mol3d?.atoms ?? FALLBACK_ATOMS;
   const dynBonds = mol3d?.bonds ?? FALLBACK_BONDS;
   const dynFormula = mol3d?.formula ?? "C₁₃H₁₈O₂";
@@ -338,10 +340,10 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
             {/* Quick metrics */}
             <div className="grid grid-cols-4 gap-1.5 mt-3">
               {[
-                { label: "QED", val: "0.72", color: "text-emerald-400" },
-                { label: "logP", val: "3.18", color: "text-blue-400" },
-                { label: "TPSA", val: "37.3", color: "text-violet-400" },
-                { label: "HBD", val: "1", color: "text-amber-400" },
+                { label: "QED", val: molProps ? molProps.qed.toFixed(2) : "—", color: "text-emerald-400" },
+                { label: "logP", val: molProps ? String(molProps.logP) : "—", color: "text-blue-400" },
+                { label: "TPSA", val: molProps ? String(molProps.tpsa) : "—", color: "text-violet-400" },
+                { label: "HBD", val: molProps ? String(molProps.hbd) : "—", color: "text-amber-400" },
               ].map(({ label, val, color }) => (
                 <div key={label} className="bg-white/5 rounded p-1.5 text-center">
                   <div className={`text-[12px] font-bold ${color}`}>{val}</div>
@@ -497,10 +499,10 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
             <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Ro5 Drug-likeness</div>
             <div className="space-y-1.5">
               {[
-                { rule: "MW ≤ 500 Da", val: "206.3", pass: true },
-                { rule: "logP ≤ 5", val: "3.18", pass: true },
-                { rule: "HBD ≤ 5", val: "1", pass: true },
-                { rule: "HBA ≤ 10", val: "2", pass: true },
+                { rule: "MW ≤ 500 Da", val: molProps ? `${molProps.mw}` : "—", pass: molProps ? molProps.lipinskiMW : true },
+                { rule: "logP ≤ 5", val: molProps ? `${molProps.logP}` : "—", pass: molProps ? molProps.lipinskiLogP : true },
+                { rule: "HBD ≤ 5", val: molProps ? `${molProps.hbd}` : "—", pass: molProps ? molProps.lipinskiHBD : true },
+                { rule: "HBA ≤ 10", val: molProps ? `${molProps.hba}` : "—", pass: molProps ? molProps.lipinskiHBA : true },
               ].map(({ rule, val, pass }) => (
                 <div key={rule} className="flex items-center gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full ${pass ? "bg-emerald-400" : "bg-red-400"}`} />

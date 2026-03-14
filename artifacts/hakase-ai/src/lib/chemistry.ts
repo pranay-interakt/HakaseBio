@@ -12,6 +12,9 @@ export interface MolecularProperties {
   rotBonds: number;
   qed: number;
   heavyAtoms: number;
+  numRings: number;
+  numAromaticRings: number;
+  numAtoms: number;
   lipinskiMW: boolean;
   lipinskiLogP: boolean;
   lipinskiHBD: boolean;
@@ -78,7 +81,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       return {
         isValid: false,
         mw: 0, logP: 0, hbd: 0, hba: 0, tpsa: 0, rotBonds: 0,
-        qed: 0, heavyAtoms: 0,
+        qed: 0, heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
         lipinskiMW: false, lipinskiLogP: false, lipinskiHBD: false,
         lipinskiHBA: false, lipinskiPass: false,
       };
@@ -98,6 +101,9 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
     const tpsa     = Number(desc.tpsa             ?? desc.TPSA          ?? 0);
     const rotBonds = Number(desc.NumRotatableBonds ?? 0);
     const heavyAtoms = Number(desc.NumHeavyAtoms  ?? 0);
+    const numRings  = Number(desc.NumRings         ?? 0);
+    const numAromaticRings = Number(desc.NumAromaticRings ?? 0);
+    const numAtoms  = Number(desc.NumAtoms         ?? desc.NumHeavyAtoms ?? 0);
 
     // QED: not provided by MinimalLib — compute a Lipinski-based approximation
     const qed = (() => {
@@ -125,6 +131,9 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       rotBonds,
       qed:      parseFloat(qed.toFixed(3)),
       heavyAtoms,
+      numRings,
+      numAromaticRings,
+      numAtoms,
       lipinskiMW,
       lipinskiLogP,
       lipinskiHBD,

@@ -10,6 +10,7 @@ import {
   FlaskConical, Activity, SlidersHorizontal, RotateCcw, ZoomIn, ZoomOut
 } from "lucide-react";
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
+import { getMolecularProperties } from "@/lib/chemistry";
 import { useRDKitReady } from "@/lib/useRDKitReady";
 
 const ATOM_COLORS: Record<string, string> = {
@@ -177,6 +178,7 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
 
   const rdkitReady = useRDKitReady();
   const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles, rdkitReady]);
+  const molProps = useMemo(() => smiles ? getMolecularProperties(smiles) : null, [smiles, rdkitReady]);
   const dynAtoms = (mol3d?.atoms ?? BASE_ATOMS) as typeof BASE_ATOMS;
   const dynBonds = (mol3d?.bonds ?? BASE_BONDS) as typeof BASE_BONDS;
   const dynFormula = mol3d?.formula;
@@ -618,16 +620,20 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
                 <div className="border-t border-white/8 pt-3">
                   <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Properties</div>
                   <div className="space-y-1.5">
-                    {[
-                      { k: "Molecular Weight", v: `${primaryMol.mw} Da` },
-                      { k: "Binding Affinity", v: primaryMol.binding },
-                      { k: "Toxicity Risk", v: primaryMol.tox },
-                      { k: "Synthetic Accessibility", v: `${primaryMol.sa}/10` },
-                      { k: "H-Bond Donors", v: "1" },
-                      { k: "H-Bond Acceptors", v: "2" },
-                      { k: "Rotatable Bonds", v: "4" },
-                      { k: "logP", v: "3.18" },
-                    ].map(({ k, v }) => (
+                    {(() => {
+                      const isLive = primaryMol.id === "live";
+                      const p = isLive ? molProps : null;
+                      return [
+                        { k: "Molecular Weight", v: p ? `${p.mw} Da` : `${primaryMol.mw} Da` },
+                        { k: "Binding Affinity", v: primaryMol.binding },
+                        { k: "Toxicity Risk", v: p ? (p.tpsa > 120 ? "High" : p.tpsa > 80 ? "Medium" : "Low") : primaryMol.tox },
+                        { k: "Synthetic Accessibility", v: `${primaryMol.sa}/10` },
+                        { k: "H-Bond Donors", v: p ? String(p.hbd) : "—" },
+                        { k: "H-Bond Acceptors", v: p ? String(p.hba) : "—" },
+                        { k: "Rotatable Bonds", v: p ? String(p.rotBonds) : "—" },
+                        { k: "logP", v: p ? String(p.logP) : "—" },
+                      ];
+                    })().map(({ k, v }) => (
                       <div key={k} className="flex justify-between">
                         <span className="text-[10px] text-slate-500">{k}</span>
                         <span className="text-[10px] text-slate-300 font-medium">{v}</span>
