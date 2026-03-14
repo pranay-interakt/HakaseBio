@@ -187,32 +187,25 @@ export function HakaseAI() {
   }, [smiles, rdkitReady]);
   // ─────────────────────────────────────────────────────────────────────
 
-  // ── UniProt auto-fetch ─────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── UniProt explicit fetch ─────────────────────────────────────────────────
+  const handleProteinFetch = useCallback(async () => {
     const id = uniprotId.trim();
-    // Basic UniProt accession pattern: 6 or 10 chars starting with letter
-    if (id.length < 6) { setProteinInfo(null); setProteinError(null); return; }
-    if (proteinDebounceRef.current) clearTimeout(proteinDebounceRef.current);
-    proteinDebounceRef.current = setTimeout(async () => {
-      setProteinLoading(true);
-      setProteinError(null);
-      setAlphafoldData(null);
-      try {
-        const info = await fetchUniProt(id);
-        setProteinInfo(info);
-        // Auto-populate PDB field with first known structure if user hasn't overridden it
-        if (info.pdbIds.length && !pdbId) setPdbId(info.pdbIds[0]);
-        // Fetch AlphaFold prediction in parallel (best-effort)
-        fetchAlphaFold(id).then(af => setAlphafoldData(af ?? null)).catch(() => null);
-      } catch (err: unknown) {
-        setProteinInfo(null);
-        setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
-      } finally {
-        setProteinLoading(false);
-      }
-    }, 600);
-    return () => { if (proteinDebounceRef.current) clearTimeout(proteinDebounceRef.current); };
-  }, [uniprotId]);
+    if (!id) return;
+    setProteinLoading(true);
+    setProteinError(null);
+    setProteinInfo(null);
+    setAlphafoldData(null);
+    try {
+      const info = await fetchUniProt(id);
+      setProteinInfo(info);
+      if (info.pdbIds.length && !pdbId) setPdbId(info.pdbIds[0]);
+      fetchAlphaFold(id).then(af => setAlphafoldData(af ?? null)).catch(() => null);
+    } catch (err: unknown) {
+      setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
+    } finally {
+      setProteinLoading(false);
+    }
+  }, [uniprotId, pdbId]);
 
   // ── RCSB PDB auto-fetch ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1243,21 +1236,76 @@ export function HakaseAI() {
                   <section>
                     <SectionHeader icon={Dna} label="Target Protein Configuration" />
                     <div className="space-y-3">
-                      {/* UniProt ID */}
-                      <FieldGroup label="Target UniProt ID" hint="Required for binding simulation">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                          <Input
-                            value={uniprotId}
-                            onChange={e => { setUniprotId(e.target.value); setProteinInfo(null); setProteinError(null); }}
-                            className="bg-white/5 border-white/10 text-white text-[12px] pl-8 focus:border-violet-500/60"
-                            placeholder="e.g. P00533"
-                          />
-                          {proteinLoading && (
-                            <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 animate-spin" />
-                          )}
+
+                      {/* ── Help banner ─────────────────────────────────── */}
+                      <div className="bg-blue-500/5 border border-blue-500/15 rounded-lg p-2.5 flex gap-2">
+                        <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                        <div className="text-[10px] text-slate-400 leading-relaxed">
+                          Enter a <span className="text-white font-medium">UniProt accession</span> (e.g. <span className="font-mono text-violet-300">P00533</span>) and click <span className="text-white font-medium">Fetch</span> to load the protein. Then optionally specify a <span className="text-white font-medium">PDB structure</span> for binding simulation — or let it auto-populate from the protein's known crystal structures.
                         </div>
-                        {/* UniProt result */}
+                      </div>
+
+                      {/* ── UniProt ID ───────────────────────────────────── */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Target UniProt ID</span>
+                            <span className="text-[9px] text-red-400">*</span>
+                          </div>
+                          <span className="text-[9px] text-slate-600">Required for binding simulation</span>
+                        </div>
+
+                        {/* Format guide */}
+                        <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                          {[
+                            { id: "P00533", label: "EGFR" },
+                            { id: "P01116", label: "KRAS" },
+                            { id: "P11802", label: "CDK4" },
+                            { id: "Q06187", label: "BTK" },
+                          ].map(({ id, label }) => (
+                            <button
+                              key={id}
+                              onClick={() => { setUniprotId(id); setProteinInfo(null); setProteinError(null); }}
+                              className="text-[9px] text-slate-600 hover:text-violet-400 transition-colors font-mono"
+                            >
+                              {id} <span className="text-slate-700 not-italic">({label})</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                            <Input
+                              value={uniprotId}
+                              onChange={e => { setUniprotId(e.target.value.toUpperCase()); setProteinInfo(null); setProteinError(null); }}
+                              onKeyDown={e => e.key === "Enter" && handleProteinFetch()}
+                              className="bg-white/5 border-white/10 text-white text-[12px] pl-8 font-mono focus:border-violet-500/60 uppercase"
+                              placeholder="UniProt accession e.g. P00533"
+                            />
+                          </div>
+                          <button
+                            onClick={handleProteinFetch}
+                            disabled={!uniprotId.trim() || proteinLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
+                          >
+                            {proteinLoading
+                              ? <><RefreshCw className="w-3 h-3 animate-spin" /> Fetching…</>
+                              : <><Download className="w-3 h-3" /> Fetch</>
+                            }
+                          </button>
+                        </div>
+
+                        {/* What is a UniProt ID */}
+                        <div className="mt-1.5 flex items-start gap-1">
+                          <Info className="w-3 h-3 text-slate-600 shrink-0 mt-0.5" />
+                          <span className="text-[9px] text-slate-600">
+                            UniProt accessions are 6–10 character protein identifiers. Find yours at{" "}
+                            <span className="text-violet-500">uniprot.org</span> by searching the protein or gene name.
+                          </span>
+                        </div>
+
+                        {/* Result card */}
                         {proteinInfo && (
                           <div className="mt-2 bg-violet-500/5 border border-violet-500/20 rounded-lg p-2.5 space-y-2">
                             <div className="flex items-center gap-2">
@@ -1279,10 +1327,11 @@ export function HakaseAI() {
                                 </div>
                               ))}
                             </div>
-                            {/* PDB quick-picks if multiple structures */}
-                            {proteinInfo.pdbIds.length > 1 && (
+                            {proteinInfo.pdbIds.length > 0 && (
                               <div>
-                                <div className="text-[9px] text-slate-600 mb-1">Known structures</div>
+                                <div className="text-[9px] text-slate-600 mb-1">
+                                  Known crystal structures — click to load one into the PDB field below
+                                </div>
                                 <div className="flex flex-wrap gap-1">
                                   {proteinInfo.pdbIds.slice(0, 8).map(id => (
                                     <button key={id} onClick={() => setPdbId(id)}
@@ -1299,7 +1348,6 @@ export function HakaseAI() {
                                 </div>
                               </div>
                             )}
-                            {/* AlphaFold fallback note */}
                             {proteinInfo.pdbIds.length === 0 && alphafoldData && (
                               <div className="text-[9px] text-blue-400 flex items-center gap-1">
                                 <Info className="w-3 h-3" />
@@ -1309,26 +1357,43 @@ export function HakaseAI() {
                           </div>
                         )}
                         {proteinError && (
-                          <div className="mt-1.5 text-[10px] text-red-400 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> {proteinError}
+                          <div className="mt-1.5 text-[10px] text-red-400 flex items-center gap-1.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0" /> {proteinError}
                           </div>
                         )}
-                      </FieldGroup>
+                      </div>
 
-                      {/* PDB Structure ID */}
-                      <FieldGroup label="PDB Structure ID" hint="Overrides auto-selected structure">
+                      {/* ── PDB Structure ID ─────────────────────────────── */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider">PDB Structure ID</span>
+                          <span className="text-[9px] text-slate-600">Auto-updates from UniProt</span>
+                        </div>
+
                         <div className="relative">
                           <Input
                             value={pdbId}
                             onChange={e => setPdbId(e.target.value.toUpperCase())}
-                            className="bg-white/5 border-white/10 text-white text-[12px] font-mono focus:border-violet-500/60 uppercase"
-                            placeholder="e.g. 4HJO"
+                            className="bg-white/5 border-white/10 text-white text-[12px] font-mono focus:border-blue-500/60 uppercase pr-9"
+                            placeholder="4-letter PDB ID e.g. 4HJO"
                             maxLength={4}
                           />
                           {pdbLoading && (
-                            <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 animate-spin" />
+                            <RefreshCw className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-blue-400 animate-spin" />
+                          )}
+                          {pdbStructure && !pdbLoading && (
+                            <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-blue-400" />
                           )}
                         </div>
+
+                        <div className="mt-1.5 flex items-start gap-1">
+                          <Info className="w-3 h-3 text-slate-600 shrink-0 mt-0.5" />
+                          <span className="text-[9px] text-slate-600">
+                            4-letter PDB accession (e.g. <span className="font-mono">4HJO</span> = EGFR with erlotinib). Auto-fetches structure metadata when you type. Find IDs at{" "}
+                            <span className="text-blue-500">rcsb.org</span>. Updates automatically when you click a structure from the UniProt card above.
+                          </span>
+                        </div>
+
                         {pdbStructure && (
                           <div className="mt-2 bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 space-y-1.5">
                             <div className="flex items-center gap-1.5">
@@ -1337,7 +1402,7 @@ export function HakaseAI() {
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                               {[
-                                { k: "Method",     v: pdbStructure.method.replace(" DIFFRACTION","") },
+                                { k: "Method",     v: pdbStructure.method.replace(" DIFFRACTION", "") },
                                 { k: "Resolution", v: pdbStructure.resolution != null ? `${pdbStructure.resolution.toFixed(2)} Å` : "—" },
                                 { k: "Chains",     v: String(pdbStructure.chains) },
                                 { k: "Released",   v: pdbStructure.releaseDate },
@@ -1350,7 +1415,7 @@ export function HakaseAI() {
                             </div>
                           </div>
                         )}
-                      </FieldGroup>
+                      </div>
 
                       <FieldGroup label="Therapeutic Area Preset">
                         <Select value={therapeuticArea} onValueChange={setTherapeuticArea}>
