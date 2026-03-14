@@ -83,8 +83,8 @@ const LAYERS = [
 const STATS = [
   { val: "90%", label: "of drug trials fail" },
   { val: "30–50%", label: "faster pre-clinical" },
-  { val: "$50M+", label: "per prevented failure" },
-  { val: "10–15 yr", label: "pipeline compressed" },
+  { val: "$5M", label: "per prevented failure" },
+  { val: "1–5 yr", label: "pipeline compressed" },
 ];
 
 function AnimatedGrid() {
@@ -115,10 +115,7 @@ export function Landing() {
 
       {/* ── Nav ── */}
       <NavBar anchorLinks={[
-        { href: "#layers", label: "Simulation Layers" },
-        { href: "#diagen", label: "Diagen Integration" },
-        { href: "#privacy", label: "Privacy" },
-        { href: "#why",     label: "Why Hakase" },
+        { href: "#why", label: "Why Hakase" },
       ]} />
 
       {/* ── Hero ── */}
@@ -473,7 +470,7 @@ export function Landing() {
             <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/5">
               <div className="p-8 text-center">
                 <div className="text-[9px] uppercase tracking-widest text-slate-600 mb-4">Without Hakase</div>
-                <div className="text-[42px] font-black text-slate-400 leading-none mb-2">10–15<span className="text-[20px] ml-1">yrs</span></div>
+                <div className="text-[42px] font-black text-slate-400 leading-none mb-2">1–5<span className="text-[20px] ml-1">yrs</span></div>
                 <div className="text-[13px] text-slate-600">from molecule to market</div>
               </div>
               <div className="p-8 text-center">
@@ -483,7 +480,7 @@ export function Landing() {
               </div>
               <div className="p-8 text-center">
                 <div className="text-[9px] uppercase tracking-widest text-emerald-600 mb-4">The Result</div>
-                <div className="text-[42px] font-black text-emerald-400 leading-none mb-2">$50M<span className="text-[20px] ml-0.5">+</span></div>
+                <div className="text-[42px] font-black text-emerald-400 leading-none mb-2">$5M</div>
                 <div className="text-[13px] text-slate-500">saved per prevented trial failure</div>
               </div>
             </div>
@@ -755,7 +752,7 @@ export function Landing() {
           Ready to simulate?
         </h2>
         <p className="relative text-[16px] text-slate-400 max-w-xl mx-auto mb-8">
-          Join the platform that compresses 10–15 years of drug development into weeks of simulation.
+          Join the platform that compresses 1–5 years of drug development into weeks of simulation.
         </p>
         <button
           onClick={() => navigate("/login")}

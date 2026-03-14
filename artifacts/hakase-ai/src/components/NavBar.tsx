@@ -23,10 +23,11 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   }, []);
 
   const platformItems = [
-    { label: "Overview", sub: "What BioDigital Twin is", anchor: "", color: "violet" },
-    { label: "Layer 1 — Molecular",       sub: "ADMET · Binding · Go/No-Go",      anchor: "#layer1", color: "violet" },
-    { label: "Layer 2 — Patient Cohort",  sub: "PK/PD · Responders · Adverse events", anchor: "#layer2", color: "blue"   },
-    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",   anchor: "#layer3", color: "emerald" },
+    { label: "Overview",                  sub: "What BioDigital Twin is",             anchor: "",        color: "violet"  },
+    { label: "Layer 1 — Molecular",       sub: "ADMET · Binding · Go/No-Go",          anchor: "#layer1", color: "violet"  },
+    { label: "Layer 2 — Patient Cohort",  sub: "PK/PD · Responders · Adverse events", anchor: "#layer2", color: "blue"    },
+    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",     anchor: "#layer3", color: "emerald" },
+    { label: "Privacy",                   sub: "Client-side · Zero data egress",       anchor: "#privacy", color: "slate" },
   ];
 
   return (
@@ -60,12 +61,19 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
                     key={label}
                     onClick={() => {
                       setPlatformOpen(false);
-                      navigate("/platform" + anchor);
+                      if (anchor === "#privacy") {
+                        navigate("/");
+                        setTimeout(() => {
+                          document.querySelector("#privacy")?.scrollIntoView({ behavior: "smooth" });
+                        }, 150);
+                      } else {
+                        navigate("/platform" + anchor);
+                      }
                     }}
                     className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors group"
                   >
                     <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${
-                      color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : "text-emerald-300"
+                      color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : "text-slate-300"
                     }`}>{label}</div>
                     <div className="text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">{sub}</div>
                   </button>
