@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import hakaseLogo from "@assets/image_1773504202272.png";
 
 export function Login() {
   const [, navigate] = useLocation();
@@ -37,12 +38,7 @@ export function Login() {
           onClick={() => navigate("/")}
           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
         >
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight">HakaseAI</span>
+          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
         </button>
         <button
           onClick={() => navigate("/")}

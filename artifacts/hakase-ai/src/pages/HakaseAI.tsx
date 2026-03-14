@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import hakaseLogo from "@assets/image_1773504202272.png";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -376,14 +377,9 @@ export function HakaseAI() {
       {/* Top Navigation Bar */}
       <header className="h-14 border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md flex items-center px-4 gap-4 shrink-0 z-50">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 min-w-[160px]">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <Dna className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-[15px] tracking-tight">
-            Hakase<span className="text-violet-400">AI</span>
-          </span>
-          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-500/40 text-violet-400 ml-0.5">
+        <div className="flex items-center gap-2 min-w-[160px]">
+          <img src={hakaseLogo} alt="HakaseAI" className="h-8 w-auto object-contain" />
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-500/40 text-violet-400">
             v1.0
           </Badge>
         </div>

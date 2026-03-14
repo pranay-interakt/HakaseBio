@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
+import hakaseLogo from "@assets/image_1773504202272.png";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
@@ -114,12 +115,7 @@ export function Landing() {
       {/* ── Nav ── */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-5 border-b border-white/5 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight">HakaseAI</span>
+          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.0</span>
         </div>
         <div className="hidden md:flex items-center gap-6 text-[13px] text-slate-400">
@@ -453,8 +449,8 @@ export function Landing() {
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 px-8 py-6 flex items-center justify-between text-[12px] text-slate-600">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-500 to-violet-700" />
-          HakaseAI · BioDigital Twin Platform · v1.0
+          <img src={hakaseLogo} alt="HakaseAI" className="h-5 w-auto object-contain opacity-70" />
+          <span>BioDigital Twin Platform · v1.0</span>
         </div>
         <div>Hakase AI · March 2026 · Confidential</div>
       </footer>
