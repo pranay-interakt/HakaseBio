@@ -1,5 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import hakaseLogo from "@assets/image_1773504202272.png";
+import {
+  initChemistry,
+  getMolecularProperties,
+  generateFingerprint,
+  isReady,
+  type MolecularProperties,
+  type FingerprintInfo,
+} from "@/lib/chemistry";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -94,6 +102,31 @@ export function HakaseAI() {
   const [bindingOn, setBindingOn] = useState(true);
   const [toxOn, setToxOn] = useState(true);
   const [fingerprintOn, setFingerprintOn] = useState(false);
+
+  // ── RDKit chemistry state ─────────────────────────────────────────────
+  const [rdkitReady, setRdkitReady] = useState(false);
+  const [molProps, setMolProps] = useState<MolecularProperties | null>(null);
+  const [molFingerprint, setMolFingerprint] = useState<FingerprintInfo | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    initChemistry().then(() => {
+      setRdkitReady(true);
+    }).catch(console.warn);
+  }, []);
+
+  useEffect(() => {
+    if (!rdkitReady) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const props = getMolecularProperties(smiles);
+      setMolProps(props);
+      setMolFingerprint(props?.isValid ? generateFingerprint(smiles) : null);
+    }, 250);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [smiles, rdkitReady]);
+  // ─────────────────────────────────────────────────────────────────────
+
   const [tissueTypes, setTissueTypes] = useState<string[]>(["Liver", "Kidney", "Cardiac"]);
   const [confidenceThreshold, setConfidenceThreshold] = useState([0.70]);
   const [rankingCriteria, setRankingCriteria] = useState("Composite");
@@ -654,19 +687,64 @@ export function HakaseAI() {
                           />
                           {smiles && (
                             <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              {!rdkitReady ? (
+                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                              ) : molProps?.isValid ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : molProps ? (
+                                <XCircle className="w-3.5 h-3.5 text-red-400" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                              )}
                             </div>
                           )}
                         </div>
                         {smiles && (
-                          <div className="mt-2 bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between h-20 text-[10px] text-slate-500">
+                          <div className={`mt-2 border rounded-lg p-3 flex items-center justify-between h-20 text-[10px] transition-colors ${
+                            !rdkitReady || !molProps
+                              ? "bg-white/5 border-white/10"
+                              : molProps.isValid
+                              ? "bg-emerald-500/5 border-emerald-500/20"
+                              : "bg-red-500/5 border-red-500/20"
+                          }`}>
                             <div className="flex items-center gap-2">
-                              <div className="w-12 h-12 rounded border border-emerald-500/30 bg-emerald-500/5 flex items-center justify-center">
-                                <Atom className="w-5 h-5 text-emerald-400/60" />
+                              <div className={`w-12 h-12 rounded border flex items-center justify-center ${
+                                !rdkitReady || !molProps
+                                  ? "border-slate-500/20 bg-slate-500/5"
+                                  : molProps.isValid
+                                  ? "border-emerald-500/30 bg-emerald-500/5"
+                                  : "border-red-500/30 bg-red-500/5"
+                              }`}>
+                                <Atom className={`w-5 h-5 ${
+                                  !rdkitReady || !molProps ? "text-slate-500/60"
+                                  : molProps.isValid ? "text-emerald-400/60"
+                                  : "text-red-400/60"
+                                }`} />
                               </div>
                               <div>
-                                <div className="text-emerald-400 text-[11px] font-medium">Valid structure</div>
-                                <div className="text-slate-500 text-[10px]">MW ≈ 206.3 Da · {smiles.length} chars</div>
+                                {!rdkitReady ? (
+                                  <>
+                                    <div className="text-slate-400 text-[11px] font-medium">Loading chemistry engine…</div>
+                                    <div className="text-slate-600 text-[10px]">RDKit.js initialising</div>
+                                  </>
+                                ) : molProps?.isValid ? (
+                                  <>
+                                    <div className="text-emerald-400 text-[11px] font-medium">Valid structure · RDKit verified</div>
+                                    <div className="text-slate-400 text-[10px]">
+                                      MW {molProps.mw} Da · logP {molProps.logP} · HBD {molProps.hbd} · HBA {molProps.hba}
+                                    </div>
+                                  </>
+                                ) : molProps ? (
+                                  <>
+                                    <div className="text-red-400 text-[11px] font-medium">Invalid SMILES</div>
+                                    <div className="text-slate-600 text-[10px]">Check notation and try again</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-slate-400 text-[11px] font-medium">Validating…</div>
+                                    <div className="text-slate-600 text-[10px]">{smiles.length} chars</div>
+                                  </>
+                                )}
                               </div>
                             </div>
                             <button
@@ -1122,7 +1200,7 @@ export function HakaseAI() {
                 <div className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[1] === "running" || !smiles}
+                    disabled={simStatus[1] === "running" || !smiles || (rdkitReady && molProps !== null && !molProps.isValid)}
                     className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
                     {simStatus[1] === "running" ? (
@@ -1204,7 +1282,7 @@ export function HakaseAI() {
                         );
                       })}
                     </div>
-                    <Layer1Results />
+                    <Layer1Results molProps={molProps} />
                   </>
                 )}
               </div>
@@ -2302,7 +2380,7 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 }
 
 // ── Layer 1 Results ───────────────────────────────────────────────────
-function Layer1Results() {
+function Layer1Results({ molProps }: { molProps: MolecularProperties | null }) {
   const [activeTab, setActiveTab] = useState("admet");
 
   return (
@@ -2327,12 +2405,12 @@ function Layer1Results() {
             </div>
           </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-white/8 flex gap-4">
+        <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "QED Score", val: "0.72", good: true },
-            { label: "Toxicity Risk", val: "Low", good: true },
-            { label: "Binding Affinity", val: "12.4 nM", good: true },
-            { label: "SA Score", val: "2.8", good: true },
+            { label: "QED Score",       val: molProps?.qed != null ? molProps.qed.toFixed(3) : "0.720", good: (molProps?.qed ?? 0.72) > 0.5 },
+            { label: "Toxicity Risk",   val: "Low",      good: true },
+            { label: "Binding Affinity",val: "12.4 nM",  good: true },
+            { label: "logP",            val: molProps?.logP != null ? molProps.logP.toFixed(2) : "3.20", good: (molProps?.lipinskiLogP ?? true) },
           ].map(({ label, val, good }) => (
             <div key={label}>
               <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
@@ -2468,10 +2546,10 @@ function ADMETRadarChart() {
             <div className="text-[10px] text-slate-600 mb-1">Drug-likeness (Lipinski)</div>
             <div className="flex gap-2 flex-wrap">
               {[
-                { rule: "MW ≤ 500", pass: true, val: "206 Da" },
-                { rule: "logP ≤ 5", pass: true, val: "3.2" },
-                { rule: "HBD ≤ 5", pass: true, val: "2" },
-                { rule: "HBA ≤ 10", pass: true, val: "4" },
+                { rule: "MW ≤ 500",  pass: molProps?.lipinskiMW  ?? true, val: molProps?.mw   != null ? `${molProps.mw} Da` : "206.3 Da" },
+                { rule: "logP ≤ 5",  pass: molProps?.lipinskiLogP ?? true, val: molProps?.logP != null ? String(molProps.logP) : "3.20" },
+                { rule: "HBD ≤ 5",   pass: molProps?.lipinskiHBD  ?? true, val: molProps?.hbd  != null ? String(molProps.hbd)  : "2" },
+                { rule: "HBA ≤ 10",  pass: molProps?.lipinskiHBA  ?? true, val: molProps?.hba  != null ? String(molProps.hba)  : "4" },
               ].map(({ rule, pass, val }) => (
                 <div key={rule} className={`text-[9px] px-1.5 py-0.5 rounded border ${pass ? "border-emerald-500/20 text-emerald-400 bg-emerald-500/5" : "border-red-500/20 text-red-400 bg-red-500/5"}`}>
                   {rule}: {val}
