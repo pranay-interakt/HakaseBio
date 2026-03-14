@@ -31,7 +31,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   ];
 
   return (
-    <nav className={`${sticky ? "sticky top-0 z-30" : "relative z-10"} flex items-center justify-between px-8 py-5 border-b border-white/5 bg-[#07080c]/95 backdrop-blur-sm`}>
+    <nav className={`${sticky ? "sticky top-0" : "relative"} z-40 flex items-center justify-between px-8 py-5 border-b border-white/5 bg-[#07080c]/95 backdrop-blur-sm`}>
       {/* Logo */}
       <button onClick={() => navigate("/")} className="flex items-center gap-2.5 shrink-0">
         <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
@@ -54,7 +54,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
           </button>
 
           {platformOpen && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 rounded-2xl border border-white/10 bg-[#0d0f17] shadow-2xl shadow-black/60 overflow-hidden z-50">
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 rounded-2xl border border-white/10 bg-[#0d0f17] shadow-2xl shadow-black/80 overflow-hidden z-[100]">
               <div className="p-1.5 space-y-0.5">
                 {platformItems.map(({ label, sub, anchor, color }) => (
                   <button
