@@ -11,7 +11,8 @@ router = "application"
 deploymentTarget = "autoscale"
 
 [deployment.postBuild]
-args = ["sh", "-c", "CI=true pnpm prune --prod && pnpm store prune"]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
 
 [workflows]
 runButton = "Project"

@@ -176,14 +176,27 @@ export function Landing() {
 
         {/* Pipeline visual */}
         <div className="mt-20 flex items-center justify-center gap-0 flex-wrap">
+          {/* INPUT node — generic, with Diagen as complementary badge */}
+          <div className="relative px-4 py-2.5 rounded-xl border border-slate-500/30 bg-slate-500/8 text-center">
+            <div className="text-[11px] font-bold text-slate-300">INPUT</div>
+            <div className="text-[10px] text-slate-600 mt-0.5">Manual · API · File</div>
+            {/* Diagen badge */}
+            <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-500/40 bg-violet-500/15 whitespace-nowrap">
+              <span className="w-1 h-1 rounded-full bg-violet-400" />
+              <span className="text-[8px] font-semibold text-violet-400">Diagen</span>
+            </div>
+          </div>
+
+          <div className="flex items-center px-1 text-slate-600">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+          </div>
+
           {[
-            { label: "DIAGEN", sub: "Generate", color: "text-violet-400", border: "border-violet-500/30", bg: "bg-violet-500/8" },
-            null,
             { label: "LAYER 1", sub: "Molecular Twin", color: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5" },
             null,
-            { label: "LAYER 2", sub: "Cohort Twin", color: "text-blue-300", border: "border-blue-500/20", bg: "bg-blue-500/5" },
+            { label: "LAYER 2", sub: "Cohort Twin",    color: "text-blue-300",   border: "border-blue-500/20",   bg: "bg-blue-500/5"   },
             null,
-            { label: "LAYER 3", sub: "Trial Twin", color: "text-emerald-300", border: "border-emerald-500/20", bg: "bg-emerald-500/5" },
+            { label: "LAYER 3", sub: "Trial Twin",     color: "text-emerald-300",border: "border-emerald-500/20",bg: "bg-emerald-500/5" },
           ].map((item, i) =>
             item === null ? (
               <div key={i} className="flex items-center px-1 text-slate-600">
