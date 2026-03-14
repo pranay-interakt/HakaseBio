@@ -85,9 +85,45 @@ export function HakaseAI() {
   const [projImportLoading, setProjImportLoading] = useState(false);
   const [projImportResult, setProjImportResult] = useState<{ name: string; indication: string; phase: string; sponsor: string } | null>(null);
   const [savedProjects, setSavedProjects] = useState([
-    { name: "CDK4/6 Inhibitor Screen", indication: "Breast Cancer", layers: 3 },
-    { name: "EGFR-T790M Mutant", indication: "NSCLC", layers: 2 },
-    { name: "KRAS G12C Series", indication: "Colorectal", layers: 1 },
+    {
+      name: "CDK4/6 Inhibitor Screen",
+      indication: "Breast Cancer",
+      molName: "HAK-CDK4-231",
+      uniprotId: "P11802",
+      layers: 3,
+      goNogo: "GO" as const,
+      qed: 0.74,
+      binding: "14.2 nM",
+      responderRate: 0.61,
+      successProb: 0.78,
+      lastRun: "2h ago",
+    },
+    {
+      name: "EGFR-T790M Mutant",
+      indication: "NSCLC",
+      molName: "HAK-EGFR-047",
+      uniprotId: "P00533",
+      layers: 2,
+      goNogo: "GO" as const,
+      qed: 0.69,
+      binding: "8.1 nM",
+      responderRate: 0.58,
+      successProb: null,
+      lastRun: "Yesterday",
+    },
+    {
+      name: "KRAS G12C Series",
+      indication: "Colorectal",
+      molName: "HAK-KRAS-112",
+      uniprotId: "P01116",
+      layers: 1,
+      goNogo: "WATCH" as const,
+      qed: 0.52,
+      binding: "42.7 nM",
+      responderRate: null,
+      successProb: null,
+      lastRun: "3d ago",
+    },
   ]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -589,17 +625,62 @@ export function HakaseAI() {
               {/* Saved Projects */}
               <div className="p-3 flex-1 overflow-y-auto">
                 <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Saved Projects</div>
-                {savedProjects.map((proj) => (
-                  <div key={proj.name} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1 group">
-                    <div className="text-[11px] font-medium text-slate-300 truncate group-hover:text-white">{proj.name}</div>
-                    <div className="text-[10px] text-slate-600">{proj.indication}</div>
-                    <div className="flex gap-0.5 mt-1.5">
-                      {[1, 2, 3].map(l => (
-                        <div key={l} className={`h-0.5 flex-1 rounded-full ${l <= proj.layers ? "bg-violet-500" : "bg-white/10"}`} />
-                      ))}
+                {savedProjects.map((proj) => {
+                  const goColor = proj.goNogo === "GO" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    : proj.goNogo === "WATCH" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
+                    : "text-red-400 bg-red-500/10 border-red-500/20";
+                  const barColors = ["bg-violet-500", "bg-blue-500", "bg-emerald-500"];
+                  return (
+                    <div key={proj.name} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1.5 group border border-transparent hover:border-white/8 transition-all">
+                      {/* Header row */}
+                      <div className="flex items-start justify-between gap-1 mb-0.5">
+                        <div className="text-[11px] font-semibold text-slate-300 truncate group-hover:text-white leading-tight">{proj.name}</div>
+                        <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded border ${goColor}`}>{proj.goNogo}</span>
+                      </div>
+
+                      {/* Molecule + indication */}
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[9px] text-slate-600 font-mono">{proj.molName}</span>
+                        <span className="text-slate-700">·</span>
+                        <span className="text-[9px] text-slate-600">{proj.indication}</span>
+                      </div>
+
+                      {/* Key metrics */}
+                      <div className="flex gap-2 mb-1.5">
+                        <div>
+                          <div className="text-[8px] text-slate-700 uppercase tracking-wider">QED</div>
+                          <div className="text-[10px] font-semibold text-slate-400">{proj.qed.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[8px] text-slate-700 uppercase tracking-wider">Binding</div>
+                          <div className="text-[10px] font-semibold text-slate-400">{proj.binding}</div>
+                        </div>
+                        {proj.responderRate != null && (
+                          <div>
+                            <div className="text-[8px] text-slate-700 uppercase tracking-wider">Resp.</div>
+                            <div className="text-[10px] font-semibold text-blue-400">{(proj.responderRate * 100).toFixed(0)}%</div>
+                          </div>
+                        )}
+                        {proj.successProb != null && (
+                          <div>
+                            <div className="text-[8px] text-slate-700 uppercase tracking-wider">P(success)</div>
+                            <div className="text-[10px] font-semibold text-emerald-400">{(proj.successProb * 100).toFixed(0)}%</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Layer progress bars + last run */}
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex gap-0.5 flex-1">
+                          {[0, 1, 2].map(l => (
+                            <div key={l} className={`h-0.5 flex-1 rounded-full ${l < proj.layers ? barColors[l] : "bg-white/10"}`} />
+                          ))}
+                        </div>
+                        <span className="text-[8px] text-slate-700 shrink-0">{proj.lastRun}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <button className="w-full mt-3 py-2 text-[11px] text-violet-400 hover:text-violet-300 border border-dashed border-violet-500/30 hover:border-violet-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5">
                   <Plus className="w-3 h-3" /> New Project
