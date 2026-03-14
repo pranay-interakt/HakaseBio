@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,19 +9,15 @@ import {
   SlidersHorizontal, Grid3x3, Table, BarChart2, Activity,
   ChevronRight, Plus, Search, Lock, Unlock, Copy, FileText
 } from "lucide-react";
+import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#b0b8c8", N: "#60a5fa", O: "#f87171",
-  H: "#e2e8f0", S: "#facc15", P: "#fb923c", F: "#34d399", Cl: "#4ade80",
+  H: "#e2e8f0", S: "#facc15", P: "#fb923c", F: "#34d399", Cl: "#4ade80", Br: "#fb923c",
 };
 
-interface AtomData {
-  id: number; symbol: string; x: number; y: number; z: number;
-  residue?: string; charge?: number;
-}
-
-const ATOMS: AtomData[] = [
-  { id: 0, symbol: "C", x: 0, y: 0, z: 0, charge: 0 },
+const FALLBACK_ATOMS: Atom3D[] = [
+  { id: 0, symbol: "C", x: 0, y: 0, z: 0 },
   { id: 1, symbol: "C", x: 45, y: -28, z: 8 },
   { id: 2, symbol: "C", x: 90, y: 0, z: 4 },
   { id: 3, symbol: "C", x: 90, y: 45, z: -4 },
@@ -29,21 +25,16 @@ const ATOMS: AtomData[] = [
   { id: 5, symbol: "C", x: 0, y: 45, z: -4 },
   { id: 6, symbol: "C", x: 140, y: -22, z: 16 },
   { id: 7, symbol: "C", x: 180, y: 8, z: 8 },
-  { id: 8, symbol: "O", x: 222, y: -12, z: 16, charge: -0.5 },
-  { id: 9, symbol: "O", x: 180, y: 54, z: 0, charge: -0.5 },
-  { id: 10, symbol: "C", x: -50, y: -22, z: 12 },
-  { id: 11, symbol: "C", x: -50, y: 67, z: -12 },
-  { id: 12, symbol: "C", x: -90, y: 22, z: 4 },
+  { id: 8, symbol: "O", x: 222, y: -12, z: 16 },
+  { id: 9, symbol: "O", x: 180, y: 54, z: 0 },
 ];
 
-const BONDS = [
+const FALLBACK_BONDS: Bond3D[] = [
   { from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 1 },
   { from: 2, to: 3, order: 2 }, { from: 3, to: 4, order: 1 },
   { from: 4, to: 5, order: 2 }, { from: 5, to: 0, order: 1 },
   { from: 2, to: 6, order: 1 }, { from: 6, to: 7, order: 1 },
   { from: 7, to: 8, order: 2 }, { from: 7, to: 9, order: 1 },
-  { from: 0, to: 10, order: 1 }, { from: 5, to: 11, order: 1 },
-  { from: 10, to: 12, order: 1 }, { from: 11, to: 12, order: 1 },
 ];
 
 function rot(x: number, y: number, z: number, rx: number, ry: number) {
@@ -53,10 +44,10 @@ function rot(x: number, y: number, z: number, rx: number, ry: number) {
   return { x: x1, y: y * cx - z1 * sx, z: y * sx + z1 * cx };
 }
 
-function MolView({ rx, ry, zoom, mode, color }: { rx: number; ry: number; zoom: number; mode: string; color: string }) {
+function MolView({ rx, ry, zoom, mode, color, atoms, bonds }: { rx: number; ry: number; zoom: number; mode: string; color: string; atoms: Atom3D[]; bonds: Bond3D[] }) {
   const cx = 180, cy = 140;
-  const projected = ATOMS.map(a => {
-    const r = rot(a.x - 60, a.y - 22, a.z, rx, ry);
+  const projected = atoms.map(a => {
+    const r = rot(a.x, a.y, a.z, rx, ry);
     const s = zoom * (1 + r.z * 0.0008);
     return { ...a, px: cx + r.x * zoom, py: cy + r.y * zoom, pz: r.z, s };
   }).sort((a, b) => a.pz - b.pz);
@@ -108,7 +99,7 @@ function MolView({ rx, ry, zoom, mode, color }: { rx: number; ry: number; zoom: 
         <filter id="ds"><feDropShadow dx="0" dy="1.5" stdDeviation="2.5" floodColor="#000" floodOpacity="0.6" /></filter>
       </defs>
 
-      {BONDS.map((b, i) => {
+      {bonds.map((b, i) => {
         const f = pm[b.from], t = pm[b.to];
         if (!f || !t) return null;
         const dep = (f.pz + t.pz) / 2;
@@ -152,22 +143,28 @@ function MolView({ rx, ry, zoom, mode, color }: { rx: number; ry: number; zoom: 
   );
 }
 
-export function MolViewer3D_Scientific() {
+export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smiles?: string; molName?: string } = {}) {
   const [rx, setRx] = useState(-0.3);
   const [ry, setRy] = useState(0.5);
   const [zoom, setZoom] = useState(0.95);
   const [mode, setMode] = useState("ball-stick");
   const [colorScheme, setColorScheme] = useState("cpk");
-  const [selectedAtom, setSelectedAtom] = useState(2);
+  const [selectedAtom, setSelectedAtom] = useState(0);
   const [measureMode, setMeasureMode] = useState<"none" | "distance" | "angle">("none");
   const [tab, setTab] = useState("atoms");
   const [locked, setLocked] = useState(false);
 
-  const atomRows = ATOMS.map(a => ({
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const dynAtoms = mol3d?.atoms ?? FALLBACK_ATOMS;
+  const dynBonds = mol3d?.bonds ?? FALLBACK_BONDS;
+  const dynFormula = mol3d?.formula ?? "C₁₃H₁₈O₂";
+  const dynMolName = propMolName || "Molecule";
+
+  const atomRows = dynAtoms.map(a => ({
     ...a,
     name: `${a.symbol}${a.id + 1}`,
-    x: a.x.toFixed(2), y: a.y.toFixed(2), z: a.z.toFixed(2),
-    charge: (a.charge ?? 0).toFixed(2),
+    x: a.x.toFixed(1), y: a.y.toFixed(1), z: a.z.toFixed(1),
+    charge: "0.00",
   }));
 
   const bondAngles = [
@@ -262,11 +259,12 @@ export function MolViewer3D_Scientific() {
         <div className="flex-1 relative flex flex-col bg-[#07080e]">
           {/* Status bar inside viewport */}
           <div className="absolute top-0 left-0 right-0 h-7 flex items-center px-3 gap-4 text-[10px] text-slate-600 border-b border-white/4 bg-black/20 z-10">
-            <span>Ibuprofen-Analog-001</span>
+            <span className="text-slate-400">{dynMolName}</span>
             <span className="text-slate-700">|</span>
-            <span>C₁₃H₁₈O₂</span>
+            <span className="font-mono">{dynFormula}</span>
             <span className="text-slate-700">|</span>
-            <span>{ATOMS.length} atoms · {BONDS.length} bonds</span>
+            <span>{dynAtoms.length} atoms · {dynBonds.length} bonds</span>
+            {mol3d && <span className="ml-1 text-emerald-500/60">● Live</span>}
             {measureMode !== "none" && (
               <span className={`ml-2 ${measureMode === "distance" ? "text-emerald-500" : "text-orange-500"}`}>
                 {measureMode === "distance" ? "📏 Click 2 atoms to measure distance" : "📐 Click 3 atoms to measure angle"}
@@ -284,7 +282,7 @@ export function MolViewer3D_Scientific() {
             }} />
 
             <div style={{ transform: `scale(${zoom * 1.2})`, cursor: locked ? "not-allowed" : "grab" }}>
-              <MolView rx={rx} ry={ry} zoom={1} mode={mode} color={colorScheme} />
+              <MolView rx={rx} ry={ry} zoom={1} mode={mode} color={colorScheme} atoms={dynAtoms} bonds={dynBonds} />
             </div>
           </div>
 
@@ -326,8 +324,8 @@ export function MolViewer3D_Scientific() {
           <div className="p-3 border-b border-white/8">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[13px] font-semibold text-white">Ibuprofen-Analog-001</div>
-                <div className="text-[10px] text-slate-500 font-mono mt-0.5">C₁₃H₁₈O₂ · MW 206.28 · CAS 15687-27-1</div>
+                <div className="text-[13px] font-semibold text-white">{dynMolName}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{dynFormula} · {dynAtoms.filter(a => a.symbol !== "H").length} heavy atoms</div>
               </div>
               <div className="flex gap-1">
                 <button className="p-1 rounded hover:bg-white/5 text-slate-500"><Copy className="w-3.5 h-3.5" /></button>

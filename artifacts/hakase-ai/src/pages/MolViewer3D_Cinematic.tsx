@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -8,28 +8,19 @@ import {
   FlaskConical, Dna, Atom, Info, Grid3x3, Share2, Film,
   RefreshCw, SlidersHorizontal, Crosshair, Zap
 } from "lucide-react";
+import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#94a3b8", N: "#60a5fa", O: "#f87171",
-  H: "#e2e8f0", S: "#facc15", F: "#34d399", Cl: "#4ade80",
+  H: "#e2e8f0", S: "#facc15", F: "#34d399", Cl: "#4ade80", Br: "#fb923c", P: "#fb923c",
 };
 
 const ATOM_RADIUS: Record<string, number> = {
-  C: 14, N: 13, O: 13, H: 8, S: 16, F: 11, Cl: 15,
+  C: 14, N: 13, O: 13, H: 8, S: 16, F: 11, Cl: 15, Br: 16, P: 15,
 };
 
-interface Atom3D {
-  id: number; symbol: string;
-  x: number; y: number; z: number;
-  label?: string;
-}
-
-interface Bond3D {
-  from: number; to: number; order: number;
-}
-
-const MOLECULE_IBUPROFEN: Atom3D[] = [
-  { id: 0, symbol: "C", x: 0, y: 0, z: 0, label: "C1" },
+const FALLBACK_ATOMS: Atom3D[] = [
+  { id: 0, symbol: "C", x: 0, y: 0, z: 0 },
   { id: 1, symbol: "C", x: 50, y: -30, z: 10 },
   { id: 2, symbol: "C", x: 100, y: 0, z: 5 },
   { id: 3, symbol: "C", x: 100, y: 50, z: -5 },
@@ -39,24 +30,14 @@ const MOLECULE_IBUPROFEN: Atom3D[] = [
   { id: 7, symbol: "C", x: 200, y: 10, z: 10 },
   { id: 8, symbol: "O", x: 245, y: -15, z: 20 },
   { id: 9, symbol: "O", x: 200, y: 60, z: 0 },
-  { id: 10, symbol: "C", x: -55, y: -25, z: 15 },
-  { id: 11, symbol: "C", x: -55, y: 75, z: -15 },
-  { id: 12, symbol: "C", x: -100, y: 25, z: 5 },
-  { id: 13, symbol: "H", x: 50, y: -70, z: 20 },
-  { id: 14, symbol: "H", x: 50, y: 120, z: -20 },
-  { id: 15, symbol: "H", x: 155, y: -65, z: 30 },
 ];
 
-const BONDS: Bond3D[] = [
+const FALLBACK_BONDS: Bond3D[] = [
   { from: 0, to: 1, order: 2 }, { from: 1, to: 2, order: 1 },
   { from: 2, to: 3, order: 2 }, { from: 3, to: 4, order: 1 },
   { from: 4, to: 5, order: 2 }, { from: 5, to: 0, order: 1 },
   { from: 2, to: 6, order: 1 }, { from: 6, to: 7, order: 1 },
   { from: 7, to: 8, order: 2 }, { from: 7, to: 9, order: 1 },
-  { from: 0, to: 10, order: 1 }, { from: 5, to: 11, order: 1 },
-  { from: 10, to: 12, order: 1 }, { from: 11, to: 12, order: 1 },
-  { from: 1, to: 13, order: 1 }, { from: 4, to: 14, order: 1 },
-  { from: 6, to: 15, order: 1 },
 ];
 
 function rotatePoint(x: number, y: number, z: number, rx: number, ry: number) {
@@ -69,27 +50,24 @@ function rotatePoint(x: number, y: number, z: number, rx: number, ry: number) {
   return { x: x1, y: y2, z: z2 };
 }
 
-function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: {
+function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, atoms, bonds }: {
   rx: number; ry: number; zoom: number; renderMode: string;
   showHydrogen: boolean; showLabels: boolean;
+  atoms: Atom3D[]; bonds: Bond3D[];
 }) {
   const cx = 200, cy = 160;
 
-  const projected = MOLECULE_IBUPROFEN
-    .filter(a => showHydrogen || a.symbol !== "H")
-    .map(a => {
-      const r = rotatePoint(a.x - 80, a.y - 30, a.z, rx, ry);
+  const visibleAtoms = atoms.filter(a => showHydrogen || a.symbol !== "H");
+  const visibleSet = new Set(visibleAtoms.map(a => a.id));
+
+  const projected = visibleAtoms.map(a => {
+      const r = rotatePoint(a.x, a.y, a.z, rx, ry);
       const scale = zoom * (1 + r.z * 0.001);
-      return {
-        ...a,
-        px: cx + r.x * zoom,
-        py: cy + r.y * zoom,
-        pz: r.z,
-        scale,
-      };
+      return { ...a, px: cx + r.x * zoom, py: cy + r.y * zoom, pz: r.z, scale };
     }).sort((a, b) => a.pz - b.pz);
 
   const idToProj = Object.fromEntries(projected.map(p => [p.id, p]));
+  const visibleBonds = bonds.filter(b => visibleSet.has(b.from) && visibleSet.has(b.to));
 
   if (renderMode === "surface") {
     return (
@@ -100,9 +78,7 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
             <stop offset="60%" stopColor="#4f46e5" stopOpacity="0.7" />
             <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0.9" />
           </radialGradient>
-          <filter id="blur1">
-            <feGaussianBlur stdDeviation="8" />
-          </filter>
+          <filter id="blur1"><feGaussianBlur stdDeviation="8" /></filter>
           <radialGradient id="glowGrad" cx="50%" cy="50%">
             <stop offset="0%" stopColor="#818cf8" stopOpacity="0.3" />
             <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
@@ -111,7 +87,6 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
         <ellipse cx={cx} cy={cy} rx="155" ry="100" fill="url(#glowGrad)" filter="url(#blur1)" />
         <ellipse cx={cx} cy={cy} rx="140" ry="88" fill="url(#surfGrad)" opacity="0.85" />
         <ellipse cx={cx - 20} cy={cy - 30} rx="55" ry="35" fill="rgba(167,139,250,0.25)" />
-        {/* Sub-surface lobes */}
         <ellipse cx={cx + 55} cy={cy + 10} rx="38" ry="25" fill="rgba(96,165,250,0.15)" />
         <ellipse cx={cx - 60} cy={cy + 20} rx="32" ry="22" fill="rgba(244,63,94,0.12)" />
         <text x={cx} y={cy + 120} fill="#a78bfa" fontSize="9" textAnchor="middle" fontFamily="monospace">Molecular Surface (VDW Radius)</text>
@@ -122,20 +97,13 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
   if (renderMode === "wireframe") {
     return (
       <svg width="400" height="320" style={{ overflow: "visible" }}>
-        {BONDS.filter(b => {
-          const a = MOLECULE_IBUPROFEN.find(x => x.id === b.from);
-          const d = MOLECULE_IBUPROFEN.find(x => x.id === b.to);
-          if (!showHydrogen && (a?.symbol === "H" || d?.symbol === "H")) return false;
-          return idToProj[b.from] && idToProj[b.to];
-        }).map((b, i) => {
+        {visibleBonds.map((b, i) => {
           const f = idToProj[b.from], t = idToProj[b.to];
           if (!f || !t) return null;
           const depth = (f.pz + t.pz) / 2;
           const alpha = 0.4 + Math.max(0, Math.min(0.6, depth / 200));
-          return (
-            <line key={i} x1={f.px} y1={f.py} x2={t.px} y2={t.py}
-              stroke={`rgba(139,92,246,${alpha})`} strokeWidth={b.order === 2 ? 2 : 1.5} />
-          );
+          return <line key={i} x1={f.px} y1={f.py} x2={t.px} y2={t.py}
+            stroke={`rgba(139,92,246,${alpha})`} strokeWidth={b.order >= 2 ? 2 : 1.5} />;
         })}
         {projected.map(a => (
           <circle key={a.id} cx={a.px} cy={a.py} r={3}
@@ -158,39 +126,25 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
         <filter id="atomShadow">
           <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
         </filter>
-        <filter id="glowFilter">
-          <feGaussianBlur stdDeviation="4" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
       </defs>
 
-      {BONDS.filter(b => {
-        const a = MOLECULE_IBUPROFEN.find(x => x.id === b.from);
-        const d = MOLECULE_IBUPROFEN.find(x => x.id === b.to);
-        if (!showHydrogen && (a?.symbol === "H" || d?.symbol === "H")) return false;
-        return idToProj[b.from] && idToProj[b.to];
-      }).map((b, i) => {
+      {visibleBonds.map((b, i) => {
         const f = idToProj[b.from], t = idToProj[b.to];
         if (!f || !t) return null;
         const dx = t.px - f.px, dy = t.py - f.py;
-        const len = Math.sqrt(dx * dx + dy * dy);
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
         const depth = (f.pz + t.pz) / 2;
         const alpha = 0.4 + Math.max(0, Math.min(0.5, depth / 150));
-        if (b.order === 2) {
+        if (b.order >= 2) {
           const nx = -dy / len * 3, ny = dx / len * 3;
           return (
             <g key={i}>
-              <line x1={f.px + nx} y1={f.py + ny} x2={t.px + nx} y2={t.py + ny}
-                stroke={`rgba(180,180,200,${alpha})`} strokeWidth="2" />
-              <line x1={f.px - nx} y1={f.py - ny} x2={t.px - nx} y2={t.py - ny}
-                stroke={`rgba(180,180,200,${alpha})`} strokeWidth="2" />
+              <line x1={f.px + nx} y1={f.py + ny} x2={t.px + nx} y2={t.py + ny} stroke={`rgba(180,180,200,${alpha})`} strokeWidth="2" />
+              <line x1={f.px - nx} y1={f.py - ny} x2={t.px - nx} y2={t.py - ny} stroke={`rgba(180,180,200,${alpha})`} strokeWidth="2" />
             </g>
           );
         }
-        return (
-          <line key={i} x1={f.px} y1={f.py} x2={t.px} y2={t.py}
-            stroke={`rgba(180,180,200,${alpha})`} strokeWidth="3" />
-        );
+        return <line key={i} x1={f.px} y1={f.py} x2={t.px} y2={t.py} stroke={`rgba(180,180,200,${alpha})`} strokeWidth="3" />;
       })}
 
       {projected.map(a => {
@@ -199,17 +153,13 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
           <g key={a.id} style={{ cursor: "pointer" }}>
             <circle cx={a.px} cy={a.py} r={r + 2} fill="black" opacity="0.3" />
             <circle cx={a.px} cy={a.py} r={r}
-              fill={`url(#ag-${a.symbol})`}
-              filter="url(#atomShadow)"
-              stroke={ATOM_COLORS[a.symbol] || "#94a3b8"}
-              strokeWidth="0.5"
-              strokeOpacity="0.5"
+              fill={`url(#ag-${a.symbol})`} filter="url(#atomShadow)"
+              stroke={ATOM_COLORS[a.symbol] || "#94a3b8"} strokeWidth="0.5" strokeOpacity="0.5"
             />
             {showLabels && (
               <text x={a.px} y={a.py + 3} fill="white" fontSize={8 * a.scale}
                 textAnchor="middle" dominantBaseline="central" fontWeight="bold"
-                style={{ userSelect: "none", pointerEvents: "none" }}
-              >
+                style={{ userSelect: "none", pointerEvents: "none" }}>
                 {a.symbol}
               </text>
             )}
@@ -220,7 +170,7 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels }: 
   );
 }
 
-export function MolViewer3D_Cinematic() {
+export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles?: string; molName?: string } = {}) {
   const [rx, setRx] = useState(0.2);
   const [ry, setRy] = useState(0.4);
   const [zoom, setZoom] = useState(0.9);
@@ -228,10 +178,16 @@ export function MolViewer3D_Cinematic() {
   const [renderMode, setRenderMode] = useState<"ball-stick" | "surface" | "wireframe">("ball-stick");
   const [showHydrogen, setShowHydrogen] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
-  const [selectedAtom, setSelectedAtom] = useState<string | null>("C1 — Carbon (sp2)");
-  const [activeLib, setActiveLib] = useState("Ibuprofen-Analog-001");
+  const [selectedAtom, setSelectedAtom] = useState<string | null>(null);
+  const [activeLib, setActiveLib] = useState(propMolName || "Molecule");
   const animRef = useRef<number>(0);
   const ryRef = useRef(ry);
+
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const dynAtoms = mol3d?.atoms ?? FALLBACK_ATOMS;
+  const dynBonds = mol3d?.bonds ?? FALLBACK_BONDS;
+  const dynFormula = mol3d?.formula ?? "C₁₃H₁₈O₂";
+  const dynMolName = propMolName || "Molecule";
 
   useEffect(() => {
     if (!isAnimating) { cancelAnimationFrame(animRef.current); return; }
@@ -376,14 +332,17 @@ export function MolViewer3D_Cinematic() {
 
           {/* Molecule */}
           <div style={{ transform: "scale(1.4)", cursor: "grab" }}>
-            <MoleculeViewer rx={rx} ry={ry} zoom={zoom} renderMode={renderMode} showHydrogen={showHydrogen} showLabels={showLabels} />
+            <MoleculeViewer rx={rx} ry={ry} zoom={zoom} renderMode={renderMode} showHydrogen={showHydrogen} showLabels={showLabels} atoms={dynAtoms} bonds={dynBonds} />
           </div>
 
           {/* Formula overlay */}
           <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md border border-white/8 rounded-xl px-4 py-3">
             <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Active Molecule</div>
-            <div className="text-[14px] font-semibold text-white">{activeLib}</div>
-            <div className="text-[11px] text-violet-300 font-mono mt-0.5">C₁₃H₁₈O₂ · MW 206.3 Da</div>
+            <div className="text-[14px] font-semibold text-white">{dynMolName}</div>
+            <div className="text-[11px] text-violet-300 font-mono mt-0.5">
+              {dynFormula} · {dynAtoms.filter(a => a.symbol !== "H").length} heavy atoms
+            </div>
+            {mol3d && <div className="text-[9px] text-emerald-400/70 mt-0.5">● Live from SMILES</div>}
           </div>
 
           {/* XYZ axis indicator */}

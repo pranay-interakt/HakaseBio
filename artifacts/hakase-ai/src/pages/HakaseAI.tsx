@@ -2400,9 +2400,9 @@ export function HakaseAI() {
             </div>
           </div>
           <div className="flex-1 overflow-hidden">
-            {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic />}
-            {viewer3DMode === "scientific" && <MolViewer3D_Scientific />}
-            {viewer3DMode === "explorer" && <MolViewer3D_Explorer />}
+            {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic smiles={smiles} molName={molName || "Molecule"} />}
+            {viewer3DMode === "scientific" && <MolViewer3D_Scientific smiles={smiles} molName={molName || "Molecule"} />}
+            {viewer3DMode === "explorer" && <MolViewer3D_Explorer smiles={smiles} molName={molName || "Molecule"} />}
           </div>
         </div>,
         document.body

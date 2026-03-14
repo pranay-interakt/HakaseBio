@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   BarChart2, Zap, GitCompare, ChevronRight, Atom, Dna,
   FlaskConical, Activity, SlidersHorizontal, RotateCcw, ZoomIn, ZoomOut
 } from "lucide-react";
+import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#94a3b8", N: "#60a5fa", O: "#f87171",
@@ -96,10 +97,10 @@ function MiniMol({ rx, ry, color }: { rx: number; ry: number; color: string }) {
   );
 }
 
-function BigMol({ rx, ry, zoom, color }: { rx: number; ry: number; zoom: number; color: string }) {
+function BigMol({ rx, ry, zoom, color, dynAtoms, dynBonds }: { rx: number; ry: number; zoom: number; color: string; dynAtoms: typeof BASE_ATOMS; dynBonds: typeof BASE_BONDS }) {
   const cx = 200, cy = 160;
-  const atoms = BASE_ATOMS.map(a => {
-    const r = rot(a.x - 60, a.y - 20, a.z, rx, ry);
+  const atoms = dynAtoms.map(a => {
+    const r = rot(a.x, a.y, a.z, rx, ry);
     const s = zoom * (1 + r.z * 0.001);
     return { ...a, px: cx + r.x * zoom, py: cy + r.y * zoom, pz: r.z, s };
   }).sort((a, b) => a.pz - b.pz);
@@ -118,7 +119,7 @@ function BigMol({ rx, ry, zoom, color }: { rx: number; ry: number; zoom: number;
         <filter id="bs"><feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#000" floodOpacity="0.5" /></filter>
       </defs>
 
-      {BASE_BONDS.map((b, i) => {
+      {dynBonds.map((b, i) => {
         const f = pm[b.from], t = pm[b.to];
         if (!f || !t) return null;
         const d = (f.pz + t.pz) / 2;
@@ -158,7 +159,7 @@ function BigMol({ rx, ry, zoom, color }: { rx: number; ry: number; zoom: number;
   );
 }
 
-export function MolViewer3D_Explorer() {
+export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?: string; molName?: string } = {}) {
   const [selected, setSelected] = useState<string[]>(["m1"]);
   const [primary, setPrimary] = useState("m1");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -169,6 +170,12 @@ export function MolViewer3D_Explorer() {
   const [ry, setRy] = useState(0.6);
   const [zoom, setZoom] = useState(1.0);
   const [filterTox, setFilterTox] = useState<string[]>([]);
+
+  const mol3d = useMemo(() => smiles ? smilesTo3D(smiles) : null, [smiles]);
+  const dynAtoms = (mol3d?.atoms ?? BASE_ATOMS) as typeof BASE_ATOMS;
+  const dynBonds = (mol3d?.bonds ?? BASE_BONDS) as typeof BASE_BONDS;
+  const dynFormula = mol3d?.formula;
+  const dynMolName = propMolName || "Molecule";
 
   const primaryMol = MOLECULES.find(m => m.id === primary)!;
 
@@ -393,10 +400,11 @@ export function MolViewer3D_Explorer() {
 
           {/* Molecule info overlay */}
           <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: primaryMol.accentColor }} />
-            <span className="text-[13px] font-semibold text-white">{primaryMol.name}</span>
-            <span className="text-[11px] text-slate-500 font-mono">{primaryMol.formula}</span>
-            {primaryMol.tag && (
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: mol3d ? "#10b981" : primaryMol.accentColor }} />
+            <span className="text-[13px] font-semibold text-white">{mol3d ? dynMolName : primaryMol.name}</span>
+            <span className="text-[11px] text-slate-500 font-mono">{mol3d ? dynFormula : primaryMol.formula}</span>
+            {mol3d && <span className="text-[9px] text-emerald-400/60 border border-emerald-500/20 px-1.5 py-0.5 rounded">● Live from SMILES</span>}
+            {!mol3d && primaryMol.tag && (
               <Badge className="text-[9px] px-2 py-0" style={{ color: primaryMol.accentColor, backgroundColor: primaryMol.accentColor + "20", borderColor: primaryMol.accentColor + "40" }}>
                 {primaryMol.tag}
               </Badge>
@@ -406,7 +414,7 @@ export function MolViewer3D_Explorer() {
           {/* Molecule render */}
           <div className="flex-1 flex items-center justify-center relative z-10">
             <div style={{ transform: `scale(${zoom})`, cursor: "grab" }}>
-              <BigMol rx={rx} ry={ry} zoom={1} color={primaryMol.accentColor} />
+              <BigMol rx={rx} ry={ry} zoom={1} color={mol3d ? "#10b981" : primaryMol.accentColor} dynAtoms={dynAtoms} dynBonds={dynBonds} />
             </div>
           </div>
 

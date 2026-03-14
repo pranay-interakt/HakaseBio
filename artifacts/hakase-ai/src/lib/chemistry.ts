@@ -64,6 +64,10 @@ export function isReady(): boolean {
   return rdkit !== null;
 }
 
+export function getRDKitInstance(): any | null {
+  return rdkit;
+}
+
 export function getMolecularProperties(smiles: string): MolecularProperties | null {
   if (!rdkit || !smiles.trim()) return null;
 
