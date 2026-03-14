@@ -9,6 +9,7 @@ import {
   type FingerprintInfo,
 } from "@/lib/chemistry";
 import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
+import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
 import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
 import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
 import { createPortal } from "react-dom";
@@ -75,10 +76,11 @@ export function HakaseAI() {
     qed: number; sa: number; bindingAffinity: string;
   } | null>(null);
   const [apiImportOpen, setApiImportOpen] = useState(false);
-  const [apiSource, setApiSource] = useState("chembl");
+  const [apiSource, setApiSource] = useState<ApiSource>("chembl");
   const [apiCompoundId, setApiCompoundId] = useState("");
   const [apiLoading, setApiLoading] = useState(false);
-  const [apiResult, setApiResult] = useState<{ name: string; smiles: string; mw: string } | null>(null);
+  const [apiResult, setApiResult] = useState<{ name: string; smiles: string; mw: string; sourceId?: string } | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [projImportOpen, setProjImportOpen] = useState(false);
   const [projImportSource, setProjImportSource] = useState("clinicaltrials");
   const [projImportId, setProjImportId] = useState("");
@@ -394,54 +396,20 @@ export function HakaseAI() {
     }, 800);
   }, [projImportSource, projImportId]);
 
-  const handleApiFetch = useCallback(() => {
+  const handleApiFetch = useCallback(async () => {
     if (!apiCompoundId.trim()) return;
     setApiLoading(true);
     setApiResult(null);
-    const mockDb: Record<string, Record<string, { name: string; smiles: string; mw: string }>> = {
-      chembl: {
-        "chembl25":      { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                          mw: "180.2 Da" },
-        "chembl521":     { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                     mw: "206.3 Da" },
-        "chembl255863":  { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",      mw: "446.9 Da" },
-        "chembl1201328": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",        mw: "393.4 Da" },
-        "chembl941":     { name: "Osimertinib",smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1", mw: "499.6 Da" },
-      },
-      pubchem: {
-        "2244":   { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                        mw: "180.2 Da" },
-        "3672":   { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                   mw: "206.3 Da" },
-        "176870": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",      mw: "393.4 Da" },
-        "123631": { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",    mw: "446.9 Da" },
-        "5291":   { name: "Metformin",  smiles: "CN(C)C(=N)NC(N)=N",                             mw: "129.2 Da" },
-      },
-      drugbank: {
-        "db00945": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                        mw: "180.2 Da" },
-        "db01050": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                   mw: "206.3 Da" },
-        "db00530": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",      mw: "393.4 Da" },
-        "db00619": { name: "Imatinib",   smiles: "Cc1ccc(NC(=O)c2ccc(CN3CCN(CC3)C)cc2)cc1Nc1nccc(n1)-c1cccnc1", mw: "493.6 Da" },
-        "db00317": { name: "Gefitinib",  smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",   mw: "446.9 Da" },
-      },
-      unichem: {
-        "uci1": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",                           mw: "180.2 Da" },
-        "uci2": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                      mw: "206.3 Da" },
-        "uci3": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",         mw: "393.4 Da" },
-      },
-      zinc: {
-        "zinc000003594435": { name: "Ibuprofen",  smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",          mw: "206.3 Da" },
-        "zinc000001530689": { name: "Aspirin",    smiles: "CC(=O)Oc1ccccc1C(=O)O",               mw: "180.2 Da" },
-        "zinc000019632618": { name: "Erlotinib",  smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1", mw: "393.4 Da" },
-      },
-    };
-    setTimeout(() => {
-      const sourceDb = mockDb[apiSource] ?? {};
-      const hit = sourceDb[apiCompoundId.toLowerCase().trim()];
-      if (hit) {
-        setApiResult(hit);
-      } else {
-        // Generate a plausible-looking result for unknown IDs
-        setApiResult({ name: `Compound-${apiCompoundId.toUpperCase()}`, smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O", mw: "206.3 Da" });
-      }
+    setApiError(null);
+    try {
+      const compound = await fetchCompoundFromApi(apiSource, apiCompoundId.trim());
+      setApiResult({ name: compound.name, smiles: compound.smiles, mw: compound.mw, sourceId: compound.sourceId });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Fetch failed. Check your compound ID and try again.";
+      setApiError(msg);
+    } finally {
       setApiLoading(false);
-    }, 900);
+    }
   }, [apiSource, apiCompoundId]);
 
   const toggleTissue = (tissue: string) => {
@@ -1104,16 +1072,16 @@ export function HakaseAI() {
                             <div className="pt-3">
                               <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Source Database</div>
                               <div className="flex flex-wrap gap-1.5">
-                                {[
+                                {([
                                   { id: "chembl",   label: "ChEMBL",   hint: "CHEMBL25" },
-                                  { id: "pubchem",  label: "PubChem",  hint: "CID 3672" },
+                                  { id: "pubchem",  label: "PubChem",  hint: "CID 3672 or name" },
                                   { id: "drugbank", label: "DrugBank", hint: "DB01050" },
-                                  { id: "unichem",  label: "UniChem",  hint: "UCI2" },
-                                  { id: "zinc",     label: "ZINC",     hint: "ZINC…" },
-                                ].map(src => (
+                                  { id: "unichem",  label: "UniChem",  hint: "CHEMBL ID" },
+                                  { id: "zinc",     label: "ZINC",     hint: "ZINC ID" },
+                                ] as { id: ApiSource; label: string; hint: string }[]).map(src => (
                                   <button
                                     key={src.id}
-                                    onClick={() => { setApiSource(src.id); setApiResult(null); setApiCompoundId(""); }}
+                                    onClick={() => { setApiSource(src.id); setApiResult(null); setApiError(null); setApiCompoundId(""); }}
                                     className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
                                       apiSource === src.id
                                         ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
@@ -1131,7 +1099,12 @@ export function HakaseAI() {
                               <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
                                 Compound ID / Name
                                 <span className="ml-2 text-slate-600 normal-case">
-                                  e.g. {apiSource === "chembl" ? "CHEMBL25" : apiSource === "pubchem" ? "3672" : apiSource === "drugbank" ? "DB01050" : apiSource === "unichem" ? "UCI2" : "ZINC000003594435"}
+                                  e.g.&nbsp;
+                                  {apiSource === "chembl"   ? "CHEMBL25 or aspirin"         :
+                                   apiSource === "pubchem"  ? "2244 or ibuprofen"            :
+                                   apiSource === "drugbank" ? "DB01050"                      :
+                                   apiSource === "unichem"  ? "CHEMBL25 (ChEMBL ID)"         :
+                                                             "ZINC000003594435"}
                                 </span>
                               </div>
                               <div className="flex gap-2">
@@ -1139,9 +1112,15 @@ export function HakaseAI() {
                                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
                                   <Input
                                     value={apiCompoundId}
-                                    onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); }}
+                                    onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); setApiError(null); }}
                                     onKeyDown={e => e.key === "Enter" && handleApiFetch()}
-                                    placeholder="Enter ID or name…"
+                                    placeholder={
+                                      apiSource === "chembl"   ? "CHEMBL ID or drug name…"  :
+                                      apiSource === "pubchem"  ? "CID number or drug name…"  :
+                                      apiSource === "drugbank" ? "DrugBank ID (DB01050)…"    :
+                                      apiSource === "unichem"  ? "ChEMBL ID (e.g. CHEMBL25)…":
+                                                                "ZINC ID…"
+                                    }
                                     className="bg-white/5 border-white/10 text-white text-[12px] pl-7 focus:border-violet-500/60"
                                   />
                                 </div>
@@ -1156,12 +1135,25 @@ export function HakaseAI() {
                               </div>
                             </div>
 
+                            {/* Error */}
+                            {apiError && (
+                              <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                                <div className="text-[11px] text-red-300">{apiError}</div>
+                              </div>
+                            )}
+
                             {/* Result */}
                             {apiResult && (
                               <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
-                                <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start justify-between gap-2 mb-2">
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-[11px] font-semibold text-emerald-300">{apiResult.name}</div>
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="text-[11px] font-semibold text-emerald-300">{apiResult.name}</div>
+                                      {apiResult.sourceId && (
+                                        <span className="text-[9px] text-slate-600 font-mono">{apiResult.sourceId}</span>
+                                      )}
+                                    </div>
                                     <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">{apiResult.smiles}</div>
                                     <div className="text-[10px] text-slate-600 mt-0.5">MW: {apiResult.mw}</div>
                                   </div>
