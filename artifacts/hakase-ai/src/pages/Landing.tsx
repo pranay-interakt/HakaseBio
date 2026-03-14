@@ -312,6 +312,210 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ── From Molecule to Medicine Story ── */}
+      <section id="story" className="relative z-10 py-24 px-6 border-t border-white/5">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Header */}
+          <div className="text-center mb-20">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">The Complete Pipeline</div>
+            <h2 className="text-[40px] font-black tracking-tight text-white mb-4">From Molecule to Medicine</h2>
+            <p className="text-[15px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
+              Drug discovery takes 10–15 years and $2.6 billion per approved drug, with a 90% clinical trial failure rate.
+              Hakase AI connects two powerful engines into one seamless pipeline that compresses that timeline dramatically.
+            </p>
+          </div>
+
+          {/* Two-engine overview */}
+          <div className="grid md:grid-cols-2 gap-4 mb-24">
+            <div className="rounded-2xl border border-violet-500/25 bg-violet-500/5 p-8">
+              <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">The Creator</div>
+              <h3 className="text-[22px] font-black text-white mb-3">Diagen</h3>
+              <p className="text-[14px] text-slate-400 leading-relaxed">
+                Generates novel drug molecules using generative AI — exploring chemical space, optimising for drug-likeness,
+                and producing candidate SMILES strings with preliminary safety and binding scores.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-blue-500/25 bg-blue-500/5 p-8">
+              <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-3">The Validator</div>
+              <h3 className="text-[22px] font-black text-white mb-3">BioDigital Twin</h3>
+              <p className="text-[14px] text-slate-400 leading-relaxed">
+                Tests those molecules against virtual patients and simulated clinical trials across three cascading layers —
+                Molecular, Cohort, and Trial — proving what will work before physical trials begin.
+              </p>
+            </div>
+          </div>
+
+          {/* Step-by-step flow */}
+          <div className="text-center mb-14">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-2">The Flow</div>
+            <h3 className="text-[30px] font-black tracking-tight text-white">Step by Step</h3>
+          </div>
+
+          <div className="relative">
+            {/* Vertical connector */}
+            <div className="absolute left-6 top-6 bottom-6 w-px bg-gradient-to-b from-violet-500/40 via-blue-500/30 to-emerald-500/40" />
+
+            <div className="space-y-10">
+
+              {/* Diagen step */}
+              <div className="flex gap-8">
+                <div className="shrink-0 w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400 z-10">D</div>
+                <div className="flex-1 pt-1 pb-10 border-b border-white/5">
+                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Diagen</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Generate the Molecule</h4>
+                  <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                    A researcher enters a target — say, EGFR for non-small-cell lung cancer. Diagen's models explore chemical space,
+                    optimise for drug-likeness, and deliver candidate SMILES strings within minutes, each scored for synthetic feasibility and estimated binding affinity.
+                  </p>
+                  <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-5">
+                    <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">What Diagen passes to BioDigital Twin</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6">
+                      {[
+                        "SMILES strings (molecular structure notation)",
+                        "Molecular fingerprints (structural feature vectors)",
+                        "ADMET pre-scores (absorption, distribution, metabolism, excretion, toxicity)",
+                        "3D conformers (spatial molecular geometry)",
+                        "Target protein IDs (UniProt, e.g. P00533 for EGFR)",
+                      ].map(item => (
+                        <div key={item} className="flex items-start gap-2 text-[12px] text-slate-400">
+                          <span className="text-violet-500 mt-0.5 shrink-0">→</span> {item}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-white/5 text-[11px] text-slate-600">
+                      Three integration modes:&nbsp;
+                      <span className="text-violet-400">Synchronous</span> (single molecule, &lt;30 s) ·&nbsp;
+                      <span className="text-blue-400">Async Batch</span> (webhook callbacks) ·&nbsp;
+                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3 in one call)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Layer 1 */}
+              <div className="flex gap-8">
+                <div className="shrink-0 w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400 z-10">L1</div>
+                <div className="flex-1 pt-1 pb-10 border-b border-white/5">
+                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · Molecular Digital Twin</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Is This Molecule Safe?</h4>
+                  <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                    Using ChemBERTa (77M parameters) and ESM-2 (650M parameters), it predicts the full ADMET profile,
+                    simulates binding affinity against the target protein, runs organ-by-organ toxicity analysis,
+                    and compares the candidate against approved drugs. Output: a Go/No-Go recommendation with confidence score.
+                  </p>
+                  <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
+                    <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
+                      {[
+                        ["ADMET Profiling", "5-axis radar — Absorption · Distribution · Metabolism · Excretion · Toxicity"],
+                        ["Target Binding", "Affinity heatmap + 3D docking view (e.g. 12.4 nM for EGFR)"],
+                        ["Drug-likeness", "Lipinski check — MW, logP, HBD, HBA all within range"],
+                        ["Go / No-Go", "Confidence score + comparison to approved reference drugs"],
+                      ].map(([label, desc]) => (
+                        <div key={label} className="p-4">
+                          <div className="text-[11px] font-semibold text-violet-300 mb-1">{label}</div>
+                          <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Layer 2 */}
+              <div className="flex gap-8">
+                <div className="shrink-0 w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400 z-10">L2</div>
+                <div className="flex-1 pt-1 pb-10 border-b border-white/5">
+                  <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 2 · Patient Cohort Twin</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Who Will It Work For?</h4>
+                  <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                    Using MIMIC-IV (223K real patients) and NIH All of Us (1M+ participants), it constructs a synthetic cohort of
+                    500–10,000 virtual patients with realistic demographics, comorbidities, organ function levels, and pharmacogenomic
+                    profiles (CYP450 variants). Simulates PK/PD curves, dose-response, responder classification, and adverse events.
+                  </p>
+                  <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
+                    <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
+                      {[
+                        ["Population PK/PD", "Concentration curves with therapeutic window shading"],
+                        ["Responder Classification", "Waterfall plot + donut chart of response rates"],
+                        ["Adverse Events", "MedDRA-coded table with incidence, severity, onset timing"],
+                        ["Subgroup Analysis", "Heatmap by age, sex, ethnicity, organ function"],
+                      ].map(([label, desc]) => (
+                        <div key={label} className="p-4">
+                          <div className="text-[11px] font-semibold text-blue-300 mb-1">{label}</div>
+                          <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Layer 3 */}
+              <div className="flex gap-8">
+                <div className="shrink-0 w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400 z-10">L3</div>
+                <div className="flex-1 pt-1">
+                  <div className="text-[9px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Layer 3 · Trial Digital Twin</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Will the Trial Succeed?</h4>
+                  <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                    Monte Carlo simulation (1,000–10,000 replications) and Bayesian optimisation model the entire trial —
+                    enrollment trajectories, interim analyses, adaptive design decisions, synthetic control arms, and site rankings.
+                    Generates a complete simulation report predicting trial success probability with 95% confidence intervals,
+                    preventing $50M+ late-stage failures by identifying design flaws before a single real patient is enrolled.
+                  </p>
+                  <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
+                    <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
+                      {[
+                        ["Trial Success", "Probability gauge with 95% CI + historical benchmarks"],
+                        ["Enrollment Modeling", "Trajectory chart with per-site breakdown"],
+                        ["Adaptive Design", "Decision tree of interim analysis points"],
+                        ["Cost Estimation", "Budget summary with sensitivity analysis"],
+                      ].map(([label, desc]) => (
+                        <div key={label} className="p-4">
+                          <div className="text-[11px] font-semibold text-emerald-300 mb-1">{label}</div>
+                          <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Why This Matters */}
+          <div className="mt-24 rounded-2xl border border-white/8 bg-white/2 overflow-hidden">
+            <div className="px-8 py-6 border-b border-white/5">
+              <h3 className="text-[20px] font-black text-white">Why This Matters</h3>
+            </div>
+            <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/5">
+              <div className="p-8 text-center">
+                <div className="text-[9px] uppercase tracking-widest text-slate-600 mb-4">Without Hakase</div>
+                <div className="text-[42px] font-black text-slate-400 leading-none mb-2">10–15<span className="text-[20px] ml-1">yrs</span></div>
+                <div className="text-[13px] text-slate-600">from molecule to market</div>
+              </div>
+              <div className="p-8 text-center">
+                <div className="text-[9px] uppercase tracking-widest text-violet-600 mb-4">With Hakase</div>
+                <div className="text-[42px] font-black text-violet-400 leading-none mb-2">30–50<span className="text-[20px] ml-0.5">%</span></div>
+                <div className="text-[13px] text-slate-500">faster pre-clinical cost reduction</div>
+              </div>
+              <div className="p-8 text-center">
+                <div className="text-[9px] uppercase tracking-widest text-emerald-600 mb-4">The Result</div>
+                <div className="text-[42px] font-black text-emerald-400 leading-none mb-2">$50M<span className="text-[20px] ml-0.5">+</span></div>
+                <div className="text-[13px] text-slate-500">saved per prevented trial failure</div>
+              </div>
+            </div>
+            <div className="px-8 py-5 border-t border-white/5 text-center">
+              <p className="text-[13px] text-slate-600 italic">
+                Diagen imagines the molecule. BioDigital Twin proves it will work.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ── 3D Viewer — live embedded ── */}
       <section className="relative z-10 py-20 px-6 border-t border-white/5">
         <div className="max-w-7xl mx-auto">
