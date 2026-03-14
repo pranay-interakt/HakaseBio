@@ -38,15 +38,18 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",  anchor: "#layer2",  color: "blue"    },
     { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",          anchor: "#layer3",  color: "emerald" },
     { label: "Privacy",                      sub: "Client-side · Zero data egress",        anchor: "#privacy", color: "slate"   },
+    { label: "Advanced AI · v2",             sub: "50+ models · 8 component upgrades",     anchor: "#ai-v2",   color: "amber"   },
   ];
+
+  const landingAnchors = new Set(["#privacy", "#ai-v2"]);
 
   function handlePlatformNav(anchor: string) {
     setPlatformOpen(false);
     setMobileOpen(false);
-    if (anchor === "#privacy") {
+    if (landingAnchors.has(anchor)) {
       navigate("/");
       setTimeout(() => {
-        document.querySelector("#privacy")?.scrollIntoView({ behavior: "smooth" });
+        document.querySelector(anchor)?.scrollIntoView({ behavior: "smooth" });
       }, 150);
     } else {
       navigate("/platform" + anchor);
@@ -88,7 +91,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
                       className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors group"
                     >
                       <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${
-                        color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : "text-slate-300"
+                        color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : color === "amber" ? "text-amber-300" : "text-slate-300"
                       }`}>{label}</div>
                       <div className="text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">{sub}</div>
                     </button>
@@ -147,7 +150,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
                 className="w-full text-left px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
               >
                 <div className={`text-[14px] font-semibold mb-0.5 ${
-                  color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : "text-slate-300"
+                  color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : color === "amber" ? "text-amber-300" : "text-slate-300"
                 }`}>{label}</div>
                 <div className="text-[12px] text-slate-500">{sub}</div>
               </button>

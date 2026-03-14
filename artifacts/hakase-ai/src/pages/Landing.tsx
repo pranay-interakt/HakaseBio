@@ -608,6 +608,111 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ── Advanced AI v2 ── */}
+      <section id="ai-v2" className="relative z-10 py-24 px-6 border-t border-white/5">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Header */}
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-500/25 bg-violet-500/8 mb-5">
+              <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-violet-400 tracking-wide uppercase">Coming in v2</span>
+            </div>
+            <h2 className="text-[38px] font-black tracking-tight text-white mb-4">
+              Advanced AI Models
+            </h2>
+            <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              Every simulation component is independently upgradeable from QSAR rules to dedicated AI models.
+              50+ models evaluated. 8 component upgrades. 3-phase rollout.
+              The same privacy guarantee — your molecular structures never leave the browser.
+            </p>
+          </div>
+
+          {/* Upgrade grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+
+            {/* Layer 1 upgrades */}
+            <div className="rounded-2xl border border-violet-500/15 bg-violet-500/4 p-5">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-7 h-7 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[10px] font-black text-violet-400">L1</div>
+                <span className="text-[11px] font-semibold text-violet-400 uppercase tracking-widest">Molecular</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  ["ADMET Scoring",      "Transformer model trained on tens of millions of molecules — replaces Lipinski/Veber QSAR rules."],
+                  ["Binding Affinity",   "Protein language model embeddings paired with attention-based affinity predictor. Coverage expands from ~20 targets to thousands."],
+                  ["Organ Toxicity",     "Specialized per-organ models (cardiac, hepatic, renal) with confidence intervals. Replaces structural flag heuristics."],
+                ].map(([label, desc]) => (
+                  <div key={label as string} className="border-t border-violet-500/10 pt-3 first:border-0 first:pt-0">
+                    <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
+                    <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Layer 2 upgrades */}
+            <div className="rounded-2xl border border-blue-500/15 bg-blue-500/4 p-5">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-7 h-7 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[10px] font-black text-blue-400">L2</div>
+                <span className="text-[11px] font-semibold text-blue-400 uppercase tracking-widest">Cohort</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  ["Population PK/PD",   "Pharmacometric engines trained on real patient data replace one-compartment analytical models with individual-level variability."],
+                  ["Adverse Events",      "Clinical NLP model trained on adverse event reports predicts event frequency and severity from molecular structure."],
+                  ["Drug Interactions",   "Graph neural network across all known drug pairs — covers 1M+ interaction warnings beyond structural estimates."],
+                ].map(([label, desc]) => (
+                  <div key={label as string} className="border-t border-blue-500/10 pt-3 first:border-0 first:pt-0">
+                    <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
+                    <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Layer 3 upgrades */}
+            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/4 p-5">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-7 h-7 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[10px] font-black text-emerald-400">L3</div>
+                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-widest">Trial</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  ["Trial Outcome",      "Graph-based model trained on thousands of real clinical trials predicts go/no-go with molecule, cohort, and design as inputs."],
+                  ["Survival Analysis",  "Deep survival model replaces parametric Weibull curves. Learns non-proportional hazards from historical trial data."],
+                  ["Protein Structure",  "State-of-the-art structure prediction for novel targets enables accurate binding for targets with no known crystal structure."],
+                ].map(([label, desc]) => (
+                  <div key={label as string} className="border-t border-emerald-500/10 pt-3 first:border-0 first:pt-0">
+                    <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
+                    <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Privacy guarantee row */}
+          <div className="rounded-2xl border border-white/8 bg-white/2 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="shrink-0 w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center">
+              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="text-[13px] font-semibold text-white mb-1">Privacy guarantee unchanged in v2</div>
+              <p className="text-[12px] text-slate-400 leading-relaxed">
+                The AI inference server never sees your SMILES. The browser computes a Morgan fingerprint — a 2048-bit one-way hash — and sends only that to the model endpoint. Morgan fingerprints are mathematically irreversible: no server, including ours, can reconstruct the original molecular structure.
+              </p>
+            </div>
+            <div className="shrink-0 text-[10px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8 text-emerald-400">
+              Zero-knowledge
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ── Privacy Architecture ── */}
       <section id="privacy" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
