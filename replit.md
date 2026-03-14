@@ -94,3 +94,28 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+---
+
+## HakaseAI — BioDigital Twin Platform
+
+React + Vite SPA at `artifacts/hakase-ai/`. Routes: `/` (Landing), `/login`, `/dashboard`.
+
+### Simulation Architecture (fully browser-side, no backend needed)
+
+Three layered engines in `src/lib/`:
+- `admet.ts` — `runAdmetSimulation(molProps, smiles, molName, uniprotId) → SimResults`. Rule-based ADMET scores, organ risk, binding affinity heatmap, toxicity alerts, QED, Go/No-Go.
+- `cohortSim.ts` — `runCohortSimulation(simResults, cohortSize, dose, route, freq, ageRange, severity) → CohortResults`. PK/PD curves, responder rates, AEs, dose escalation groups, subgroup breakdown.
+- `trialSim.ts` — `runTrialSimulation(simResults, cohortResults, phase, endpoint, ...) → TrialResults`. Statistical power, Weibull survival, interim analyses, site rankings, cost.
+
+### Key Types
+
+- `SimResults` — `admet`, `organs`, `toxAlerts`, `binding`, `qed`, `goNogo`, `confidence`, `recommendation`, `similarDrugs`, `smiles`, `molName`, `uniprotId`, `lipinski`
+- `CohortResults` — `cohortSize`, `responderRate`, `partialRate`, `nonResponderRate`, `pkCurve`, `cmax`, `cmaxSD`, `auc`, `halfLifeHr`, `doseGroups`, `adverseEvents`, `subgroupBreakdown`, `grade3AERate`
+- `TrialResults` — `power`, `pValue`, `sampleSize`, `successProbability`, `survivalCurve`, `powerCurve`, `interimAnalyses`, `estimatedDuration`, `estimatedCost`, `siteRecommendations`, `goNogo`
+
+### RDKit.js (MinimalLib) key descriptor names
+`amw` (MW), `CrippenClogP` (logP), `lipinskiHBD`, `lipinskiHBA`, `tpsa`, `NumRotatableBonds`
+
+### Design tokens
+Dark: `bg-[#07080c]` · Violet = Layer 1 · Blue = Layer 2 · Emerald = Layer 3 · Inter font · Logo: `@assets/image_1773504202272.png`

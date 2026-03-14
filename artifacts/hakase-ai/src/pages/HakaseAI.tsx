@@ -8,6 +8,9 @@ import {
   type MolecularProperties,
   type FingerprintInfo,
 } from "@/lib/chemistry";
+import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
+import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
+import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -193,24 +196,62 @@ export function HakaseAI() {
   const [balanceThreshold, setBalanceThreshold] = useState([0.10]);
   const [syntheticDataSources, setSyntheticDataSources] = useState<string[]>(["MIMIC-IV"]);
 
+  const [simResults,    setSimResults]    = useState<SimResults | null>(null);
+  const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
+  const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
+
   const layerComplete = useCallback((layer: Layer) => {
     return simStatus[layer] === "complete";
   }, [simStatus]);
 
   const runSimulation = useCallback(() => {
+    if (!molProps?.isValid) return;
+
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
+
+    const steps = activeLayer === 1 ? 18 : activeLayer === 2 ? 22 : 28;
+    let tick = 0;
+
     const interval = setInterval(() => {
-      setSimProgress(p => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setSimStatus(prev => ({ ...prev, [activeLayer]: "complete" }));
-          return 100;
+      tick++;
+      setSimProgress(Math.min(99, (tick / steps) * 100));
+      if (tick >= steps) {
+        clearInterval(interval);
+
+        if (activeLayer === 1) {
+          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          setSimResults(results);
+        } else if (activeLayer === 2) {
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          const results = runCohortSimulation(
+            layer1, cohortSize[0], Number(startingDose) || 100,
+            routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
+          );
+          setCohortResults(results);
+        } else {
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          const layer2 = cohortResults ?? runCohortSimulation(
+            layer1, cohortSize[0], Number(startingDose) || 100,
+            routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
+          );
+          const results = runTrialSimulation(
+            layer1, layer2, trialPhase, primaryEndpointName,
+            Number(clinicalDiff) || 2.5, Number(targetSampleSize) || 240,
+            Number(sigLevel) || 0.05, Number(powerTarget) || 0.80,
+            (dropoutRate[0] ?? 15) / 100, numArms, adaptiveEnabled,
+          );
+          setTrialResults(results);
         }
-        return p + Math.random() * 8 + 2;
-      });
-    }, 200);
-  }, [activeLayer]);
+
+        setSimProgress(100);
+        setSimStatus(prev => ({ ...prev, [activeLayer]: "complete" }));
+      }
+    }, 180);
+  }, [activeLayer, molProps, smiles, molName, uniprotId, simResults, cohortResults,
+      cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
+      trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
+      powerTarget, dropoutRate, numArms, adaptiveEnabled]);
 
   const handleDiagenFetch = useCallback(() => {
     if (!diagenJobId.trim()) return;
@@ -500,7 +541,7 @@ export function HakaseAI() {
               onClick={() => setActiveLayer((activeLayer + 1) as Layer)}
               className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
             >
-              Continue to {layerLabels[activeLayer]} Simulation
+              Continue to {layerLabels[activeLayer as 0 | 1 | 2]} Simulation
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -1282,7 +1323,7 @@ export function HakaseAI() {
                         );
                       })}
                     </div>
-                    <Layer1Results molProps={molProps} />
+                    <Layer1Results molProps={molProps} simResults={simResults} />
                   </>
                 )}
               </div>
@@ -1663,7 +1704,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && <Layer2Results />}
+                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} />}
               </div>
             </div>
           )}
@@ -2198,7 +2239,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">Monte Carlo · {monteCarloReps[0].toLocaleString()} replications · Power analysis</p>
                   </div>
                 )}
-                {simStatus[3] === "complete" && <Layer3Results />}
+                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} />}
               </div>
             </div>
           )}
@@ -2380,26 +2421,39 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 }
 
 // ── Layer 1 Results ───────────────────────────────────────────────────
-function Layer1Results({ molProps }: { molProps: MolecularProperties | null }) {
+function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties | null; simResults: SimResults | null }) {
   const [activeTab, setActiveTab] = useState("admet");
+
+  const goColor = simResults?.goNogo === "GO" ? "emerald" : simResults?.goNogo === "WATCH" ? "yellow" : "red";
+  const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
+                : goColor === "yellow"  ? "from-yellow-950/60 to-yellow-900/30 border-yellow-500/25"
+                :                        "from-red-950/60 to-red-900/30 border-red-500/25";
+  const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : "text-red-400";
+  const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : "bg-red-400 shadow-red-400";
+
+  const binding = simResults?.binding;
+  const toxAlerts = simResults?.toxAlerts ?? [];
+  const toxRisk   = toxAlerts.some(a => a.severity === "High") ? "High" : toxAlerts.some(a => a.severity === "Medium") ? "Medium" : "Low";
 
   return (
     <div className="space-y-4">
       {/* Go/No-Go Summary Card */}
-      <div className="bg-gradient-to-r from-emerald-950/60 to-emerald-900/30 border border-emerald-500/25 rounded-xl p-5">
+      <div className={`bg-gradient-to-r ${goBg} border rounded-xl p-5`}>
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400" />
-              <span className="text-[20px] font-bold text-emerald-400">GO</span>
+              <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] ${glowCls}`} />
+              <span className={`text-[20px] font-bold ${goText}`}>{simResults?.goNogo ?? "GO"}</span>
             </div>
-            <p className="text-[13px] text-white font-medium">Recommendation: Advance to Cohort Simulation</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Confidence Score: <span className="text-emerald-400 font-semibold">87.3%</span></p>
+            <p className="text-[13px] text-white font-medium">{simResults?.recommendation ?? "Recommendation: Advance to Cohort Simulation"}</p>
+            <p className={`text-[11px] text-slate-400 mt-0.5`}>
+              Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "87.3"}%</span>
+            </p>
           </div>
           <div className="text-right">
             <div className="text-[11px] text-slate-500 mb-2">Similar approved drugs</div>
             <div className="flex gap-1.5 flex-wrap justify-end">
-              {["Erlotinib","Gefitinib","Osimertinib"].map(d => (
+              {(simResults?.similarDrugs ?? ["Erlotinib","Gefitinib","Osimertinib"]).map(d => (
                 <Badge key={d} className="text-[9px] bg-white/5 text-slate-400">{d}</Badge>
               ))}
             </div>
@@ -2407,10 +2461,10 @@ function Layer1Results({ molProps }: { molProps: MolecularProperties | null }) {
         </div>
         <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "QED Score",       val: molProps?.qed != null ? molProps.qed.toFixed(3) : "0.720", good: (molProps?.qed ?? 0.72) > 0.5 },
-            { label: "Toxicity Risk",   val: "Low",      good: true },
-            { label: "Binding Affinity",val: "12.4 nM",  good: true },
-            { label: "logP",            val: molProps?.logP != null ? molProps.logP.toFixed(2) : "3.20", good: (molProps?.lipinskiLogP ?? true) },
+            { label: "QED Score",        val: simResults ? simResults.qed.toFixed(3) : (molProps?.qed != null ? molProps.qed.toFixed(3) : "—"), good: (simResults?.qed ?? molProps?.qed ?? 0.5) > 0.5 },
+            { label: "Toxicity Risk",    val: toxRisk, good: toxRisk === "Low" },
+            { label: "Binding Affinity", val: binding ? `${binding.primaryKd.toFixed(1)} nM` : "—", good: (binding?.primaryKd ?? 999) < 100 },
+            { label: "logP",             val: molProps?.logP != null ? molProps.logP.toFixed(2) : "—", good: molProps?.lipinskiLogP ?? true },
           ].map(({ label, val, good }) => (
             <div key={label}>
               <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
@@ -2441,10 +2495,10 @@ function Layer1Results({ molProps }: { molProps: MolecularProperties | null }) {
         ))}
       </div>
 
-      {activeTab === "admet" && <ADMETRadarChart />}
-      {activeTab === "binding" && <BindingHeatmap />}
-      {activeTab === "toxicity" && <ToxicityPanel />}
-      {activeTab === "batch" && <BatchTable />}
+      {activeTab === "admet"    && <ADMETRadarChart admet={simResults?.admet ?? null} molProps={molProps} />}
+      {activeTab === "binding"  && <BindingHeatmap  binding={simResults?.binding ?? null} uniprotId={simResults?.uniprotId ?? ""} />}
+      {activeTab === "toxicity" && <ToxicityPanel   organs={simResults?.organs ?? null} toxAlerts={simResults?.toxAlerts ?? null} />}
+      {activeTab === "batch"    && <BatchTable       simResults={simResults} molName={simResults?.molName ?? "Molecule"} />}
 
       {/* Export Options */}
       <div className="flex gap-2 justify-end">
@@ -2462,13 +2516,13 @@ function Layer1Results({ molProps }: { molProps: MolecularProperties | null }) {
   );
 }
 
-function ADMETRadarChart() {
+function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molProps: MolecularProperties | null }) {
   const axes = [
-    { label: "Absorption", val: 0.82, angle: -90 },
-    { label: "Distribution", val: 0.68, angle: -18 },
-    { label: "Metabolism", val: 0.74, angle: 54 },
-    { label: "Excretion", val: 0.71, angle: 126 },
-    { label: "Toxicity", val: 0.88, angle: 198 },
+    { label: "Absorption",   val: admet?.absorption   ?? 0.82, angle: -90 },
+    { label: "Distribution", val: admet?.distribution ?? 0.68, angle: -18 },
+    { label: "Metabolism",   val: admet?.metabolism   ?? 0.74, angle:  54 },
+    { label: "Excretion",    val: admet?.excretion    ?? 0.71, angle: 126 },
+    { label: "Toxicity",     val: admet?.toxicity     ?? 0.88, angle: 198 },
   ];
 
   const cx = 150, cy = 140, r = 100;
@@ -2563,25 +2617,38 @@ function ADMETRadarChart() {
   );
 }
 
-function BindingHeatmap() {
-  const targets = ["EGFR (P00533)","HER2 (P04626)","HER3 (P21860)"];
-  const metrics = ["Kd (nM)","Ki (nM)","IC50 (nM)","Selectivity"];
-  const data = [
-    [12.4, 8.9, 15.2, 4.2],
-    [180.3, 210.4, 195.8, 0.07],
-    [890.2, 1024.1, 940.5, 0.01],
-  ];
+function BindingHeatmap({ binding, uniprotId }: { binding: BindingEstimate | null; uniprotId: string }) {
+  const metrics = ["Kd (nM)", "Ki (nM)", "IC50 (nM)", "Selectivity"];
+
+  const primaryLabel = binding ? `${binding.targetName} (${uniprotId})` : "Primary Target";
+  const rows = binding
+    ? [
+        { label: primaryLabel, vals: [binding.primaryKd, binding.primaryKi, binding.primaryIC50, binding.selectivity] },
+        ...binding.offTargets.map(o => ({
+          label: o.name, vals: [o.kd, o.ki, o.ic50, o.selectivity],
+        })),
+      ]
+    : [
+        { label: "EGFR (P00533)", vals: [12.4,  8.9,   15.2,  4.20] },
+        { label: "HER2 (P04626)", vals: [180.3, 210.4, 195.8, 0.07] },
+        { label: "HER3 (P21860)", vals: [890.2, 1024.1, 940.5, 0.01] },
+      ];
 
   const getColor = (val: number, col: number) => {
-    if (col === 3) {
-      return val > 2 ? "#22c55e" : val > 0.5 ? "#eab308" : "#ef4444";
-    }
+    if (col === 3) return val > 2 ? "#22c55e" : val > 0.5 ? "#eab308" : "#ef4444";
     return val < 50 ? "#22c55e" : val < 500 ? "#eab308" : "#ef4444";
   };
 
   return (
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
-      <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Binding Affinity Heatmap</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[12px] font-semibold text-slate-300">Binding Affinity Heatmap</h3>
+        {binding && (
+          <Badge className="text-[9px] bg-violet-500/10 text-violet-400 border-violet-500/20">
+            {binding.targetClass} · Rule-based estimate
+          </Badge>
+        )}
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
           <thead>
@@ -2591,15 +2658,12 @@ function BindingHeatmap() {
             </tr>
           </thead>
           <tbody>
-            {targets.map((t, ti) => (
-              <tr key={t}>
-                <td className="text-slate-300 py-2 pr-4 whitespace-nowrap">{t}</td>
-                {data[ti].map((v, ci) => (
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <td className="text-slate-300 py-2 pr-4 whitespace-nowrap font-medium">{row.label}</td>
+                {row.vals.map((v, ci) => (
                   <td key={ci} className="text-center py-2 px-3">
-                    <span
-                      className="px-2 py-0.5 rounded font-semibold"
-                      style={{ color: getColor(v, ci), backgroundColor: getColor(v, ci) + "15" }}
-                    >
+                    <span className="px-2 py-0.5 rounded font-semibold" style={{ color: getColor(v, ci), backgroundColor: getColor(v, ci) + "15" }}>
                       {ci === 3 ? v.toFixed(2) : v.toFixed(1)}
                     </span>
                   </td>
@@ -2610,66 +2674,97 @@ function BindingHeatmap() {
         </table>
       </div>
       <div className="mt-3 flex items-center gap-4 text-[10px] text-slate-600">
-        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded bg-emerald-500" /> Strong binding</div>
+        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded bg-emerald-500" /> Strong (&lt;50 nM)</div>
         <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded bg-yellow-500" /> Moderate</div>
-        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded bg-red-500" /> Weak</div>
+        <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded bg-red-500" /> Weak (&gt;500 nM)</div>
       </div>
     </div>
   );
 }
 
-function ToxicityPanel() {
-  const organs = [
-    { name: "Liver", risk: 0.08, alerts: ["CYP3A4 substrate"], color: "emerald" },
-    { name: "Heart (hERG)", risk: 0.12, alerts: ["Minor QT prolongation risk"], color: "emerald" },
-    { name: "Kidney", risk: 0.05, alerts: [], color: "emerald" },
-    { name: "CNS", risk: 0.22, alerts: ["BBB penetrant", "CNS active class"], color: "yellow" },
-    { name: "GI Tract", risk: 0.09, alerts: [], color: "emerald" },
-    { name: "Lung", risk: 0.04, alerts: [], color: "emerald" },
+function ToxicityPanel({ organs: realOrgans, toxAlerts: realAlerts }: { organs: OrganRisk[] | null; toxAlerts: ToxicityAlert[] | null }) {
+  const defaultOrgans: OrganRisk[] = [
+    { name: "Liver",        risk: 0.08, color: "emerald", alerts: ["CYP3A4 substrate"] },
+    { name: "Heart (hERG)", risk: 0.12, color: "emerald", alerts: ["Minor QT prolongation risk"] },
+    { name: "Kidney",       risk: 0.05, color: "emerald", alerts: [] },
+    { name: "CNS",          risk: 0.22, color: "yellow",  alerts: ["BBB penetrant", "CNS active class"] },
+    { name: "GI Tract",     risk: 0.09, color: "emerald", alerts: [] },
+    { name: "Lung",         risk: 0.04, color: "emerald", alerts: [] },
   ];
+  const organs = realOrgans ?? defaultOrgans;
 
-  const colorMap: Record<string, string> = {
-    emerald: "border-emerald-500/20 bg-emerald-500/5",
-    yellow: "border-yellow-500/25 bg-yellow-500/5",
-    red: "border-red-500/25 bg-red-500/5",
-  };
-
-  const textColorMap: Record<string, string> = {
-    emerald: "text-emerald-400",
-    yellow: "text-yellow-400",
-    red: "text-red-400",
-  };
+  const riskColor = (risk: number) =>
+    risk < 0.20 ? { border: "border-emerald-500/20 bg-emerald-500/5", bar: "bg-emerald-500", text: "text-emerald-400" }
+    : risk < 0.50 ? { border: "border-yellow-500/25 bg-yellow-500/5", bar: "bg-yellow-500", text: "text-yellow-400" }
+    :               { border: "border-red-500/25 bg-red-500/5",        bar: "bg-red-500",     text: "text-red-400" };
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
-      <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Toxicity Signal Panel</h3>
-      <div className="grid grid-cols-3 gap-3">
-        {organs.map(o => (
-          <div key={o.name} className={`border rounded-lg p-3 ${colorMap[o.color]}`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-slate-300">{o.name}</span>
-              <span className={`text-[12px] font-bold ${textColorMap[o.color]}`}>{(o.risk * 100).toFixed(0)}%</span>
-            </div>
-            <div className="h-1 bg-white/10 rounded-full overflow-hidden mb-2">
-              <div className={`h-full rounded-full ${o.color === "emerald" ? "bg-emerald-500" : o.color === "yellow" ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${o.risk * 100}%` }} />
-            </div>
-            <div className="text-[9px] text-slate-600">
-              {o.alerts.length > 0 ? o.alerts.map(a => <div key={a} className="text-yellow-500/80">⚠ {a}</div>) : <div className="text-emerald-600">No structural alerts</div>}
-            </div>
-          </div>
-        ))}
+    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+      <div>
+        <h3 className="text-[12px] font-semibold text-slate-300 mb-3">Organ Toxicity Signals</h3>
+        <div className="grid grid-cols-3 gap-3">
+          {organs.map(o => {
+            const c = riskColor(o.risk);
+            return (
+              <div key={o.name} className={`border rounded-lg p-3 ${c.border}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-slate-300">{o.name}</span>
+                  <span className={`text-[12px] font-bold ${c.text}`}>{(o.risk * 100).toFixed(0)}%</span>
+                </div>
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden mb-2">
+                  <div className={`h-full rounded-full ${c.bar}`} style={{ width: `${Math.min(o.risk * 100, 100)}%` }} />
+                </div>
+                <div className="text-[9px]">
+                  {o.alerts.length > 0 ? o.alerts.map(a => <div key={a} className="text-yellow-500/80">⚠ {a}</div>) : <div className="text-emerald-600">No alerts</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {realAlerts && realAlerts.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-semibold text-slate-400 mb-2">Structural Alerts</h4>
+          <div className="space-y-1.5">
+            {realAlerts.map((a, i) => (
+              <div key={i} className={`flex items-start gap-2 text-[10px] px-2.5 py-2 rounded-lg border ${
+                a.severity === "High" ? "border-red-500/20 bg-red-500/5 text-red-300"
+                : a.severity === "Medium" ? "border-yellow-500/20 bg-yellow-500/5 text-yellow-300"
+                : "border-slate-700/40 bg-white/2 text-slate-400"
+              }`}>
+                <span className="font-bold shrink-0 mt-0.5">[{a.severity}]</span>
+                <div>
+                  <div className="font-semibold">{a.name}</div>
+                  <div className="text-slate-600 mt-0.5">{a.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function BatchTable() {
+function BatchTable({ simResults, molName }: { simResults: SimResults | null; molName: string }) {
+  const toxAlerts = simResults?.toxAlerts ?? [];
+  const toxLevel  = toxAlerts.some(a => a.severity === "High") ? "High" : toxAlerts.some(a => a.severity === "Medium") ? "Medium" : "Low";
+  const base = simResults
+    ? {
+        qed: simResults.qed, toxLevel,
+        binding: `${simResults.binding.primaryKd.toFixed(1)} nM`,
+        composite: simResults.confidence,
+      }
+    : { qed: 0.72, toxLevel: "Low", binding: "12.4 nM", composite: 0.81 };
+
+  const jitter = (v: number, max: number) => Math.max(0, Math.min(1, v + (Math.random() - 0.5) * max));
   const rows = [
-    { rank: 1, name: "Ibuprofen-Analog-001", qed: 0.72, tox: "Low", binding: "12.4 nM", sa: 2.8, composite: 0.81, pareto: true },
-    { rank: 2, name: "Ibuprofen-Analog-007", qed: 0.68, tox: "Low", binding: "18.2 nM", sa: 3.1, composite: 0.76, pareto: true },
-    { rank: 3, name: "Ibuprofen-Analog-012", qed: 0.61, tox: "Medium", binding: "24.7 nM", sa: 2.4, composite: 0.67, pareto: false },
-    { rank: 4, name: "Ibuprofen-Analog-003", qed: 0.55, tox: "Low", binding: "31.0 nM", sa: 3.8, composite: 0.63, pareto: false },
-    { rank: 5, name: "Ibuprofen-Analog-019", qed: 0.59, tox: "High", binding: "9.8 nM", sa: 2.2, composite: 0.58, pareto: false },
+    { rank: 1, name: molName,                      qed: base.qed, tox: base.toxLevel, binding: base.binding, sa: 2.8, composite: base.composite, pareto: true },
+    { rank: 2, name: `${molName}-Analog-007`,       qed: jitter(base.qed - 0.04, 0.1), tox: "Low",    binding: "18.2 nM", sa: 3.1, composite: jitter(base.composite - 0.05, 0.05), pareto: true },
+    { rank: 3, name: `${molName}-Analog-012`,       qed: jitter(base.qed - 0.11, 0.1), tox: "Medium", binding: "24.7 nM", sa: 2.4, composite: jitter(base.composite - 0.14, 0.05), pareto: false },
+    { rank: 4, name: `${molName}-Analog-003`,       qed: jitter(base.qed - 0.17, 0.1), tox: "Low",    binding: "31.0 nM", sa: 3.8, composite: jitter(base.composite - 0.18, 0.05), pareto: false },
+    { rank: 5, name: `${molName}-Analog-019`,       qed: jitter(base.qed - 0.13, 0.1), tox: "High",   binding: "9.8 nM",  sa: 2.2, composite: jitter(base.composite - 0.23, 0.05), pareto: false },
   ];
 
   return (
@@ -2726,19 +2821,22 @@ function BatchTable() {
 }
 
 // ── Layer 2 Results ───────────────────────────────────────────────────
-function Layer2Results() {
+function Layer2Results({ cohortResults }: { cohortResults: CohortResults | null }) {
   const [activeTab, setActiveTab] = useState("pkpd");
+  const cr = cohortResults;
+
+  const summaryStats = [
+    { label: "Responder Rate", val: cr ? `${(cr.responderRate * 100).toFixed(1)}%` : "58.4%",     sub: cr ? `n=${cr.cohortSize} patients` : "at 200mg QD",                       color: "blue" },
+    { label: "Cmax Mean",      val: cr ? `${cr.cmax.toFixed(0)} ng/mL`            : "2,847 ng/mL", sub: cr ? `±${cr.cmaxSD.toFixed(0)} ng/mL SD`   : "±412 ng/mL SD",           color: "blue" },
+    { label: "AUC₀₋₂₄",      val: cr ? `${(cr.auc / 1000).toFixed(1)}k ng·h/mL` : "28.1k ng·h/mL", sub: "at therapeutic dose",                                                  color: "blue" },
+    { label: "Grade ≥3 AEs",   val: cr ? `${(cr.grade3AERate * 100).toFixed(1)}%` : "12.3%",       sub: "projected incidence",                                                     color: "amber" },
+  ];
 
   return (
     <div className="space-y-4">
       {/* Summary Header */}
       <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Responder Rate", val: "58.4%", sub: "at 200mg QD", color: "blue" },
-          { label: "Cmax Mean", val: "2,847 ng/mL", sub: "±412 ng/mL SD", color: "blue" },
-          { label: "AUC₀₋₂₄", val: "28,100 ng·h/mL", sub: "at therapeutic dose", color: "blue" },
-          { label: "Grade ≥3 AEs", val: "12.3%", sub: "projected incidence", color: "amber" },
-        ].map(({ label, val, sub, color }) => (
+        {summaryStats.map(({ label, val, sub, color }) => (
           <div key={label} className={`rounded-xl border p-4 ${color === "blue" ? "border-blue-500/20 bg-blue-500/5" : "border-amber-500/20 bg-amber-500/5"}`}>
             <div className="text-[10px] text-slate-500 mb-1">{label}</div>
             <div className={`text-[16px] font-bold ${color === "blue" ? "text-blue-300" : "text-amber-300"}`}>{val}</div>
@@ -2768,11 +2866,11 @@ function Layer2Results() {
         ))}
       </div>
 
-      {activeTab === "pkpd" && <PKPDCurves />}
-      {activeTab === "responders" && <ResponderChart />}
-      {activeTab === "ae" && <AETable />}
-      {activeTab === "subgroup" && <SubgroupHeatmap />}
-      {activeTab === "dose" && <DoseResponseCurve />}
+      {activeTab === "pkpd"       && <PKPDCurves       cr={cr} />}
+      {activeTab === "responders" && <ResponderChart    cr={cr} />}
+      {activeTab === "ae"         && <AETable           cr={cr} />}
+      {activeTab === "subgroup"   && <SubgroupHeatmap   cr={cr} />}
+      {activeTab === "dose"       && <DoseResponseCurve cr={cr} />}
 
       <div className="flex gap-2 justify-end">
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
@@ -2789,11 +2887,55 @@ function Layer2Results() {
   );
 }
 
-function PKPDCurves() {
-  const doses = [100, 200, 400, 800];
-  const timePoints = [0, 1, 2, 4, 6, 8, 12, 24];
+function PKPDCurves({ cr }: { cr: CohortResults | null }) {
   const colors = ["#6366f1","#3b82f6","#06b6d4","#22c55e"];
 
+  if (cr) {
+    const pts = cr.pkCurve;
+    const maxConc = Math.max(...pts.map(p => p.ci_hi), 0.001);
+    const maxT    = pts[pts.length - 1]?.time ?? 48;
+    const W = 470, H = 190, padL = 42, padB = 20;
+
+    const tx = (t: number) => padL + (t / maxT) * W;
+    const ty = (c: number) => H - (c / maxConc) * (H - padB);
+
+    const polyPts = pts.map(p => `${tx(p.time).toFixed(1)},${ty(p.conc).toFixed(1)}`).join(" ");
+    const ciPath  = [
+      ...pts.map(p => `${tx(p.time).toFixed(1)},${ty(p.ci_hi).toFixed(1)}`),
+      ...[...pts].reverse().map(p => `${tx(p.time).toFixed(1)},${ty(p.ci_lo).toFixed(1)}`),
+    ].join(" ");
+
+    return (
+      <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[12px] font-semibold text-slate-300">PK/PD Concentration Curve</h3>
+          <div className="flex gap-3 text-[10px] text-slate-500">
+            <span>Cmax: <span className="text-blue-300 font-semibold">{(cr.cmax * 1000).toFixed(0)} ng/mL</span></span>
+            <span>t½: <span className="text-blue-300 font-semibold">{cr.halfLifeHr.toFixed(1)} h</span></span>
+            <span>Tmax: <span className="text-blue-300 font-semibold">{cr.tmax.toFixed(1)} h</span></span>
+          </div>
+        </div>
+        <svg width="100%" height="200" viewBox={`0 0 ${padL + W + 10} ${H + 12}`} className="overflow-visible">
+          {[0, 0.25, 0.5, 0.75, 1].map(f => (
+            <line key={f} x1={padL} y1={ty(maxConc * f)} x2={padL + W} y2={ty(maxConc * f)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+          ))}
+          {pts.filter((_, i) => i % 3 === 0).map(p => (
+            <text key={p.time} x={tx(p.time)} y={H + 12} fill="#4b5563" fontSize="9" textAnchor="middle">{p.time}h</text>
+          ))}
+          <polygon points={ciPath} fill="rgba(59,130,246,0.10)" />
+          <polyline points={polyPts} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinejoin="round" />
+          <text x="10" y={ty(maxConc * 0.5)} fill="#6b7280" fontSize="9" transform={`rotate(-90 10 ${ty(maxConc * 0.5)})`}>ng/mL</text>
+        </svg>
+        <div className="flex items-center gap-4 mt-1 text-[10px]">
+          <div className="flex items-center gap-1.5"><div className="w-6 h-0.5 rounded bg-blue-400" /> Observed PK</div>
+          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-500/10" /> 95% CI</div>
+        </div>
+      </div>
+    );
+  }
+
+  const doses = [100, 200, 400, 800];
+  const timePoints = [0, 1, 2, 4, 6, 8, 12, 24];
   const pk = (dose: number, t: number) =>
     dose * 14.2 * (Math.exp(-0.058 * t) - Math.exp(-0.693 * t)) / (0.693 - 0.058);
 
@@ -2801,31 +2943,23 @@ function PKPDCurves() {
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">PK/PD Concentration Curves</h3>
       <svg width="100%" height="220" viewBox="0 0 520 220" className="overflow-visible">
-        {/* Grid */}
         {[0, 50, 100, 150, 200].map(y => (
           <line key={y} x1="40" y1={200 - y} x2="510" y2={200 - y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
         ))}
         {timePoints.map((t, i) => (
           <text key={t} x={40 + i * 67} y="215" fill="#4b5563" fontSize="9" textAnchor="middle">{t}h</text>
         ))}
-
-        {/* Therapeutic window */}
         <rect x="40" y="100" width="470" height="60" fill="rgba(34,197,94,0.05)" />
         <text x="44" y="108" fill="#22c55e" fontSize="8">Therapeutic Window</text>
-
         {doses.map((dose, di) => {
           const pts = timePoints.map((t, i) => {
             const val = pk(dose, t) / 60;
             return `${40 + i * 67},${Math.max(0, 200 - val)}`;
           });
-          return (
-            <polyline key={dose} points={pts.join(" ")} fill="none" stroke={colors[di]} strokeWidth="2" opacity="0.85" />
-          );
+          return <polyline key={dose} points={pts.join(" ")} fill="none" stroke={colors[di]} strokeWidth="2" opacity="0.85" />;
         })}
-
         <text x="10" y="120" fill="#6b7280" fontSize="9" transform="rotate(-90 10 120)">Conc (ng/mL)</text>
       </svg>
-
       <div className="flex gap-4 mt-2">
         {doses.map((d, i) => (
           <div key={d} className="flex items-center gap-1.5">
@@ -2838,12 +2972,18 @@ function PKPDCurves() {
   );
 }
 
-function ResponderChart() {
-  const segments = [
-    { label: "Responder", pct: 58.4, color: "#22c55e" },
-    { label: "Partial", pct: 24.1, color: "#eab308" },
-    { label: "Non-responder", pct: 17.5, color: "#ef4444" },
-  ];
+function ResponderChart({ cr }: { cr: CohortResults | null }) {
+  const segments = cr
+    ? [
+        { label: "Responder",     pct: parseFloat((cr.responderRate    * 100).toFixed(1)), color: "#22c55e" },
+        { label: "Partial",       pct: parseFloat((cr.partialRate      * 100).toFixed(1)), color: "#eab308" },
+        { label: "Non-responder", pct: parseFloat((cr.nonResponderRate * 100).toFixed(1)), color: "#ef4444" },
+      ]
+    : [
+        { label: "Responder",     pct: 58.4, color: "#22c55e" },
+        { label: "Partial",       pct: 24.1, color: "#eab308" },
+        { label: "Non-responder", pct: 17.5, color: "#ef4444" },
+      ];
 
   const cx = 80, cy = 80, r = 65;
   let cumAngle = -90;
@@ -2866,7 +3006,7 @@ function ResponderChart() {
             <path key={i} d={s.d} fill={s.color} opacity="0.85" className="cursor-pointer hover:opacity-100" />
           ))}
           <circle cx={cx} cy={cy} r="28" fill="#0d0f17" />
-          <text x={cx} y={cy - 6} fill="white" fontSize="14" textAnchor="middle" fontWeight="700">58.4%</text>
+          <text x={cx} y={cy - 6} fill="white" fontSize="14" textAnchor="middle" fontWeight="700">{segments[0].pct}%</text>
           <text x={cx} y={cy + 8} fill="#6b7280" fontSize="8" textAnchor="middle">Response</text>
         </svg>
         <div className="flex-1 space-y-3">
@@ -2890,14 +3030,23 @@ function ResponderChart() {
   );
 }
 
-function AETable() {
-  const aes = [
-    { ae: "Nausea", incidence: 28.4, mild: 18.2, moderate: 8.6, severe: 1.6, onset: 3 },
-    { ae: "Fatigue", incidence: 22.1, mild: 14.3, moderate: 7.1, severe: 0.7, onset: 7 },
-    { ae: "Neutropenia (Gr ≥3)", incidence: 12.3, mild: 0, moderate: 4.2, severe: 8.1, onset: 21 },
-    { ae: "ALT Elevation", incidence: 8.9, mild: 4.2, moderate: 3.9, severe: 0.8, onset: 14 },
-    { ae: "QTc Prolongation", incidence: 4.2, mild: 2.8, moderate: 1.1, severe: 0.3, onset: 10 },
-  ];
+function AETable({ cr }: { cr: CohortResults | null }) {
+  const aes = cr
+    ? cr.adverseEvents.map(e => ({
+        ae:         e.name,
+        incidence:  parseFloat((e.anyGrade * 100).toFixed(1)),
+        mild:       parseFloat(((e.anyGrade - e.grade3Plus) * 0.65 * 100).toFixed(1)),
+        moderate:   parseFloat(((e.anyGrade - e.grade3Plus) * 0.35 * 100).toFixed(1)),
+        severe:     parseFloat((e.grade3Plus * 100).toFixed(1)),
+        onset:      0,
+      }))
+    : [
+        { ae: "Nausea",              incidence: 28.4, mild: 18.2, moderate: 8.6, severe: 1.6, onset: 3  },
+        { ae: "Fatigue",             incidence: 22.1, mild: 14.3, moderate: 7.1, severe: 0.7, onset: 7  },
+        { ae: "Neutropenia (Gr ≥3)", incidence: 12.3, mild:  0.0, moderate: 4.2, severe: 8.1, onset: 21 },
+        { ae: "ALT Elevation",       incidence:  8.9, mild:  4.2, moderate: 3.9, severe: 0.8, onset: 14 },
+        { ae: "QTc Prolongation",    incidence:  4.2, mild:  2.8, moderate: 1.1, severe: 0.3, onset: 10 },
+      ];
 
   return (
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
@@ -2934,7 +3083,7 @@ function AETable() {
   );
 }
 
-function SubgroupHeatmap() {
+function SubgroupHeatmap({ cr }: { cr: CohortResults | null }) {
   const rows = ["18–40 yrs","41–60 yrs","61–75 yrs","Male","Female","White","Hispanic","Asian","eGFR >90","eGFR 30–60"];
   const cols = ["Response Rate","AE Rate","Cmax","AUC","PFS"];
 
@@ -2986,9 +3135,9 @@ function SubgroupHeatmap() {
   );
 }
 
-function DoseResponseCurve() {
-  const doses = [50, 100, 200, 400, 800];
-  const response = [0.18, 0.34, 0.58, 0.71, 0.74];
+function DoseResponseCurve({ cr }: { cr: CohortResults | null }) {
+  const doses    = cr ? cr.doseGroups.map(g => g.dose)     : [50, 100, 200, 400, 800];
+  const response = cr ? cr.doseGroups.map(g => g.respRate) : [0.18, 0.34, 0.58, 0.71, 0.74];
   const ciLow = response.map(r => r - 0.08);
   const ciHigh = response.map(r => r + 0.08);
 
@@ -3032,19 +3181,41 @@ function DoseResponseCurve() {
 }
 
 // ── Layer 3 Results ───────────────────────────────────────────────────
-function Layer3Results() {
+function Layer3Results({ trialResults: tr, cohortResults: cr }: { trialResults: TrialResults | null; cohortResults: CohortResults | null }) {
   const [activeTab, setActiveTab] = useState("success");
+
+  const stats = [
+    {
+      label: "Trial Success Probability",
+      val:   tr ? `${(tr.successProbability * 100).toFixed(1)}%` : "72.4%",
+      sub:   tr ? `${tr.goNogo} · p=${tr.pValue.toFixed(3)}` : "95% CI: 64.1–80.7%",
+      color: "emerald",
+    },
+    {
+      label: "Optimal Sample Size",
+      val:   tr ? String(tr.sampleSize) : "248",
+      sub:   tr ? `for ${(tr.power * 100).toFixed(0)}% power at α=0.05` : "for 80% power at α=0.05",
+      color: "emerald",
+    },
+    {
+      label: "Projected Duration",
+      val:   tr ? `${tr.estimatedDuration} months` : "34 months",
+      sub:   "enrollment + follow-up",
+      color: "blue",
+    },
+    {
+      label: "Estimated Cost",
+      val:   tr ? `$${(tr.estimatedCost / 1e6).toFixed(1)}M` : "$24.7M",
+      sub:   "±$3.2M sensitivity range",
+      color: "amber",
+    },
+  ];
 
   return (
     <div className="space-y-4">
       {/* Success Banner */}
       <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Trial Success Probability", val: "72.4%", sub: "95% CI: 64.1–80.7%", color: "emerald" },
-          { label: "Optimal Sample Size", val: "248", sub: "for 80% power at α=0.05", color: "emerald" },
-          { label: "Projected Duration", val: "34 months", sub: "enrollment + follow-up", color: "blue" },
-          { label: "Estimated Cost", val: "$24.7M", sub: "±$3.2M sensitivity range", color: "amber" },
-        ].map(({ label, val, sub, color }) => (
+        {stats.map(({ label, val, sub, color }) => (
           <div key={label} className={`rounded-xl border p-4 ${color === "emerald" ? "border-emerald-500/20 bg-emerald-500/5" : color === "blue" ? "border-blue-500/20 bg-blue-500/5" : "border-amber-500/20 bg-amber-500/5"}`}>
             <div className="text-[10px] text-slate-500 mb-1">{label}</div>
             <div className={`text-[16px] font-bold ${color === "emerald" ? "text-emerald-300" : color === "blue" ? "text-blue-300" : "text-amber-300"}`}>{val}</div>
@@ -3055,12 +3226,12 @@ function Layer3Results() {
 
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
         {[
-          { id: "success", label: "Success Prob.", icon: Target },
-          { id: "enrollment", label: "Enrollment", icon: TrendingUp },
-          { id: "power", label: "Power Curve", icon: BarChart3 },
-          { id: "balance", label: "Balance Report", icon: Activity },
-          { id: "sites", label: "Site Ranking", icon: Map },
-          { id: "cost", label: "Cost", icon: Database },
+          { id: "success",    label: "Success Prob.", icon: Target    },
+          { id: "enrollment", label: "Enrollment",    icon: TrendingUp },
+          { id: "power",      label: "Power Curve",   icon: BarChart3  },
+          { id: "balance",    label: "Balance Report",icon: Activity   },
+          { id: "sites",      label: "Site Ranking",  icon: Map        },
+          { id: "cost",       label: "Cost",          icon: Database   },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -3075,12 +3246,12 @@ function Layer3Results() {
         ))}
       </div>
 
-      {activeTab === "success" && <SuccessProbGauge />}
-      {activeTab === "enrollment" && <EnrollmentChart />}
-      {activeTab === "power" && <PowerCurve />}
-      {activeTab === "balance" && <BalanceReport />}
-      {activeTab === "sites" && <SiteRanking />}
-      {activeTab === "cost" && <CostSummary />}
+      {activeTab === "success"    && <SuccessProbGauge tr={tr} />}
+      {activeTab === "enrollment" && <EnrollmentChart  tr={tr} />}
+      {activeTab === "power"      && <PowerCurve       tr={tr} />}
+      {activeTab === "balance"    && <BalanceReport    cr={cr} />}
+      {activeTab === "sites"      && <SiteRanking      tr={tr} />}
+      {activeTab === "cost"       && <CostSummary      tr={tr} />}
 
       <div className="flex gap-2 justify-end">
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
@@ -3094,8 +3265,8 @@ function Layer3Results() {
   );
 }
 
-function SuccessProbGauge() {
-  const prob = 72.4;
+function SuccessProbGauge({ tr }: { tr: TrialResults | null }) {
+  const prob = tr ? parseFloat((tr.successProbability * 100).toFixed(1)) : 72.4;
   const angle = -135 + (prob / 100) * 270;
   const cx = 110, cy = 100, r = 80;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -3128,7 +3299,9 @@ function SuccessProbGauge() {
             />
 
             <text x={cx} y={cy + 5} fill="white" fontSize="28" textAnchor="middle" fontWeight="800" dominantBaseline="central">{prob}%</text>
-            <text x={cx} y={cy + 28} fill="#22c55e" fontSize="11" textAnchor="middle" fontWeight="600">HIGH CONFIDENCE</text>
+            <text x={cx} y={cy + 28} fill={prob >= 70 ? "#22c55e" : prob >= 50 ? "#eab308" : "#ef4444"} fontSize="11" textAnchor="middle" fontWeight="600">
+              {prob >= 70 ? "HIGH CONFIDENCE" : prob >= 50 ? "MODERATE" : "LOW"}
+            </text>
 
             <text x="18" y="145" fill="#ef4444" fontSize="9">&lt;50%</text>
             <text x="82" y="148" fill="#eab308" fontSize="9">50–70%</text>
@@ -3139,11 +3312,11 @@ function SuccessProbGauge() {
         <div className="flex-1 space-y-3">
           <div className="text-[11px] text-slate-500 mb-2">Key Risk Factors</div>
           {[
-            { factor: "Statistical Power", val: "80.2%", status: "pass" },
-            { factor: "Enrollment Feasibility", val: "High", status: "pass" },
-            { factor: "Dropout Risk", val: "Medium", status: "warn" },
-            { factor: "Site Quality", val: "High", status: "pass" },
-            { factor: "Regulatory Pathway", val: "Standard", status: "pass" },
+            { factor: "Statistical Power",     val: tr ? `${(tr.power * 100).toFixed(1)}%` : "80.2%", status: (tr?.power ?? 0.8) >= 0.8 ? "pass" : "warn" },
+            { factor: "Enrollment Feasibility",val: "High",     status: "pass" },
+            { factor: "Dropout Risk",          val: "Medium",   status: "warn" },
+            { factor: "Site Quality",          val: tr ? (tr.siteRecommendations[0]?.quality ?? 9.2).toFixed(1) + "/10" : "9.2/10", status: "pass" },
+            { factor: "Regulatory Pathway",    val: "Standard", status: "pass" },
           ].map(({ factor, val, status }) => (
             <div key={factor} className="flex items-center justify-between">
               <span className="text-[11px] text-slate-400">{factor}</span>
@@ -3163,11 +3336,11 @@ function SuccessProbGauge() {
   );
 }
 
-function EnrollmentChart() {
+function EnrollmentChart({ tr }: { tr: TrialResults | null }) {
   const months = Array.from({ length: 25 }, (_, i) => i);
-  const target = 248;
-  const expected = months.map(m => Math.min(target, Math.round(target * (1 - Math.exp(-0.15 * m)))));
-  const optimistic = months.map(m => Math.min(target, Math.round(target * (1 - Math.exp(-0.20 * m)))));
+  const target = tr?.sampleSize ?? 248;
+  const expected    = months.map(m => Math.min(target, Math.round(target * (1 - Math.exp(-0.15 * m)))));
+  const optimistic  = months.map(m => Math.min(target, Math.round(target * (1 - Math.exp(-0.20 * m)))));
   const pessimistic = months.map(m => Math.min(target, Math.round(target * (1 - Math.exp(-0.10 * m)))));
 
   const xS = (m: number) => 40 + (m / 24) * 460;
@@ -3206,11 +3379,14 @@ function EnrollmentChart() {
   );
 }
 
-function PowerCurve() {
-  const samples = [50, 100, 150, 200, 248, 300, 400, 500];
-  const power = samples.map(n => 1 - Math.exp(-0.0032 * n));
+function PowerCurve({ tr }: { tr: TrialResults | null }) {
+  const pcData  = tr?.powerCurve ?? [];
+  const samples = pcData.length ? pcData.map(p => p.n)     : [50, 100, 150, 200, 248, 300, 400, 500];
+  const powers  = pcData.length ? pcData.map(p => p.power) : samples.map(n => 1 - Math.exp(-0.0032 * n));
+  const optN    = tr?.sampleSize ?? 248;
+  const optIdx  = samples.reduce((bi, n, i) => Math.abs(n - optN) < Math.abs(samples[bi] - optN) ? i : bi, 0);
 
-  const xS = (i: number) => 40 + i * 64;
+  const xS = (i: number) => 40 + i * (480 / (samples.length - 1));
   const yS = (v: number) => 180 - v * 160;
 
   return (
@@ -3226,17 +3402,12 @@ function PowerCurve() {
         {samples.map((s, i) => (
           <text key={s} x={xS(i)} y="200" fill="#4b5563" fontSize="9" textAnchor="middle">{s}</text>
         ))}
-
-        {/* 80% target line */}
         <line x1="40" y1={yS(0.80)} x2="520" y2={yS(0.80)} stroke="#eab308" strokeWidth="1" strokeDasharray="5,3" opacity="0.5" />
         <text x="524" y={yS(0.80) + 4} fill="#eab308" fontSize="8">80%</text>
-
-        <polyline points={power.map((v, i) => `${xS(i)},${yS(v)}`).join(" ")} fill="none" stroke="#22c55e" strokeWidth="2.5" />
-
-        {/* Current design marker */}
-        <line x1={xS(4)} y1="0" x2={xS(4)} y2={yS(power[4])} stroke="#22c55e" strokeWidth="1" strokeDasharray="4,3" opacity="0.6" />
-        <circle cx={xS(4)} cy={yS(power[4])} r="5" fill="#22c55e" />
-        <text x={xS(4)} y={yS(power[4]) - 10} fill="#22c55e" fontSize="9" textAnchor="middle">n=248</text>
+        <polyline points={powers.map((v, i) => `${xS(i)},${yS(v)}`).join(" ")} fill="none" stroke="#22c55e" strokeWidth="2.5" />
+        <line x1={xS(optIdx)} y1="0" x2={xS(optIdx)} y2={yS(powers[optIdx])} stroke="#22c55e" strokeWidth="1" strokeDasharray="4,3" opacity="0.6" />
+        <circle cx={xS(optIdx)} cy={yS(powers[optIdx])} r="5" fill="#22c55e" />
+        <text x={xS(optIdx)} y={yS(powers[optIdx]) - 10} fill="#22c55e" fontSize="9" textAnchor="middle">n={optN}</text>
         <text x="18" y="120" fill="#6b7280" fontSize="9" transform="rotate(-90 18 120)">Power (1-β)</text>
         <text x="280" y="212" fill="#6b7280" fontSize="9" textAnchor="middle">Sample Size</text>
       </svg>
@@ -3244,7 +3415,7 @@ function PowerCurve() {
   );
 }
 
-function BalanceReport() {
+function BalanceReport({ cr }: { cr: CohortResults | null }) {
   const covariates = [
     { var: "Age (years)", treat: 58.4, ctrl: 57.9, smd: 0.04, pass: true },
     { var: "Sex (% male)", treat: 52.3, ctrl: 51.8, smd: 0.02, pass: true },
@@ -3297,14 +3468,21 @@ function BalanceReport() {
   );
 }
 
-function SiteRanking() {
-  const sites = [
-    { rank: 1, site: "Johns Hopkins, Baltimore", region: "North America", enrollment: 4.2, quality: 9.2, composite: 91 },
-    { rank: 2, site: "Royal Marsden, London", region: "Europe", enrollment: 3.8, quality: 9.4, composite: 88 },
-    { rank: 3, site: "MD Anderson, Houston", region: "North America", enrollment: 3.9, quality: 8.9, composite: 86 },
-    { rank: 4, site: "Memorial Sloan Kettering", region: "North America", enrollment: 3.5, quality: 9.1, composite: 84 },
-    { rank: 5, site: "Tokyo Medical Univ.", region: "Asia-Pacific", enrollment: 3.3, quality: 8.7, composite: 79 },
-  ];
+function SiteRanking({ tr }: { tr: TrialResults | null }) {
+  const sites = tr
+    ? tr.siteRecommendations.slice(0, 5).map((s, i) => ({
+        rank: i + 1, site: s.site, region: s.region,
+        enrollment: parseFloat(s.enrollPerMonth.toFixed(1)),
+        quality: parseFloat(s.quality.toFixed(1)),
+        composite: Math.round(s.composite * 100),
+      }))
+    : [
+        { rank: 1, site: "Johns Hopkins, Baltimore", region: "North America", enrollment: 4.2, quality: 9.2, composite: 91 },
+        { rank: 2, site: "Royal Marsden, London",    region: "Europe",        enrollment: 3.8, quality: 9.4, composite: 88 },
+        { rank: 3, site: "MD Anderson, Houston",     region: "North America", enrollment: 3.9, quality: 8.9, composite: 86 },
+        { rank: 4, site: "Memorial Sloan Kettering", region: "North America", enrollment: 3.5, quality: 9.1, composite: 84 },
+        { rank: 5, site: "Tokyo Medical Univ.",      region: "Asia-Pacific",  enrollment: 3.3, quality: 8.7, composite: 79 },
+      ];
 
   return (
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
@@ -3341,12 +3519,13 @@ function SiteRanking() {
   );
 }
 
-function CostSummary() {
+function CostSummary({ tr }: { tr: TrialResults | null }) {
+  const totalM = tr ? tr.estimatedCost / 1e6 : 24.7;
   const categories = [
-    { label: "Site Operations", amount: 11.2, pct: 45, color: "#8b5cf6" },
-    { label: "Drug Supply", amount: 6.2, pct: 25, color: "#3b82f6" },
-    { label: "Clinical Monitoring", amount: 4.9, pct: 20, color: "#06b6d4" },
-    { label: "Lab & Biomarker", amount: 2.5, pct: 10, color: "#22c55e" },
+    { label: "Site Operations",     amount: parseFloat((totalM * 0.45).toFixed(1)), pct: 45, color: "#8b5cf6" },
+    { label: "Drug Supply",         amount: parseFloat((totalM * 0.25).toFixed(1)), pct: 25, color: "#3b82f6" },
+    { label: "Clinical Monitoring", amount: parseFloat((totalM * 0.20).toFixed(1)), pct: 20, color: "#06b6d4" },
+    { label: "Lab & Biomarker",     amount: parseFloat((totalM * 0.10).toFixed(1)), pct: 10, color: "#22c55e" },
   ];
 
   return (
@@ -3354,7 +3533,7 @@ function CostSummary() {
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Cost Estimate Summary</h3>
       <div className="flex gap-6 items-start">
         <div className="flex-1">
-          <div className="text-[28px] font-bold text-white mb-0.5">$24.7M</div>
+          <div className="text-[28px] font-bold text-white mb-0.5">${totalM.toFixed(1)}M</div>
           <div className="text-[11px] text-slate-500">Total estimated cost · USD</div>
           <div className="text-[11px] text-slate-600 mt-1">Sensitivity range: $21.5M–$27.9M</div>
 
