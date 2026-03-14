@@ -88,7 +88,9 @@ export function HakaseAI() {
     {
       name: "CDK4/6 Inhibitor Screen",
       indication: "Breast Cancer",
+      indicationCode: "C50 – Breast Cancer (HR+/HER2-)",
       molName: "HAK-CDK4-231",
+      smiles: "C1CN(C(=O)c2cc3cc(NC(=O)c4ccc(F)cn4)ccc3[nH]2)CCC1N",
       uniprotId: "P11802",
       layers: 3,
       goNogo: "GO" as const,
@@ -101,7 +103,9 @@ export function HakaseAI() {
     {
       name: "EGFR-T790M Mutant",
       indication: "NSCLC",
+      indicationCode: "C34.1 – Non-small-cell lung carcinoma",
       molName: "HAK-EGFR-047",
+      smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1",
       uniprotId: "P00533",
       layers: 2,
       goNogo: "GO" as const,
@@ -114,7 +118,9 @@ export function HakaseAI() {
     {
       name: "KRAS G12C Series",
       indication: "Colorectal",
+      indicationCode: "C18 – Colorectal carcinoma",
       molName: "HAK-KRAS-112",
+      smiles: "CC1(C)CCC(=C1)c1cc(NC(=O)c2ccc(F)cc2)c2ncc(-c3ccncc3)cc2n1",
       uniprotId: "P01116",
       layers: 1,
       goNogo: "WATCH" as const,
@@ -239,6 +245,19 @@ export function HakaseAI() {
   const layerComplete = useCallback((layer: Layer) => {
     return simStatus[layer] === "complete";
   }, [simStatus]);
+
+  const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
+    setSmiles(proj.smiles);
+    setMolName(proj.molName);
+    setUniprotId(proj.uniprotId);
+    setIndication(proj.indicationCode);
+    setSimResults(null);
+    setCohortResults(null);
+    setTrialResults(null);
+    setSimStatus({ 1: "idle", 2: "idle", 3: "idle" });
+    setSimProgress(0);
+    setActiveLayer(1);
+  }, [savedProjects]);
 
   const runSimulation = useCallback(() => {
     if (!molProps?.isValid) return;
@@ -631,7 +650,7 @@ export function HakaseAI() {
                     : "text-red-400 bg-red-500/10 border-red-500/20";
                   const barColors = ["bg-violet-500", "bg-blue-500", "bg-emerald-500"];
                   return (
-                    <div key={proj.name} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1.5 group border border-transparent hover:border-white/8 transition-all">
+                    <div key={proj.name} onClick={() => loadSavedProject(proj)} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1.5 group border border-transparent hover:border-white/8 transition-all">
                       {/* Header row */}
                       <div className="flex items-start justify-between gap-1 mb-0.5">
                         <div className="text-[11px] font-semibold text-slate-300 truncate group-hover:text-white leading-tight">{proj.name}</div>
@@ -758,7 +777,21 @@ export function HakaseAI() {
                             <span className="text-[9px] text-slate-600">{projImportResult.phase} · {projImportResult.sponsor}</span>
                             <button
                               onClick={() => {
-                                setSavedProjects(prev => [{ name: projImportResult.name, indication: projImportResult.indication, layers: 0 }, ...prev]);
+                                setSavedProjects(prev => [{
+                                  name: projImportResult.name,
+                                  indication: projImportResult.indication,
+                                  indicationCode: projImportResult.indication,
+                                  molName: "Imported",
+                                  smiles: "",
+                                  uniprotId: "",
+                                  layers: 0,
+                                  goNogo: "WATCH" as const,
+                                  qed: 0,
+                                  binding: "—",
+                                  responderRate: null,
+                                  successProb: null,
+                                  lastRun: "Just now",
+                                }, ...prev]);
                                 setProjImportOpen(false);
                                 setProjImportResult(null);
                                 setProjImportId("");
