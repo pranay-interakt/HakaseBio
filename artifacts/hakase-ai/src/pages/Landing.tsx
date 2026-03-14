@@ -401,15 +401,15 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · Molecular Digital Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Is This Molecule Safe?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Using ChemBERTa (77M parameters) and ESM-2 (650M parameters), it predicts the full ADMET profile,
-                    simulates binding affinity against the target protein, runs organ-by-organ toxicity analysis,
+                    Using RDKit.js and a browser-native QSAR engine, it predicts the full ADMET profile,
+                    estimates binding affinity against the target protein, runs organ-by-organ toxicity analysis,
                     and compares the candidate against approved drugs. Output: a Go/No-Go recommendation with confidence score.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
                         ["ADMET Profiling", "5-axis radar — Absorption · Distribution · Metabolism · Excretion · Toxicity"],
-                        ["Target Binding", "Affinity heatmap + 3D docking view (e.g. 12.4 nM for EGFR)"],
+                        ["Target Binding", "Affinity heatmap + QSAR-estimated binding (Kd, Ki, IC50)"],
                         ["Drug-likeness", "Lipinski check — MW, logP, HBD, HBA all within range"],
                         ["Go / No-Go", "Confidence score + comparison to approved reference drugs"],
                       ].map(([label, desc]) => (
@@ -430,9 +430,9 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 2 · Patient Cohort Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Who Will It Work For?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Using MIMIC-IV (223K real patients) and NIH All of Us (1M+ participants), it constructs a synthetic cohort of
-                    500–10,000 virtual patients with realistic demographics, comorbidities, organ function levels, and pharmacogenomic
-                    profiles (CYP450 variants). Simulates PK/PD curves, dose-response, responder classification, and adverse events.
+                    A statistical cohort engine constructs 500–10,000 virtual patients with configurable demographics,
+                    comorbidities, organ function levels, and pharmacogenomic profiles. Simulates PK/PD curves,
+                    dose-response, responder classification, and adverse events entirely in-browser.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
@@ -459,10 +459,10 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Layer 3 · Trial Digital Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Will the Trial Succeed?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Monte Carlo simulation (1,000–10,000 replications) and Bayesian optimisation model the entire trial —
+                    A statistical power and survival engine models the entire trial —
                     enrollment trajectories, interim analyses, adaptive design decisions, synthetic control arms, and site rankings.
-                    Generates a complete simulation report predicting trial success probability with 95% confidence intervals,
-                    preventing $50M+ late-stage failures by identifying design flaws before a single real patient is enrolled.
+                    Generates a simulation report predicting trial success probability with 95% confidence intervals,
+                    identifying design flaws before a single real patient is enrolled.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
@@ -621,7 +621,7 @@ export function Landing() {
           <div className="flex justify-center gap-3 mt-6 flex-wrap">
             {[
               "Ball & Stick", "VDW Surface", "Wireframe", "Space Fill",
-              "Atom Labels", "H-Bond Overlay", "Pharmacophore", "Docking Pose",
+              "Atom Labels", "Atom Selection", "Pharmacophore", "QSAR Docking Estimate",
             ].map(f => (
               <div key={f} className="text-[11px] px-3 py-1 rounded-full border border-white/10 text-slate-500 bg-white/3">
                 {f}
