@@ -21,6 +21,19 @@ const ATOM_RADIUS: Record<string, number> = {
   C: 14, N: 13, O: 13, H: 8, S: 16, F: 11, Cl: 15, Br: 16, P: 15,
 };
 
+const ELEMENT_DATA: Record<string, { name: string; atomicNum: number; mass: number; valence: number }> = {
+  H:  { name: "Hydrogen",    atomicNum: 1,  mass: 1.008,   valence: 1 },
+  C:  { name: "Carbon",      atomicNum: 6,  mass: 12.011,  valence: 4 },
+  N:  { name: "Nitrogen",    atomicNum: 7,  mass: 14.007,  valence: 3 },
+  O:  { name: "Oxygen",      atomicNum: 8,  mass: 15.999,  valence: 2 },
+  F:  { name: "Fluorine",    atomicNum: 9,  mass: 18.998,  valence: 1 },
+  P:  { name: "Phosphorus",  atomicNum: 15, mass: 30.974,  valence: 5 },
+  S:  { name: "Sulfur",      atomicNum: 16, mass: 32.06,   valence: 2 },
+  Cl: { name: "Chlorine",    atomicNum: 17, mass: 35.45,   valence: 1 },
+  Br: { name: "Bromine",     atomicNum: 35, mass: 79.904,  valence: 1 },
+  I:  { name: "Iodine",      atomicNum: 53, mass: 126.904, valence: 1 },
+};
+
 const FALLBACK_ATOMS: Atom3D[] = [
   { id: 0, symbol: "C", x: 0, y: 0, z: 0 },
   { id: 1, symbol: "C", x: 50, y: -30, z: 10 },
@@ -52,10 +65,12 @@ function rotatePoint(x: number, y: number, z: number, rx: number, ry: number) {
   return { x: x1, y: y2, z: z2 };
 }
 
-function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, atoms, bonds }: {
+function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, atoms, bonds, onAtomClick, selectedAtomId }: {
   rx: number; ry: number; zoom: number; renderMode: string;
   showHydrogen: boolean; showLabels: boolean;
   atoms: Atom3D[]; bonds: Bond3D[];
+  onAtomClick: (atom: Atom3D) => void;
+  selectedAtomId: number | null;
 }) {
   const cx = 200, cy = 160;
 
@@ -108,8 +123,11 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, at
             stroke={`rgba(139,92,246,${alpha})`} strokeWidth={b.order >= 2 ? 2 : 1.5} />;
         })}
         {projected.map(a => (
-          <circle key={a.id} cx={a.px} cy={a.py} r={3}
-            fill={ATOM_COLORS[a.symbol] || "#94a3b8"} opacity={0.9} />
+          <g key={a.id} onClick={() => onAtomClick(a)} style={{ cursor: "pointer" }}>
+            {selectedAtomId === a.id && <circle cx={a.px} cy={a.py} r={8} fill="none" stroke="#a78bfa" strokeWidth="1.5" opacity="0.8" />}
+            <circle cx={a.px} cy={a.py} r={4}
+              fill={selectedAtomId === a.id ? "#a78bfa" : (ATOM_COLORS[a.symbol] || "#94a3b8")} opacity={0.9} />
+          </g>
         ))}
       </svg>
     );
@@ -151,14 +169,16 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, at
 
       {projected.map(a => {
         const r = (ATOM_RADIUS[a.symbol] || 12) * a.scale * 0.85;
+        const isSelected = selectedAtomId === a.id;
         return (
-          <g key={a.id} style={{ cursor: "pointer" }}>
+          <g key={a.id} style={{ cursor: "pointer" }} onClick={() => onAtomClick(a)}>
+            {isSelected && <circle cx={a.px} cy={a.py} r={r + 6} fill="none" stroke="#a78bfa" strokeWidth="1.5" opacity="0.9" strokeDasharray="3 2" />}
             <circle cx={a.px} cy={a.py} r={r + 2} fill="black" opacity="0.3" />
             <circle cx={a.px} cy={a.py} r={r}
               fill={`url(#ag-${a.symbol})`} filter="url(#atomShadow)"
-              stroke={ATOM_COLORS[a.symbol] || "#94a3b8"} strokeWidth="0.5" strokeOpacity="0.5"
+              stroke={isSelected ? "#a78bfa" : (ATOM_COLORS[a.symbol] || "#94a3b8")} strokeWidth={isSelected ? "2" : "0.5"} strokeOpacity={isSelected ? "1" : "0.5"}
             />
-            {showLabels && (
+            {(showLabels || isSelected) && (
               <text x={a.px} y={a.py + 3} fill="white" fontSize={8 * a.scale}
                 textAnchor="middle" dominantBaseline="central" fontWeight="bold"
                 style={{ userSelect: "none", pointerEvents: "none" }}>
@@ -180,7 +200,7 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
   const [renderMode, setRenderMode] = useState<"ball-stick" | "surface" | "wireframe">("ball-stick");
   const [showHydrogen, setShowHydrogen] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
-  const [selectedAtom, setSelectedAtom] = useState<string | null>(null);
+  const [selectedAtom, setSelectedAtom] = useState<Atom3D | null>(null);
   const animRef = useRef<number>(0);
   const ryRef = useRef(ry);
 
@@ -362,7 +382,13 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
 
           {/* Molecule */}
           <div style={{ transform: "scale(1.4)", cursor: "grab" }}>
-            <MoleculeViewer rx={rx} ry={ry} zoom={zoom} renderMode={renderMode} showHydrogen={showHydrogen} showLabels={showLabels} atoms={dynAtoms} bonds={dynBonds} />
+            <MoleculeViewer
+              rx={rx} ry={ry} zoom={zoom} renderMode={renderMode}
+              showHydrogen={showHydrogen} showLabels={showLabels}
+              atoms={dynAtoms} bonds={dynBonds}
+              onAtomClick={setSelectedAtom}
+              selectedAtomId={selectedAtom?.id ?? null}
+            />
           </div>
 
           {/* Formula overlay */}
@@ -448,14 +474,48 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
         <div className="w-[220px] border-l border-white/6 bg-black/10 backdrop-blur-sm flex flex-col shrink-0">
           {/* Selected atom */}
           <div className="p-3 border-b border-white/6">
-            <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Selected</div>
-            {selectedAtom ? (
-              <div className="bg-violet-600/10 border border-violet-500/20 rounded-lg p-2.5">
-                <div className="text-[12px] font-semibold text-violet-300">{selectedAtom}</div>
-                <div className="text-[10px] text-slate-500 mt-1">Click an atom to select</div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] text-slate-600 uppercase tracking-wider">Selected</span>
+              {selectedAtom && (
+                <button onClick={() => setSelectedAtom(null)} className="text-slate-600 hover:text-slate-400 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            {selectedAtom ? (() => {
+              const el = ELEMENT_DATA[selectedAtom.symbol];
+              const bondCount = dynBonds.filter(b => b.from === selectedAtom.id || b.to === selectedAtom.id).length;
+              const hybridization = bondCount >= 4 ? "sp³" : bondCount === 3 ? "sp²" : bondCount <= 2 ? "sp" : "—";
+              return (
+                <div className="bg-violet-600/10 border border-violet-500/20 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[18px] font-bold text-violet-300 leading-none">{selectedAtom.symbol}</span>
+                    {el && <span className="text-[11px] text-slate-400">{el.name}</span>}
+                  </div>
+                  {el && (
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                      <span className="text-[9px] text-slate-600">Atomic No.</span>
+                      <span className="text-[9px] text-violet-300 text-right">{el.atomicNum}</span>
+                      <span className="text-[9px] text-slate-600">Mass</span>
+                      <span className="text-[9px] text-violet-300 text-right">{el.mass} Da</span>
+                      <span className="text-[9px] text-slate-600">Bonds</span>
+                      <span className="text-[9px] text-violet-300 text-right">{bondCount}</span>
+                      <span className="text-[9px] text-slate-600">Hybrid.</span>
+                      <span className="text-[9px] text-violet-300 text-right">{hybridization}</span>
+                    </div>
+                  )}
+                  <div className="pt-1 border-t border-white/6">
+                    <div className="text-[8px] text-slate-600 mb-0.5">Position (Å)</div>
+                    <div className="text-[9px] text-slate-400 font-mono">
+                      x {(selectedAtom.x / 40).toFixed(2)}  y {(selectedAtom.y / 40).toFixed(2)}  z {(selectedAtom.z / 40).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                <Crosshair className="w-3 h-3" /> Click an atom to select
               </div>
-            ) : (
-              <div className="text-[11px] text-slate-600">Click an atom to select</div>
             )}
           </div>
 
