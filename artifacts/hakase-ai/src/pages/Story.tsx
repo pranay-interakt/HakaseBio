@@ -1,39 +1,14 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import hakaseLogo from "@assets/image_1773504202272.png";
+import { NavBar } from "@/components/NavBar";
 
 export function Story() {
-  const [, navigate] = useLocation();
   const [version, setVersion] = useState<"simple" | "technical">("simple");
 
   return (
     <div className="min-h-screen bg-[#07080c] text-white font-[Inter,sans-serif]">
 
       {/* ── Nav ── */}
-      <nav className="sticky top-0 z-30 flex items-center justify-between px-8 py-5 border-b border-white/5 bg-[#07080c]/95 backdrop-blur-sm">
-        <button onClick={() => navigate("/")} className="flex items-center gap-2.5">
-          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.0</span>
-        </button>
-        <div className="hidden md:flex items-center gap-6 text-[13px] text-slate-400">
-          <button onClick={() => navigate("/")} className="hover:text-white transition-colors">Platform</button>
-          <span className="text-white font-medium">The Story</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/login")}
-            className="text-[13px] text-slate-400 hover:text-white transition-colors px-3 py-1.5"
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => navigate("/login")}
-            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors text-white"
-          >
-            Get Started →
-          </button>
-        </div>
-      </nav>
+      <NavBar sticky />
 
       {/* ── Hero ── */}
       <div className="relative z-10 px-6 pt-20 pb-10 text-center border-b border-white/5">

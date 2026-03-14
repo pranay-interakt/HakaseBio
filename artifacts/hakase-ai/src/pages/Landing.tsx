@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import hakaseLogo from "@assets/image_1773504202272.png";
+import { NavBar } from "@/components/NavBar";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
@@ -113,34 +114,12 @@ export function Landing() {
       <AnimatedGrid />
 
       {/* ── Nav ── */}
-      <nav className="relative z-10 flex items-center justify-between px-8 py-5 border-b border-white/5 backdrop-blur-sm">
-        <div className="flex items-center gap-2.5">
-          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.0</span>
-        </div>
-        <div className="hidden md:flex items-center gap-6 text-[13px] text-slate-400">
-          <a href="#platform" className="hover:text-white transition-colors">Platform</a>
-          <a href="#layers" className="hover:text-white transition-colors">Simulation Layers</a>
-          <a href="#diagen" className="hover:text-white transition-colors">Diagen Integration</a>
-          <a href="#privacy" className="hover:text-white transition-colors">Privacy</a>
-          <a href="#why" className="hover:text-white transition-colors">Why Hakase</a>
-          <button onClick={() => navigate("/story")} className="hover:text-white transition-colors">The Story</button>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/login")}
-            className="text-[13px] text-slate-400 hover:text-white transition-colors px-3 py-1.5"
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => navigate("/login")}
-            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors text-white"
-          >
-            Get Started →
-          </button>
-        </div>
-      </nav>
+      <NavBar anchorLinks={[
+        { href: "#layers", label: "Simulation Layers" },
+        { href: "#diagen", label: "Diagen Integration" },
+        { href: "#privacy", label: "Privacy" },
+        { href: "#why",     label: "Why Hakase" },
+      ]} />
 
       {/* ── Hero ── */}
       <section id="platform" className="relative z-10 pt-28 pb-20 px-6 text-center">

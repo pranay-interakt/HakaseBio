@@ -4,6 +4,7 @@ import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/Login";
 import { HakaseAI } from "@/pages/HakaseAI";
 import { Story } from "@/pages/Story";
+import { Platform } from "@/pages/Platform";
 
 const queryClient = new QueryClient();
 
@@ -15,6 +16,7 @@ function App() {
           <Route path="/" component={Landing} />
           <Route path="/login" component={Login} />
           <Route path="/story" component={Story} />
+          <Route path="/platform" component={Platform} />
           <Route path="/dashboard" component={HakaseAI} />
           <Route path="/dashboard/:rest*" component={HakaseAI} />
           <Route component={Landing} />
