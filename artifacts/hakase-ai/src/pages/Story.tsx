@@ -70,9 +70,9 @@ export function Story() {
           </button>
         </div>
         <p className="text-[12px] text-slate-600 mt-3">
-          {version === "simple"
-            ? "For investors, partners, and anyone who wants to understand the product without a science degree."
-            : "For scientists, medicinal chemists, biostatisticians, and biotech teams evaluating the platform."}
+          {version === "technical"
+            ? "For scientists, medicinal chemists, biostatisticians, and biotech teams evaluating the platform."
+            : ""}
         </p>
       </div>
 
