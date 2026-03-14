@@ -69,11 +69,6 @@ export function Story() {
             Technical Story
           </button>
         </div>
-        <p className="text-[12px] text-slate-600 mt-3">
-          {version === "technical"
-            ? "For scientists, medicinal chemists, biostatisticians, and biotech teams evaluating the platform."
-            : ""}
-        </p>
       </div>
 
       {/* ── SIMPLE STORY ── */}
