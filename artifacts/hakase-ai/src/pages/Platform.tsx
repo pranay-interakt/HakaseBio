@@ -28,10 +28,7 @@ export function Platform() {
       <div className="relative z-10 px-6 pt-20 pb-16 text-center border-b border-white/5">
         <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-4">BioDigital Twin · Platform</div>
         <h1 className="text-[52px] font-black tracking-tight text-white leading-tight mb-5">
-          From molecule to trial,<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400">
-            in under 15 seconds
-          </span>
+          From molecule to trial
         </h1>
         <p className="text-[16px] text-slate-400 max-w-2xl mx-auto">
           Three simulation layers that cascade — each building on the last — to answer the questions that determine whether a drug program succeeds or fails.
