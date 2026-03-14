@@ -55,12 +55,12 @@ function MolView({ rx, ry, zoom, mode, color, atoms, bonds }: { rx: number; ry: 
   }).sort((a, b) => a.pz - b.pz);
   const pm = Object.fromEntries(projected.map(p => [p.id, p]));
 
-  const atomColor = (sym: string) => {
+  const atomColor = (sym: string, atomId: number) => {
     if (color === "cpk") return ATOM_COLORS[sym] || "#94a3b8";
     if (color === "chain") return "#60a5fa";
     if (color === "bfactor") {
       const heat = ["#3b82f6","#22c55e","#eab308","#f97316","#ef4444"];
-      return heat[Math.floor(Math.random() * heat.length)];
+      return heat[atomId % heat.length];
     }
     return ATOM_COLORS[sym] || "#94a3b8";
   };
@@ -122,7 +122,7 @@ function MolView({ rx, ry, zoom, mode, color, atoms, bonds }: { rx: number; ry: 
       {projected.map(a => {
         const r = mode === "spacefill" ? (({ C: 17, N: 15, O: 15, H: 10, S: 18 } as Record<string,number>)[a.symbol] || 14) * a.s
           : (({ C: 12, N: 11, O: 11, H: 7, S: 13 } as Record<string,number>)[a.symbol] || 10) * a.s;
-        const ac = atomColor(a.symbol);
+        const ac = atomColor(a.symbol, a.id);
         return (
           <g key={a.id}>
             <circle cx={a.px} cy={a.py} r={r + 1.5} fill="black" opacity="0.25" />
