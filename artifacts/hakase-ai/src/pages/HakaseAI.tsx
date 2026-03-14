@@ -1113,7 +1113,7 @@ export function HakaseAI() {
                           <div className="flex items-center gap-2">
                             <Globe className="w-3.5 h-3.5 text-violet-400" />
                             <span className="text-[11px] font-semibold text-slate-300">Import via API</span>
-                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/10 text-violet-400 border-violet-500/20">ChEMBL · PubChem · DrugBank · more</Badge>
+                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/10 text-violet-400 border-violet-500/20">ChEMBL · PubChem · ZINC · UniChem</Badge>
                           </div>
                           {apiImportOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
                         </button>
@@ -1125,11 +1125,10 @@ export function HakaseAI() {
                               <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Source Database</div>
                               <div className="flex flex-wrap gap-1.5">
                                 {([
-                                  { id: "chembl",   label: "ChEMBL",   hint: "CHEMBL25" },
-                                  { id: "pubchem",  label: "PubChem",  hint: "CID 3672 or name" },
-                                  { id: "drugbank", label: "DrugBank", hint: "DB01050" },
-                                  { id: "unichem",  label: "UniChem",  hint: "CHEMBL ID" },
-                                  { id: "zinc",     label: "ZINC",     hint: "ZINC ID" },
+                                  { id: "chembl",  label: "ChEMBL",  hint: "CHEMBL25" },
+                                  { id: "pubchem", label: "PubChem", hint: "CID 3672 or name" },
+                                  { id: "unichem", label: "UniChem", hint: "CHEMBL ID" },
+                                  { id: "zinc",    label: "ZINC",    hint: "ZINC ID" },
                                 ] as { id: ApiSource; label: string; hint: string }[]).map(src => (
                                   <button
                                     key={src.id}
@@ -1152,11 +1151,10 @@ export function HakaseAI() {
                                 Compound ID / Name
                                 <span className="ml-2 text-slate-600 normal-case">
                                   e.g.&nbsp;
-                                  {apiSource === "chembl"   ? "CHEMBL25 or aspirin"         :
-                                   apiSource === "pubchem"  ? "2244 or ibuprofen"            :
-                                   apiSource === "drugbank" ? "DB01050"                      :
-                                   apiSource === "unichem"  ? "CHEMBL25 (ChEMBL ID)"         :
-                                                             "ZINC000003594435"}
+                                  {apiSource === "chembl"  ? "CHEMBL25 or aspirin"    :
+                                   apiSource === "pubchem" ? "2244 or ibuprofen"       :
+                                   apiSource === "unichem" ? "CHEMBL25 (ChEMBL ID)"   :
+                                                            "ZINC000003594435"}
                                 </span>
                               </div>
                               <div className="flex gap-2">
@@ -1167,11 +1165,10 @@ export function HakaseAI() {
                                     onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); setApiError(null); }}
                                     onKeyDown={e => e.key === "Enter" && handleApiFetch()}
                                     placeholder={
-                                      apiSource === "chembl"   ? "CHEMBL ID or drug name…"  :
-                                      apiSource === "pubchem"  ? "CID number or drug name…"  :
-                                      apiSource === "drugbank" ? "DrugBank ID (DB01050)…"    :
-                                      apiSource === "unichem"  ? "ChEMBL ID (e.g. CHEMBL25)…":
-                                                                "ZINC ID…"
+                                      apiSource === "chembl"  ? "CHEMBL ID or drug name…"   :
+                                      apiSource === "pubchem" ? "CID number or drug name…"   :
+                                      apiSource === "unichem" ? "ChEMBL ID (e.g. CHEMBL25)…" :
+                                                               "ZINC ID…"
                                     }
                                     className="bg-white/5 border-white/10 text-white text-[12px] pl-7 focus:border-violet-500/60"
                                   />

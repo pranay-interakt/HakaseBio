@@ -183,34 +183,8 @@ async function fetchUniChem(idOrName: string): Promise<ApiCompound> {
   return { ...compound, source: "UniChem → PubChem", sourceId: `${chemblId} → CID ${pubchemEntry.src_compound_id}` };
 }
 
-// ── DrugBank ────────────────────────────────────────────────────────────────
-// DrugBank requires a paid commercial licence ($2K–$20K/year).
-// We resolve common accession IDs locally with real SMILES so the most
-// important clinical drugs are still accessible.
-const DRUGBANK_LOCAL: Record<string, ApiCompound> = {
-  "db00945": { name: "Aspirin",     smiles: "CC(=O)Oc1ccccc1C(=O)O",                                                   mw: "180.2 Da", logP: "1.2",  hbd: "1", hba: "4", source: "DrugBank", sourceId: "DB00945" },
-  "db01050": { name: "Ibuprofen",   smiles: "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                                               mw: "206.3 Da", logP: "3.97", hbd: "1", hba: "1", source: "DrugBank", sourceId: "DB01050" },
-  "db00619": { name: "Imatinib",    smiles: "Cc1ccc(NC(=O)c2ccc(CN3CCN(CC3)C)cc2)cc1Nc1nccc(n1)-c1cccnc1",             mw: "493.6 Da", logP: "3.74", hbd: "3", hba: "9", source: "DrugBank", sourceId: "DB00619" },
-  "db00530": { name: "Erlotinib",   smiles: "C#Cc1cccc(Nc2ncnc3cc(OCCO)c(OCCO)cc23)c1",                                 mw: "393.4 Da", logP: "2.70", hbd: "1", hba: "7", source: "DrugBank", sourceId: "DB00530" },
-  "db00317": { name: "Gefitinib",   smiles: "COc1cc2ncnc(Nc3cccc(F)c3)c2cc1OCCCN1CCOCC1",                               mw: "446.9 Da", logP: "3.18", hbd: "1", hba: "8", source: "DrugBank", sourceId: "DB00317" },
-  "db01254": { name: "Dasatinib",   smiles: "Cc1nc(Nc2ncc(s2)C(=O)Nc2c(C)cccc2Cl)cc(n1)N1CCN(CCO)CC1",                 mw: "488.0 Da", logP: "3.11", hbd: "3", hba: "9", source: "DrugBank", sourceId: "DB01254" },
-  "db08916": { name: "Afatinib",    smiles: "CN(C)/C=C/C(=O)Nc1cc2c(Nc3cccc(Cl)c3F)ncnc2cc1OC(C)CNCC",                 mw: "485.9 Da", logP: "3.59", hbd: "2", hba: "9", source: "DrugBank", sourceId: "DB08916" },
-  "db09073": { name: "Palbociclib", smiles: "Cc1cn(C2CCCC2)c(=O)c1-c1nc2c(N3CCC(N4CCNCC4)CC3)ncnc2s1",                 mw: "447.5 Da", logP: "2.18", hbd: "2", hba: "9", source: "DrugBank", sourceId: "DB09073" },
-  "db09036": { name: "Osimertinib", smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1",     mw: "499.6 Da", logP: "4.29", hbd: "2", hba: "9", source: "DrugBank", sourceId: "DB09036" },
-  "db00877": { name: "Sirolimus",   smiles: "CCC(=O)OC1CC(OC2CC(CC(=O)O2)C(CC2CCC(C(=O)C(CC(CC(=O)C(C(C(=CC(C(=O)CC(OC2)C)C)O)C)CC=CC(C)(C)O)OC)OC)O1)C", mw: "914.2 Da", source: "DrugBank", sourceId: "DB00877" },
-};
-
-async function fetchDrugBank(id: string): Promise<ApiCompound> {
-  const key = id.toLowerCase().replace(/\s/g, "");
-  const hit = DRUGBANK_LOCAL[key];
-  if (hit) return hit;
-  throw new Error(
-    "DrugBank requires a paid API licence for arbitrary lookups. Try the same compound in ChEMBL or PubChem — they cover all approved drugs for free.",
-  );
-}
-
 // ── Public dispatcher ────────────────────────────────────────────────────────
-export type ApiSource = "chembl" | "pubchem" | "drugbank" | "unichem" | "zinc";
+export type ApiSource = "chembl" | "pubchem" | "unichem" | "zinc";
 
 export async function fetchCompoundFromApi(
   source: ApiSource,
@@ -220,11 +194,10 @@ export async function fetchCompoundFromApi(
   if (!trimmed) throw new Error("Please enter a compound ID or name.");
 
   switch (source) {
-    case "chembl":   return fetchChEMBL(trimmed);
-    case "pubchem":  return fetchPubChem(trimmed);
-    case "drugbank": return fetchDrugBank(trimmed);
-    case "unichem":  return fetchUniChem(trimmed);
-    case "zinc":     return fetchZINC(trimmed);
-    default:         throw new Error(`Unknown source: ${source}`);
+    case "chembl":  return fetchChEMBL(trimmed);
+    case "pubchem": return fetchPubChem(trimmed);
+    case "unichem": return fetchUniChem(trimmed);
+    case "zinc":    return fetchZINC(trimmed);
+    default:        throw new Error(`Unknown source: ${source}`);
   }
 }
