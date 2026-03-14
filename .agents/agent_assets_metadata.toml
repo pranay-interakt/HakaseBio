@@ -12,3 +12,9 @@ id = "CIHScfIaNsaDh3kGtVX0i"
 uri = "file://hakase-ai-user-manual.md"
 type = "text"
 title = "HakaseAI — User Manual v1.0"
+
+[[outputs]]
+id = "zgNaZN6RullwilETexfDF"
+uri = "file://hakase-ai-input-fields.md"
+type = "text"
+title = "HakaseAI — 72 Input Fields Reference"
