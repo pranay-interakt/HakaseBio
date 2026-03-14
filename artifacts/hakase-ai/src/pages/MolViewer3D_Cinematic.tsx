@@ -268,7 +268,7 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
             <Atom className="w-3.5 h-3.5 text-white" />
           </div>
           <span className="text-[13px] font-semibold">3D Molecular Viewer</span>
-          <span className="text-[10px] text-slate-600 ml-1">— Variant A: Cinematic</span>
+          <span className="text-[10px] text-slate-600 ml-1">— Cinematic</span>
         </div>
 
         <div className="flex items-center gap-1.5 mx-auto">

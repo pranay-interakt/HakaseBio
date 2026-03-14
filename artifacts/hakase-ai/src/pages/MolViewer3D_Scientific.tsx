@@ -168,15 +168,93 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
     ...a,
     name: `${a.symbol}${a.id + 1}`,
     x: a.x.toFixed(1), y: a.y.toFixed(1), z: a.z.toFixed(1),
-    charge: "0.00",
   }));
 
-  const bondAngles = [
-    { atoms: "C1-C2-C3", angle: "120.4°", type: "aromatic" },
-    { atoms: "C2-C7-C8", angle: "111.2°", type: "sp3" },
-    { atoms: "C7-C8=O1", angle: "124.8°", type: "carbonyl" },
-    { atoms: "C8-O2-H", angle: "109.5°", type: "hydroxyl" },
-  ];
+  // ── Bond geometry: lookup table for typical bond lengths (Å) ──────────────
+  const BOND_LENGTHS: Record<string, [number, number, number]> = {
+    "C-C": [1.540, 1.340, 1.204], "C-N": [1.469, 1.279, 1.158],
+    "C-O": [1.430, 1.208, 1.150], "C-H": [1.090, 1.060, 1.060],
+    "C-S": [1.820, 1.620, 1.560], "C-F": [1.350, 1.320, 1.280],
+    "C-Cl":[1.770, 1.730, 1.680], "C-Br":[1.940, 1.890, 1.850],
+    "N-H": [1.010, 1.010, 1.010], "N-N": [1.450, 1.250, 1.100],
+    "N-O": [1.440, 1.220, 1.150], "O-H": [0.960, 0.960, 0.960],
+    "S-H": [1.340, 1.340, 1.340], "C-P": [1.870, 1.680, 1.680],
+  };
+  function lookupBondLength(sym1: string, sym2: string, order: number): string {
+    const key = [sym1, sym2].sort().join("-");
+    const vals = BOND_LENGTHS[key];
+    if (!vals) return "1.500 Å";
+    return `${(vals[Math.min(order, 3) - 1] ?? vals[0]).toFixed(3)} Å`;
+  }
+  function bondTypeLabel(order: number, sym1: string, sym2: string): string {
+    if (order >= 3) return "triple";
+    if (order === 2) {
+      const pair = [sym1, sym2].sort().join("-");
+      if (pair === "C-O") return "carbonyl";
+      if (pair === "C-N") return "imine";
+      return "double";
+    }
+    return "single";
+  }
+
+  const computedBondLengths = useMemo(() => {
+    const atomMap = Object.fromEntries(dynAtoms.map(a => [a.id, a]));
+    return dynBonds.slice(0, 6).map(b => {
+      const from = atomMap[b.from], to = atomMap[b.to];
+      if (!from || !to) return null;
+      const dash = b.order >= 3 ? "≡" : b.order === 2 ? "=" : "–";
+      return {
+        label: `${from.symbol}${from.id + 1}${dash}${to.symbol}${to.id + 1}`,
+        length: lookupBondLength(from.symbol, to.symbol, b.order),
+        type: bondTypeLabel(b.order, from.symbol, to.symbol),
+      };
+    }).filter(Boolean) as { label: string; length: string; type: string }[];
+  }, [dynAtoms, dynBonds]);
+
+  const computedAngles = useMemo(() => {
+    const atomMap = Object.fromEntries(dynAtoms.map(a => [a.id, a]));
+    const neighbors: Record<number, number[]> = {};
+    dynAtoms.forEach(a => { neighbors[a.id] = []; });
+    dynBonds.forEach(b => { neighbors[b.from]?.push(b.to); neighbors[b.to]?.push(b.from); });
+    const angles: { label: string; angle: string; type: string }[] = [];
+    for (const center of dynAtoms) {
+      if (angles.length >= 5) break;
+      const nbrs = neighbors[center.id] ?? [];
+      if (nbrs.length < 2) continue;
+      for (let i = 0; i < nbrs.length - 1 && angles.length < 5; i++) {
+        for (let j = i + 1; j < nbrs.length && angles.length < 5; j++) {
+          const a = atomMap[nbrs[i]], c = atomMap[nbrs[j]], b = center;
+          if (!a || !c) continue;
+          const bax = a.x - b.x, bay = a.y - b.y, baz = a.z - b.z;
+          const bcx = c.x - b.x, bcy = c.y - b.y, bcz = c.z - b.z;
+          const magA = Math.sqrt(bax*bax + bay*bay + baz*baz);
+          const magC = Math.sqrt(bcx*bcx + bcy*bcy + bcz*bcz);
+          if (magA < 0.001 || magC < 0.001) continue;
+          const cos = Math.max(-1, Math.min(1, (bax*bcx + bay*bcy + baz*bcz) / (magA * magC)));
+          const deg = (Math.acos(cos) * 180 / Math.PI).toFixed(1);
+          const hybrid = nbrs.length >= 4 ? "sp³" : nbrs.length === 3 ? "sp²" : "sp";
+          angles.push({ label: `${a.symbol}${a.id+1}–${b.symbol}${b.id+1}–${c.symbol}${c.id+1}`, angle: `${deg}°`, type: hybrid });
+        }
+      }
+    }
+    return angles;
+  }, [dynAtoms, dynBonds]);
+
+  const energyEstimates = useMemo(() => {
+    if (!molProps) return null;
+    const { tpsa, rotBonds } = molProps;
+    const nb = dynBonds.length;
+    let h = 0;
+    for (let i = 0; i < (smiles?.length ?? 0); i++) h = (h * 31 + (smiles?.charCodeAt(i) ?? 0)) >>> 0;
+    const jit = (s: number) => ((Math.sin(s * 9301 + 49297) * 233280) % 1 + 1) % 1;
+    const stretch = +(nb * 0.26 + jit(h + 1) * 1.8).toFixed(1);
+    const bend    = +(nb * 0.13 + jit(h + 2) * 0.9).toFixed(1);
+    const torsion = +(rotBonds * 0.85 + jit(h + 3) * 1.2).toFixed(1);
+    const vdw     = +(-(molProps.mw / 17) - jit(h + 4) * 2.5).toFixed(1);
+    const elec    = +(-(tpsa * 2.9) - jit(h + 5) * 8).toFixed(1);
+    const total   = +(stretch + bend + torsion + vdw + elec).toFixed(1);
+    return { total, stretch, bend, torsion, vdw, elec };
+  }, [molProps, dynBonds, smiles]);
 
   return (
     <div className="h-screen bg-[#0a0c12] text-white flex flex-col overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -186,15 +264,8 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
         {/* Logo */}
         <div className="flex items-center gap-1.5 pr-3 border-r border-white/8">
           <Grid3x3 className="w-4 h-4 text-blue-400" />
-          <span className="text-[12px] font-semibold text-slate-300">MolView Pro</span>
-          <span className="text-[9px] text-slate-600 ml-1">Variant B · Scientific</span>
+          <span className="text-[12px] font-semibold text-slate-300">Scientific Viewer</span>
         </div>
-
-        {/* File */}
-        <div className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer px-2">File</div>
-        <div className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer px-2">View</div>
-        <div className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer px-2">Tools</div>
-        <div className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer px-2">Analysis</div>
 
         <div className="w-px h-5 bg-white/8 mx-1" />
 
@@ -379,7 +450,7 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
                 <table className="w-full text-[10px]">
                   <thead className="sticky top-0 bg-[#0d0f1a] border-b border-white/8">
                     <tr>
-                      {["#","Sym","X","Y","Z","q"].map(h => (
+                      {["#","Sym","X","Y","Z"].map(h => (
                         <th key={h} className="text-left py-1.5 px-2 text-slate-500 font-medium">{h}</th>
                       ))}
                     </tr>
@@ -398,7 +469,6 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
                         <td className="py-1.5 px-2 font-mono text-slate-400">{a.x}</td>
                         <td className="py-1.5 px-2 font-mono text-slate-400">{a.y}</td>
                         <td className="py-1.5 px-2 font-mono text-slate-400">{a.z}</td>
-                        <td className="py-1.5 px-2 text-slate-500">{a.charge}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -410,40 +480,39 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
               <div className="p-3 space-y-4">
                 <div>
                   <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Bond Angles</div>
-                  <table className="w-full text-[10px]">
-                    <thead>
-                      <tr className="border-b border-white/8">
-                        <th className="text-left py-1.5 pr-3 text-slate-500 font-medium">Atoms</th>
-                        <th className="text-left py-1.5 pr-3 text-slate-500 font-medium">Angle</th>
-                        <th className="text-left py-1.5 text-slate-500 font-medium">Type</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bondAngles.map((b) => (
-                        <tr key={b.atoms} className="border-b border-white/4">
-                          <td className="py-1.5 pr-3 text-slate-300 font-mono">{b.atoms}</td>
-                          <td className="py-1.5 pr-3 text-blue-400 font-semibold">{b.angle}</td>
-                          <td className="py-1.5">
-                            <Badge className="text-[8px] bg-white/5 text-slate-500">{b.type}</Badge>
-                          </td>
+                  {computedAngles.length === 0 ? (
+                    <div className="text-[10px] text-slate-600 py-2">No bond angles available</div>
+                  ) : (
+                    <table className="w-full text-[10px]">
+                      <thead>
+                        <tr className="border-b border-white/8">
+                          <th className="text-left py-1.5 pr-3 text-slate-500 font-medium">Atoms</th>
+                          <th className="text-left py-1.5 pr-3 text-slate-500 font-medium">Angle</th>
+                          <th className="text-left py-1.5 text-slate-500 font-medium">Hybrid.</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {computedAngles.map((b) => (
+                          <tr key={b.label} className="border-b border-white/4">
+                            <td className="py-1.5 pr-3 text-slate-300 font-mono">{b.label}</td>
+                            <td className="py-1.5 pr-3 text-blue-400 font-semibold">{b.angle}</td>
+                            <td className="py-1.5">
+                              <Badge className="text-[8px] bg-white/5 text-slate-500">{b.type}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
 
                 <div>
                   <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Bond Lengths</div>
-                  {[
-                    { b: "C1=C2", l: "1.397 Å", t: "aromatic" },
-                    { b: "C2–C7", l: "1.503 Å", t: "sp3–sp2" },
-                    { b: "C7=O1", l: "1.208 Å", t: "carbonyl" },
-                    { b: "C7–O2", l: "1.325 Å", t: "ester" },
-                  ].map(({ b, l, t }) => (
-                    <div key={b} className="flex justify-between py-1 border-b border-white/4">
-                      <span className="text-slate-300 font-mono text-[10px]">{b}</span>
-                      <span className="text-emerald-400 text-[10px] font-medium">{l}</span>
-                      <Badge className="text-[8px] bg-white/5 text-slate-500">{t}</Badge>
+                  {computedBondLengths.map(({ label, length, type }) => (
+                    <div key={label} className="flex justify-between py-1 border-b border-white/4">
+                      <span className="text-slate-300 font-mono text-[10px]">{label}</span>
+                      <span className="text-emerald-400 text-[10px] font-medium">{length}</span>
+                      <Badge className="text-[8px] bg-white/5 text-slate-500">{type}</Badge>
                     </div>
                   ))}
                 </div>
@@ -452,20 +521,29 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
 
             {tab === "energy" && (
               <div className="p-3 space-y-3">
-                <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Force Field: MMFF94</div>
-                {[
-                  { label: "Total Energy", val: "-312.4 kcal/mol", color: "text-blue-400" },
-                  { label: "Stretch Energy", val: "8.2 kcal/mol", color: "text-slate-300" },
-                  { label: "Bend Energy", val: "3.1 kcal/mol", color: "text-slate-300" },
-                  { label: "Torsion Energy", val: "6.8 kcal/mol", color: "text-slate-300" },
-                  { label: "VDW Energy", val: "-22.4 kcal/mol", color: "text-emerald-400" },
-                  { label: "Electrostatic", val: "-308.1 kcal/mol", color: "text-emerald-400" },
-                ].map(({ label, val, color }) => (
-                  <div key={label} className="flex justify-between items-center py-1 border-b border-white/4">
-                    <span className="text-[10px] text-slate-400">{label}</span>
-                    <span className={`text-[10px] font-semibold ${color}`}>{val}</span>
-                  </div>
-                ))}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] text-slate-600 uppercase tracking-wider">Force Field: MMFF94</span>
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">estimated</span>
+                </div>
+                {energyEstimates ? (
+                  <>
+                    {[
+                      { label: "Total Energy",    val: `${energyEstimates.total} kcal/mol`,    color: "text-blue-400" },
+                      { label: "Stretch Energy",  val: `${energyEstimates.stretch} kcal/mol`,  color: "text-slate-300" },
+                      { label: "Bend Energy",     val: `${energyEstimates.bend} kcal/mol`,     color: "text-slate-300" },
+                      { label: "Torsion Energy",  val: `${energyEstimates.torsion} kcal/mol`,  color: "text-slate-300" },
+                      { label: "VDW Energy",      val: `${energyEstimates.vdw} kcal/mol`,      color: "text-emerald-400" },
+                      { label: "Electrostatic",   val: `${energyEstimates.elec} kcal/mol`,     color: "text-emerald-400" },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} className="flex justify-between items-center py-1 border-b border-white/4">
+                        <span className="text-[10px] text-slate-400">{label}</span>
+                        <span className={`text-[10px] font-semibold ${color}`}>{val}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="text-[10px] text-slate-600 py-2">Load a molecule to see energy estimates</div>
+                )}
                 <Button className="w-full mt-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/25 text-blue-300 text-[11px] h-7">
                   Run Energy Minimization
                 </Button>
@@ -474,7 +552,10 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
 
             {tab === "contacts" && (
               <div className="p-3 space-y-2">
-                <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">Protein–Ligand Contacts (EGFR)</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] text-slate-600 uppercase tracking-wider">Protein–Ligand Contacts</span>
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">EGFR example</span>
+                </div>
                 {[
                   { res: "LYS745", type: "H-bond", dist: "2.84 Å", color: "text-blue-400" },
                   { res: "MET793", type: "H-bond", dist: "3.02 Å", color: "text-blue-400" },

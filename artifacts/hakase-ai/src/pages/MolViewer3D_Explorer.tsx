@@ -236,8 +236,7 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
             <Dna className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="text-[13px] font-bold">MolExplorer</span>
-          <span className="text-[9px] text-slate-600 ml-0.5">Variant C · Multi-Molecule</span>
+          <span className="text-[13px] font-bold">Molecule Explorer</span>
         </div>
 
         {/* Search */}
