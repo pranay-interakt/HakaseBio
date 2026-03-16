@@ -2038,15 +2038,30 @@ export function HakaseAI() {
 
                       <FieldGroup label="Toxicity Risk Vector">
                         <div className="space-y-2">
-                          {[
-                            { label: "hERG", val: 0.12, color: "bg-emerald-500" },
-                            { label: "Hepatotox", val: 0.08, color: "bg-yellow-500" },
-                            { label: "Genotox", val: 0.04, color: "bg-emerald-500" },
-                          ].map(({ label, val, color }) => (
+                          {(() => {
+                            const riskColor = (r: number) =>
+                              r > 0.30 ? "bg-red-500" : r > 0.15 ? "bg-yellow-500" : "bg-emerald-500";
+                            if (!simResults) return [
+                              { label: "hERG",      val: 0.12, color: "bg-emerald-500" },
+                              { label: "Hepatotox", val: 0.08, color: "bg-yellow-500"  },
+                              { label: "Genotox",   val: 0.04, color: "bg-emerald-500" },
+                            ];
+                            const herg  = simResults.organs.find(o => o.name === "Heart (hERG)");
+                            const liver = simResults.organs.find(o => o.name === "Liver");
+                            const genotoxAlert = simResults.toxAlerts.find(a => a.category === "Genotox");
+                            const genotoxVal = genotoxAlert
+                              ? (genotoxAlert.severity === "High" ? 0.40 : genotoxAlert.severity === "Medium" ? 0.22 : 0.10)
+                              : 0.03;
+                            return [
+                              { label: "hERG",      val: herg?.risk  ?? 0.10, color: riskColor(herg?.risk  ?? 0.10) },
+                              { label: "Hepatotox", val: liver?.risk ?? 0.07, color: riskColor(liver?.risk ?? 0.07) },
+                              { label: "Genotox",   val: genotoxVal,          color: riskColor(genotoxVal)          },
+                            ];
+                          })().map(({ label, val, color }) => (
                             <div key={label} className="flex items-center gap-3">
                               <span className="text-[10px] text-slate-400 w-16">{label}</span>
                               <div className="flex-1 bg-white/5 rounded-full h-1.5 overflow-hidden">
-                                <div className={`h-full ${color} rounded-full`} style={{ width: `${val * 100}%` }} />
+                                <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${Math.min(val * 100, 100)}%` }} />
                               </div>
                               <span className="text-[10px] text-slate-500 w-8 text-right">{val.toFixed(2)}</span>
                             </div>
