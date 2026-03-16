@@ -40,7 +40,7 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3;
@@ -380,6 +380,23 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
+  type AiReport = {
+    molecularOverview?: string;
+    safetyNarrative?: string;
+    pkAnalysis?: string;
+    targetEngagement?: string;
+    cohortInsights?: string;
+    trialDesignRationale?: string;
+    competitiveContext?: string;
+    riskMitigations?: string[];
+    goNogoRationale?: string;
+    nextSteps?: string[];
+  };
+  const [aiReport,   setAiReport]   = useState<AiReport | null>(null);
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [aiError,    setAiError]    = useState<string | null>(null);
+  const [aiStream,   setAiStream]   = useState("");
+
   useEffect(() => {
     if (!simResults || admetSource !== "From Layer 1") return;
     const { absorption, metabolism, excretion } = simResults.admet;
@@ -393,6 +410,57 @@ export function HakaseAI() {
   const layerComplete = useCallback((layer: Layer) => {
     return simStatus[layer] === "complete";
   }, [simStatus]);
+
+  const runAiAnalysis = useCallback(async () => {
+    if (!simResults) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiStream("");
+    setAiReport(null);
+
+    try {
+      const res = await fetch("/api/bio-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          molName:   simResults.molName,
+          smiles:    simResults.smiles,
+          indication,
+          layer1:    simResults,
+          layer2:    cohortResults,
+          layer3:    trialResults,
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const reader  = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let   buf     = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          const json = JSON.parse(part.slice(6)) as { chunk?: string; done?: boolean; full?: string; error?: string };
+          if (json.error) throw new Error(json.error);
+          if (json.chunk) setAiStream(prev => prev + json.chunk);
+          if (json.done && json.full) {
+            const raw = json.full.trim();
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+              try { setAiReport(JSON.parse(match[0])); } catch { /* keep streaming text */ }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [simResults, cohortResults, trialResults, indication]);
 
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
@@ -2977,6 +3045,126 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
           ))}
         </div>
       </div>
+
+      {/* Claude AI Analysis Panel */}
+      {simResults && (
+        <div className="border border-violet-500/20 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-violet-500/8">
+            <div className="flex items-center gap-2.5">
+              <div className="w-5 h-5 rounded-md bg-violet-500/20 flex items-center justify-center">
+                <Sparkles className="w-3 h-3 text-violet-400" />
+              </div>
+              <span className="text-[13px] font-semibold text-white">Claude AI Analysis</span>
+              <Badge className="text-[9px] bg-violet-500/15 text-violet-300 border-violet-500/25 px-1.5">claude-sonnet-4-6</Badge>
+            </div>
+            {!aiLoading && !aiReport && (
+              <button
+                onClick={runAiAnalysis}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-violet-300 hover:text-violet-200 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 rounded-lg px-3 py-1.5 transition-all"
+              >
+                <Sparkles className="w-3 h-3" />
+                Analyze with Claude
+              </button>
+            )}
+            {aiLoading && (
+              <div className="flex items-center gap-1.5 text-[11px] text-violet-400">
+                <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
+                Analyzing…
+              </div>
+            )}
+            {aiReport && !aiLoading && (
+              <button
+                onClick={runAiAnalysis}
+                className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Re-analyze
+              </button>
+            )}
+          </div>
+
+          {aiError && (
+            <div className="px-4 py-3 text-[12px] text-red-400 bg-red-500/5">
+              {aiError}
+            </div>
+          )}
+
+          {aiLoading && !aiReport && (
+            <div className="px-4 py-4">
+              <div className="text-[11px] text-slate-500 mb-2">Streaming biomedical analysis…</div>
+              <div className="text-[11px] text-slate-400 font-mono leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
+                {aiStream || "Connecting to Claude…"}
+              </div>
+            </div>
+          )}
+
+          {aiReport && (
+            <div className="divide-y divide-white/5">
+              {[
+                { key: "molecularOverview",     label: "Molecular Overview",       icon: "🔬", color: "violet" },
+                { key: "safetyNarrative",       label: "Safety Narrative",         icon: "🛡️", color: "red"    },
+                { key: "pkAnalysis",            label: "PK / PD Analysis",         icon: "📈", color: "blue"   },
+                { key: "targetEngagement",      label: "Target Engagement",        icon: "🎯", color: "amber"  },
+                { key: "cohortInsights",        label: "Cohort Insights",          icon: "👥", color: "blue"   },
+                { key: "trialDesignRationale",  label: "Trial Design",             icon: "🏥", color: "emerald"},
+                { key: "competitiveContext",    label: "Competitive Context",      icon: "⚖️", color: "amber"  },
+                { key: "goNogoRationale",       label: "Go/No-Go Rationale",       icon: "✅", color: "emerald"},
+              ].filter(({ key }) => {
+                const val = aiReport[key as keyof typeof aiReport];
+                return val && typeof val === "string" && !val.toLowerCase().includes("not yet run") && !val.toLowerCase().includes("not yet simulated");
+              }).map(({ key, label, icon }) => (
+                <div key={key} className="px-4 py-3">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <span>{icon}</span>{label}
+                  </div>
+                  <p className="text-[12px] text-slate-300 leading-relaxed">
+                    {aiReport[key as keyof typeof aiReport] as string}
+                  </p>
+                </div>
+              ))}
+
+              {aiReport.riskMitigations && aiReport.riskMitigations.length > 0 && (
+                <div className="px-4 py-3">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <span>⚠️</span>Risk Mitigations
+                  </div>
+                  <ul className="space-y-1.5">
+                    {aiReport.riskMitigations.map((r, i) => (
+                      <li key={i} className="flex items-start gap-2 text-[12px] text-slate-300">
+                        <span className="text-yellow-400 mt-0.5 shrink-0">•</span>
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiReport.nextSteps && aiReport.nextSteps.length > 0 && (
+                <div className="px-4 py-3 bg-white/2">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <span>🚀</span>Recommended Next Steps
+                  </div>
+                  <ol className="space-y-1.5">
+                    {aiReport.nextSteps.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-[12px] text-slate-300">
+                        <span className="text-violet-400 font-bold shrink-0">{i + 1}.</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!aiLoading && !aiReport && !aiError && (
+            <div className="px-4 py-5 text-center">
+              <p className="text-[12px] text-slate-500">
+                Click <span className="text-violet-400 font-medium">Analyze with Claude</span> to get an AI-powered interpretation of your simulation results — including safety, PK/PD, competitive positioning, and next steps.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">

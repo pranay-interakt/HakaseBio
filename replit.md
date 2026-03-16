@@ -124,5 +124,16 @@ Three layered engines in `src/lib/`:
 ### RDKit.js (MinimalLib) key descriptor names
 `amw` (MW), `CrippenClogP` (logP), `lipinskiHBD`, `lipinskiHBA`, `tpsa`, `NumRotatableBonds`
 
+### Claude AI Analysis (claude-sonnet-4-6)
+
+Integrated via Replit Anthropic integration (`@workspace/integrations-anthropic-ai`).
+
+- **API route**: `POST /api/bio-analysis` — in `artifacts/api-server/src/routes/bio-analysis/index.ts`
+- **Accepts**: `{ molName, smiles, indication, layer1: SimResults, layer2?: CohortResults, layer3?: TrialResults }`
+- **Returns**: SSE stream of `{ chunk }` events, followed by `{ done: true, full: "<JSON>" }` event
+- **Claude prompt**: Detailed pharma system prompt requesting 10-key JSON report: `molecularOverview`, `safetyNarrative`, `pkAnalysis`, `targetEngagement`, `cohortInsights`, `trialDesignRationale`, `competitiveContext`, `riskMitigations[]`, `goNogoRationale`, `nextSteps[]`
+- **UI**: "Claude AI Analysis" panel in the Layer 1 results output column (HakaseAI.tsx). Appears after any simulation completes. Streams real-time, parses JSON on completion, renders section-by-section.
+- **State**: `aiReport`, `aiLoading`, `aiError`, `aiStream` + `runAiAnalysis` callback in HakaseAI.tsx
+
 ### Design tokens
 Dark: `bg-[#07080c]` · Violet = Layer 1 · Blue = Layer 2 · Emerald = Layer 3 · Inter font · Logo: `@assets/image_1773504202272.png`
