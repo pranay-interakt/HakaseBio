@@ -1911,6 +1911,10 @@ export function HakaseAI() {
                       chatLoading={chatLoading}
                       sendChatMessage={sendChatMessage}
                       onChatInputChange={setChatInput}
+                      uniprotId={uniprotId}
+                      pdbId={pdbId}
+                      alphafoldPlddt={alphafoldData?.meanPlddt ?? null}
+                      proteinName={proteinInfo?.name ?? ""}
                     />
                   </>
                 )}
@@ -3268,6 +3272,293 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 }
 
 
+// ── Simulation Data Sources & References Panel ────────────────────────────
+type SrcEntry = { name: string; status: "live" | "estimated" | "unavailable"; detail: string; url?: string };
+type RefEntry = { code: string; title: string; url?: string };
+
+function buildL1Sources(
+  sr: SimResults | null,
+  uniprotId: string,
+  pdbId: string,
+  proteinName: string,
+  alphafoldPlddt: number | null,
+): SrcEntry[] {
+  return [
+    {
+      name: "RDKit.js v2022.09",
+      status: "live",
+      detail: "WebAssembly — 38 molecular descriptors computed from SMILES (MW, LogP, TPSA, HBD, HBA, RotBonds, QED)",
+      url: "https://www.rdkit.org",
+    },
+    {
+      name: "ChEMBL API v6",
+      status: sr?.similarDrugs?.length ? "live" : "estimated",
+      detail: sr?.similarDrugs?.length
+        ? `Binding QSAR from similar drugs: ${sr.similarDrugs.join(", ")}`
+        : "No similar drugs found — binding estimated from structural features",
+      url: "https://www.ebi.ac.uk/chembl/",
+    },
+    {
+      name: "UniProt REST API",
+      status: uniprotId ? "live" : "unavailable",
+      detail: uniprotId
+        ? `Target: ${uniprotId}${proteinName ? ` — ${proteinName}` : ""} — sequence, active sites, binding pockets`
+        : "No UniProt ID provided",
+      url: uniprotId ? `https://www.uniprot.org/uniprotkb/${uniprotId}` : undefined,
+    },
+    {
+      name: "RCSB PDB",
+      status: pdbId ? "live" : "unavailable",
+      detail: pdbId
+        ? `Crystal structure ${pdbId} loaded — coordinates used for docking estimate`
+        : "No PDB structure selected",
+      url: pdbId ? `https://www.rcsb.org/structure/${pdbId}` : undefined,
+    },
+    {
+      name: "AlphaFold Database (EBI)",
+      status: alphafoldPlddt ? "live" : uniprotId ? "estimated" : "unavailable",
+      detail: alphafoldPlddt
+        ? `Mean pLDDT ${alphafoldPlddt.toFixed(0)} — structure confidence score`
+        : uniprotId ? "Queried — no AlphaFold entry available for this target" : "No UniProt ID — not queried",
+      url: uniprotId ? `https://alphafold.ebi.ac.uk/entry/${uniprotId}` : undefined,
+    },
+    {
+      name: "openFDA Drug Labels",
+      status: sr?.similarDrugs?.length ? "live" : "unavailable",
+      detail: sr?.similarDrugs?.length
+        ? `Boxed warning check: ${sr.similarDrugs.join(", ")}`
+        : "No similar drugs to check",
+      url: "https://api.fda.gov/drug/label.json",
+    },
+    {
+      name: "Lipinski Rule-of-Five (QSAR)",
+      status: "estimated",
+      detail: `MW=${sr?.lipinski?.mw?.toFixed(0) ?? "?"}Da, LogP=${sr?.lipinski?.logP?.toFixed(2) ?? "?"} — Ro5 oral bioavailability filter`,
+    },
+    {
+      name: "ADMET QSAR Engine (in silico)",
+      status: "estimated",
+      detail: "Absorption / Distribution / Metabolism / Excretion / Toxicity — rule-based estimates, 0–1 scale",
+    },
+  ];
+}
+
+function buildL2Sources(
+  cr: CohortResults | null,
+  sr: SimResults | null,
+): SrcEntry[] {
+  const ds = cr?.dataSources;
+  return [
+    {
+      name: "2-Compartment PBPK Model",
+      status: ds?.pbpk === "2-compartment" ? "live" : "estimated",
+      detail: "PK-Sim OSP physiological parameters — RK4 ODE solver — central + peripheral compartments — allometric scaling",
+    },
+    {
+      name: "NHANES 2017–2020 (CDC)",
+      status: ds?.population === "nhanes" ? "live" : "estimated",
+      detail: "Body weight, eGFR, ALT, albumin distributions — virtual patient sampling for population PK",
+      url: "https://www.cdc.gov/nchs/nhanes/",
+    },
+    {
+      name: "ChEMBL PD Parameters",
+      status: ds?.pd === "chembl-live" ? "live" : "estimated",
+      detail: ds?.pd === "chembl-live"
+        ? `IC50/Ki from ChEMBL → Emax/Hill EC50 for ${sr?.similarDrugs?.join(", ") ?? "similar drugs"}`
+        : "Estimated from ADMET profile — ChEMBL PD data unavailable",
+      url: "https://www.ebi.ac.uk/chembl/",
+    },
+    {
+      name: "openFDA FAERS",
+      status: ds?.ae === "faers-live" ? "live" : "estimated",
+      detail: ds?.ae === "faers-live"
+        ? `Post-market AE reports for ${sr?.similarDrugs?.[0] ?? "reference drug"} — MedDRA v26.0 terminology`
+        : "FAERS unavailable — AE rates estimated from ADMET tox profile",
+      url: "https://api.fda.gov/drug/event.json",
+    },
+  ];
+}
+
+function buildL3Sources(sr: SimResults | null): SrcEntry[] {
+  return [
+    {
+      name: "Trial Simulation Engine",
+      status: "estimated",
+      detail: "Power: exact normal CDF — KM curves: Weibull parametric — O'Brien–Fleming α-spending adaptive boundaries",
+    },
+    {
+      name: "Drugs@FDA API",
+      status: sr?.similarDrugs?.length ? "live" : "unavailable",
+      detail: sr?.similarDrugs?.length
+        ? `NDA/BLA precedent: ${sr.similarDrugs.join(", ")} — approval history, Priority vs Standard review`
+        : "No similar drugs — FDA precedent not queried",
+      url: "https://api.fda.gov/drug/drugsfda.json",
+    },
+    {
+      name: "openFDA FAERS (Class AE Signal)",
+      status: sr?.similarDrugs?.length ? "live" : "unavailable",
+      detail: sr?.similarDrugs?.length
+        ? `Post-market AE class signal for ${sr.similarDrugs[0]}`
+        : "No similar drugs queried",
+      url: "https://api.fda.gov/drug/event.json",
+    },
+    {
+      name: "FDA Phase III Precedent (inferred)",
+      status: "estimated",
+      detail: "Endpoint and sample size precedent inferred from approved similar drugs and indication class",
+    },
+  ];
+}
+
+const L1_REFS: RefEntry[] = [
+  { code: "ICH M3(R2)", title: "Nonclinical Safety Studies for Human Clinical Trials and Marketing Authorization (2009)", url: "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf" },
+  { code: "ICH S7A",    title: "Safety Pharmacology Studies for Human Pharmaceuticals (2001)" },
+  { code: "ICH S7B",    title: "Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (hERG) (2005)" },
+  { code: "ICH S2(R1)", title: "Genotoxicity Testing and Data Interpretation for Pharmaceuticals — Ames Test & Micronucleus (2012)" },
+  { code: "FDA IND",    title: "Investigational New Drug Application — IND Phase I Guidance (2019)", url: "https://www.fda.gov/drugs/investigational-new-drug-ind-application" },
+  { code: "Lipinski RO5", title: "Lipinski et al. — Experimental and Computational Approaches to Estimate Solubility and Permeability, Adv Drug Deliv Rev 1997;23:3–25" },
+  { code: "FDA BCS",    title: "FDA Biopharmaceutics Classification System — Absorption ≥70% threshold (Class I/II)" },
+];
+
+const L2_REFS: RefEntry[] = [
+  { code: "ICH M3(R2)", title: "Nonclinical Safety Studies — timing of non-clinical relative to clinical (2009)" },
+  { code: "ICH E14",    title: "Clinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential (2005)" },
+  { code: "FDA PopPK",  title: "FDA Guidance: Population Pharmacokinetics (2022)", url: "https://www.fda.gov/media/128793/download" },
+  { code: "FDA MRSD",   title: "FDA Guidance: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials (2005)" },
+  { code: "NHANES",     title: "CDC National Health and Nutrition Examination Survey 2017–2020 — physiological parameter distributions" },
+  { code: "FAERS",      title: "FDA Adverse Event Reporting System — MedDRA v26.0 Preferred Terms" },
+  { code: "PK-Sim OSP", title: "PK-Sim® Open Systems Pharmacology — 2-compartment PBPK physiological parameters" },
+];
+
+const L3_REFS: RefEntry[] = [
+  { code: "21 CFR 312.82", title: "FDA Breakthrough Therapy Designation criteria and expedited program procedures" },
+  { code: "ICH E9(R1)", title: "Statistical Principles for Clinical Trials — Estimands and Sensitivity Analysis (2019)" },
+  { code: "FDA Adaptive", title: "FDA Guidance: Adaptive Design Clinical Trials for Drugs and Biologics (2019)", url: "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/adaptive-design-clinical-trials-drugs-and-biologics-guidance-industry" },
+  { code: "PDUFA VII",  title: "Prescription Drug User Fee Act VII — Priority Review 6-month standard, Standard Review 12-month" },
+  { code: "FDA BT 2018", title: "FDA Guidance: Expedited Programs for Serious Conditions — Breakthrough Therapy (2018)" },
+  { code: "ICH E14",    title: "QT/QTc Interval monitoring requirements carried into Phase III design" },
+  { code: "FDA NDA",    title: "FDA NDA/BLA Submission — 505(b)(1) and 505(b)(2) pathway criteria" },
+];
+
+function SimulationDataSources({
+  layer,
+  simResults,
+  cohortResults,
+  uniprotId = "",
+  pdbId = "",
+  proteinName = "",
+  alphafoldPlddt = null,
+}: {
+  layer: 1 | 2 | 3;
+  simResults?: SimResults | null;
+  cohortResults?: CohortResults | null;
+  uniprotId?: string;
+  pdbId?: string;
+  proteinName?: string;
+  alphafoldPlddt?: number | null;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const sources: SrcEntry[] =
+    layer === 1 ? buildL1Sources(simResults ?? null, uniprotId, pdbId, proteinName, alphafoldPlddt) :
+    layer === 2 ? buildL2Sources(cohortResults ?? null, simResults ?? null) :
+                  buildL3Sources(simResults ?? null);
+
+  const refs: RefEntry[] = layer === 1 ? L1_REFS : layer === 2 ? L2_REFS : L3_REFS;
+
+  const liveCount = sources.filter(s => s.status === "live").length;
+  const layerColor = layer === 1 ? "violet" : layer === 2 ? "blue" : "emerald";
+  const borderCls = layerColor === "violet" ? "border-violet-500/20" : layerColor === "blue" ? "border-blue-500/20" : "border-emerald-500/20";
+  const textAccent = layerColor === "violet" ? "text-violet-400" : layerColor === "blue" ? "text-blue-400" : "text-emerald-400";
+
+  return (
+    <div className={`border ${borderCls} rounded-xl overflow-hidden bg-white/[0.02]`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <Database className="w-3.5 h-3.5 text-slate-500" />
+          <span className="text-[11px] font-semibold text-slate-300">Data Sources & References</span>
+          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 ${textAccent}`}>
+            {liveCount} LIVE · {sources.length - liveCount} ESTIMATED
+          </span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-5 pt-1 space-y-5 border-t border-white/5">
+
+          {/* Database Queries */}
+          <div>
+            <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3 mt-3">Database Queries Made</div>
+            <div className="space-y-2">
+              {sources.map(src => (
+                <div key={src.name} className="flex items-start gap-2.5">
+                  <span className={`text-[11px] font-mono mt-0.5 shrink-0 ${
+                    src.status === "live" ? "text-emerald-400" :
+                    src.status === "estimated" ? "text-amber-400" : "text-slate-600"
+                  }`}>
+                    {src.status === "live" ? "✓" : src.status === "estimated" ? "~" : "—"}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[11px] font-medium ${
+                        src.status === "live" ? "text-slate-200" :
+                        src.status === "estimated" ? "text-slate-400" : "text-slate-600"
+                      }`}>{src.name}</span>
+                      <span className={`text-[8px] font-semibold px-1 py-0.5 rounded ${
+                        src.status === "live" ? "bg-emerald-500/10 text-emerald-500" :
+                        src.status === "estimated" ? "bg-amber-500/10 text-amber-500" :
+                        "bg-white/5 text-slate-600"
+                      }`}>
+                        {src.status === "live" ? "LIVE" : src.status === "estimated" ? "ESTIMATED" : "N/A"}
+                      </span>
+                      {src.url && (
+                        <a href={src.url} target="_blank" rel="noopener noreferrer"
+                           className="text-[9px] text-blue-500 hover:text-blue-400 transition-colors">↗</a>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{src.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Regulatory References */}
+          <div>
+            <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Regulatory Guidance References</div>
+            <div className="space-y-1.5">
+              {refs.map(ref => (
+                <div key={ref.code} className="flex items-baseline gap-2.5">
+                  <span className={`text-[9px] font-mono shrink-0 w-24 ${textAccent}`}>{ref.code}</span>
+                  <span className="text-[10px] text-slate-400 leading-relaxed">
+                    {ref.title}
+                    {ref.url && (
+                      <a href={ref.url} target="_blank" rel="noopener noreferrer"
+                         className="ml-1 text-blue-500 hover:text-blue-400">↗</a>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="rounded-lg border border-amber-500/15 bg-amber-500/5 px-3 py-2.5">
+            <div className="text-[9px] text-amber-600/90 leading-relaxed">
+              <span className="font-semibold text-amber-500">Important:</span> All simulations are in silico estimates intended for early-stage hypothesis generation. Results must be validated against experimental data. LIVE badge indicates a real-time API query was made; ESTIMATED indicates the value was derived from computational rules. HakaseAI output does not constitute regulatory advice and should not substitute for formal regulatory consultation with qualified experts.
+            </div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Regulatory Insight Card (all 3 layers) ───────────────────────────────
 function RegulatoryInsightCard({
   layer, indication, simResults: sr, cohortResults: cr, trialResults: tr, similarDrugs,
@@ -3742,6 +4033,7 @@ function Layer1Results({
   molProps, simResults, indication,
   aiReport, aiLoading, aiError, aiStream, runAiAnalysis,
   chatMessages, chatInput, chatLoading, sendChatMessage, onChatInputChange,
+  uniprotId, pdbId, alphafoldPlddt, proteinName,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
@@ -3756,6 +4048,10 @@ function Layer1Results({
   chatLoading: boolean;
   sendChatMessage: (question: string) => void;
   onChatInputChange: (val: string) => void;
+  uniprotId?: string;
+  pdbId?: string;
+  alphafoldPlddt?: number | null;
+  proteinName?: string;
 }) {
   const [activeTab, setActiveTab] = useState("admet");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -4038,6 +4334,14 @@ function Layer1Results({
       </div>
 
       <RegulatoryInsightCard layer={1} indication={indication} simResults={simResults} />
+      <SimulationDataSources
+        layer={1}
+        simResults={simResults}
+        uniprotId={uniprotId}
+        pdbId={pdbId}
+        alphafoldPlddt={alphafoldPlddt}
+        proteinName={proteinName}
+      />
     </div>
   );
 }
@@ -4441,6 +4745,7 @@ function Layer2Results({ cohortResults, indication, simResults: sr2 }: { cohortR
       </div>
 
       <RegulatoryInsightCard layer={2} indication={indication} cohortResults={cr} similarDrugs={sr2?.similarDrugs} />
+      <SimulationDataSources layer={2} simResults={sr2} cohortResults={cr} />
     </div>
   );
 }
@@ -4826,6 +5131,7 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simRes
       </div>
 
       <RegulatoryInsightCard layer={3} indication={indication} trialResults={tr} similarDrugs={sr?.similarDrugs} />
+      <SimulationDataSources layer={3} simResults={sr} />
     </div>
   );
 }
