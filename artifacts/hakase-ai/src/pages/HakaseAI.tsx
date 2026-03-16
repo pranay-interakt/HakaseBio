@@ -461,6 +461,9 @@ export function HakaseAI() {
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle" });
     setSimProgress(0);
     setActiveLayer(1);
+    setAiReport(null);
+    setAiError(null);
+    setAiStream("");
   }, [savedProjects]);
 
   const runSimulation = useCallback(async () => {
