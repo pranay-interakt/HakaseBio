@@ -7,6 +7,7 @@ import {
   isReady,
   type MolecularProperties,
   type FingerprintInfo,
+  getRDKitInstance,
 } from "@/lib/chemistry";
 import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
 import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
@@ -1205,8 +1206,8 @@ export function HakaseAI() {
                       </FieldGroup>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <UploadButton label="SDF / MOL2 Upload" hint=".sdf, .mol2, .mol · 10MB" />
-                        <UploadButton label="Batch CSV" hint="CSV with 'smiles' col · 500 rows" />
+                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
+                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
                       </div>
 
                       {/* ── Diagen Integration ── */}
@@ -3053,11 +3054,201 @@ function CollapsibleSection({ label, open, setOpen, children, accentColor, badge
   );
 }
 
-function UploadButton({ label, hint }: { label: string; hint: string }) {
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === "," && !inQ) { result.push(cur.trim()); cur = ""; }
+    else { cur += ch; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function MolFileUpload({ onLoaded }: { onLoaded: (smiles: string, name?: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<"idle" | "parsing" | "ok" | "error">("idle");
+  const [msg, setMsg] = useState("");
+
+  const handleFile = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) { setMsg("File exceeds 10 MB"); setStatus("error"); return; }
+    setStatus("parsing");
+    const text = await file.text();
+
+    const lname = file.name.toLowerCase();
+
+    let molBlock = text;
+    if (lname.endsWith(".sdf")) {
+      const end = text.indexOf("$$$$");
+      molBlock = end > -1 ? text.slice(0, end + 4) : text;
+    }
+
+    const nameFromHeader = molBlock.split("\n")[0]?.trim() || undefined;
+
+    const rdkit = getRDKitInstance();
+    if (!rdkit) { setMsg("Chemistry engine not ready"); setStatus("error"); return; }
+
+    let mol: any = null;
+    try {
+      mol = rdkit.get_mol(molBlock);
+
+      if (!mol || !mol.is_valid()) {
+        mol?.delete();
+        const smilesInData = text.match(/>\s*<(?:SMILES|Smiles|smiles)>\s*\r?\n([^\r\n]+)/);
+        if (smilesInData) {
+          mol = rdkit.get_mol(smilesInData[1].trim());
+        }
+      }
+
+      if (!mol || !mol.is_valid()) {
+        setMsg("Could not parse molecule");
+        setStatus("error");
+        mol?.delete();
+        return;
+      }
+
+      const smiles = mol.get_smiles();
+      mol.delete();
+
+      const nm = nameFromHeader && nameFromHeader !== "" && nameFromHeader.length < 60
+        ? nameFromHeader
+        : undefined;
+
+      setMsg(nm ? `Loaded: ${nm}` : "Loaded");
+      setStatus("ok");
+      onLoaded(smiles, nm);
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch (e) {
+      mol?.delete();
+      setMsg("Parse error");
+      setStatus("error");
+    }
+  };
+
+  const borderCls = status === "ok"
+    ? "border-emerald-500/40 bg-emerald-500/5"
+    : status === "error"
+    ? "border-red-500/30 bg-red-500/5"
+    : "border-white/10 hover:border-violet-500/30 hover:bg-violet-500/5";
+
   return (
-    <div className="border border-dashed border-white/10 hover:border-white/20 rounded-lg p-3 text-center cursor-pointer hover:bg-white/3 transition-all group">
-      <div className="text-[11px] font-medium text-slate-400 group-hover:text-slate-300">{label}</div>
-      <div className="text-[9px] text-slate-600 mt-0.5">{hint}</div>
+    <>
+      <input ref={inputRef} type="file" accept=".sdf,.mol,.mol2" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+      <div onClick={() => inputRef.current?.click()}
+        className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all group ${borderCls}`}>
+        {status === "parsing" && (
+          <div className="flex items-center justify-center gap-1.5">
+            <div className="w-2.5 h-2.5 border border-violet-400 border-t-transparent rounded-full animate-spin" />
+            <span className="text-[11px] text-violet-400">Parsing…</span>
+          </div>
+        )}
+        {status === "ok" && (
+          <div className="text-[11px] font-medium text-emerald-400 truncate">{msg}</div>
+        )}
+        {status === "error" && (
+          <div className="text-[11px] font-medium text-red-400">{msg}</div>
+        )}
+        {status === "idle" && (
+          <>
+            <div className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300">SDF / MOL2 Upload</div>
+            <div className="text-[9px] text-slate-600 mt-0.5">.sdf, .mol2, .mol · 10 MB</div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function BatchCsvUpload({ onSelected }: { onSelected: (smiles: string, name?: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows]     = useState<Array<{ smiles: string; name?: string }>>([]);
+  const [open, setOpen]     = useState(false);
+  const [error, setError]   = useState("");
+  const panelRef            = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleFile = async (file: File) => {
+    setError("");
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { setError("CSV has no data rows"); return; }
+
+    const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g, "").trim());
+    const smilesCol = headers.findIndex(h => h === "smiles" || h === "smile" || h === "canonical_smiles");
+    if (smilesCol < 0) { setError("No 'smiles' column found"); return; }
+    const nameCol = headers.findIndex(h => ["name", "compound_name", "molecule", "compound", "id", "cmpd_id"].includes(h));
+
+    const parsed: Array<{ smiles: string; name?: string }> = [];
+    for (let i = 1; i < Math.min(lines.length, 501); i++) {
+      const cols = parseCsvLine(lines[i]);
+      const sm = cols[smilesCol]?.trim();
+      if (!sm) continue;
+      const nm = nameCol >= 0 ? cols[nameCol]?.trim() || undefined : undefined;
+      parsed.push({ smiles: sm, name: nm });
+    }
+
+    if (parsed.length === 0) { setError("No valid SMILES rows found"); return; }
+    setRows(parsed);
+    setOpen(true);
+  };
+
+  return (
+    <div className="relative">
+      <input ref={inputRef} type="file" accept=".csv" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+
+      <div onClick={() => rows.length > 0 ? setOpen(o => !o) : inputRef.current?.click()}
+        className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all group ${rows.length > 0 ? "border-blue-500/40 bg-blue-500/5" : "border-white/10 hover:border-blue-500/30 hover:bg-blue-500/5"}`}>
+        {error ? (
+          <div className="text-[11px] font-medium text-red-400">{error}</div>
+        ) : rows.length > 0 ? (
+          <>
+            <div className="text-[11px] font-medium text-blue-300">{rows.length} compounds loaded</div>
+            <div className="text-[9px] text-blue-400/60 mt-0.5">Click to pick one</div>
+          </>
+        ) : (
+          <>
+            <div className="text-[11px] font-medium text-slate-400 group-hover:text-blue-300">Batch CSV</div>
+            <div className="text-[9px] text-slate-600 mt-0.5">CSV with 'smiles' col · 500 rows</div>
+          </>
+        )}
+      </div>
+
+      {open && rows.length > 0 && (
+        <div ref={panelRef}
+          className="absolute left-0 top-full mt-1 z-50 w-72 bg-[#0f1117] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/8 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-300">{rows.length} compounds — click to load</span>
+            <div className="flex gap-2">
+              <button onClick={() => inputRef.current?.click()} className="text-[10px] text-slate-500 hover:text-slate-300">Replace</button>
+              <button onClick={() => setOpen(false)} className="text-[10px] text-slate-500 hover:text-slate-300">✕</button>
+            </div>
+          </div>
+          <div className="max-h-56 overflow-y-auto divide-y divide-white/5">
+            {rows.map((r, i) => (
+              <button key={i}
+                onClick={() => { onSelected(r.smiles, r.name); setOpen(false); }}
+                className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors group/row">
+                <div className="text-[11px] font-medium text-slate-300 truncate group-hover/row:text-white">
+                  {r.name ?? `Row ${i + 1}`}
+                </div>
+                <div className="text-[9px] text-slate-600 font-mono truncate">{r.smiles}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
