@@ -33,21 +33,24 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   }, [mobileOpen]);
 
   const platformItems = [
-    { label: "Overview",                     sub: "What BioDigital Twin is",              anchor: "",         color: "violet"  },
-    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",           anchor: "#layer1",  color: "violet"  },
-    { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",  anchor: "#layer2",  color: "blue"    },
-    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",        anchor: "#vpse",    color: "blue"    },
-    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",          anchor: "#layer3",  color: "emerald" },
-    { label: "Privacy",                      sub: "Client-side · Zero data egress",        anchor: "#privacy", color: "slate"   },
-    { label: "Advanced AI · v2",             sub: "50+ models · 8 component upgrades",     anchor: "#ai-v2",   color: "amber"   },
+    { label: "Overview",                     sub: "What BioDigital Twin is",              anchor: "",            route: "",            color: "violet"  },
+    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",           anchor: "#layer1",     route: "",            color: "violet"  },
+    { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",  anchor: "#layer2",     route: "",            color: "blue"    },
+    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",        anchor: "#vpse",       route: "",            color: "blue"    },
+    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",          anchor: "#layer3",     route: "",            color: "emerald" },
+    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",     anchor: "",            route: "/regulatory", color: "blue"    },
+    { label: "Privacy",                      sub: "Client-side · Zero data egress",        anchor: "#privacy",    route: "",            color: "slate"   },
+    { label: "Advanced AI · v2",             sub: "50+ models · 8 component upgrades",     anchor: "#ai-v2",      route: "",            color: "amber"   },
   ];
 
   const landingAnchors = new Set(["#privacy", "#ai-v2", "#vpse"]);
 
-  function handlePlatformNav(anchor: string) {
+  function handlePlatformNav(anchor: string, route: string) {
     setPlatformOpen(false);
     setMobileOpen(false);
-    if (landingAnchors.has(anchor)) {
+    if (route) {
+      navigate(route);
+    } else if (landingAnchors.has(anchor)) {
       navigate("/");
       setTimeout(() => {
         document.querySelector(anchor)?.scrollIntoView({ behavior: "smooth" });
@@ -85,10 +88,10 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
             {platformOpen && (
               <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 rounded-2xl border border-white/10 bg-[#0d0f17] shadow-2xl shadow-black/80 overflow-hidden z-[100]">
                 <div className="p-1.5 space-y-0.5">
-                  {platformItems.map(({ label, sub, anchor, color }) => (
+                  {platformItems.map(({ label, sub, anchor, route, color }) => (
                     <button
                       key={label}
-                      onClick={() => handlePlatformNav(anchor)}
+                      onClick={() => handlePlatformNav(anchor, route)}
                       className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors group"
                     >
                       <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${
@@ -144,10 +147,10 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
 
             {/* Platform section */}
             <div className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold px-3 pb-2 pt-1">Platform</div>
-            {platformItems.map(({ label, sub, anchor, color }) => (
+            {platformItems.map(({ label, sub, anchor, route, color }) => (
               <button
                 key={label}
-                onClick={() => handlePlatformNav(anchor)}
+                onClick={() => handlePlatformNav(anchor, route)}
                 className="w-full text-left px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
               >
                 <div className={`text-[14px] font-semibold mb-0.5 ${

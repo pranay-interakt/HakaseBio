@@ -5,6 +5,7 @@ import { Login } from "@/pages/Login";
 import { HakaseAI } from "@/pages/HakaseAI";
 import { Story } from "@/pages/Story";
 import { Platform } from "@/pages/Platform";
+import { Regulatory } from "@/pages/Regulatory";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,7 @@ function App() {
           <Route path="/login" component={Login} />
           <Route path="/story" component={Story} />
           <Route path="/platform" component={Platform} />
+          <Route path="/regulatory" component={Regulatory} />
           <Route path="/dashboard" component={HakaseAI} />
           <Route path="/dashboard/:rest*" component={HakaseAI} />
           <Route component={Landing} />
