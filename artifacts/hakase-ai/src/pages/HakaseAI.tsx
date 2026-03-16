@@ -386,6 +386,11 @@ export function HakaseAI() {
   const [aiError,    setAiError]    = useState<string | null>(null);
   const [aiStream,   setAiStream]   = useState("");
 
+  const [l1AiReport,  setL1AiReport]  = useState<Record<string, unknown> | null>(null);
+  const [l1AiLoading, setL1AiLoading] = useState(false);
+  const [l1AiError,   setL1AiError]   = useState<string | null>(null);
+  const [l1AiStream,  setL1AiStream]  = useState("");
+
   const [l2AiReport,  setL2AiReport]  = useState<Record<string, unknown> | null>(null);
   const [l2AiLoading, setL2AiLoading] = useState(false);
   const [l2AiError,   setL2AiError]   = useState<string | null>(null);
@@ -528,6 +533,18 @@ export function HakaseAI() {
       opts.setLoading(false);
     }
   }, []);
+
+  const runL1AiAnalysis = useCallback(() => {
+    if (!simResults) return;
+    streamAiLayer({
+      focus: "molecular",
+      body: { molName: simResults.molName, smiles: simResults.smiles, indication, layer1: simResults, proteinInfo },
+      setLoading: setL1AiLoading,
+      setError:   setL1AiError,
+      setStream:  setL1AiStream,
+      setReport:  setL1AiReport,
+    });
+  }, [simResults, indication, proteinInfo, streamAiLayer]);
 
   const runL2AiAnalysis = useCallback(() => {
     if (!simResults || !cohortResults) return;
@@ -1996,16 +2013,11 @@ export function HakaseAI() {
                       molProps={molProps}
                       simResults={simResults}
                       indication={indication}
-                      aiReport={aiReport}
-                      aiLoading={aiLoading}
-                      aiError={aiError}
-                      aiStream={aiStream}
-                      runAiAnalysis={runAiAnalysis}
-                      chatMessages={chatMessages}
-                      chatInput={chatInput}
-                      chatLoading={chatLoading}
-                      sendChatMessage={sendChatMessage}
-                      onChatInputChange={setChatInput}
+                      l1AiReport={l1AiReport}
+                      l1AiLoading={l1AiLoading}
+                      l1AiError={l1AiError}
+                      l1AiStream={l1AiStream}
+                      runL1AiAnalysis={runL1AiAnalysis}
                       uniprotId={uniprotId}
                       pdbId={pdbId}
                       alphafoldPlddt={alphafoldData?.meanPlddt ?? null}
@@ -4422,34 +4434,23 @@ type AiReport = {
 
 function Layer1Results({
   molProps, simResults, indication,
-  aiReport, aiLoading, aiError, aiStream, runAiAnalysis,
-  chatMessages, chatInput, chatLoading, sendChatMessage, onChatInputChange,
+  l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
   indication: string;
-  aiReport: AiReport | null;
-  aiLoading: boolean;
-  aiError: string | null;
-  aiStream: string;
-  runAiAnalysis: () => void;
-  chatMessages: Array<{ role: "user" | "assistant"; content: string }>;
-  chatInput: string;
-  chatLoading: boolean;
-  sendChatMessage: (question: string) => void;
-  onChatInputChange: (val: string) => void;
+  l1AiReport: Record<string, unknown> | null;
+  l1AiLoading: boolean;
+  l1AiError: string | null;
+  l1AiStream: string;
+  runL1AiAnalysis: () => void;
   uniprotId?: string;
   pdbId?: string;
   alphafoldPlddt?: number | null;
   proteinName?: string;
 }) {
   const [activeTab, setActiveTab] = useState("admet");
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
 
   const goColor = simResults?.goNogo === "GO" ? "emerald" : simResults?.goNogo === "WATCH" ? "yellow" : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
@@ -4501,189 +4502,6 @@ function Layer1Results({
         </div>
       </div>
 
-      {/* AI Analysis Panel */}
-      {simResults && (
-        <div className="border border-violet-500/20 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-violet-500/8">
-            <div className="flex items-center gap-2.5">
-              <div className="w-5 h-5 rounded-md bg-violet-500/20 flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-violet-400" />
-              </div>
-              <span className="text-[13px] font-semibold text-white">AI Analysis</span>
-              <Badge className="text-[9px] bg-violet-500/15 text-violet-300 border-violet-500/25 px-1.5">Hakase AI v2</Badge>
-            </div>
-            {!aiLoading && !aiReport && (
-              <button
-                onClick={runAiAnalysis}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-violet-300 hover:text-violet-200 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 rounded-lg px-3 py-1.5 transition-all"
-              >
-                <Sparkles className="w-3 h-3" />
-                Run AI Analysis
-              </button>
-            )}
-            {aiLoading && (
-              <div className="flex items-center gap-1.5 text-[11px] text-violet-400">
-                <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
-                Analyzing…
-              </div>
-            )}
-            {aiReport && !aiLoading && (
-              <button
-                onClick={runAiAnalysis}
-                className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Re-analyze
-              </button>
-            )}
-          </div>
-
-          {aiError && (
-            <div className="px-4 py-3 text-[12px] text-red-400 bg-red-500/5">
-              {aiError}
-            </div>
-          )}
-
-          {aiLoading && !aiReport && (
-            <div className="px-4 py-4">
-              <div className="text-[11px] text-slate-500 mb-2">Streaming biomedical analysis…</div>
-              <div className="text-[11px] text-slate-400 font-mono leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
-                {aiStream || "Connecting…"}
-              </div>
-            </div>
-          )}
-
-          {aiReport && (
-            <div className="divide-y divide-white/5">
-              {[
-                { key: "molecularOverview",     label: "Molecular Overview",       icon: "🔬", color: "violet" },
-                { key: "safetyNarrative",       label: "Safety Narrative",         icon: "🛡️", color: "red"    },
-                { key: "pkAnalysis",            label: "PK / PD Analysis",         icon: "📈", color: "blue"   },
-                { key: "targetEngagement",      label: "Target Engagement",        icon: "🎯", color: "amber"  },
-                { key: "cohortInsights",        label: "Cohort Insights",          icon: "👥", color: "blue"   },
-                { key: "trialDesignRationale",  label: "Trial Design",             icon: "🏥", color: "emerald"},
-                { key: "competitiveContext",    label: "Competitive Context",      icon: "⚖️", color: "amber"  },
-                { key: "regulatoryPathway",     label: "Regulatory Pathway",       icon: "🏛️", color: "blue"   },
-                { key: "goNogoRationale",       label: "Go/No-Go Rationale",       icon: "✅", color: "emerald"},
-              ].filter(({ key }) => {
-                const val = aiReport[key as keyof typeof aiReport];
-                return val && typeof val === "string" && !val.toLowerCase().includes("not yet run") && !val.toLowerCase().includes("not yet simulated");
-              }).map(({ key, label, icon }) => (
-                <div key={key} className="px-4 py-3">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <span>{icon}</span>{label}
-                  </div>
-                  <p className="text-[12px] text-slate-300 leading-relaxed">
-                    {aiReport[key as keyof typeof aiReport] as string}
-                  </p>
-                </div>
-              ))}
-
-              {aiReport.riskMitigations && aiReport.riskMitigations.length > 0 && (
-                <div className="px-4 py-3">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <span>⚠️</span>Risk Mitigations
-                  </div>
-                  <ul className="space-y-1.5">
-                    {aiReport.riskMitigations.map((r, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[12px] text-slate-300">
-                        <span className="text-yellow-400 mt-0.5 shrink-0">•</span>
-                        {r}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {aiReport.nextSteps && aiReport.nextSteps.length > 0 && (
-                <div className="px-4 py-3 bg-white/2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <span>🚀</span>Recommended Next Steps
-                  </div>
-                  <ol className="space-y-1.5">
-                    {aiReport.nextSteps.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[12px] text-slate-300">
-                        <span className="text-violet-400 font-bold shrink-0">{i + 1}.</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!aiLoading && !aiReport && !aiError && (
-            <div className="px-4 py-5 text-center">
-              <p className="text-[12px] text-slate-500">
-                Click <span className="text-violet-400 font-medium">Run AI Analysis</span> to get an AI-powered interpretation of your simulation results — including safety, PK/PD, competitive positioning, and next steps.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Q&A Chat — visible only after AI report is generated */}
-      {aiReport && (
-        <div className="border border-violet-500/15 rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-500/5 border-b border-violet-500/10">
-            <MessageCircle className="w-3.5 h-3.5 text-violet-400" />
-            <span className="text-[12px] font-semibold text-white">Follow-up Q&amp;A</span>
-            {chatMessages.length > 0 && (
-              <span className="ml-auto text-[10px] text-slate-500">{Math.ceil(chatMessages.length / 2)} turn{chatMessages.length > 2 ? "s" : ""}</span>
-            )}
-          </div>
-
-          {chatMessages.length > 0 && (
-            <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
-              {chatMessages.map((msg, i) => (
-                <div key={i} className={`px-4 py-3 ${msg.role === "user" ? "bg-violet-500/6" : "bg-transparent"}`}>
-                  <div className={`text-[9px] font-semibold uppercase tracking-wider mb-1 ${msg.role === "user" ? "text-violet-400" : "text-slate-500"}`}>
-                    {msg.role === "user" ? "You" : "Hakase AI"}
-                  </div>
-                  {msg.content ? (
-                    <p className="text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-
-          {chatMessages.length === 0 && (
-            <div className="px-4 py-3">
-              <p className="text-[11px] text-slate-600">Ask a follow-up question about the analysis — mechanisms, safety margins, dose rationale, regulatory strategy, or competitive landscape.</p>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 p-3 border-t border-white/5">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => onChatInputChange(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !chatLoading && chatInput.trim()) sendChatMessage(chatInput); }}
-              placeholder="Ask about this compound…"
-              disabled={chatLoading}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:bg-violet-500/5 transition-all disabled:opacity-50"
-            />
-            <button
-              onClick={() => { if (!chatLoading && chatInput.trim()) sendChatMessage(chatInput); }}
-              disabled={chatLoading || !chatInput.trim()}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 hover:text-violet-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-            >
-              {chatLoading
-                ? <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
-                : <ArrowRight className="w-3.5 h-3.5" />
-              }
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
@@ -4733,6 +4551,7 @@ function Layer1Results({
         alphafoldPlddt={alphafoldPlddt}
         proteinName={proteinName}
       />
+      <LayerAiPanel layer={1} report={l1AiReport} loading={l1AiLoading} error={l1AiError} stream={l1AiStream} onRun={runL1AiAnalysis} />
     </div>
   );
 }
