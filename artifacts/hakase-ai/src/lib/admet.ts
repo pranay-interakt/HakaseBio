@@ -40,6 +40,8 @@ export interface LipinskiAnalysis {
   hbaPass:  boolean; hba:  number;
   violations: number;
   leadLike: boolean;
+  tpsa:     number;
+  rotBonds: number;
 }
 
 export interface SimResults {
@@ -245,6 +247,8 @@ export function runAdmetSimulation(
     hbaPass:  hba <= 10,  hba,
     violations: [mw > 500, logP > 5, hbd > 5, hba > 10].filter(Boolean).length,
     leadLike: mw <= 350 && logP <= 3.5 && hbd <= 3 && hba <= 7,
+    tpsa,
+    rotBonds,
   };
 
   // ── SA Score (synthetic accessibility 1=easy, 10=hard) ─────────────────

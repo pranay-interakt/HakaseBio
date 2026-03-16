@@ -119,42 +119,48 @@ function solveODE(
 }
 
 export function runPBPK(drug: PBPKDrugParams, patient: PBPKPatientParams): PBPKOutput {
-  const BW = patient.weightKg;
+  const BW = isFinite(patient.weightKg) && patient.weightKg > 0 ? patient.weightKg : 70;
+
+  // Sanitise drug params — guard against undefined/NaN inputs
+  const logP  = isFinite(drug.logP)  ? drug.logP  : 2.5;
+  const tpsa  = isFinite(drug.tpsa)  ? drug.tpsa  : 80;
+  const mw    = isFinite(drug.mw)    && drug.mw > 0 ? drug.mw : 350;
+  const hbd   = isFinite(drug.hbd)   ? drug.hbd   : 1;
+  const egfr  = isFinite(patient.egfr) && patient.egfr > 0 ? patient.egfr : 90;
+  const albumin = isFinite(patient.albuminGdL) && patient.albuminGdL > 0 ? patient.albuminGdL : 4.1;
 
   // ── Tissue-to-plasma partition coefficient (Kp) ──────────────────────────
   // Simplified Rodgers & Rowland approach:
   //   logP > 2 → lipophilic: higher peripheral distribution
-  const Kp = Math.max(0.3, Math.min(15, 1 + (drug.logP - 1) * 0.8));
+  const Kp = Math.max(0.3, Math.min(15, 1 + (logP - 1) * 0.8));
 
   // ── Volume of distribution (allometric from 70 kg reference) ─────────────
   // Vc ≈ plasma volume + highly-perfused organs (reference: ~5–8 L for 70 kg)
-  const VcRef = 5.0 + drug.logP * 0.5;
-  const VpRef = Math.max(5, 20 + drug.logP * 4.0 + drug.mw / 80);
+  const VcRef = 5.0 + logP * 0.5;
+  const VpRef = Math.max(5, 20 + logP * 4.0 + mw / 80);
   const Vc = allometricV(Math.max(3, VcRef), BW);
   const Vp = allometricV(Math.max(10, VpRef), BW);
   const Vdss = (Vc + Vp * Kp) / BW; // L/kg
 
   // ── Clearance (allometric, renal adjustment) ──────────────────────────────
-  // Base hepatic CL from ADMET metabolism score (0=poor, 1=ideal)
-  const CLhep_ref = (1 - drug.metabolismScore) * 25 + 2; // L/h, 70 kg ref
-  // Renal CL proportional to eGFR deviation from normal (100 mL/min)
-  const renalFraction = drug.mw < 400 ? 0.25 : 0.10;
-  const CLren_ref     = 6.0 * renalFraction * (patient.egfr / 100);
+  const metScore = isFinite(drug.metabolismScore) ? drug.metabolismScore : 0.7;
+  const CLhep_ref = (1 - metScore) * 25 + 2; // L/h, 70 kg ref
+  const renalFraction = mw < 400 ? 0.25 : 0.10;
+  const CLren_ref     = 6.0 * renalFraction * (egfr / 100);
   const CL_ref        = CLhep_ref + CLren_ref;
   const CL            = allometricCL(Math.max(0.5, CL_ref), BW);
 
   // Albumin binding correction: low albumin → higher free fraction → faster CL
-  const albNorm = (patient.albuminGdL - 4.1) / 4.1;
-  const CLadj   = CL * (1 - albNorm * 0.3 * Math.min(1, drug.logP / 4));
+  const albNorm = (albumin - 4.1) / 4.1;
+  const CLadj   = Math.max(0.1, CL * (1 - albNorm * 0.3 * Math.min(1, logP / 4)));
 
   // ── Inter-compartmental clearance (Q) ────────────────────────────────────
-  // Typically 30–60% of CL for moderate lipophilicity
-  const Q = Math.max(1, CLadj * (0.3 + drug.logP * 0.05));
+  const Q = Math.max(1, CLadj * (0.3 + logP * 0.05));
 
   // ── Absorption rate constant (ka, oral) ──────────────────────────────────
-  // High TPSA → slow absorption; high logP → rapid
+  const absScore = isFinite(drug.absorptionScore) ? drug.absorptionScore : 0.7;
   const ka = drug.routeIV ? 0
-    : Math.max(0.2, Math.min(5.0, drug.absorptionScore * 3.5 - drug.tpsa / 200));
+    : Math.max(0.2, Math.min(5.0, absScore * 3.5 - tpsa / 200));
 
   // ── Solve ODE ────────────────────────────────────────────────────────────
   const concentrations = solveODE(drug, Vc, Vp, CLadj, Q, Kp, ka, BW);
