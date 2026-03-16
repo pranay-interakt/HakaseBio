@@ -3401,6 +3401,36 @@ const LAYER_AI_LABELS: Record<number, { title: string; subtitle: string; accent:
   3: { title: "Trial & Regulatory AI Analysis", subtitle: "Trial design · Power · Regulatory pathway · GO/NO-GO", accent: "text-emerald-400", border: "border-emerald-500/20", badge: "bg-emerald-500/10 text-emerald-400", btn: "bg-emerald-600 hover:bg-emerald-500" },
 };
 
+// ── Rich text renderer: highlights numbers/units inline ─────────────────────
+const NUM_RE = /(\d[\d,]*\.?\d*\s*(?:%|ng\/mL|Da|h\b|nM|μM|µM|mL|L\/h|L\/kg|mg\/kg|mg\/mL|ng·h\/mL|nmol|μmol|fold|×|x\b|ki|Ki|IC50|EC50|AUC|Cmax|Tmax|t½|kDa|kcal\/mol|kcal|cal|eV)|n\s*=\s*\d+|HR\s*[=:]\s*[\d.]+|CI\s*[\d.,–\s%()]+|p\s*[<>=]\s*[\d.]+|HBD\s*\d+|HBA\s*\d+|[\d]+\.[\d]+)/g;
+
+function RichText({ text, accent }: { text: string; accent: string }) {
+  const tokens: Array<{ t: string; hi: boolean }> = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  NUM_RE.lastIndex = 0;
+  while ((m = NUM_RE.exec(text)) !== null) {
+    if (m.index > last) tokens.push({ t: text.slice(last, m.index), hi: false });
+    tokens.push({ t: m[0], hi: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) tokens.push({ t: text.slice(last), hi: false });
+  return (
+    <>
+      {tokens.map((tok, i) =>
+        tok.hi
+          ? <span key={i} className={`font-mono font-semibold tabular-nums ${accent}`}>{tok.t}</span>
+          : <span key={i}>{tok.t}</span>
+      )}
+    </>
+  );
+}
+
+// Split prose at sentence boundaries so each sentence breathes
+function splitSentences(text: string): string[] {
+  return text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean);
+}
+
 const LAYER_AI_KEY_LABELS: Record<string, string> = {
   molecularOverview:            "Molecular Overview",
   safetyNarrative:              "Safety Assessment",
@@ -3487,25 +3517,39 @@ function LayerAiPanel({
       )}
 
       {report && !loading && (
-        <div className="px-4 pb-5 pt-3 space-y-4">
+        <div className="divide-y divide-white/[0.04]">
           {Object.entries(report).map(([key, val]) => {
             if (!val || (Array.isArray(val) && val.length === 0)) return null;
             const label = LAYER_AI_KEY_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").trim();
             const isArr = Array.isArray(val);
+            const text = String(val);
+            const sentences = isArr ? [] : splitSentences(text);
             return (
-              <div key={key}>
-                <div className={`text-[9px] font-semibold uppercase tracking-widest mb-1.5 ${cfg.accent}`}>{label}</div>
+              <div key={key} className="px-5 py-4">
+                {/* Section header with accent bar */}
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className={`w-[3px] h-4 rounded-full ${cfg.btn}`} />
+                  <span className={`text-[9px] font-bold uppercase tracking-[0.12em] ${cfg.accent}`}>{label}</span>
+                </div>
                 {isArr ? (
-                  <ul className="space-y-1">
+                  <ul className="space-y-2">
                     {(val as string[]).map((item, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className={`mt-1 text-[8px] ${cfg.accent}`}>▸</span>
-                        <span className="text-[11px] text-slate-300 leading-relaxed">{item}</span>
+                      <li key={i} className="flex items-start gap-3 pl-1">
+                        <span className={`mt-[5px] w-1 h-1 rounded-full flex-shrink-0 ${cfg.btn}`} />
+                        <span className="text-[12px] text-slate-300 leading-[1.7]">
+                          <RichText text={item} accent={cfg.accent} />
+                        </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[11px] text-slate-300 leading-relaxed">{String(val)}</p>
+                  <div className="space-y-2 pl-[18px]">
+                    {sentences.map((s, i) => (
+                      <p key={i} className="text-[12px] text-slate-300 leading-[1.75]">
+                        <RichText text={s} accent={cfg.accent} />
+                      </p>
+                    ))}
+                  </div>
                 )}
               </div>
             );
@@ -3609,21 +3653,38 @@ function FullAiOverlay({
                 if (!val || (Array.isArray(val) && val.length === 0)) return null;
                 const label = FULL_KEY_LABELS[key] ?? key;
                 const isArr = Array.isArray(val);
+                const text = String(val);
+                const sentences = isArr ? [] : splitSentences(text);
                 return (
-                  <div key={key} className="border border-white/6 rounded-xl p-4">
-                    <div className="text-[9px] font-semibold uppercase tracking-widest text-violet-400 mb-2">{label}</div>
-                    {isArr ? (
-                      <ul className="space-y-1.5">
-                        {(val as string[]).map((item, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="mt-1 text-[9px] text-violet-400 shrink-0">▸</span>
-                            <span className="text-[12px] text-slate-300 leading-relaxed">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[12px] text-slate-300 leading-relaxed">{String(val)}</p>
-                    )}
+                  <div key={key} className="border border-white/6 rounded-xl overflow-hidden">
+                    {/* Section header */}
+                    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
+                      <div className="w-[3px] h-4 rounded-full bg-violet-500" />
+                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-violet-400">{label}</span>
+                    </div>
+                    {/* Body */}
+                    <div className="px-4 py-3">
+                      {isArr ? (
+                        <ul className="space-y-2">
+                          {(val as string[]).map((item, i) => (
+                            <li key={i} className="flex items-start gap-3">
+                              <span className="mt-[6px] w-1 h-1 rounded-full bg-violet-500 flex-shrink-0" />
+                              <span className="text-[12px] text-slate-300 leading-[1.7]">
+                                <RichText text={item} accent="text-violet-400" />
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="space-y-2">
+                          {sentences.map((s, i) => (
+                            <p key={i} className="text-[12px] text-slate-300 leading-[1.75]">
+                              <RichText text={s} accent="text-violet-400" />
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
