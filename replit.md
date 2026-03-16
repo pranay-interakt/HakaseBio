@@ -105,13 +105,20 @@ React + Vite SPA at `artifacts/hakase-ai/`. Routes: `/` (Landing), `/login`, `/d
 
 Three layered engines in `src/lib/`:
 - `admet.ts` — `runAdmetSimulation(molProps, smiles, molName, uniprotId) → SimResults`. Rule-based ADMET scores, organ risk, binding affinity heatmap, toxicity alerts, QED, Go/No-Go.
-- `cohortSim.ts` — `runCohortSimulation(simResults, cohortSize, dose, route, freq, ageRange, severity) → CohortResults`. PK/PD curves, responder rates, AEs, dose escalation groups, subgroup breakdown.
+- `cohortSim.ts` — `runCohortSimulation(simResults, cohortSize, dose, route, freq, ageRange, severity, pdParams?, faersResult?) → CohortResults`. Two-compartment PBPK (via pbpk.ts), NHANES population variability (via nhanes.ts), ChEMBL Emax PD (via pdModel.ts), FAERS AE calibration (via faersApi.ts).
 - `trialSim.ts` — `runTrialSimulation(simResults, cohortResults, phase, endpoint, ...) → TrialResults`. Statistical power, Weibull survival, interim analyses, site rankings, cost.
+
+### VPSE: Layer 2 Real-Data Engines (all browser-side)
+
+- `lib/pbpk.ts` — Two-compartment PBPK ODE solver (RK4, 1-min steps). Central + peripheral compartments, allometric scaling (BW^0.75), albumin binding correction, renal clearance adjustment. PK-Sim OSP physiological reference values.
+- `lib/nhanes.ts` — NHANES 2017–2020 population distributions. Samples virtual patients with realistic weight, age, eGFR, ALT, albumin distributions. `summariseCohort()` returns mean/SD + renal impairment fraction used to calibrate PK variability and subgroups.
+- `lib/pdModel.ts` — `fetchPDParameters(similarDrugs, mw, seed)` queries ChEMBL bioactivity API (IC50/Ki) for reference drugs. Geometric mean potency → Emax/Hill model EC50. `emaxEffect(c, pdParams)` computes E(C) = Emax × C^n / (EC50^n + C^n).
+- `lib/faersApi.ts` — `fetchFAERSSignals(drugName)` queries openFDA FAERS API for top MedDRA adverse event terms + counts for a reference drug name. Maps to display-ready labels + colours. Falls back gracefully if API unavailable.
 
 ### Key Types
 
 - `SimResults` — `admet`, `organs`, `toxAlerts`, `binding`, `qed`, `goNogo`, `confidence`, `recommendation`, `similarDrugs`, `smiles`, `molName`, `uniprotId`, `lipinski`
-- `CohortResults` — `cohortSize`, `responderRate`, `partialRate`, `nonResponderRate`, `pkCurve`, `cmax`, `cmaxSD`, `auc`, `halfLifeHr`, `doseGroups`, `adverseEvents`, `subgroupBreakdown`, `grade3AERate`
+- `CohortResults` — `cohortSize`, `responderRate`, `partialRate`, `nonResponderRate`, `pkCurve`, `cmax`, `cmaxSD`, `auc`, `halfLifeHr`, `doseGroups`, `adverseEvents`, `subgroupBreakdown`, `grade3AERate`, `nhanesStats`, `dataSources: { pbpk, pd, ae, population }`
 - `TrialResults` — `power`, `pValue`, `sampleSize`, `successProbability`, `survivalCurve`, `powerCurve`, `interimAnalyses`, `estimatedDuration`, `estimatedCost`, `siteRecommendations`, `goNogo`
 
 ### RDKit.js (MinimalLib) key descriptor names

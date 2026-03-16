@@ -15,6 +15,8 @@ import {
   type ProteinInfo, type PdbStructure, type AlphafoldPrediction,
 } from "@/lib/proteinApi";
 import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
+import { fetchFAERSSignals } from "@/lib/faersApi";
+import { fetchPDParameters } from "@/lib/pdModel";
 import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
@@ -313,7 +315,7 @@ export function HakaseAI() {
     setActiveLayer(1);
   }, [savedProjects]);
 
-  const runSimulation = useCallback(() => {
+  const runSimulation = useCallback(async () => {
     if (!molProps?.isValid) return;
 
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
@@ -322,6 +324,43 @@ export function HakaseAI() {
     const steps = activeLayer === 1 ? 18 : activeLayer === 2 ? 22 : 28;
     let tick = 0;
 
+    if (activeLayer === 2) {
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+
+      // Kick off real-data fetches (FAERS + ChEMBL PD) concurrently with progress animation
+      const seedStr = layer1.smiles + String(cohortSize[0]);
+      let seedH = 0;
+      for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
+
+      const fetchPromise = Promise.allSettled([
+        fetchFAERSSignals(layer1.similarDrugs[0] ?? layer1.molName),
+        fetchPDParameters(layer1.similarDrugs, layer1.lipinski.mw, seedH),
+      ]);
+
+      await new Promise<void>(resolve => {
+        const iv = setInterval(() => {
+          tick++;
+          setSimProgress(Math.min(95, (tick / steps) * 100));
+          if (tick >= steps) { clearInterval(iv); resolve(); }
+        }, 180);
+      });
+
+      const [faersSettled, pdSettled] = await fetchPromise;
+      const faersResult = faersSettled.status === "fulfilled" ? faersSettled.value : undefined;
+      const pdParams    = pdSettled.status === "fulfilled"    ? pdSettled.value    : undefined;
+
+      const results = runCohortSimulation(
+        layer1, cohortSize[0], Number(startingDose) || 100,
+        routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
+        pdParams, faersResult,
+      );
+      setCohortResults(results);
+      setSimProgress(100);
+      setSimStatus(prev => ({ ...prev, 2: "complete" }));
+      return;
+    }
+
+    // L1 / L3: original synchronous flow unchanged
     const interval = setInterval(() => {
       tick++;
       setSimProgress(Math.min(99, (tick / steps) * 100));
@@ -331,13 +370,6 @@ export function HakaseAI() {
         if (activeLayer === 1) {
           const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
           setSimResults(results);
-        } else if (activeLayer === 2) {
-          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
-          const results = runCohortSimulation(
-            layer1, cohortSize[0], Number(startingDose) || 100,
-            routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
-          );
-          setCohortResults(results);
         } else {
           const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
           const layer2 = cohortResults ?? runCohortSimulation(
@@ -3136,11 +3168,23 @@ function Layer2Results({ cohortResults }: { cohortResults: CohortResults | null 
   const [activeTab, setActiveTab] = useState("pkpd");
   const cr = cohortResults;
 
+  const cmaxNgmL = cr ? cr.cmax * 1000 : null;
+  const cmaxSDNgmL = cr ? cr.cmaxSD * 1000 : null;
   const summaryStats = [
-    { label: "Responder Rate", val: cr ? `${(cr.responderRate * 100).toFixed(1)}%` : "58.4%",     sub: cr ? `n=${cr.cohortSize} patients` : "at 200mg QD",                       color: "blue" },
-    { label: "Cmax Mean",      val: cr ? `${cr.cmax.toFixed(0)} ng/mL`            : "2,847 ng/mL", sub: cr ? `±${cr.cmaxSD.toFixed(0)} ng/mL SD`   : "±412 ng/mL SD",           color: "blue" },
-    { label: "AUC₀₋₂₄",      val: cr ? `${(cr.auc / 1000).toFixed(1)}k ng·h/mL` : "28.1k ng·h/mL", sub: "at therapeutic dose",                                                  color: "blue" },
-    { label: "Grade ≥3 AEs",   val: cr ? `${(cr.grade3AERate * 100).toFixed(1)}%` : "12.3%",       sub: "projected incidence",                                                     color: "amber" },
+    { label: "Responder Rate", val: cr ? `${(cr.responderRate * 100).toFixed(1)}%` : "58.4%",         sub: cr ? `n=${cr.cohortSize} patients` : "at 200mg QD",                    color: "blue" },
+    { label: "Cmax Mean",      val: cmaxNgmL != null ? `${cmaxNgmL.toFixed(0)} ng/mL` : "2,847 ng/mL", sub: cmaxSDNgmL != null ? `±${cmaxSDNgmL.toFixed(0)} ng/mL SD` : "±412 ng/mL SD", color: "blue" },
+    { label: "AUC₀₋₄₈",      val: cr ? `${cr.auc.toFixed(1)} µg·h/mL`             : "28.1 µg·h/mL", sub: "2-compartment PBPK",                                                 color: "blue" },
+    { label: "Grade ≥3 AEs",   val: cr ? `${(cr.grade3AERate * 100).toFixed(1)}%`    : "12.3%",        sub: "projected incidence",                                                color: "amber" },
+  ];
+
+  const ds = cr?.dataSources;
+  const sourceBadges = [
+    { label: "2-Cpt PBPK",   active: ds?.pbpk === "2-compartment", color: "blue"   },
+    { label: "NHANES Pop.",   active: ds?.population === "nhanes",  color: "blue"   },
+    { label: ds?.pd === "chembl-live" ? "ChEMBL PD" : "Est. PD",
+      active: ds?.pd === "chembl-live", color: "violet" },
+    { label: ds?.ae === "faers-live"  ? "FAERS AE"  : "Est. AE",
+      active: ds?.ae === "faers-live",  color: ds?.ae === "faers-live" ? "emerald" : "slate" },
   ];
 
   return (
@@ -3153,6 +3197,24 @@ function Layer2Results({ cohortResults }: { cohortResults: CohortResults | null 
             <div className={`text-[16px] font-bold ${color === "blue" ? "text-blue-300" : "text-amber-300"}`}>{val}</div>
             <div className="text-[10px] text-slate-600 mt-0.5">{sub}</div>
           </div>
+        ))}
+      </div>
+
+      {/* Data Source Badges */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[9px] text-slate-600 uppercase tracking-widest">Data sources:</span>
+        {sourceBadges.map(({ label, active, color }) => (
+          <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+            active
+              ? color === "blue"   ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
+              : color === "violet" ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+              : color === "emerald"? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-white/10 bg-white/5 text-slate-400"
+              : "border-white/8 bg-white/3 text-slate-600"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? (color === "emerald" ? "bg-emerald-400" : color === "violet" ? "bg-violet-400" : "bg-blue-400") : "bg-slate-600"}`} />
+            {label}
+          </span>
         ))}
       </div>
 

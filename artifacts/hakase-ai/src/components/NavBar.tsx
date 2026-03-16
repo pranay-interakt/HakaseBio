@@ -36,12 +36,13 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     { label: "Overview",                     sub: "What BioDigital Twin is",              anchor: "",         color: "violet"  },
     { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",           anchor: "#layer1",  color: "violet"  },
     { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",  anchor: "#layer2",  color: "blue"    },
+    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",        anchor: "#vpse",    color: "blue"    },
     { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",          anchor: "#layer3",  color: "emerald" },
     { label: "Privacy",                      sub: "Client-side · Zero data egress",        anchor: "#privacy", color: "slate"   },
     { label: "Advanced AI · v2",             sub: "50+ models · 8 component upgrades",     anchor: "#ai-v2",   color: "amber"   },
   ];
 
-  const landingAnchors = new Set(["#privacy", "#ai-v2"]);
+  const landingAnchors = new Set(["#privacy", "#ai-v2", "#vpse"]);
 
   function handlePlatformNav(anchor: string) {
     setPlatformOpen(false);

@@ -713,6 +713,183 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ── VPSE: Layer 2 Real-Data Upgrades ── */}
+      <section id="vpse" className="relative z-10 py-24 px-6 border-t border-white/5">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Header */}
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/25 bg-blue-500/8 mb-5">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-blue-400 tracking-wide uppercase">Now Live · Layer 2</span>
+            </div>
+            <h2 className="text-[38px] font-black tracking-tight text-white mb-4">
+              Virtual Patient Simulation Engine
+            </h2>
+            <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              Layer 2 now draws from four real-world data sources instead of pure structural estimates —
+              upgrading every part of the Patient Cohort Twin while keeping all computation inside your browser.
+            </p>
+          </div>
+
+          {/* 4 upgrade cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+
+            {/* 1 — Two-Compartment PBPK */}
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/4 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#3b82f6" strokeWidth="1.5">
+                      <path d="M3 12 Q6 6 9 12 Q12 18 15 12 Q18 6 21 12" />
+                      <circle cx="9" cy="12" r="1.5" fill="#3b82f6" />
+                      <circle cx="15" cy="12" r="1.5" fill="#3b82f6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mb-0.5">PK Engine</div>
+                    <div className="text-[14px] font-bold text-white">Two-Compartment PBPK</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">Live</span>
+              </div>
+              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                Replaces the one-compartment analytical model with a two-compartment PBPK solver
+                (central + peripheral) with RK4 numerical integration at 1-minute steps.
+                Parameters derived from PK-Sim OSP physiology: central volume, peripheral volume,
+                inter-compartmental clearance, and allometric scaling (BW^0.75).
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["RK4 ODE Solver", "Allometric Scaling", "Biexponential PK Curve", "PK-Sim Physiology"].map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/15 text-blue-400/70">{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* 2 — NHANES Population Generator */}
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/4 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#3b82f6" strokeWidth="1.5">
+                      {[4, 10, 16, 22].map((x, i) => (
+                        <g key={x}>
+                          <circle cx={x} cy="9" r="2.5" opacity={1 - i * 0.2} />
+                          <path d={`M${x - 3} 17 Q${x} 13 ${x + 3} 17`} opacity={1 - i * 0.2} fill="none" />
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mb-0.5">Population Generator</div>
+                    <div className="text-[14px] font-bold text-white">NHANES Population Distributions</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">Live</span>
+              </div>
+              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                Virtual patient parameters now drawn from NHANES 2017–2020 population distributions:
+                body weight, age, eGFR, ALT, serum albumin. Renal impairment prevalence (eGFR &lt; 60)
+                is computed per cohort and used to adjust PK variability and subgroup response rates.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["NHANES 2017–2020", "eGFR Subgroups", "Albumin Binding", "Population Variability"].map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/15 text-blue-400/70">{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* 3 — ChEMBL PD Model */}
+            <div className="rounded-2xl border border-violet-500/20 bg-violet-500/4 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#8b5cf6" strokeWidth="1.5">
+                      <path d="M4 20 Q8 8 12 14 Q16 20 20 4" />
+                      <line x1="4" y1="14" x2="20" y2="14" strokeDasharray="2 2" opacity="0.4" />
+                      <text x="14" y="11" fill="#8b5cf6" fontSize="5" fontFamily="monospace">EC₅₀</text>
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-violet-400 uppercase tracking-widest font-semibold mb-0.5">PD Response Model</div>
+                    <div className="text-[14px] font-bold text-white">ChEMBL Emax Parameters</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 font-semibold">Live</span>
+              </div>
+              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                Queries the ChEMBL bioactivity API for IC50 / Ki values of the closest known
+                reference drug. Geometric mean potency seeds the Emax / Hill model
+                (E = Emax × C^n / (EC50^n + C^n)), replacing purely QSAR-estimated responder rates
+                with concentration–effect relationships derived from real assay data.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["ChEMBL Bioactivity API", "Emax / Hill Model", "IC50 → EC50 Mapping", "2.4M Compounds"].map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-violet-500/15 text-violet-400/70">{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* 4 — FAERS Safety Calibration */}
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/4 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#22c55e" strokeWidth="1.5">
+                      <path d="M12 3 L4 7 L4 13 Q4 18 12 21 Q20 18 20 13 L20 7 Z" />
+                      <path d="M9 12 L11 14 L15 10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-semibold mb-0.5">Safety Simulator</div>
+                    <div className="text-[14px] font-bold text-white">FAERS AE Calibration</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-semibold">Live</span>
+              </div>
+              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
+                Calls the openFDA FAERS API at simulation time to pull the top adverse event
+                signals (MedDRA preferred terms + real report counts) for the closest reference
+                drug class. Real-world frequencies replace hardcoded structural estimates when
+                the API returns sufficient signal data (&ge; 4 terms).
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["openFDA FAERS API", "MedDRA Terms", "20M+ AE Reports", "Real-World Signal"].map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/15 text-emerald-400/70">{t}</span>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Data sources summary bar */}
+          <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-[11px] font-semibold text-white mb-0.5">All four upgrades run client-side</div>
+              <div className="text-[11px] text-slate-500">APIs called from your browser · no SMILES ever transmitted · same zero-data-egress guarantee</div>
+            </div>
+            <div className="flex items-center gap-3">
+              {[
+                { label: "ChEMBL",   sub: "2.4M compounds", color: "violet" },
+                { label: "openFDA",  sub: "20M+ AE reports", color: "emerald" },
+                { label: "NHANES",   sub: "2017–2020",        color: "blue" },
+                { label: "PK-Sim",   sub: "OSP Physiology",  color: "blue" },
+              ].map(({ label, sub, color }) => (
+                <div key={label} className={`text-center px-3 py-2 rounded-xl border ${
+                  color === "violet"  ? "border-violet-500/20 bg-violet-500/5"
+                  : color === "emerald" ? "border-emerald-500/20 bg-emerald-500/5"
+                  : "border-blue-500/20 bg-blue-500/5"
+                }`}>
+                  <div className={`text-[11px] font-bold ${color === "violet" ? "text-violet-300" : color === "emerald" ? "text-emerald-300" : "text-blue-300"}`}>{label}</div>
+                  <div className="text-[9px] text-slate-600 mt-0.5">{sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ── Privacy Architecture ── */}
       <section id="privacy" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
