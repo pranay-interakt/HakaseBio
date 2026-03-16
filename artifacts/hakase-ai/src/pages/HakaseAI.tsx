@@ -358,6 +358,11 @@ export function HakaseAI() {
   const [dropoutRate, setDropoutRate] = useState([15]);
   const [dropoutPattern, setDropoutPattern] = useState("Exponential");
   const [adaptiveEnabled, setAdaptiveEnabled] = useState(false);
+  const [interimTiming, setInterimTiming] = useState("At 50% enrollment");
+  const [futilityBoundary, setFutilityBoundary] = useState("O'Brien-Fleming");
+  const [superiorityBoundary, setSuperiorityBoundary] = useState("O'Brien-Fleming");
+  const [sampleSizeReest, setSampleSizeReest] = useState(false);
+  const [responseAdaptiveRand, setResponseAdaptiveRand] = useState(false);
   const [criteriaRows, setCriteriaRows] = useState<CriteriaRow[]>([
     { id: "1", type: "Inclusion", category: "Demographics", operator: "range", value: "18–75 years" },
     { id: "2", type: "Inclusion", category: "Labs", operator: "greater than", value: "eGFR ≥ 30 mL/min" },
@@ -374,6 +379,16 @@ export function HakaseAI() {
   const [simResults,    setSimResults]    = useState<SimResults | null>(null);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
+
+  useEffect(() => {
+    if (!simResults || admetSource !== "From Layer 1") return;
+    const { absorption, metabolism, excretion } = simResults.admet;
+    const { logP, mw } = simResults.lipinski;
+    setAbsorptionProb(absorption.toFixed(2));
+    setDistribVolume(Math.max(0.3, Math.min(50, 0.5 + logP * 0.8 + mw / 300)).toFixed(1));
+    setHalfLife(Math.max(0.5, Math.min(72, 0.693 / (metabolism * 0.4 + 0.05))).toFixed(1));
+    setRenalClearance(String(Math.round(excretion * 120)));
+  }, [simResults, admetSource]);
 
   const layerComplete = useCallback((layer: Layer) => {
     return simStatus[layer] === "complete";
@@ -2526,7 +2541,7 @@ export function HakaseAI() {
                       {adaptiveEnabled && (
                         <>
                           <FieldGroup label="Interim Analysis Timing">
-                            <Select defaultValue="50%">
+                            <Select value={interimTiming} onValueChange={setInterimTiming}>
                               <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px]">
                                 <SelectValue />
                               </SelectTrigger>
@@ -2539,7 +2554,7 @@ export function HakaseAI() {
                           </FieldGroup>
                           <div className="grid grid-cols-2 gap-2">
                             <FieldGroup label="Futility Boundary">
-                              <Select defaultValue="O'Brien-Fleming">
+                              <Select value={futilityBoundary} onValueChange={setFutilityBoundary}>
                                 <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px]">
                                   <SelectValue />
                                 </SelectTrigger>
@@ -2551,7 +2566,7 @@ export function HakaseAI() {
                               </Select>
                             </FieldGroup>
                             <FieldGroup label="Superiority Boundary">
-                              <Select defaultValue="O'Brien-Fleming">
+                              <Select value={superiorityBoundary} onValueChange={setSuperiorityBoundary}>
                                 <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px]">
                                   <SelectValue />
                                 </SelectTrigger>
@@ -2563,8 +2578,8 @@ export function HakaseAI() {
                               </Select>
                             </FieldGroup>
                           </div>
-                          <ToggleRow label="Sample Size Re-estimation" value={false} onChange={() => {}} />
-                          <ToggleRow label="Response-Adaptive Randomization" value={false} onChange={() => {}} />
+                          <ToggleRow label="Sample Size Re-estimation" value={sampleSizeReest} onChange={setSampleSizeReest} />
+                          <ToggleRow label="Response-Adaptive Randomization" value={responseAdaptiveRand} onChange={setResponseAdaptiveRand} />
                         </>
                       )}
                     </div>
