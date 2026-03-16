@@ -323,6 +323,7 @@ export function HakaseAI() {
   const [cyp2d6, setCyp2d6] = useState(true);
   const [cyp3a4, setCyp3a4] = useState(true);
   const [cyp2c19, setCyp2c19] = useState(false);
+  const [cyp2c9, setCyp2c9] = useState(false);
   const [startingDose, setStartingDose] = useState("100");
   const [doseUnit, setDoseUnit] = useState("mg");
   const [escalationScheme, setEscalationScheme] = useState("Modified Fibonacci");
@@ -1972,7 +1973,7 @@ export function HakaseAI() {
                         { label: "CYP2D6 Modeling", val: cyp2d6, set: setCyp2d6, hint: "Poor/IM/EM/UM metabolizers" },
                         { label: "CYP3A4 Modeling", val: cyp3a4, set: setCyp3a4, hint: "Major drug metabolism" },
                         { label: "CYP2C19 Modeling", val: cyp2c19, set: setCyp2c19, hint: "Selected drug classes" },
-                        { label: "CYP2C9 Modeling", val: false, set: () => {}, hint: "Warfarin-type metabolism" },
+                        { label: "CYP2C9 Modeling", val: cyp2c9, set: setCyp2c9, hint: "Warfarin-type metabolism" },
                       ].map(item => (
                         <ToggleRow
                           key={item.label}
