@@ -5546,45 +5546,49 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simRes
 
 function SuccessProbGauge({ tr }: { tr: TrialResults | null }) {
   const prob = tr ? parseFloat((tr.successProbability * 100).toFixed(1)) : 72.4;
-  const angle = -135 + (prob / 100) * 270;
-  const cx = 110, cy = 100, r = 80;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
 
-  const arcStart = { x: cx + r * Math.cos(toRad(-135)), y: cy + r * Math.sin(toRad(-135)) };
-  const arcEnd = { x: cx + r * Math.cos(toRad(135)), y: cy + r * Math.sin(toRad(135)) };
-  const fillEnd = { x: cx + r * Math.cos(toRad(angle)), y: cy + r * Math.sin(toRad(angle)) };
+  // stroke-dasharray gauge — far more reliable than SVG arc path maths
+  const cx = 110, cy = 105, r = 76;
+  const circ = 2 * Math.PI * r;         // full circle circumference
+  const trackLen = circ * 0.75;          // 270° track
+  const segLen = trackLen / 3;           // each coloured zone = 90°
+  const fillLen = (prob / 100) * trackLen;
+  const color = prob < 50 ? "#ef4444" : prob < 70 ? "#eab308" : "#22c55e";
 
-  const gaugeArc = (startAngle: number, endAngle: number, color: string) => {
-    const s = { x: cx + r * Math.cos(toRad(startAngle)), y: cy + r * Math.sin(toRad(startAngle)) };
-    const e = { x: cx + r * Math.cos(toRad(endAngle)), y: cy + r * Math.sin(toRad(endAngle)) };
-    const large = endAngle - startAngle > 180 ? 1 : 0;
-    return <path d={`M${s.x},${s.y} A${r},${r} 0 ${large} 1 ${e.x},${e.y}`} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" />;
-  };
+  // rotate-origin so the track starts at 8-o'clock (225° from 12 = 135° from 3 o'clock)
+  const rot = `rotate(135 ${cx} ${cy})`;
 
   return (
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Trial Success Probability</h3>
       <div className="flex gap-8 items-center">
         <div className="relative">
-          <svg width="220" height="150">
-            {gaugeArc(-135, -45, "#ef444440")}
-            {gaugeArc(-45, 45, "#eab30840")}
-            {gaugeArc(45, 135, "#22c55e40")}
+          <svg width="220" height="155">
+            {/* background track: red / yellow / green zones */}
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ef444430" strokeWidth="13" strokeLinecap="butt"
+              strokeDasharray={`${segLen} ${circ - segLen}`} transform={rot} />
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#eab30830" strokeWidth="13" strokeLinecap="butt"
+              strokeDasharray={`${segLen} ${circ - segLen}`}
+              strokeDashoffset={-segLen} transform={rot} />
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#22c55e30" strokeWidth="13" strokeLinecap="butt"
+              strokeDasharray={`${segLen} ${circ - segLen}`}
+              strokeDashoffset={-segLen * 2} transform={rot} />
 
-            {gaugeArc(-135, angle, prob < 50 ? "#ef4444" : prob < 70 ? "#eab308" : "#22c55e")}
+            {/* coloured fill arc — dasharray shrinks/grows with prob */}
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="13" strokeLinecap="round"
+              strokeDasharray={`${fillLen} ${circ - fillLen}`} transform={rot}
+              style={{ transition: "stroke-dasharray 0.4s ease, stroke 0.4s ease" }} />
 
-            <circle cx={cx} cy={cy} r="6" fill={prob > 70 ? "#22c55e" : "#eab308"}
-              style={{ transform: `translate(${cx + (r - 2) * Math.cos(toRad(angle)) - cx}px, ${cy + (r - 2) * Math.sin(toRad(angle)) - cy}px)` }}
-            />
-
-            <text x={cx} y={cy + 5} fill="white" fontSize="28" textAnchor="middle" fontWeight="800" dominantBaseline="central">{prob}%</text>
-            <text x={cx} y={cy + 28} fill={prob >= 70 ? "#22c55e" : prob >= 50 ? "#eab308" : "#ef4444"} fontSize="11" textAnchor="middle" fontWeight="600">
+            {/* centre text */}
+            <text x={cx} y={cy - 8} fill="white" fontSize="30" textAnchor="middle" fontWeight="800">{prob}%</text>
+            <text x={cx} y={cy + 14} fill={color} fontSize="10" textAnchor="middle" fontWeight="700" letterSpacing="0.05em">
               {prob >= 70 ? "HIGH CONFIDENCE" : prob >= 50 ? "MODERATE" : "LOW"}
             </text>
 
-            <text x="18" y="145" fill="#ef4444" fontSize="9">&lt;50%</text>
-            <text x="82" y="148" fill="#eab308" fontSize="9">50–70%</text>
-            <text x="165" y="145" fill="#22c55e" fontSize="9">&gt;70%</text>
+            {/* zone labels */}
+            <text x="14"  y="150" fill="#ef4444" fontSize="9">&lt;50%</text>
+            <text x="80"  y="153" fill="#eab308" fontSize="9">50–70%</text>
+            <text x="162" y="150" fill="#22c55e" fontSize="9">&gt;70%</text>
           </svg>
         </div>
 

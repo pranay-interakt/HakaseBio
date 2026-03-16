@@ -184,7 +184,18 @@ export function runTrialSimulation(
     estimatedCost: Math.round(estimatedCost / 1e5) / 10,
     siteRecommendations,
     goNogo: trialGoNogo,
-    successProbability: parseFloat(clamp(power * 0.75 + (1 - pValue) * 0.25).toFixed(3)),
+    successProbability: parseFloat(clamp(
+      // Realistic compound/trial specific probability with meaningful variation
+      // Historical base: ~58% Phase III, ~35% Phase II, ~65% Phase I
+      (trialPhase.toLowerCase().includes("iii") ? 0.58 : trialPhase.toLowerCase().includes("ii") ? 0.35 : 0.65)
+      // Effect-size quality: HR 0.30 = full bonus, HR 0.90 = no bonus
+      * (0.55 + clamp(1 - (hr - 0.30) / 0.60, 0, 1) * 0.45)
+      // Power adequacy: penalise if underpowered
+      * (power >= powerTarget ? 1.0 : 0.60 + (power / powerTarget) * 0.40)
+      // Molecule-specific noise (±10%)
+      + jitter(0, 0.10, seed + 200),
+      0.12, 0.92
+    ).toFixed(3)),
     recommendation,
   };
 }
