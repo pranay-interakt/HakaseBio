@@ -2361,7 +2361,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} />}
+                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} />}
               </div>
             </div>
           )}
@@ -3326,6 +3326,73 @@ function RegulatoryInsightCard({
     violet:  "border-violet-500/30 bg-violet-500/5",
   };
 
+  // ── openFDA live data ─────────────────────────────────────────────────
+  const [fdaLabelData, setFdaLabelData] = useState<Record<string, boolean>>({});
+  const [fdaFaers, setFdaFaers]         = useState<Array<{ term: string; count: number; rate: number }>>([]);
+  const [fdaTotalReports, setFdaTotalReports] = useState(0);
+  const [fdaDrugs, setFdaDrugs]         = useState<Record<string, { appNumber: string; reviewType: string; approvalYear?: string }>>({});
+
+  const allSimilarDrugs = layer === 1 ? (sr?.similarDrugs ?? []) : (similarDrugs ?? []);
+  const drugsKey        = allSimilarDrugs.join(",");
+
+  useEffect(() => {
+    if (!drugsKey) return;
+    const drugs = drugsKey.split(",").filter(Boolean);
+    if (drugs.length === 0) return;
+    const firstDrug = drugs[0];
+
+    if (layer === 1) {
+      Promise.all(
+        drugs.slice(0, 4).map(drug => {
+          const enc = encodeURIComponent(drug.toLowerCase());
+          return fetch(`https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${enc}"&limit=1`)
+            .then(r => r.ok ? r.json() : null).catch(() => null)
+            .then(data => ({ drug, boxed: !!(data?.results?.[0]?.boxed_warning) }));
+        })
+      ).then(results => {
+        const map: Record<string, boolean> = {};
+        results.forEach(({ drug, boxed }) => { map[drug] = boxed; });
+        setFdaLabelData(map);
+      });
+    }
+
+    if (layer === 2) {
+      const enc = encodeURIComponent(firstDrug.toLowerCase());
+      Promise.all([
+        fetch(`https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:"${enc}"&limit=1`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:"${enc}"&count=patient.reaction.reactionmeddrapt.exact&limit=8`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]).then(([totalData, countData]) => {
+        const total: number = (totalData as any)?.meta?.results?.total ?? 0;
+        const rows: Array<{ term: string; count: number }> = (countData as any)?.results ?? [];
+        setFdaTotalReports(total);
+        setFdaFaers(rows.map(r => ({ term: r.term, count: r.count, rate: total > 0 ? r.count / total : 0 })));
+      });
+    }
+
+    if (layer === 3) {
+      Promise.all(
+        drugs.slice(0, 4).map(drug => {
+          const enc = encodeURIComponent(drug.toLowerCase());
+          return fetch(`https://api.fda.gov/drug/drugsfda.json?search=openfda.generic_name:"${enc}"&limit=1`)
+            .then(r => r.ok ? r.json() : null).catch(() => null)
+            .then(data => {
+              const r = (data as any)?.results?.[0];
+              if (!r) return { drug, appNumber: null as string | null, reviewType: null as string | null, approvalYear: null as string | null };
+              const subs: Array<{ submission_type?: string; review_priority?: string; submission_status_date?: string }> = r.submissions ?? [];
+              const orig = subs.find(s => s.submission_type === "ORIG" || s.submission_type?.startsWith("ORIG-")) ?? subs[0];
+              return { drug, appNumber: r.application_number ?? null, reviewType: orig?.review_priority ?? null, approvalYear: orig?.submission_status_date?.slice(0, 4) ?? null };
+            });
+        })
+      ).then(results => {
+        const map: Record<string, { appNumber: string; reviewType: string; approvalYear?: string }> = {};
+        results.forEach(r => { if (r.appNumber) map[r.drug] = { appNumber: r.appNumber, reviewType: r.reviewType ?? "STANDARD", approvalYear: r.approvalYear ?? undefined }; });
+        setFdaDrugs(map);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer, drugsKey]);
+  // ─────────────────────────────────────────────────────────────────────
+
   const subtitles: Record<number, string> = {
     1: "Molecular & Preclinical Regulatory Flags",
     2: "Clinical Pharmacology Regulatory Package",
@@ -3418,13 +3485,23 @@ function RegulatoryInsightCard({
             </div>
           </div>
 
-          {/* Precedent drugs */}
+          {/* Precedent drugs — with live openFDA drug label boxed-warning badge */}
           {sr?.similarDrugs && sr.similarDrugs.length > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
+                {Object.keys(fdaLabelData).length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {sr.similarDrugs.map(d => (
-                  <span key={d} className="px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300">{d}</span>
+                  <span key={d} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300">
+                    {d}
+                    {fdaLabelData[d] === true && (
+                      <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
+                    )}
+                  </span>
                 ))}
               </div>
             </div>
@@ -3497,24 +3574,53 @@ function RegulatoryInsightCard({
             </div>
           </div>
 
-          {/* Precedent drugs */}
-          {cr?.adverseEvents && cr.adverseEvents.length > 0 && (
-            <div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">FAERS-Calibrated AE Signals for Label</div>
-              <div className="space-y-1">
-                {cr.adverseEvents.slice(0, 4).map(ae => (
-                  <div key={ae.name} className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-300">{ae.name}</span>
-                    <div className="flex gap-3">
-                      <span className="text-[10px] text-slate-500">Any-grade: <span className="text-white">{ae.anyGrade.toFixed(1)}%</span></span>
-                      <span className={`text-[10px] ${ae.grade3Plus > 10 ? "text-amber-400" : "text-slate-500"}`}>Gr≥3: {ae.grade3Plus.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                ))}
+          {/* AE Signals — real openFDA FAERS data when available, fallback to simulated */}
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                {fdaFaers.length > 0 ? "Real-World AE Signal for Label" : "FAERS-Calibrated AE Signals for Label"}
               </div>
-              <div className="text-[9px] text-slate-600 mt-1.5">These will inform the WARNINGS AND PRECAUTIONS section of the product label.</div>
+              {fdaFaers.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] bg-blue-500/15 text-blue-400 border border-blue-500/25 font-mono">LIVE · FDA FAERS</span>
+              )}
             </div>
-          )}
+            {fdaFaers.length > 0 ? (
+              <>
+                <div className="text-[9px] text-slate-600 mb-1.5">
+                  Based on {allSimilarDrugs[0]} · {fdaTotalReports.toLocaleString()} post-market reports · normalized reporting rate
+                </div>
+                <div className="space-y-1">
+                  {fdaFaers.slice(0, 5).map(ae => (
+                    <div key={ae.term} className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-300">{ae.term}</span>
+                      <span className="text-[10px] text-slate-500">
+                        Rate: <span className="text-white">{(ae.rate * 100).toFixed(2)}%</span>
+                        <span className="text-slate-600 ml-1">({ae.count.toLocaleString()} reports)</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[9px] text-slate-600 mt-1.5">These will inform the WARNINGS AND PRECAUTIONS section of the product label. Source: openFDA FAERS.</div>
+              </>
+            ) : cr?.adverseEvents && cr.adverseEvents.length > 0 ? (
+              <>
+                <div className="space-y-1">
+                  {cr.adverseEvents.slice(0, 4).map(ae => (
+                    <div key={ae.name} className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-300">{ae.name}</span>
+                      <div className="flex gap-3">
+                        <span className="text-[10px] text-slate-500">Any-grade: <span className="text-white">{ae.anyGrade.toFixed(1)}%</span></span>
+                        <span className={`text-[10px] ${ae.grade3Plus > 10 ? "text-amber-400" : "text-slate-500"}`}>Gr≥3: {ae.grade3Plus.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[9px] text-slate-600 mt-1.5">These will inform the WARNINGS AND PRECAUTIONS section of the product label.</div>
+              </>
+            ) : (
+              <div className="text-[10px] text-slate-600 italic">Loading FAERS signals…</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -3579,13 +3685,33 @@ function RegulatoryInsightCard({
             </div>
           )}
 
-          {/* Precedent drugs */}
+          {/* Precedent drugs — with live Drugs@FDA NDA/BLA metadata */}
           {similarDrugs && similarDrugs.length > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
+                {Object.keys(fdaDrugs).length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">LIVE · Drugs@FDA</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {similarDrugs.map(d => (
-                  <span key={d} className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300">{d}</span>
+                  <div key={d} className="flex flex-col px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-[10px] text-emerald-300 font-semibold">{d}</span>
+                    {fdaDrugs[d] ? (
+                      <span className="text-[9px] text-slate-500 mt-0.5">
+                        {fdaDrugs[d].appNumber}
+                        {" · "}
+                        {fdaDrugs[d].reviewType === "PRIORITY"
+                          ? <span className="text-amber-400">Priority Review</span>
+                          : <span>Standard Review</span>
+                        }
+                        {fdaDrugs[d].approvalYear && <span className="text-slate-600"> · {fdaDrugs[d].approvalYear}</span>}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-slate-700">Loading…</span>
+                    )}
+                  </div>
                 ))}
               </div>
               <div className="text-[9px] text-slate-600 mt-1.5">Review approval dossiers for endpoint precedent, primary analysis methods, and required safety data packages.</div>
@@ -4221,7 +4347,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
 }
 
 // ── Layer 2 Results ───────────────────────────────────────────────────
-function Layer2Results({ cohortResults, indication }: { cohortResults: CohortResults | null; indication: string }) {
+function Layer2Results({ cohortResults, indication, simResults: sr2 }: { cohortResults: CohortResults | null; indication: string; simResults: SimResults | null }) {
   const [activeTab, setActiveTab] = useState("pkpd");
   const cr = cohortResults;
 
@@ -4314,7 +4440,7 @@ function Layer2Results({ cohortResults, indication }: { cohortResults: CohortRes
         </Button>
       </div>
 
-      <RegulatoryInsightCard layer={2} indication={indication} cohortResults={cr} />
+      <RegulatoryInsightCard layer={2} indication={indication} cohortResults={cr} similarDrugs={sr2?.similarDrugs} />
     </div>
   );
 }

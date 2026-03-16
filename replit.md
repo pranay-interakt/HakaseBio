@@ -114,6 +114,7 @@ Three layered engines in `src/lib/`:
 - `lib/nhanes.ts` — NHANES 2017–2020 population distributions. Samples virtual patients with realistic weight, age, eGFR, ALT, albumin distributions. `summariseCohort()` returns mean/SD + renal impairment fraction used to calibrate PK variability and subgroups.
 - `lib/pdModel.ts` — `fetchPDParameters(similarDrugs, mw, seed)` queries ChEMBL bioactivity API (IC50/Ki) for reference drugs. Geometric mean potency → Emax/Hill model EC50. `emaxEffect(c, pdParams)` computes E(C) = Emax × C^n / (EC50^n + C^n).
 - `lib/faersApi.ts` — `fetchFAERSSignals(drugName)` queries openFDA FAERS API for top MedDRA adverse event terms + counts for a reference drug name. Maps to display-ready labels + colours. Falls back gracefully if API unavailable.
+- `lib/openFDA.ts` — Three live openFDA integrations used by `RegulatoryInsightCard`: (1) `fetchFAERSReactions(drugName)` — FAERS adverse event counts + normalized reporting rate for L2 Regulatory card; (2) `fetchDrugsAtFDA(drugs[])` — NDA/BLA application number, Priority vs Standard review, and approval year for L3 Regulatory card; (3) `fetchDrugLabels(drugs[])` — boxed warning detection from drug label SPL for L1 Regulatory card. All use `https://api.fda.gov` (no API key, browser CORS supported, graceful fallback).
 
 ### Key Types
 
