@@ -3046,7 +3046,7 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
         </div>
       </div>
 
-      {/* Claude AI Analysis Panel */}
+      {/* AI Analysis Panel */}
       {simResults && (
         <div className="border border-violet-500/20 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-violet-500/8">
@@ -3054,8 +3054,8 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
               <div className="w-5 h-5 rounded-md bg-violet-500/20 flex items-center justify-center">
                 <Sparkles className="w-3 h-3 text-violet-400" />
               </div>
-              <span className="text-[13px] font-semibold text-white">Claude AI Analysis</span>
-              <Badge className="text-[9px] bg-violet-500/15 text-violet-300 border-violet-500/25 px-1.5">claude-sonnet-4-6</Badge>
+              <span className="text-[13px] font-semibold text-white">AI Analysis</span>
+              <Badge className="text-[9px] bg-violet-500/15 text-violet-300 border-violet-500/25 px-1.5">Hakase AI v2</Badge>
             </div>
             {!aiLoading && !aiReport && (
               <button
@@ -3063,7 +3063,7 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
                 className="flex items-center gap-1.5 text-[11px] font-medium text-violet-300 hover:text-violet-200 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 rounded-lg px-3 py-1.5 transition-all"
               >
                 <Sparkles className="w-3 h-3" />
-                Analyze with Claude
+                Run AI Analysis
               </button>
             )}
             {aiLoading && (
@@ -3092,7 +3092,7 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
             <div className="px-4 py-4">
               <div className="text-[11px] text-slate-500 mb-2">Streaming biomedical analysis…</div>
               <div className="text-[11px] text-slate-400 font-mono leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap">
-                {aiStream || "Connecting to Claude…"}
+                {aiStream || "Connecting…"}
               </div>
             </div>
           )}
@@ -3159,7 +3159,7 @@ function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties
           {!aiLoading && !aiReport && !aiError && (
             <div className="px-4 py-5 text-center">
               <p className="text-[12px] text-slate-500">
-                Click <span className="text-violet-400 font-medium">Analyze with Claude</span> to get an AI-powered interpretation of your simulation results — including safety, PK/PD, competitive positioning, and next steps.
+                Click <span className="text-violet-400 font-medium">Run AI Analysis</span> to get an AI-powered interpretation of your simulation results — including safety, PK/PD, competitive positioning, and next steps.
               </p>
             </div>
           )}
