@@ -97,6 +97,7 @@ Always respond in structured JSON with exactly these keys:
   "cohortInsights": "<Layer 2 patient population insights, responder segmentation, dose-response interpretation. Reference real AE signals if FAERS data is present. — or 'Layer 2 not yet run' if absent>",
   "trialDesignRationale": "<Layer 3 trial design evaluation, adaptive strategy assessment including interim analysis decisions if available, power/cost trade-offs — or 'Layer 3 not yet run' if absent>",
   "competitiveContext": "<how this compound compares to existing drugs in its class based on the similar drugs listed>",
+  "regulatoryPathway": "<recommended FDA/EMA regulatory strategy: application type (NDA/BLA), likely pathway (standard/priority/accelerated/breakthrough), IND-enabling study priorities, Phase I starting dose rationale based on binding IC50 and ADMET, breakthrough therapy or fast track eligibility reasoning, and key regulatory risk factors>",
   "riskMitigations": ["<specific risk 1 with mitigation>", "<specific risk 2 with mitigation>", "<specific risk 3>"],
   "goNogoRationale": "<scientific justification for the GO/WATCH/NO-GO recommendation>",
   "nextSteps": ["<immediate next experiment or study>", "<second priority action>", "<third priority action>"]
