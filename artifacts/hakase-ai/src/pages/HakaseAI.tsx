@@ -407,16 +407,30 @@ export function HakaseAI() {
     setAiReport(null);
 
     try {
+      // Sample pkCurve to ~15 evenly-spaced points to keep prompt lean
+      let pkCurveSampled: Array<{ time: number; conc: number }> | undefined;
+      if (cohortResults?.pkCurve && cohortResults.pkCurve.length > 0) {
+        const curve = cohortResults.pkCurve;
+        const step  = Math.max(1, Math.floor(curve.length / 15));
+        pkCurveSampled = curve
+          .filter((_, i) => i % step === 0)
+          .map(p => ({ time: p.time, conc: +p.conc.toFixed(2) }));
+      }
+
       const res = await fetch("/api/bio-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          molName:   simResults.molName,
-          smiles:    simResults.smiles,
+          molName:        simResults.molName,
+          smiles:         simResults.smiles,
           indication,
-          layer1:    simResults,
-          layer2:    cohortResults,
-          layer3:    trialResults,
+          layer1:         simResults,
+          layer2:         cohortResults,
+          layer3:         trialResults,
+          proteinInfo,
+          pkCurve:        pkCurveSampled,
+          adverseEvents:  cohortResults?.adverseEvents,
+          interimAnalyses: trialResults?.interimAnalyses,
         }),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
@@ -448,7 +462,7 @@ export function HakaseAI() {
     } finally {
       setAiLoading(false);
     }
-  }, [simResults, cohortResults, trialResults, indication]);
+  }, [simResults, cohortResults, trialResults, indication, proteinInfo]);
 
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
