@@ -234,9 +234,85 @@ export function HakaseAI() {
   const [topN, setTopN] = useState("10");
   const [compositeWeights, setCompositeWeights] = useState([0.3, 0.3, 0.3, 0.1]);
 
+  // ── ICD-10 comorbidity lookup ──────────────────────────────────────────────
+  const ICD10_LIST = [
+    { code: "I10",   label: "Hypertension" },
+    { code: "E11",   label: "Type 2 Diabetes Mellitus" },
+    { code: "E11",   label: "T2DM" },
+    { code: "N18.3", label: "CKD Stage 3" },
+    { code: "N18.4", label: "CKD Stage 4" },
+    { code: "N18.5", label: "CKD Stage 5" },
+    { code: "I50.9", label: "Heart Failure" },
+    { code: "I48",   label: "Atrial Fibrillation" },
+    { code: "J44.1", label: "COPD with Exacerbation" },
+    { code: "J44.0", label: "COPD" },
+    { code: "E78.5", label: "Hyperlipidaemia" },
+    { code: "E78.0", label: "Hypercholesterolaemia" },
+    { code: "K76.0", label: "Fatty Liver Disease" },
+    { code: "K74.6", label: "Cirrhosis" },
+    { code: "E03.9", label: "Hypothyroidism" },
+    { code: "E05.9", label: "Hyperthyroidism" },
+    { code: "M79.3", label: "Panniculitis" },
+    { code: "M05",   label: "Rheumatoid Arthritis" },
+    { code: "M35.9", label: "Autoimmune Disease" },
+    { code: "G35",   label: "Multiple Sclerosis" },
+    { code: "G20",   label: "Parkinson's Disease" },
+    { code: "F32.9", label: "Depression" },
+    { code: "F41.1", label: "Generalised Anxiety Disorder" },
+    { code: "F20.9", label: "Schizophrenia" },
+    { code: "I25.1", label: "Coronary Artery Disease" },
+    { code: "I21",   label: "Myocardial Infarction" },
+    { code: "I63",   label: "Ischaemic Stroke" },
+    { code: "I64",   label: "Stroke, Unspecified" },
+    { code: "Z87.39","label": "History of DVT/PE" },
+    { code: "D64.9", label: "Anaemia" },
+    { code: "D69.6", label: "Thrombocytopaenia" },
+    { code: "C61",   label: "Prostate Cancer" },
+    { code: "C50.9", label: "Breast Cancer" },
+    { code: "C18.9", label: "Colorectal Cancer" },
+    { code: "C34.9", label: "Lung Cancer" },
+    { code: "C91.1", label: "Chronic Lymphocytic Leukaemia" },
+    { code: "K92.1", label: "Melaena / GI Bleeding" },
+    { code: "B18.1", label: "Chronic Hepatitis B" },
+    { code: "B18.2", label: "Chronic Hepatitis C" },
+    { code: "Z21",   label: "HIV Positive (Asymptomatic)" },
+    { code: "B20",   label: "HIV Disease" },
+    { code: "E10",   label: "Type 1 Diabetes Mellitus" },
+    { code: "E66",   label: "Obesity" },
+    { code: "E11.65","label": "T2DM with Hyperglycaemia" },
+    { code: "N04",   label: "Nephrotic Syndrome" },
+    { code: "N17",   label: "Acute Kidney Injury" },
+    { code: "Q21.1", label: "Atrial Septal Defect" },
+    { code: "M81.0", label: "Osteoporosis" },
+    { code: "M10.9", label: "Gout" },
+    { code: "L40",   label: "Psoriasis" },
+    { code: "K51",   label: "Ulcerative Colitis" },
+    { code: "K50",   label: "Crohn's Disease" },
+  ];
+
   // Layer 2 state
   const [indication, setIndication] = useState("C34.1 – Non-small-cell lung carcinoma");
   const [severity, setSeverity] = useState("Moderate");
+  const [comorbidConditions, setComorbidConditions] = useState<Array<{ code: string; label: string }>>([
+    { code: "I10",   label: "Hypertension" },
+    { code: "E11",   label: "T2DM" },
+    { code: "N18.3", label: "CKD Stage 3" },
+  ]);
+  const [comorbidSearch, setComorbidSearch] = useState("");
+  const [comorbidOpen, setComorbidOpen] = useState(false);
+  const comorbidRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!comorbidOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (comorbidRef.current && !comorbidRef.current.contains(e.target as Node)) {
+        setComorbidOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [comorbidOpen]);
+
   const [cohortSize, setCohortSize] = useState([5000]);
   const [ageRange, setAgeRange] = useState([18, 75]);
   const [bodyWeightRange, setBodyWeightRange] = useState([50, 120]);
@@ -1720,15 +1796,69 @@ export function HakaseAI() {
                       </FieldGroup>
 
                       <FieldGroup label="Comorbid Conditions" hint="Max 10 · ICD-10 codes">
-                        <div className="flex gap-1.5 flex-wrap">
-                          {["Hypertension","T2DM","CKD Stage 3"].map(c => (
-                            <Badge key={c} variant="secondary" className="text-[10px] gap-1 bg-white/8 text-slate-400 hover:bg-red-500/10 cursor-pointer">
-                              {c} <X className="w-2.5 h-2.5" />
-                            </Badge>
-                          ))}
-                          <button className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5">
-                            <Plus className="w-3 h-3" /> Add
-                          </button>
+                        <div className="relative" ref={comorbidRef}>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {comorbidConditions.map(c => (
+                              <Badge
+                                key={c.code + c.label}
+                                variant="secondary"
+                                className="text-[10px] gap-1 bg-white/8 text-slate-400 hover:bg-red-500/10 hover:text-red-400 cursor-pointer transition-colors select-none"
+                                onClick={() => setComorbidConditions(prev => prev.filter(x => !(x.code === c.code && x.label === c.label)))}
+                              >
+                                <span className="font-mono text-blue-400/70 mr-0.5 text-[9px]">{c.code}</span>
+                                {c.label} <X className="w-2.5 h-2.5 shrink-0" />
+                              </Badge>
+                            ))}
+                            {comorbidConditions.length < 10 && (
+                              <button
+                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5 transition-colors"
+                                onClick={() => { setComorbidSearch(""); setComorbidOpen(true); }}
+                              >
+                                <Plus className="w-3 h-3" /> Add
+                              </button>
+                            )}
+                          </div>
+                          {comorbidOpen && (
+                            <div className="absolute z-50 top-full mt-1.5 left-0 w-72 rounded-xl border border-white/10 bg-[#0e1018] shadow-2xl">
+                              <div className="p-2 border-b border-white/8">
+                                <input
+                                  autoFocus
+                                  value={comorbidSearch}
+                                  onChange={e => setComorbidSearch(e.target.value)}
+                                  onKeyDown={e => e.key === "Escape" && setComorbidOpen(false)}
+                                  placeholder="Search ICD-10 code or condition…"
+                                  className="w-full bg-white/5 rounded-lg px-3 py-1.5 text-[11px] text-white placeholder:text-slate-600 outline-none border border-white/8 focus:border-blue-500/40"
+                                />
+                              </div>
+                              <div className="max-h-52 overflow-y-auto py-1">
+                                {(() => {
+                                  const q = comorbidSearch.toLowerCase();
+                                  const filtered = ICD10_LIST.filter(item => {
+                                    const already = comorbidConditions.some(c => c.code === item.code && c.label === item.label);
+                                    return !already && (item.label.toLowerCase().includes(q) || item.code.toLowerCase().includes(q));
+                                  });
+                                  if (filtered.length === 0) return (
+                                    <div className="px-3 py-4 text-[11px] text-slate-600 text-center">No matches found</div>
+                                  );
+                                  return filtered.slice(0, 8).map(item => (
+                                    <button
+                                      key={item.code + item.label}
+                                      className="w-full text-left px-3 py-1.5 flex items-center gap-2.5 hover:bg-white/5 transition-colors"
+                                      onMouseDown={e => e.preventDefault()}
+                                      onClick={() => {
+                                        setComorbidConditions(prev => [...prev, item]);
+                                        setComorbidSearch("");
+                                        setComorbidOpen(false);
+                                      }}
+                                    >
+                                      <span className="font-mono text-[10px] text-blue-400 w-14 shrink-0">{item.code}</span>
+                                      <span className="text-[11px] text-slate-300">{item.label}</span>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </FieldGroup>
                     </div>
