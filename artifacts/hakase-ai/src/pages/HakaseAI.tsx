@@ -40,7 +40,7 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3;
@@ -385,6 +385,10 @@ export function HakaseAI() {
   const [aiError,    setAiError]    = useState<string | null>(null);
   const [aiStream,   setAiStream]   = useState("");
 
+  const [chatMessages,    setChatMessages]    = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const [chatInput,       setChatInput]       = useState("");
+  const [chatLoading,     setChatLoading]     = useState(false);
+
   useEffect(() => {
     if (!simResults || admetSource !== "From Layer 1") return;
     const { absorption, metabolism, excretion } = simResults.admet;
@@ -405,6 +409,8 @@ export function HakaseAI() {
     setAiError(null);
     setAiStream("");
     setAiReport(null);
+    setChatMessages([]);
+    setChatInput("");
 
     try {
       // Sample pkCurve to ~15 evenly-spaced points to keep prompt lean
@@ -464,6 +470,62 @@ export function HakaseAI() {
     }
   }, [simResults, cohortResults, trialResults, indication, proteinInfo]);
 
+  const sendChatMessage = useCallback(async (question: string) => {
+    if (!aiReport || !question.trim() || chatLoading) return;
+    const userMsg = { role: "user" as const, content: question };
+    const history = [...chatMessages, userMsg];
+    setChatMessages(history);
+    setChatInput("");
+    setChatLoading(true);
+    const placeholderIdx = history.length;
+    setChatMessages(prev => [...prev, { role: "assistant" as const, content: "" }]);
+    try {
+      const res = await fetch("/api/bio-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context:    aiReport,
+          messages:   history,
+          molName:    simResults?.molName,
+          indication,
+        }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const reader  = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let   buf     = "";
+      let   text    = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          const json = JSON.parse(part.slice(6)) as { chunk?: string; done?: boolean; error?: string };
+          if (json.error) throw new Error(json.error);
+          if (json.chunk) {
+            text += json.chunk;
+            setChatMessages(prev => {
+              const updated = [...prev];
+              updated[placeholderIdx] = { role: "assistant", content: text };
+              return updated;
+            });
+          }
+        }
+      }
+    } catch (err) {
+      setChatMessages(prev => {
+        const updated = [...prev];
+        updated[placeholderIdx] = { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Chat failed"}` };
+        return updated;
+      });
+    } finally {
+      setChatLoading(false);
+    }
+  }, [aiReport, chatMessages, chatLoading, simResults?.molName, indication]);
+
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
     setMolName(proj.molName);
@@ -478,6 +540,9 @@ export function HakaseAI() {
     setAiReport(null);
     setAiError(null);
     setAiStream("");
+    setChatMessages([]);
+    setChatInput("");
+    setChatLoading(false);
   }, [savedProjects]);
 
   const runSimulation = useCallback(async () => {
@@ -1834,11 +1899,17 @@ export function HakaseAI() {
                     <Layer1Results
                       molProps={molProps}
                       simResults={simResults}
+                      indication={indication}
                       aiReport={aiReport}
                       aiLoading={aiLoading}
                       aiError={aiError}
                       aiStream={aiStream}
                       runAiAnalysis={runAiAnalysis}
+                      chatMessages={chatMessages}
+                      chatInput={chatInput}
+                      chatLoading={chatLoading}
+                      sendChatMessage={sendChatMessage}
+                      onChatInputChange={setChatInput}
                     />
                   </>
                 )}
@@ -2289,7 +2360,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} />}
+                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} />}
               </div>
             </div>
           )}
@@ -2824,7 +2895,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">Monte Carlo · {monteCarloReps[0].toLocaleString()} replications · Power analysis</p>
                   </div>
                 )}
-                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} />}
+                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} />}
               </div>
             </div>
           )}
@@ -3005,6 +3076,336 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
   );
 }
 
+
+// ── Regulatory Insight Card (all 3 layers) ───────────────────────────────
+function RegulatoryInsightCard({
+  layer, indication, simResults: sr, cohortResults: cr, trialResults: tr, similarDrugs,
+}: {
+  layer: 1 | 2 | 3;
+  indication: string;
+  simResults?: SimResults | null;
+  cohortResults?: CohortResults | null;
+  trialResults?: TrialResults | null;
+  similarDrugs?: string[];
+}) {
+  const indLower   = indication.toLowerCase();
+  const isOncology = /c\d{2}|carcinoma|lymphoma|leukemia|melanoma|sarcoma|glioma|myeloma|tumor|cancer/i.test(indication);
+  const isRare     = /orphan|rare|ultra-rare|wilson|gaucher|fabry|pompe/i.test(indication);
+  const isNeuro    = /alzheimer|parkinson|sclerosis|epilepsy|ad\b|ms\b/i.test(indLower);
+  const appType    = isOncology ? "BLA / NDA (oncology)" : "NDA (small molecule)";
+
+  // L1 derived signals
+  const toxAlerts  = sr?.toxAlerts ?? [];
+  const hergFlag   = toxAlerts.some(a => /herg|cardiac|qt/i.test(a.name + a.detail));
+  const mutagFlag  = toxAlerts.some(a => /mutagen|genotox|ames/i.test(a.category + a.name));
+  const metabFlag  = toxAlerts.some(a => /cyp|metabol|reactive/i.test(a.category + a.name));
+  const admet      = sr?.admet;
+  const logP       = sr?.lipinski?.logP ?? 2;
+  const mw         = sr?.lipinski?.mw   ?? 400;
+  const saScore    = sr?.saScore ?? 2.5;
+
+  // L2 derived signals
+  const halfLife   = cr?.halfLifeHr   ?? 0;
+  const cmax       = cr?.cmax ? cr.cmax * 1000 : 0;
+  const auc        = cr?.auc  ?? 0;
+  const grade3Rate = cr?.grade3AERate ?? 0;
+  const pkCV       = cr?.cmaxSD && cr?.cmax ? (cr.cmaxSD / cr.cmax) * 100 : 35;
+  const mrsdEst    = cmax > 0 ? (cmax * 0.1).toFixed(0) : "—";
+  const dosInterval = halfLife > 0 ? (halfLife < 8 ? "BID–TID" : halfLife < 16 ? "QD–BID" : "QD") : "QD";
+
+  // L3 derived signals
+  const power   = tr?.power             ?? 0;
+  const succP   = tr?.successProbability ?? 0;
+  const hr      = tr?.hazardRatio        ?? 1;
+  const durMo   = tr?.estimatedDuration  ?? 36;
+  const btEligible  = (power >= 0.80 && succP >= 0.70 && hr < 0.75) || isNeuro;
+  const ftEligible  = isOncology || isNeuro || isRare || succP >= 0.60;
+  const orphEligible = isRare || (isOncology && /rare|small cell|aml|all\b/i.test(indLower));
+  const accelApproval = isOncology && hr < 0.70;
+
+  const colorMap: Record<string, string> = {
+    slate: "text-slate-400", violet: "text-violet-400",
+    blue: "text-blue-400", amber: "text-amber-400",
+    emerald: "text-emerald-400", red: "text-red-400",
+  };
+  const borderMap: Record<string, string> = {
+    emerald: "border-emerald-500/30 bg-emerald-500/5",
+    blue:    "border-blue-500/30 bg-blue-500/5",
+    amber:   "border-amber-500/30 bg-amber-500/5",
+    violet:  "border-violet-500/30 bg-violet-500/5",
+  };
+
+  const subtitles: Record<number, string> = {
+    1: "Molecular & Preclinical Regulatory Flags",
+    2: "Clinical Pharmacology Regulatory Package",
+    3: "Development Pathway & Designation Strategy",
+  };
+  const accentColors: Record<number, string> = {
+    1: "text-violet-400", 2: "text-blue-400", 3: "text-emerald-400",
+  };
+  const borderAccents: Record<number, string> = {
+    1: "border-violet-500/20", 2: "border-blue-500/20", 3: "border-emerald-500/20",
+  };
+
+  return (
+    <div className={`rounded-xl border ${borderAccents[layer]} bg-white/2 p-4 space-y-4`}>
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Shield className={`w-4 h-4 ${accentColors[layer]}`} />
+        <div>
+          <div className="text-[12px] font-semibold text-white">Regulatory Outlook</div>
+          <div className="text-[10px] text-slate-500">{subtitles[layer]} · {appType} · FDA/EMA</div>
+        </div>
+      </div>
+
+      {/* ── LAYER 1: Molecular / Preclinical ── */}
+      {layer === 1 && (
+        <div className="space-y-3">
+          {/* Preclinical Flags */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Preclinical Safety Flags (from ADMET profile)</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "hERG / Cardiac QT",   flagged: hergFlag,  detail: hergFlag  ? "hERG inhibition detected — cardiac safety study mandatory" : "Low cardiac liability predicted" },
+                { label: "Mutagenicity / Genotox", flagged: mutagFlag, detail: mutagFlag ? "Mutagenicity alert — full Ames + MN battery required" : "No genotoxicity structural alerts" },
+                { label: "CYP / Reactive Metabolite", flagged: metabFlag, detail: metabFlag ? "CYP interaction risk — in vitro DDI panel required" : "Moderate CYP interaction potential" },
+              ].map(({ label, flagged, detail }) => (
+                <div key={label} className={`rounded-lg border p-2.5 ${flagged ? "border-red-500/30 bg-red-500/5" : "border-white/8 bg-white/2"}`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {flagged ? <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
+                    <span className={`text-[10px] font-semibold ${flagged ? "text-red-300" : "text-slate-300"}`}>{label}</span>
+                  </div>
+                  <div className="text-[9px] text-slate-500 leading-snug">{detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Required IND Package */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Required IND-Enabling Package</div>
+            <div className="space-y-1.5">
+              {[
+                { study: "GLP Repeat-Dose Toxicology",     note: "Rat + Dog, 28-day min",                      priority: hergFlag || mutagFlag ? "Urgent" : "Required" },
+                { study: "Genotoxicity Battery",            note: "Ames + in vitro MN" + (mutagFlag ? " + in vivo MN (flagged)" : ""), priority: mutagFlag ? "Urgent" : "Required" },
+                { study: "Safety Pharmacology (ICH S7A/B)", note: hergFlag ? "hERG patch-clamp mandatory" : "hERG, CNS, respiratory panels", priority: hergFlag ? "Urgent" : "Required" },
+                { study: "ADME / Metabolite Profiling",     note: metabFlag ? "In vitro DDI panel + reactive metabolite trapping" : "Human microsomes + hepatocytes", priority: metabFlag ? "High" : "Required" },
+                { study: "CMC & GMP Synthesis",             note: `MW=${mw.toFixed(0)} Da · SA=${saScore.toFixed(1)} — ${saScore > 3.5 ? "complex synthesis, early route scouting" : "standard synthesis"}`, priority: "Required" },
+                { study: "Carcinogenicity",                 note: "Rat + Mouse, 2-year",                        priority: isRare ? "Waivable" : "Phase III" },
+              ].map(({ study, note, priority }) => (
+                <div key={study} className="flex items-start gap-2">
+                  <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${priority === "Urgent" ? "bg-red-400" : priority === "High" ? "bg-amber-400" : priority === "Required" ? "bg-violet-400" : "bg-slate-600"}`} />
+                  <div className="flex-1 flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[11px] text-slate-200">{study}</span>
+                      <span className="text-[10px] text-slate-500 ml-1.5 leading-snug">({note})</span>
+                    </div>
+                    <span className={`text-[10px] shrink-0 font-medium ${priority === "Urgent" ? "text-red-400" : priority === "High" ? "text-amber-400" : priority === "Required" ? "text-violet-400" : "text-slate-500"}`}>
+                      {priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ADMET vs FDA thresholds */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Physicochemical vs FDA Guidance Thresholds</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "LogP",   val: logP.toFixed(1), thresh: "≤ 5 (RO5)", ok: logP <= 5  },
+                { label: "MW",     val: `${mw.toFixed(0)} Da`, thresh: "≤ 500 Da",    ok: mw <= 500  },
+                { label: "Absorption", val: admet ? `${(admet.absorption * 100).toFixed(0)}%` : "—", thresh: "≥ 70% (BCS I/II)", ok: (admet?.absorption ?? 0) >= 0.70 },
+              ].map(({ label, val, thresh, ok }) => (
+                <div key={label} className={`rounded-lg border p-2 ${ok ? "border-white/8" : "border-amber-500/30 bg-amber-500/5"}`}>
+                  <div className={`text-[12px] font-bold ${ok ? "text-white" : "text-amber-300"}`}>{val}</div>
+                  <div className="text-[10px] text-slate-400">{label}</div>
+                  <div className="text-[9px] text-slate-600">{thresh}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Precedent drugs */}
+          {sr?.similarDrugs && sr.similarDrugs.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {sr.similarDrugs.map(d => (
+                  <span key={d} className="px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300">{d}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── LAYER 2: Clinical Pharmacology ── */}
+      {layer === 2 && (
+        <div className="space-y-3">
+          {/* Phase I Dose Strategy */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Phase I Dose Strategy (from PBPK)</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "MRSD Estimate",     val: `~${mrsdEst} ng/mL`,    note: "1/10 × Cmax (conservative)", color: "blue"    },
+                { label: "Dosing Interval",   val: dosInterval,             note: `t½ = ${halfLife.toFixed(1)} h`, color: "violet"  },
+                { label: "Grade ≥3 AE Rate",  val: `${(grade3Rate * 100).toFixed(1)}%`, note: grade3Rate > 0.15 ? "Exceeds 15% — DLT risk" : "Within acceptable range", color: grade3Rate > 0.15 ? "amber" : "emerald" },
+              ].map(({ label, val, note, color }) => {
+                const cardBorder = color === "blue" ? "border-blue-500/20 bg-blue-500/5" : color === "violet" ? "border-violet-500/20 bg-violet-500/5" : color === "amber" ? "border-amber-500/20 bg-amber-500/5" : "border-emerald-500/20 bg-emerald-500/5";
+                return (
+                <div key={label} className={`rounded-lg border p-2.5 ${cardBorder}`}>
+                  <div className={`text-[13px] font-bold ${colorMap[color]}`}>{val}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{label}</div>
+                  <div className="text-[9px] text-slate-500 mt-0.5">{note}</div>
+                </div>
+                ); })}
+
+            </div>
+          </div>
+
+          {/* FDA Clinical Pharmacology Package */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">FDA Clinical Pharmacology Package Required</div>
+            <div className="space-y-1.5">
+              {[
+                { study: "SAD Study",                  note: "Single-Ascending Dose — primary PK characterisation",              req: true  },
+                { study: "MAD Study",                  note: "Multiple-Ascending Dose — steady-state and accumulation",           req: true  },
+                { study: "Food Effect Study",           note: `AUC change at high-fat meal — ${logP > 3 ? "likely significant (logP > 3)" : "low risk predicted"}`, req: true  },
+                { study: "Renal Impairment Study",     note: `${auc > 0 ? `AUC${auc.toFixed(0)} µg·h/mL — assess dose adj` : "renal elimination assessment"}`, req: true  },
+                { study: "Hepatic Impairment Study",   note: "Child-Pugh A/B/C — CYP metabolism characterisation",               req: true  },
+                { study: "QT/QTc (TQT) Study",        note: hergFlag ? "Mandatory (hERG flag from L1)" : "Likely required per ICH E14", req: true  },
+                { study: "DDI Studies (CYP Panel)",   note: metabFlag ? "High priority (CYP flag from L1) — full in vitro / in vivo" : `PK CV=${pkCV.toFixed(0)}% — standard panel`, req: true  },
+                { study: "Popln PK / Exposure-Response", note: "E-R analysis for dose selection and label",                      req: false },
+              ].map(({ study, note, req }) => (
+                <div key={study} className="flex items-start gap-2">
+                  <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${req ? "bg-blue-400" : "bg-slate-600"}`} />
+                  <div className="flex-1 flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[11px] text-slate-200">{study}</span>
+                      <span className="text-[10px] text-slate-500 ml-1.5">({note})</span>
+                    </div>
+                    <span className={`text-[10px] shrink-0 font-medium ${req ? "text-blue-400" : "text-slate-500"}`}>{req ? "Required" : "Recommended"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PK Variability Assessment */}
+          <div className={`rounded-lg border p-3 ${pkCV > 50 ? "border-amber-500/30 bg-amber-500/5" : "border-white/8"}`}>
+            <div className="flex items-center gap-1.5 mb-1">
+              {pkCV > 50 ? <AlertTriangle className="w-3 h-3 text-amber-400" /> : <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+              <span className="text-[11px] font-semibold text-white">PK Variability (Cmax CV%: {pkCV.toFixed(0)}%)</span>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {pkCV > 50
+                ? "High inter-patient variability — FDA will require therapeutic drug monitoring guidance and a concentration-response analysis for label."
+                : "Acceptable variability — standard dosing regimen supportable without TDM requirement."}
+            </div>
+          </div>
+
+          {/* Precedent drugs */}
+          {cr?.adverseEvents && cr.adverseEvents.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">FAERS-Calibrated AE Signals for Label</div>
+              <div className="space-y-1">
+                {cr.adverseEvents.slice(0, 4).map(ae => (
+                  <div key={ae.name} className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-300">{ae.name}</span>
+                    <div className="flex gap-3">
+                      <span className="text-[10px] text-slate-500">Any-grade: <span className="text-white">{ae.anyGrade.toFixed(1)}%</span></span>
+                      <span className={`text-[10px] ${ae.grade3Plus > 10 ? "text-amber-400" : "text-slate-500"}`}>Gr≥3: {ae.grade3Plus.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[9px] text-slate-600 mt-1.5">These will inform the WARNINGS AND PRECAUTIONS section of the product label.</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── LAYER 3: Pathway & Designation ── */}
+      {layer === 3 && (
+        <div className="space-y-3">
+          {/* Designation Eligibility */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">FDA Designation Eligibility</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Breakthrough Therapy",    eligible: btEligible,    detail: "≥80% power, HR<0.75, substantial improvement",  color: "emerald" },
+                { name: "Fast Track",              eligible: ftEligible,    detail: "Serious condition + unmet medical need",          color: "blue"    },
+                { name: "Accelerated Approval",    eligible: accelApproval, detail: "Surrogate endpoint acceptable (HR<0.70)",         color: "amber"   },
+                { name: "Orphan Drug Designation", eligible: orphEligible,  detail: "< 200,000 US patients / year",                    color: "violet"  },
+              ].map(({ name, eligible, detail, color }) => (
+                <div key={name} className={`rounded-lg border p-2.5 ${eligible ? borderMap[color] : "border-white/5 opacity-40"}`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {eligible ? <CheckCircle2 className={`w-3 h-3 ${colorMap[color]}`} /> : <XCircle className="w-3 h-3 text-slate-600" />}
+                    <span className={`text-[10px] font-semibold ${eligible ? "text-white" : "text-slate-600"}`}>{name}</span>
+                  </div>
+                  <div className={`text-[9px] ${eligible ? "text-slate-400" : "text-slate-700"}`}>{detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Full Development Timeline */}
+          <div>
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Estimated Development Timeline to Approval</div>
+            <div className="space-y-2">
+              {[
+                { phase: "IND-Enabling Studies",        duration: "6–9 months",   color: "slate"   },
+                { phase: "IND Filing + 30-day Review",  duration: "1–2 months",   color: "violet"  },
+                { phase: "Phase I (Safety / Dose)",     duration: "12–18 months", color: "blue"    },
+                { phase: "Phase II (Proof of Concept)", duration: "18–30 months", color: "amber"   },
+                { phase: "Phase III (Pivotal — simulated)", duration: `${durMo} months`, color: "emerald" },
+                { phase: "NDA / BLA + PDUFA Review",   duration: btEligible ? "6 months (Priority)" : "12 months (Standard)", color: "red" },
+              ].map(({ phase, duration, color }, i) => (
+                <div key={phase} className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold border ${colorMap[color]} border-current shrink-0`}>
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-300">{phase}</span>
+                    <span className={`text-[11px] font-semibold ${colorMap[color]}`}>{duration}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Adaptive trial regulatory note */}
+          {tr?.interimAnalyses && tr.interimAnalyses.length > 0 && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="text-[10px] font-semibold text-emerald-300 mb-1">Adaptive Design — Regulatory Precedent</div>
+              <div className="text-[10px] text-slate-400">
+                {tr.interimAnalyses.length} interim look{tr.interimAnalyses.length > 1 ? "s" : ""} detected in the trial simulation.
+                FDA requires a pre-specified Statistical Analysis Plan (SAP) and blinded DMC charter filed with the IND before enrollment.
+                O'Brien-Fleming boundaries are widely accepted; Bayesian adaptive designs require a simulations-based package.
+              </div>
+            </div>
+          )}
+
+          {/* Precedent drugs */}
+          {similarDrugs && similarDrugs.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {similarDrugs.map(d => (
+                  <span key={d} className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300">{d}</span>
+                ))}
+              </div>
+              <div className="text-[9px] text-slate-600 mt-1.5">Review approval dossiers for endpoint precedent, primary analysis methods, and required safety data packages.</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Layer 1 Results ───────────────────────────────────────────────────
 type AiReport = {
   molecularOverview?: string;
@@ -3014,24 +3415,37 @@ type AiReport = {
   cohortInsights?: string;
   trialDesignRationale?: string;
   competitiveContext?: string;
+  regulatoryPathway?: string;
   riskMitigations?: string[];
   goNogoRationale?: string;
   nextSteps?: string[];
 };
 
 function Layer1Results({
-  molProps, simResults,
+  molProps, simResults, indication,
   aiReport, aiLoading, aiError, aiStream, runAiAnalysis,
+  chatMessages, chatInput, chatLoading, sendChatMessage, onChatInputChange,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
+  indication: string;
   aiReport: AiReport | null;
   aiLoading: boolean;
   aiError: string | null;
   aiStream: string;
   runAiAnalysis: () => void;
+  chatMessages: Array<{ role: "user" | "assistant"; content: string }>;
+  chatInput: string;
+  chatLoading: boolean;
+  sendChatMessage: (question: string) => void;
+  onChatInputChange: (val: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState("admet");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   const goColor = simResults?.goNogo === "GO" ? "emerald" : simResults?.goNogo === "WATCH" ? "yellow" : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
@@ -3144,6 +3558,7 @@ function Layer1Results({
                 { key: "cohortInsights",        label: "Cohort Insights",          icon: "👥", color: "blue"   },
                 { key: "trialDesignRationale",  label: "Trial Design",             icon: "🏥", color: "emerald"},
                 { key: "competitiveContext",    label: "Competitive Context",      icon: "⚖️", color: "amber"  },
+                { key: "regulatoryPathway",     label: "Regulatory Pathway",       icon: "🏛️", color: "blue"   },
                 { key: "goNogoRationale",       label: "Go/No-Go Rationale",       icon: "✅", color: "emerald"},
               ].filter(({ key }) => {
                 const val = aiReport[key as keyof typeof aiReport];
@@ -3203,6 +3618,69 @@ function Layer1Results({
         </div>
       )}
 
+      {/* Q&A Chat — visible only after AI report is generated */}
+      {aiReport && (
+        <div className="border border-violet-500/15 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-500/5 border-b border-violet-500/10">
+            <MessageCircle className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-[12px] font-semibold text-white">Follow-up Q&amp;A</span>
+            {chatMessages.length > 0 && (
+              <span className="ml-auto text-[10px] text-slate-500">{Math.ceil(chatMessages.length / 2)} turn{chatMessages.length > 2 ? "s" : ""}</span>
+            )}
+          </div>
+
+          {chatMessages.length > 0 && (
+            <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`px-4 py-3 ${msg.role === "user" ? "bg-violet-500/6" : "bg-transparent"}`}>
+                  <div className={`text-[9px] font-semibold uppercase tracking-wider mb-1 ${msg.role === "user" ? "text-violet-400" : "text-slate-500"}`}>
+                    {msg.role === "user" ? "You" : "Hakase AI"}
+                  </div>
+                  {msg.content ? (
+                    <p className="text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {chatMessages.length === 0 && (
+            <div className="px-4 py-3">
+              <p className="text-[11px] text-slate-600">Ask a follow-up question about the analysis — mechanisms, safety margins, dose rationale, regulatory strategy, or competitive landscape.</p>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 p-3 border-t border-white/5">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => onChatInputChange(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !chatLoading && chatInput.trim()) sendChatMessage(chatInput); }}
+              placeholder="Ask about this compound…"
+              disabled={chatLoading}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:bg-violet-500/5 transition-all disabled:opacity-50"
+            />
+            <button
+              onClick={() => { if (!chatLoading && chatInput.trim()) sendChatMessage(chatInput); }}
+              disabled={chatLoading || !chatInput.trim()}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 hover:text-violet-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+            >
+              {chatLoading
+                ? <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />
+                : <ArrowRight className="w-3.5 h-3.5" />
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
         {[
@@ -3241,6 +3719,8 @@ function Layer1Results({
           <Download className="w-3.5 h-3.5" /> Export JSON
         </Button>
       </div>
+
+      <RegulatoryInsightCard layer={1} indication={indication} simResults={simResults} />
     </div>
   );
 }
@@ -3550,7 +4030,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
 }
 
 // ── Layer 2 Results ───────────────────────────────────────────────────
-function Layer2Results({ cohortResults }: { cohortResults: CohortResults | null }) {
+function Layer2Results({ cohortResults, indication }: { cohortResults: CohortResults | null; indication: string }) {
   const [activeTab, setActiveTab] = useState("pkpd");
   const cr = cohortResults;
 
@@ -3642,6 +4122,8 @@ function Layer2Results({ cohortResults }: { cohortResults: CohortResults | null 
           Export I/E Criteria to Layer 3 <ArrowRight className="w-3.5 h-3.5" />
         </Button>
       </div>
+
+      <RegulatoryInsightCard layer={2} indication={indication} cohortResults={cr} />
     </div>
   );
 }
@@ -3940,7 +4422,12 @@ function DoseResponseCurve({ cr }: { cr: CohortResults | null }) {
 }
 
 // ── Layer 3 Results ───────────────────────────────────────────────────
-function Layer3Results({ trialResults: tr, cohortResults: cr }: { trialResults: TrialResults | null; cohortResults: CohortResults | null }) {
+function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simResults: sr }: {
+  trialResults: TrialResults | null;
+  cohortResults: CohortResults | null;
+  indication: string;
+  simResults: SimResults | null;
+}) {
   const [activeTab, setActiveTab] = useState("success");
 
   const stats = [
@@ -3985,12 +4472,12 @@ function Layer3Results({ trialResults: tr, cohortResults: cr }: { trialResults: 
 
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
         {[
-          { id: "success",    label: "Success Prob.", icon: Target    },
-          { id: "enrollment", label: "Enrollment",    icon: TrendingUp },
-          { id: "power",      label: "Power Curve",   icon: BarChart3  },
-          { id: "balance",    label: "Balance Report",icon: Activity   },
-          { id: "sites",      label: "Site Ranking",  icon: Map        },
-          { id: "cost",       label: "Cost",          icon: Database   },
+          { id: "success",     label: "Success Prob.", icon: Target    },
+          { id: "enrollment",  label: "Enrollment",    icon: TrendingUp },
+          { id: "power",       label: "Power Curve",   icon: BarChart3  },
+          { id: "balance",     label: "Balance Report",icon: Activity   },
+          { id: "sites",       label: "Site Ranking",  icon: Map        },
+          { id: "cost",        label: "Cost",          icon: Database   },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -4005,12 +4492,12 @@ function Layer3Results({ trialResults: tr, cohortResults: cr }: { trialResults: 
         ))}
       </div>
 
-      {activeTab === "success"    && <SuccessProbGauge tr={tr} />}
-      {activeTab === "enrollment" && <EnrollmentChart  tr={tr} />}
-      {activeTab === "power"      && <PowerCurve       tr={tr} />}
-      {activeTab === "balance"    && <BalanceReport    cr={cr} />}
-      {activeTab === "sites"      && <SiteRanking      tr={tr} />}
-      {activeTab === "cost"       && <CostSummary      tr={tr} />}
+      {activeTab === "success"     && <SuccessProbGauge    tr={tr} />}
+      {activeTab === "enrollment"  && <EnrollmentChart     tr={tr} />}
+      {activeTab === "power"       && <PowerCurve          tr={tr} />}
+      {activeTab === "balance"     && <BalanceReport       cr={cr} />}
+      {activeTab === "sites"       && <SiteRanking         tr={tr} />}
+      {activeTab === "cost"        && <CostSummary         tr={tr} />}
 
       <div className="flex gap-2 justify-end">
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
@@ -4020,9 +4507,12 @@ function Layer3Results({ trialResults: tr, cohortResults: cr }: { trialResults: 
           <FileText className="w-3.5 h-3.5" /> Generate Full Report
         </Button>
       </div>
+
+      <RegulatoryInsightCard layer={3} indication={indication} trialResults={tr} similarDrugs={sr?.similarDrugs} />
     </div>
   );
 }
+
 
 function SuccessProbGauge({ tr }: { tr: TrialResults | null }) {
   const prob = tr ? parseFloat((tr.successProbability * 100).toFixed(1)) : 72.4;
