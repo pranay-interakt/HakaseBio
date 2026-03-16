@@ -622,9 +622,9 @@ export function Landing() {
               Advanced AI Models
             </h2>
             <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              Every simulation component is independently upgradeable from QSAR rules to dedicated AI models.
-              50+ models evaluated. 8 component upgrades. 3-phase rollout.
-              The same privacy guarantee — your molecular structures never leave the browser.
+              Every simulation component is backed by a dedicated AI model — from ADMET scoring to trial outcome prediction.
+              50+ models evaluated. 8 components. 3-phase rollout.
+              Full privacy guarantee — your molecular structures never leave the browser.
             </p>
           </div>
 
@@ -639,9 +639,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["ADMET Scoring",      "Transformer model trained on tens of millions of molecules — replaces Lipinski/Veber QSAR rules."],
-                  ["Binding Affinity",   "Protein language model embeddings paired with attention-based affinity predictor. Coverage expands from ~20 targets to thousands."],
-                  ["Organ Toxicity",     "Specialized per-organ models (cardiac, hepatic, renal) with confidence intervals. Replaces structural flag heuristics."],
+                  ["ADMET Scoring",      "Transformer model trained on tens of millions of molecules, delivering depth beyond traditional physicochemical rules."],
+                  ["Binding Affinity",   "Protein language model embeddings paired with an attention-based affinity predictor. Coverage spans ~20 well-known targets to thousands."],
+                  ["Organ Toxicity",     "Specialized per-organ models (cardiac, hepatic, renal) with confidence intervals — cardiac, hepatic, and renal endpoints covered."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-violet-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -659,9 +659,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["Population PK/PD",   "Pharmacometric engines trained on real patient data replace one-compartment analytical models with individual-level variability."],
-                  ["Adverse Events",      "Clinical NLP model trained on adverse event reports predicts event frequency and severity from molecular structure."],
-                  ["Drug Interactions",   "Graph neural network across all known drug pairs — covers 1M+ interaction warnings beyond structural estimates."],
+                  ["Population PK/PD",   "Pharmacometric engines trained on real patient data, capturing individual-level PK/PD variability across diverse virtual cohorts."],
+                  ["Adverse Events",      "Clinical NLP model trained on adverse event reports — predicts event frequency and severity directly from molecular structure."],
+                  ["Drug Interactions",   "Graph neural network across all known drug pairs, covering 1M+ interaction signals across approved and investigational compounds."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-blue-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -679,9 +679,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["Trial Outcome",      "Graph-based model trained on thousands of real clinical trials predicts go/no-go with molecule, cohort, and design as inputs."],
-                  ["Survival Analysis",  "Deep survival model replaces parametric Weibull curves. Learns non-proportional hazards from historical trial data."],
-                  ["Protein Structure",  "State-of-the-art structure prediction for novel targets enables accurate binding for targets with no known crystal structure."],
+                  ["Trial Outcome",      "Graph-based model trained on thousands of real clinical trials predicts go/no-go probability with molecule, cohort, and design as inputs."],
+                  ["Survival Analysis",  "Deep survival model learns non-proportional hazards from historical trial data, capturing complex time-to-event patterns."],
+                  ["Protein Structure",  "State-of-the-art structure prediction for novel targets enables accurate binding simulation for targets with no known crystal structure."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-emerald-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -700,7 +700,7 @@ export function Landing() {
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-[13px] font-semibold text-white mb-1">Privacy guarantee unchanged in v2</div>
+              <div className="text-[13px] font-semibold text-white mb-1">Privacy guarantee</div>
               <p className="text-[12px] text-slate-400 leading-relaxed">
                 The AI inference server never sees your SMILES. The browser computes a Morgan fingerprint — a 2048-bit one-way hash — and sends only that to the model endpoint. Morgan fingerprints are mathematically irreversible: no server, including ours, can reconstruct the original molecular structure.
               </p>
@@ -727,8 +727,8 @@ export function Landing() {
               Virtual Patient Simulation Engine
             </h2>
             <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              Layer 2 now draws from four real-world data sources instead of pure structural estimates —
-              upgrading every part of the Patient Cohort Twin while keeping all computation inside your browser.
+              Layer 2 draws from four real-world data sources — NHANES, ChEMBL, FAERS, and PK-Sim physiology —
+              with all computation running inside your browser.
             </p>
           </div>
 
@@ -754,10 +754,9 @@ export function Landing() {
                 <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">Live</span>
               </div>
               <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
-                Replaces the one-compartment analytical model with a two-compartment PBPK solver
-                (central + peripheral) with RK4 numerical integration at 1-minute steps.
-                Parameters derived from PK-Sim OSP physiology: central volume, peripheral volume,
-                inter-compartmental clearance, and allometric scaling (BW^0.75).
+                A two-compartment PBPK solver (central + peripheral) with RK4 numerical integration
+                at 1-minute steps. Parameters derived from PK-Sim OSP physiology: central volume,
+                peripheral volume, inter-compartmental clearance, and allometric scaling (BW^0.75).
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {["RK4 ODE Solver", "Allometric Scaling", "Biexponential PK Curve", "PK-Sim Physiology"].map(t => (
@@ -820,8 +819,8 @@ export function Landing() {
               <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
                 Queries the ChEMBL bioactivity API for IC50 / Ki values of the closest known
                 reference drug. Geometric mean potency seeds the Emax / Hill model
-                (E = Emax × C^n / (EC50^n + C^n)), replacing purely QSAR-estimated responder rates
-                with concentration–effect relationships derived from real assay data.
+                (E = Emax × C^n / (EC50^n + C^n)), grounding responder rates in
+                concentration–effect relationships derived from real assay data.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {["ChEMBL Bioactivity API", "Emax / Hill Model", "IC50 → EC50 Mapping", "2.4M Compounds"].map(t => (
@@ -850,8 +849,8 @@ export function Landing() {
               <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
                 Calls the openFDA FAERS API at simulation time to pull the top adverse event
                 signals (MedDRA preferred terms + real report counts) for the closest reference
-                drug class. Real-world frequencies replace hardcoded structural estimates when
-                the API returns sufficient signal data (&ge; 4 terms).
+                drug class. When the API returns sufficient signal data (&ge; 4 terms), adverse
+                event frequencies reflect real-world pharmacovigilance reporting.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {["openFDA FAERS API", "MedDRA Terms", "20M+ AE Reports", "Real-World Signal"].map(t => (

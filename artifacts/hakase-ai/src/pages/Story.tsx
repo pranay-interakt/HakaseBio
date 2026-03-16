@@ -328,7 +328,7 @@ export function Story() {
               </p>
               <div className="space-y-3">
                 {[
-                  ["PK Time-Course", "One-compartment model: C(t) = (F × Dose / Vd) × (ka / (ka − ke)) × (e^(−ke×t) − e^(−ka×t)). Parameters (F, Vd, ka, ke) derived from ADMET scores. 100 time points with 90% CI from inter-individual variability simulation."],
+                  ["PK Time-Course", "Two-compartment PBPK solver with RK4 integration at 1-minute steps. Central and peripheral volumes, inter-compartmental clearance, and allometric scaling (BW^0.75) derived from PK-Sim physiology. 95% CI from NHANES population variability."],
                   ["Responder Rate", "Sigmoidal Emax model driven by binding affinity (stronger binding → higher response) and disease severity. Biomarker-positive subgroup gets 1.5–2× the overall rate."],
                   ["AE Profiling", "Each organ-risk flag from L1 maps to CTCAE-graded adverse events: hERG → QT prolongation (Grade 1–2: 10–20%, Grade 3+: 5–15%), hepatotox → ALT elevation, BBB → CNS effects."],
                   ["DLT Rate", "Dose-limiting toxicity probability: High severity = 15–25% per flag, Medium = 5–15%, Low = 1–5%. Aggregated for total DLT rate."],
