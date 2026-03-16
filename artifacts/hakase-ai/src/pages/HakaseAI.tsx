@@ -380,18 +380,6 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
-  type AiReport = {
-    molecularOverview?: string;
-    safetyNarrative?: string;
-    pkAnalysis?: string;
-    targetEngagement?: string;
-    cohortInsights?: string;
-    trialDesignRationale?: string;
-    competitiveContext?: string;
-    riskMitigations?: string[];
-    goNogoRationale?: string;
-    nextSteps?: string[];
-  };
   const [aiReport,   setAiReport]   = useState<AiReport | null>(null);
   const [aiLoading,  setAiLoading]  = useState(false);
   const [aiError,    setAiError]    = useState<string | null>(null);
@@ -1826,7 +1814,15 @@ export function HakaseAI() {
                         );
                       })}
                     </div>
-                    <Layer1Results molProps={molProps} simResults={simResults} />
+                    <Layer1Results
+                      molProps={molProps}
+                      simResults={simResults}
+                      aiReport={aiReport}
+                      aiLoading={aiLoading}
+                      aiError={aiError}
+                      aiStream={aiStream}
+                      runAiAnalysis={runAiAnalysis}
+                    />
                   </>
                 )}
               </div>
@@ -2993,7 +2989,31 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 }
 
 // ── Layer 1 Results ───────────────────────────────────────────────────
-function Layer1Results({ molProps, simResults }: { molProps: MolecularProperties | null; simResults: SimResults | null }) {
+type AiReport = {
+  molecularOverview?: string;
+  safetyNarrative?: string;
+  pkAnalysis?: string;
+  targetEngagement?: string;
+  cohortInsights?: string;
+  trialDesignRationale?: string;
+  competitiveContext?: string;
+  riskMitigations?: string[];
+  goNogoRationale?: string;
+  nextSteps?: string[];
+};
+
+function Layer1Results({
+  molProps, simResults,
+  aiReport, aiLoading, aiError, aiStream, runAiAnalysis,
+}: {
+  molProps: MolecularProperties | null;
+  simResults: SimResults | null;
+  aiReport: AiReport | null;
+  aiLoading: boolean;
+  aiError: string | null;
+  aiStream: string;
+  runAiAnalysis: () => void;
+}) {
   const [activeTab, setActiveTab] = useState("admet");
 
   const goColor = simResults?.goNogo === "GO" ? "emerald" : simResults?.goNogo === "WATCH" ? "yellow" : "red";
