@@ -5073,7 +5073,7 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simRes
     },
     {
       label: "Estimated Cost",
-      val:   tr ? `$${(tr.estimatedCost / 1e6).toFixed(1)}M` : "$24.7M",
+      val:   tr ? `$${tr.estimatedCost.toFixed(1)}M` : "$24.7M",
       sub:   "±$3.2M sensitivity range",
       color: "amber",
     },
@@ -5392,7 +5392,7 @@ function SiteRanking({ tr }: { tr: TrialResults | null }) {
 }
 
 function CostSummary({ tr }: { tr: TrialResults | null }) {
-  const totalM = tr ? tr.estimatedCost / 1e6 : 24.7;
+  const totalM = tr ? tr.estimatedCost : 24.7;
   const categories = [
     { label: "Site Operations",     amount: parseFloat((totalM * 0.45).toFixed(1)), pct: 45, color: "#8b5cf6" },
     { label: "Drug Supply",         amount: parseFloat((totalM * 0.25).toFixed(1)), pct: 25, color: "#3b82f6" },
