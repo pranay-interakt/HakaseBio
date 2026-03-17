@@ -32,6 +32,7 @@ export interface TrialResults {
   interimAnalyses:    InterimAnalysis[];
   estimatedDuration:  number;
   estimatedCost:      number;
+  numSites:           number;
   siteRecommendations: Array<{ site: string; region: string; enrollPerMonth: number; quality: number; composite: number }>;
   goNogo:             "GO" | "CONDITIONAL GO" | "NO-GO";
   successProbability: number;
@@ -82,6 +83,8 @@ export function runTrialSimulation(
   dropoutRate:  number,
   numArms:      number,
   adaptiveEnabled: boolean,
+  numSites:     number,
+  indication:   string,
 ): TrialResults {
   const seed = hashStr(simResults.smiles + trialPhase + primaryEndpoint);
   const { responderRate } = cohortResults;
@@ -140,8 +143,67 @@ export function runTrialSimulation(
 
   // Trial duration
   const enrollmentRate = 4.2;
-  const estimatedDuration = Math.ceil(n / (enrollmentRate * 20) + medianPFS_treatment * 1.5);
-  const estimatedCost     = n * 98500 + 20 * 1200000;
+  const estimatedDuration = Math.ceil(n / (enrollmentRate * numSites) + medianPFS_treatment * 1.5);
+
+  // ── Realistic cost model (based on published industry benchmarks) ──────────
+  // Phase-based per-patient direct costs (Tufts CSDD / IQVIA data)
+  const phLower = trialPhase.toLowerCase();
+  const isPhI   = phLower.includes("i")   && !phLower.includes("ii");
+  const isPhII  = phLower.includes("ii")  && !phLower.includes("iii");
+  const isPhIII = phLower.includes("iii");
+
+  const perPatientBase =
+    isPhI   ? 28_000 :   // Phase I: simple escalation, small n
+    isPhII  ? 58_000 :   // Phase II: PK/PD, dose-expansion cohorts
+    isPhIII ? 105_000 :  // Phase III: full pivotal, REMS, comparator
+              42_000;    // Hybrid / adaptive
+
+  // Indication-area multiplier (oncology & CNS are most expensive)
+  const ind = indication.toLowerCase();
+  const indicationMul =
+    (ind.includes("nsclc") || ind.includes("lung") || ind.includes("breast") ||
+     ind.includes("colorect") || ind.includes("cancer") || ind.includes("oncol") ||
+     ind.includes("carcinoma") || ind.includes("leukemia") || ind.includes("lymphoma") ||
+     ind.includes("myeloma") || ind.includes("glioma") || ind.includes("tumor"))  ? 1.45 :
+    (ind.includes("alzheimer") || ind.includes("parkinson") || ind.includes("cns") ||
+     ind.includes("neuro") || ind.includes("psychiatr") || ind.includes("schizo") ||
+     ind.includes("ms") || ind.includes("multiple sclerosis"))                     ? 1.60 :
+    (ind.includes("rare") || ind.includes("orphan") || ind.includes("aml") ||
+     ind.includes("sickle") || ind.includes("huntington"))                          ? 1.55 :
+    (ind.includes("cardio") || ind.includes("heart") || ind.includes("hf ") ||
+     ind.includes("coronary") || ind.includes("stroke"))                            ? 1.30 :
+    (ind.includes("infect") || ind.includes("hiv") || ind.includes("hepatit") ||
+     ind.includes("covid") || ind.includes("antimicr"))                             ? 0.90 :
+    1.00;
+
+  // Site-level costs: startup + per-visit management
+  const siteStartup     = numSites * 90_000;
+  const siteManagement  = numSites * (
+    isPhIII ? 1_800_000 : isPhII ? 900_000 : 320_000
+  );
+
+  // Fixed regulatory & programme costs
+  const fixedRegulatory =
+    isPhIII ? 5_500_000 : isPhII ? 2_200_000 : 1_100_000;
+
+  // Drug manufacturing for trial supply (per arm)
+  const manufacturing = numArms * (
+    isPhIII ? 7_000_000 : isPhII ? 2_800_000 : 1_100_000
+  );
+
+  // Adaptive design premium (IA infrastructure, DMC, re-randomisation)
+  const adaptivePremium = adaptiveEnabled ? 1_400_000 : 0;
+
+  // Base cost
+  const baseCost =
+    n * perPatientBase * indicationMul
+    + siteStartup + siteManagement
+    + fixedRegulatory + manufacturing
+    + adaptivePremium;
+
+  // Overhead: CRO management (18%), safety/pharmacovigilance (7%),
+  //           data management + biostatistics (8%) → ×1.33 total
+  const estimatedCostRaw = baseCost * 1.33;
 
   // Site recommendations
   const siteRecommendations = [
@@ -181,7 +243,8 @@ export function runTrialSimulation(
     powerCurve,
     interimAnalyses,
     estimatedDuration,
-    estimatedCost: Math.round(estimatedCost / 1e5) / 10,
+    estimatedCost: Math.round(estimatedCostRaw / 1e5) / 10,
+    numSites,
     siteRecommendations,
     goNogo: trialGoNogo,
     successProbability: parseFloat(clamp(

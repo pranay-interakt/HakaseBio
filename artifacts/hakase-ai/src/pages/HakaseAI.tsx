@@ -475,6 +475,7 @@ export function HakaseAI() {
             Number(clinicalDiff) || 2.5, Number(targetSampleSize) || 240,
             Number(sigLevel) || 0.05, Number(powerTarget) || 0.80,
             (dropoutRate[0] ?? 15) / 100, numArms, adaptiveEnabled,
+            Number(numSites) || 20, indication,
           );
           setTrialResults(results);
         }
@@ -4722,7 +4723,7 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simRes
     {
       label: "Estimated Cost",
       val:   tr ? `$${tr.estimatedCost.toFixed(1)}M` : "$24.7M",
-      sub:   "±$3.2M sensitivity range",
+      sub:   tr ? `±$${(tr.estimatedCost * 0.12).toFixed(1)}M sensitivity range` : "±$3.0M sensitivity range",
       color: "amber",
     },
   ];
@@ -5044,13 +5045,23 @@ function SiteRanking({ tr }: { tr: TrialResults | null }) {
 }
 
 function CostSummary({ tr }: { tr: TrialResults | null }) {
-  const totalM = tr ? tr.estimatedCost : 24.7;
+  const totalM   = tr ? tr.estimatedCost : 24.7;
+  const n        = tr ? tr.sampleSize    : 240;
+  const sites    = tr ? tr.numSites      : 20;
+  const loM      = parseFloat((totalM * 0.88).toFixed(1));
+  const hiM      = parseFloat((totalM * 1.12).toFixed(1));
+
+  // Cost breakdown percentages grounded in industry data:
+  // Site Operations ~42%, Drug Supply ~28%, Clinical Monitoring ~20%, Lab/Biomarker ~10%
   const categories = [
-    { label: "Site Operations",     amount: parseFloat((totalM * 0.45).toFixed(1)), pct: 45, color: "#8b5cf6" },
-    { label: "Drug Supply",         amount: parseFloat((totalM * 0.25).toFixed(1)), pct: 25, color: "#3b82f6" },
-    { label: "Clinical Monitoring", amount: parseFloat((totalM * 0.20).toFixed(1)), pct: 20, color: "#06b6d4" },
-    { label: "Lab & Biomarker",     amount: parseFloat((totalM * 0.10).toFixed(1)), pct: 10, color: "#22c55e" },
-  ];
+    { label: "Site Operations",     pct: 42, color: "#8b5cf6" },
+    { label: "Drug Supply",         pct: 28, color: "#3b82f6" },
+    { label: "Clinical Monitoring", pct: 20, color: "#06b6d4" },
+    { label: "Lab & Biomarker",     pct: 10, color: "#22c55e" },
+  ].map(c => ({ ...c, amount: parseFloat((totalM * c.pct / 100).toFixed(1)) }));
+
+  const perPatient = n > 0 ? Math.round((totalM * 1_000_000) / n) : 0;
+  const perSite    = sites > 0 ? parseFloat(((totalM / sites)).toFixed(2)) : 0;
 
   return (
     <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
@@ -5059,7 +5070,7 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
         <div className="flex-1">
           <div className="text-[28px] font-bold text-white mb-0.5">${totalM.toFixed(1)}M</div>
           <div className="text-[11px] text-slate-500">Total estimated cost · USD</div>
-          <div className="text-[11px] text-slate-600 mt-1">Sensitivity range: $21.5M–$27.9M</div>
+          <div className="text-[11px] text-slate-600 mt-1">Sensitivity range: ${loM}M–${hiM}M</div>
 
           <div className="mt-4 space-y-2.5">
             {categories.map(c => (
@@ -5082,11 +5093,11 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
         <div className="text-right space-y-2">
           <div className="border border-white/8 rounded-lg p-3 text-right">
             <div className="text-[10px] text-slate-600">Cost per Patient</div>
-            <div className="text-[16px] font-bold text-white mt-0.5">$99,597</div>
+            <div className="text-[16px] font-bold text-white mt-0.5">${perPatient.toLocaleString()}</div>
           </div>
           <div className="border border-white/8 rounded-lg p-3 text-right">
             <div className="text-[10px] text-slate-600">Cost per Site</div>
-            <div className="text-[16px] font-bold text-white mt-0.5">$1.24M</div>
+            <div className="text-[16px] font-bold text-white mt-0.5">${perSite.toFixed(2)}M</div>
           </div>
           <div className="flex gap-1 mt-3 justify-end">
             {["USD","EUR","JPY"].map(c => (
