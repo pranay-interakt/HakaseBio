@@ -7,43 +7,80 @@ interface NavBarProps {
   anchorLinks?: { href: string; label: string }[];
 }
 
+const ChevronDown = ({ open }: { open: boolean }) => (
+  <svg className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
 export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   const [, navigate] = useLocation();
   const [platformOpen, setPlatformOpen] = useState(false);
+  const [techOpen, setTechOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const platformRef = useRef<HTMLDivElement>(null);
+  const techRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setPlatformOpen(false);
-      }
+      if (platformRef.current && !platformRef.current.contains(e.target as Node)) setPlatformOpen(false);
+      if (techRef.current && !techRef.current.contains(e.target as Node)) setTechOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
   const platformItems = [
-    { label: "Overview",                     sub: "What BioDigital Twin is",              anchor: "",            route: "",            color: "violet"  },
-    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",           anchor: "#layer1",     route: "",            color: "violet"  },
-    { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",  anchor: "#layer2",     route: "",            color: "blue"    },
-    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",        anchor: "#vpse",       route: "",            color: "blue"    },
-    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",          anchor: "#layer3",     route: "",            color: "emerald" },
-    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",     anchor: "",            route: "/regulatory", color: "blue"    },
-    { label: "Privacy",                      sub: "Client-side · Zero data egress",        anchor: "#privacy",    route: "",            color: "slate"   },
-    { label: "Advanced AI · v2",             sub: "50+ models · 8 component upgrades",     anchor: "#ai-v2",      route: "",            color: "amber"   },
+    { label: "Overview",                     sub: "What BioDigital Twin is",             anchor: "",           route: "",            color: "violet"  },
+    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",          anchor: "#layer1",    route: "",            color: "violet"  },
+    { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events", anchor: "#layer2",    route: "",            color: "blue"    },
+    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",      anchor: "#vpse",      route: "",            color: "blue"    },
+    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",         anchor: "#layer3",    route: "",            color: "emerald" },
+    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",    anchor: "",           route: "/regulatory", color: "blue"    },
   ];
 
-  const landingAnchors = new Set(["#privacy", "#ai-v2", "#vpse"]);
+  const techItems = [
+    {
+      label: "APIs & Data Sources",
+      sub: "ChEMBL · PubChem · UniProt · RCSB · AlphaFold · openFDA",
+      route: "/apis",
+      color: "violet",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Databases",
+      sub: "NHANES · FAERS · PDB · ChEMBL · AlphaFold · UniProtKB",
+      route: "/apis#databases",
+      color: "blue",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2 1.8 3 4 3h8c2.2 0 4-1 4-3V7c0-2-1.8-3-4-3H8C5.8 4 4 5 4 7zm0 5h16" />
+        </svg>
+      ),
+    },
+    {
+      label: "Privacy",
+      sub: "Client-side computation · Zero data egress · Your rights",
+      route: "/privacy",
+      color: "emerald",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ),
+    },
+  ];
+
+  const landingAnchors = new Set(["#ai-v2", "#vpse"]);
 
   function handlePlatformNav(anchor: string, route: string) {
     setPlatformOpen(false);
@@ -52,13 +89,31 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
       navigate(route);
     } else if (landingAnchors.has(anchor)) {
       navigate("/");
-      setTimeout(() => {
-        document.querySelector(anchor)?.scrollIntoView({ behavior: "smooth" });
-      }, 150);
+      setTimeout(() => { document.querySelector(anchor)?.scrollIntoView({ behavior: "smooth" }); }, 150);
     } else {
       navigate("/platform" + anchor);
     }
   }
+
+  function handleTechNav(route: string) {
+    setTechOpen(false);
+    setMobileOpen(false);
+    if (route.includes("#")) {
+      const [path, hash] = route.split("#");
+      navigate(path);
+      setTimeout(() => { document.querySelector("#" + hash)?.scrollIntoView({ behavior: "smooth" }); }, 200);
+    } else {
+      navigate(route);
+    }
+  }
+
+  const colorMap: Record<string, string> = {
+    violet: "text-violet-300", blue: "text-blue-300", emerald: "text-emerald-300",
+    amber: "text-amber-300", slate: "text-slate-300",
+  };
+  const accentMap: Record<string, string> = {
+    violet: "text-violet-400", blue: "text-blue-400", emerald: "text-emerald-400",
+  };
 
   return (
     <>
@@ -71,20 +126,16 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
         </button>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-6 text-[13px] text-slate-400">
+        <div className="hidden md:flex items-center gap-7 text-[13px] text-slate-400">
 
           {/* Platform dropdown */}
-          <div ref={dropdownRef} className="relative">
+          <div ref={platformRef} className="relative">
             <button
-              onClick={() => setPlatformOpen(o => !o)}
+              onClick={() => { setPlatformOpen(o => !o); setTechOpen(false); }}
               className={`flex items-center gap-1.5 transition-colors ${platformOpen ? "text-white" : "hover:text-white"}`}
             >
-              Platform
-              <svg className={`w-3 h-3 transition-transform duration-200 ${platformOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              Platform <ChevronDown open={platformOpen} />
             </button>
-
             {platformOpen && (
               <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 rounded-2xl border border-white/10 bg-[#0d0f17] shadow-2xl shadow-black/80 overflow-hidden z-[100]">
                 <div className="p-1.5 space-y-0.5">
@@ -94,10 +145,38 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
                       onClick={() => handlePlatformNav(anchor, route)}
                       className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors group"
                     >
-                      <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${
-                        color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : color === "amber" ? "text-amber-300" : "text-slate-300"
-                      }`}>{label}</div>
+                      <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${colorMap[color]}`}>{label}</div>
                       <div className="text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors">{sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Technology dropdown */}
+          <div ref={techRef} className="relative">
+            <button
+              onClick={() => { setTechOpen(o => !o); setPlatformOpen(false); }}
+              className={`flex items-center gap-1.5 transition-colors ${techOpen ? "text-white" : "hover:text-white"}`}
+            >
+              Technology <ChevronDown open={techOpen} />
+            </button>
+            {techOpen && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-80 rounded-2xl border border-white/10 bg-[#0d0f17] shadow-2xl shadow-black/80 overflow-hidden z-[100]">
+                <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-widest text-slate-600 font-semibold">Technology</div>
+                <div className="p-1.5 space-y-0.5">
+                  {techItems.map(({ label, sub, route, color, icon }) => (
+                    <button
+                      key={label}
+                      onClick={() => handleTechNav(route)}
+                      className="w-full text-left px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group flex items-start gap-3"
+                    >
+                      <div className={`mt-0.5 ${accentMap[color]} opacity-70 group-hover:opacity-100 transition-opacity shrink-0`}>{icon}</div>
+                      <div>
+                        <div className={`text-[12px] font-semibold mb-0.5 transition-colors group-hover:text-white ${colorMap[color]}`}>{label}</div>
+                        <div className="text-[11px] text-slate-500 group-hover:text-slate-400 transition-colors leading-relaxed">{sub}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -122,7 +201,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
           </button>
         </div>
 
-        {/* Mobile: hamburger */}
+        {/* Mobile hamburger */}
         <button
           className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
           onClick={() => setMobileOpen(o => !o)}
@@ -145,7 +224,6 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
         <div className="md:hidden fixed inset-0 top-[73px] z-30 bg-[#07080c]/98 backdrop-blur-sm overflow-y-auto">
           <div className="px-6 py-6 space-y-1">
 
-            {/* Platform section */}
             <div className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold px-3 pb-2 pt-1">Platform</div>
             {platformItems.map(({ label, sub, anchor, route, color }) => (
               <button
@@ -153,16 +231,27 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
                 onClick={() => handlePlatformNav(anchor, route)}
                 className="w-full text-left px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
               >
-                <div className={`text-[14px] font-semibold mb-0.5 ${
-                  color === "violet" ? "text-violet-300" : color === "blue" ? "text-blue-300" : color === "emerald" ? "text-emerald-300" : color === "amber" ? "text-amber-300" : "text-slate-300"
-                }`}>{label}</div>
+                <div className={`text-[14px] font-semibold mb-0.5 ${colorMap[color]}`}>{label}</div>
                 <div className="text-[12px] text-slate-500">{sub}</div>
               </button>
             ))}
 
             <div className="border-t border-white/5 my-4" />
 
-            {/* Other links */}
+            <div className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold px-3 pb-2">Technology</div>
+            {techItems.map(({ label, sub, route, color }) => (
+              <button
+                key={label}
+                onClick={() => handleTechNav(route)}
+                className="w-full text-left px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
+              >
+                <div className={`text-[14px] font-semibold mb-0.5 ${colorMap[color]}`}>{label}</div>
+                <div className="text-[12px] text-slate-500">{sub}</div>
+              </button>
+            ))}
+
+            <div className="border-t border-white/5 my-4" />
+
             {anchorLinks.map(({ href, label }) => (
               <a
                 key={href}

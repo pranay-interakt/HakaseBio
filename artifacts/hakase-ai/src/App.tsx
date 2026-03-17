@@ -6,6 +6,8 @@ import { HakaseAI } from "@/pages/HakaseAI";
 import { Story } from "@/pages/Story";
 import { Platform } from "@/pages/Platform";
 import { Regulatory } from "@/pages/Regulatory";
+import { APIs } from "@/pages/APIs";
+import { Privacy } from "@/pages/Privacy";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +21,8 @@ function App() {
           <Route path="/story" component={Story} />
           <Route path="/platform" component={Platform} />
           <Route path="/regulatory" component={Regulatory} />
+          <Route path="/apis" component={APIs} />
+          <Route path="/privacy" component={Privacy} />
           <Route path="/dashboard" component={HakaseAI} />
           <Route path="/dashboard/:rest*" component={HakaseAI} />
           <Route component={Landing} />

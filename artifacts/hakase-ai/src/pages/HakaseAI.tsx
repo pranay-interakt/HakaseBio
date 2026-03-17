@@ -41,7 +41,7 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3;
@@ -381,31 +381,6 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
-  const [aiReport,   setAiReport]   = useState<AiReport | null>(null);
-  const [aiLoading,  setAiLoading]  = useState(false);
-  const [aiError,    setAiError]    = useState<string | null>(null);
-  const [aiStream,   setAiStream]   = useState("");
-
-  const [l1AiReport,  setL1AiReport]  = useState<Record<string, unknown> | null>(null);
-  const [l1AiLoading, setL1AiLoading] = useState(false);
-  const [l1AiError,   setL1AiError]   = useState<string | null>(null);
-  const [l1AiStream,  setL1AiStream]  = useState("");
-
-  const [l2AiReport,  setL2AiReport]  = useState<Record<string, unknown> | null>(null);
-  const [l2AiLoading, setL2AiLoading] = useState(false);
-  const [l2AiError,   setL2AiError]   = useState<string | null>(null);
-  const [l2AiStream,  setL2AiStream]  = useState("");
-
-  const [l3AiReport,  setL3AiReport]  = useState<Record<string, unknown> | null>(null);
-  const [l3AiLoading, setL3AiLoading] = useState(false);
-  const [l3AiError,   setL3AiError]   = useState<string | null>(null);
-  const [l3AiStream,  setL3AiStream]  = useState("");
-
-  const [fullAiOpen, setFullAiOpen] = useState(false);
-
-  const [chatMessages,    setChatMessages]    = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
-  const [chatInput,       setChatInput]       = useState("");
-  const [chatLoading,     setChatLoading]     = useState(false);
 
   useEffect(() => {
     if (!simResults || admetSource !== "From Layer 1") return;
@@ -421,217 +396,6 @@ export function HakaseAI() {
     return simStatus[layer] === "complete";
   }, [simStatus]);
 
-  const runAiAnalysis = useCallback(async () => {
-    if (!simResults) return;
-    setAiLoading(true);
-    setAiError(null);
-    setAiStream("");
-    setAiReport(null);
-    setChatMessages([]);
-    setChatInput("");
-
-    try {
-      // Sample pkCurve to ~15 evenly-spaced points to keep prompt lean
-      let pkCurveSampled: Array<{ time: number; conc: number }> | undefined;
-      if (cohortResults?.pkCurve && cohortResults.pkCurve.length > 0) {
-        const curve = cohortResults.pkCurve;
-        const step  = Math.max(1, Math.floor(curve.length / 15));
-        pkCurveSampled = curve
-          .filter((_, i) => i % step === 0)
-          .map(p => ({ time: p.time, conc: +p.conc.toFixed(2) }));
-      }
-
-      const res = await fetch("/api/bio-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          molName:        simResults.molName,
-          smiles:         simResults.smiles,
-          indication,
-          layer1:         simResults,
-          layer2:         cohortResults,
-          layer3:         trialResults,
-          proteinInfo,
-          pkCurve:        pkCurveSampled,
-          adverseEvents:  cohortResults?.adverseEvents,
-          interimAnalyses: trialResults?.interimAnalyses,
-        }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const reader  = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let   buf     = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          const json = JSON.parse(part.slice(6)) as { chunk?: string; done?: boolean; full?: string; error?: string };
-          if (json.error) throw new Error(json.error);
-          if (json.chunk) setAiStream(prev => prev + json.chunk);
-          if (json.done && json.full) {
-            const raw = json.full.trim();
-            const match = raw.match(/\{[\s\S]*\}/);
-            if (match) {
-              try { setAiReport(JSON.parse(match[0])); } catch { /* keep streaming text */ }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : "Analysis failed");
-    } finally {
-      setAiLoading(false);
-    }
-  }, [simResults, cohortResults, trialResults, indication, proteinInfo]);
-
-  const streamAiLayer = useCallback(async (opts: {
-    focus: string;
-    body: object;
-    setLoading: (v: boolean) => void;
-    setError: (v: string | null) => void;
-    setStream: (v: string | ((prev: string) => string)) => void;
-    setReport: (v: Record<string, unknown> | null) => void;
-  }) => {
-    opts.setLoading(true);
-    opts.setError(null);
-    opts.setStream("");
-    opts.setReport(null);
-    try {
-      const res = await fetch("/api/bio-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...opts.body, focus: opts.focus }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const reader  = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          const json = JSON.parse(part.slice(6)) as { chunk?: string; done?: boolean; full?: string; error?: string };
-          if (json.error) throw new Error(json.error);
-          if (json.chunk) opts.setStream(prev => prev + json.chunk);
-          if (json.done && json.full) {
-            const match = json.full.trim().match(/\{[\s\S]*\}/);
-            if (match) { try { opts.setReport(JSON.parse(match[0])); } catch { /* ignore */ } }
-          }
-        }
-      }
-    } catch (err) {
-      opts.setError(err instanceof Error ? err.message : "Analysis failed");
-    } finally {
-      opts.setLoading(false);
-    }
-  }, []);
-
-  const runL1AiAnalysis = useCallback(() => {
-    if (!simResults) return;
-    streamAiLayer({
-      focus: "molecular",
-      body: { molName: simResults.molName, smiles: simResults.smiles, indication, layer1: simResults, proteinInfo },
-      setLoading: setL1AiLoading,
-      setError:   setL1AiError,
-      setStream:  setL1AiStream,
-      setReport:  setL1AiReport,
-    });
-  }, [simResults, indication, proteinInfo, streamAiLayer]);
-
-  const runL2AiAnalysis = useCallback(() => {
-    if (!simResults || !cohortResults) return;
-    let pkCurveSampled: Array<{ time: number; conc: number }> | undefined;
-    if (cohortResults.pkCurve?.length) {
-      const curve = cohortResults.pkCurve;
-      const step  = Math.max(1, Math.floor(curve.length / 15));
-      pkCurveSampled = curve.filter((_, i) => i % step === 0).map(p => ({ time: p.time, conc: +p.conc.toFixed(2) }));
-    }
-    streamAiLayer({
-      focus: "clinical",
-      body: { molName: simResults.molName, smiles: simResults.smiles, indication, layer1: simResults, layer2: cohortResults, proteinInfo, pkCurve: pkCurveSampled, adverseEvents: cohortResults.adverseEvents },
-      setLoading: setL2AiLoading,
-      setError:   setL2AiError,
-      setStream:  setL2AiStream,
-      setReport:  setL2AiReport,
-    });
-  }, [simResults, cohortResults, indication, proteinInfo, streamAiLayer]);
-
-  const runL3AiAnalysis = useCallback(() => {
-    if (!simResults || !trialResults) return;
-    streamAiLayer({
-      focus: "trial",
-      body: { molName: simResults.molName, smiles: simResults.smiles, indication, layer1: simResults, layer2: cohortResults, layer3: trialResults, proteinInfo, interimAnalyses: trialResults.interimAnalyses },
-      setLoading: setL3AiLoading,
-      setError:   setL3AiError,
-      setStream:  setL3AiStream,
-      setReport:  setL3AiReport,
-    });
-  }, [simResults, cohortResults, trialResults, indication, proteinInfo, streamAiLayer]);
-
-  const sendChatMessage = useCallback(async (question: string) => {
-    if (!aiReport || !question.trim() || chatLoading) return;
-    const userMsg = { role: "user" as const, content: question };
-    const history = [...chatMessages, userMsg];
-    setChatMessages(history);
-    setChatInput("");
-    setChatLoading(true);
-    const placeholderIdx = history.length;
-    setChatMessages(prev => [...prev, { role: "assistant" as const, content: "" }]);
-    try {
-      const res = await fetch("/api/bio-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context:    aiReport,
-          messages:   history,
-          molName:    simResults?.molName,
-          indication,
-        }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const reader  = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let   buf     = "";
-      let   text    = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          const json = JSON.parse(part.slice(6)) as { chunk?: string; done?: boolean; error?: string };
-          if (json.error) throw new Error(json.error);
-          if (json.chunk) {
-            text += json.chunk;
-            setChatMessages(prev => {
-              const updated = [...prev];
-              updated[placeholderIdx] = { role: "assistant", content: text };
-              return updated;
-            });
-          }
-        }
-      }
-    } catch (err) {
-      setChatMessages(prev => {
-        const updated = [...prev];
-        updated[placeholderIdx] = { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Chat failed"}` };
-        return updated;
-      });
-    } finally {
-      setChatLoading(false);
-    }
-  }, [aiReport, chatMessages, chatLoading, simResults?.molName, indication]);
-
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
     setMolName(proj.molName);
@@ -643,12 +407,6 @@ export function HakaseAI() {
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle" });
     setSimProgress(0);
     setActiveLayer(1);
-    setAiReport(null);
-    setAiError(null);
-    setAiStream("");
-    setChatMessages([]);
-    setChatInput("");
-    setChatLoading(false);
   }, [savedProjects]);
 
   const runSimulation = useCallback(async () => {
@@ -943,14 +701,7 @@ export function HakaseAI() {
         </div>
 
         {/* Right nav actions */}
-        <div className="flex items-center gap-2 min-w-[220px] justify-end">
-          <button
-            onClick={() => { setFullAiOpen(true); if (!aiReport && !aiLoading) runAiAnalysis(); }}
-            disabled={!simResults}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
-          >
-            <Sparkles className="w-3.5 h-3.5" /> Full AI Report
-          </button>
+        <div className="flex items-center gap-2 min-w-[180px] justify-end">
           <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
             <Bell className="w-4 h-4" />
           </button>
@@ -2013,11 +1764,6 @@ export function HakaseAI() {
                       molProps={molProps}
                       simResults={simResults}
                       indication={indication}
-                      l1AiReport={l1AiReport}
-                      l1AiLoading={l1AiLoading}
-                      l1AiError={l1AiError}
-                      l1AiStream={l1AiStream}
-                      runL1AiAnalysis={runL1AiAnalysis}
                       uniprotId={uniprotId}
                       pdbId={pdbId}
                       alphafoldPlddt={alphafoldData?.meanPlddt ?? null}
@@ -2472,7 +2218,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />}
+                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} />}
               </div>
             </div>
           )}
@@ -3007,27 +2753,13 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">Monte Carlo · {monteCarloReps[0].toLocaleString()} replications · Power analysis</p>
                   </div>
                 )}
-                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />}
+                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} />}
               </div>
             </div>
           )}
         </main>
       </div>
 
-      <FullAiOverlay
-        open={fullAiOpen}
-        onClose={() => setFullAiOpen(false)}
-        report={aiReport}
-        loading={aiLoading}
-        error={aiError}
-        stream={aiStream}
-        onRun={runAiAnalysis}
-        chatMessages={chatMessages}
-        chatInput={chatInput}
-        chatLoading={chatLoading}
-        sendChatMessage={sendChatMessage}
-        onChatInputChange={setChatInput}
-      />
 
       {viewer3DOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex flex-col bg-[#04050a]">
@@ -3394,347 +3126,8 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 }
 
 
-// ── Layer AI Analysis Panel ───────────────────────────────────────────────
-const LAYER_AI_LABELS: Record<number, { title: string; subtitle: string; accent: string; border: string; badge: string; btn: string }> = {
-  1: { title: "Molecular AI Analysis", subtitle: "Medicinal chemistry · ADMET · Target engagement", accent: "text-violet-400", border: "border-violet-500/20", badge: "bg-violet-500/10 text-violet-400", btn: "bg-violet-600 hover:bg-violet-500" },
-  2: { title: "Clinical PK/PD AI Analysis", subtitle: "PBPK · Cohort response · Adverse events · Dosing", accent: "text-blue-400", border: "border-blue-500/20", badge: "bg-blue-500/10 text-blue-400", btn: "bg-blue-600 hover:bg-blue-500" },
-  3: { title: "Trial & Regulatory AI Analysis", subtitle: "Trial design · Power · Regulatory pathway · GO/NO-GO", accent: "text-emerald-400", border: "border-emerald-500/20", badge: "bg-emerald-500/10 text-emerald-400", btn: "bg-emerald-600 hover:bg-emerald-500" },
-};
+// ── Simulation Data Sources follows ──────────────────────────────────────────
 
-// ── Rich text renderer: highlights numbers/units inline ─────────────────────
-const NUM_RE = /(\d[\d,]*\.?\d*\s*(?:%|ng\/mL|Da|h\b|nM|μM|µM|mL|L\/h|L\/kg|mg\/kg|mg\/mL|ng·h\/mL|nmol|μmol|fold|×|x\b|ki|Ki|IC50|EC50|AUC|Cmax|Tmax|t½|kDa|kcal\/mol|kcal|cal|eV)|n\s*=\s*\d+|HR\s*[=:]\s*[\d.]+|CI\s*[\d.,–\s%()]+|p\s*[<>=]\s*[\d.]+|HBD\s*\d+|HBA\s*\d+|[\d]+\.[\d]+)/g;
-
-function RichText({ text, accent }: { text: string; accent: string }) {
-  const tokens: Array<{ t: string; hi: boolean }> = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  NUM_RE.lastIndex = 0;
-  while ((m = NUM_RE.exec(text)) !== null) {
-    if (m.index > last) tokens.push({ t: text.slice(last, m.index), hi: false });
-    tokens.push({ t: m[0], hi: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) tokens.push({ t: text.slice(last), hi: false });
-  return (
-    <>
-      {tokens.map((tok, i) =>
-        tok.hi
-          ? <span key={i} className={`font-mono font-semibold tabular-nums ${accent}`}>{tok.t}</span>
-          : <span key={i}>{tok.t}</span>
-      )}
-    </>
-  );
-}
-
-// Split prose at sentence boundaries so each sentence breathes
-function splitSentences(text: string): string[] {
-  return text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean);
-}
-
-const LAYER_AI_KEY_LABELS: Record<string, string> = {
-  molecularOverview:            "Molecular Overview",
-  safetyNarrative:              "Safety Assessment",
-  targetEngagement:             "Target Engagement",
-  structuralAlerts:             "Structural Alerts",
-  competitiveContext:           "Competitive Context",
-  pkAnalysis:                   "PK Analysis",
-  cohortInsights:               "Cohort Insights",
-  adverseEventInterpretation:   "Adverse Event Signals",
-  dosingRecommendation:         "Dosing Recommendation",
-  drugInteractionRisk:          "Drug Interaction Risk",
-  trialDesignRationale:         "Trial Design Rationale",
-  powerAnalysis:                "Power Analysis",
-  regulatoryPathway:            "Regulatory Pathway",
-  goNogoRationale:              "GO/NO-GO Rationale",
-  costBenefitAssessment:        "Cost-Benefit Assessment",
-  riskMitigations:              "Risk Mitigations",
-  nextSteps:                    "Recommended Next Steps",
-};
-
-function LayerAiPanel({
-  layer, report, loading, error, stream, onRun,
-}: {
-  layer: 1 | 2 | 3;
-  report: Record<string, unknown> | null;
-  loading: boolean;
-  error: string | null;
-  stream: string;
-  onRun: () => void;
-}) {
-  const cfg = LAYER_AI_LABELS[layer];
-
-  return (
-    <div className={`border ${cfg.border} rounded-xl overflow-hidden bg-white/[0.015]`}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <div className="flex items-center gap-2.5">
-          <Sparkles className={`w-3.5 h-3.5 ${cfg.accent}`} />
-          <span className="text-[12px] font-semibold text-white">{cfg.title}</span>
-          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${cfg.badge}`}>Hakase AI v2</span>
-        </div>
-        {loading ? (
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <div className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin" />
-            Analyzing…
-          </div>
-        ) : report ? (
-          <button onClick={onRun} className={`flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-md font-medium text-white transition-colors ${cfg.btn}`}>
-            <RefreshCw className="w-3 h-3" /> Re-run
-          </button>
-        ) : (
-          <button onClick={onRun} className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-md font-semibold text-white transition-colors ${cfg.btn}`}>
-            <Sparkles className="w-3 h-3" /> Run AI Analysis
-          </button>
-        )}
-      </div>
-
-      {/* Body */}
-      {!loading && !report && !error && (
-        <div className="px-4 py-6 text-center">
-          <div className={`w-10 h-10 rounded-full ${cfg.badge} flex items-center justify-center mx-auto mb-3`}>
-            <Sparkles className={`w-5 h-5 ${cfg.accent}`} />
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium mb-1">{cfg.subtitle}</p>
-          <p className="text-[11px] text-slate-600 max-w-[320px] mx-auto">
-            Click <span className={`${cfg.accent} font-medium`}>Run AI Analysis</span> to get a Claude-powered deep dive on this simulation layer's results.
-          </p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="px-4 py-5">
-          <div className="text-[10px] text-slate-500 mb-2 font-medium">Streaming biomedical analysis…</div>
-          <pre className={`text-[10px] ${cfg.accent} leading-relaxed whitespace-pre-wrap font-mono max-h-48 overflow-y-auto`}>
-            {stream || "Connecting…"}
-          </pre>
-        </div>
-      )}
-
-      {error && (
-        <div className="px-4 py-3">
-          <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</div>
-        </div>
-      )}
-
-      {report && !loading && (
-        <div className="divide-y divide-white/[0.04]">
-          {Object.entries(report).map(([key, val]) => {
-            if (!val || (Array.isArray(val) && val.length === 0)) return null;
-            const label = LAYER_AI_KEY_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").trim();
-            const isArr = Array.isArray(val);
-            const text = String(val);
-            const sentences = isArr ? [] : splitSentences(text);
-            return (
-              <div key={key} className="px-5 py-4">
-                {/* Section header with accent bar */}
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className={`w-[3px] h-4 rounded-full ${cfg.btn}`} />
-                  <span className={`text-[9px] font-bold uppercase tracking-[0.12em] ${cfg.accent}`}>{label}</span>
-                </div>
-                {isArr ? (
-                  <ul className="space-y-2">
-                    {(val as string[]).map((item, i) => (
-                      <li key={i} className="flex items-start gap-3 pl-1">
-                        <span className={`mt-[5px] w-1 h-1 rounded-full flex-shrink-0 ${cfg.btn}`} />
-                        <span className="text-[12px] text-slate-300 leading-[1.7]">
-                          <RichText text={item} accent={cfg.accent} />
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="space-y-2 pl-[18px]">
-                    {sentences.map((s, i) => (
-                      <p key={i} className="text-[12px] text-slate-300 leading-[1.75]">
-                        <RichText text={s} accent={cfg.accent} />
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Full AI Report Overlay ────────────────────────────────────────────────
-function FullAiOverlay({
-  open, onClose, report, loading, error, stream, onRun,
-  chatMessages, chatInput, chatLoading, sendChatMessage, onChatInputChange,
-}: {
-  open: boolean;
-  onClose: () => void;
-  report: AiReport | null;
-  loading: boolean;
-  error: string | null;
-  stream: string;
-  onRun: () => void;
-  chatMessages: Array<{ role: "user" | "assistant"; content: string }>;
-  chatInput: string;
-  chatLoading: boolean;
-  sendChatMessage: (q: string) => void;
-  onChatInputChange: (v: string) => void;
-}) {
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
-  if (!open) return null;
-
-  const FULL_KEY_LABELS: Record<string, string> = {
-    molecularOverview: "Molecular Overview", safetyNarrative: "Safety Assessment",
-    pkAnalysis: "PK Analysis", targetEngagement: "Target Engagement",
-    cohortInsights: "Cohort Insights", trialDesignRationale: "Trial Design",
-    competitiveContext: "Competitive Context", regulatoryPathway: "Regulatory Pathway",
-    riskMitigations: "Risk Mitigations", goNogoRationale: "GO/NO-GO Rationale",
-    nextSteps: "Next Steps",
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative ml-auto w-[680px] max-w-[95vw] h-full bg-[#0b0d14] border-l border-white/10 flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-violet-400" />
-            </div>
-            <div>
-              <div className="text-[14px] font-semibold text-white">Full Project AI Analysis</div>
-              <div className="text-[11px] text-slate-500">Integrated assessment across all 3 simulation layers</div>
-            </div>
-            <span className="text-[9px] font-semibold px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Hakase AI v2</span>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/8 text-slate-400 hover:text-white transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {!loading && !report && !error && (
-            <div className="flex flex-col items-center justify-center h-64 text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-violet-400" />
-              </div>
-              <div>
-                <div className="text-[14px] font-semibold text-white mb-1">Integrated Cross-Layer Analysis</div>
-                <div className="text-[12px] text-slate-500 max-w-[320px]">Synthesises molecular safety, PK/PD cohort data, and trial design into a single expert assessment</div>
-              </div>
-              <button onClick={onRun} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-lg font-semibold text-[13px] transition-colors">
-                <Sparkles className="w-4 h-4" /> Generate Full Analysis
-              </button>
-            </div>
-          )}
-
-          {loading && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-3 h-3 border border-violet-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-[11px] text-slate-400 font-medium">Streaming analysis across all layers…</span>
-              </div>
-              <pre className="text-[10px] text-violet-400 leading-relaxed whitespace-pre-wrap font-mono">{stream || "Connecting…"}</pre>
-            </div>
-          )}
-
-          {error && <div className="text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">{error}</div>}
-
-          {report && !loading && (
-            <>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-500">Analysis complete — {Object.keys(report).length} sections</span>
-                <button onClick={onRun} className="flex items-center gap-1.5 text-[10px] bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-md text-slate-400 transition-colors">
-                  <RefreshCw className="w-3 h-3" /> Re-run
-                </button>
-              </div>
-              {Object.entries(report).map(([key, val]) => {
-                if (!val || (Array.isArray(val) && val.length === 0)) return null;
-                const label = FULL_KEY_LABELS[key] ?? key;
-                const isArr = Array.isArray(val);
-                const text = String(val);
-                const sentences = isArr ? [] : splitSentences(text);
-                return (
-                  <div key={key} className="border border-white/6 rounded-xl overflow-hidden">
-                    {/* Section header */}
-                    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
-                      <div className="w-[3px] h-4 rounded-full bg-violet-500" />
-                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-violet-400">{label}</span>
-                    </div>
-                    {/* Body */}
-                    <div className="px-4 py-3">
-                      {isArr ? (
-                        <ul className="space-y-2">
-                          {(val as string[]).map((item, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <span className="mt-[6px] w-1 h-1 rounded-full bg-violet-500 flex-shrink-0" />
-                              <span className="text-[12px] text-slate-300 leading-[1.7]">
-                                <RichText text={item} accent="text-violet-400" />
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="space-y-2">
-                          {sentences.map((s, i) => (
-                            <p key={i} className="text-[12px] text-slate-300 leading-[1.75]">
-                              <RichText text={s} accent="text-violet-400" />
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {/* Chat */}
-          {report && (
-            <div className="border border-white/6 rounded-xl overflow-hidden mt-2">
-              <div className="px-4 py-2.5 border-b border-white/6 bg-white/2">
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="w-3.5 h-3.5 text-violet-400" />
-                  <span className="text-[11px] font-semibold text-slate-300">Ask the Analysis</span>
-                </div>
-              </div>
-              <div className="max-h-52 overflow-y-auto px-4 py-3 space-y-3">
-                {chatMessages.length === 0 && (
-                  <p className="text-[11px] text-slate-600 text-center py-4">Ask a follow-up question about this compound…</p>
-                )}
-                {chatMessages.map((m, i) => (
-                  <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
-                    <div className={`text-[11px] leading-relaxed px-3 py-2 rounded-xl max-w-[85%] ${
-                      m.role === "user" ? "bg-violet-600/20 text-violet-200 rounded-tr-sm" : "bg-white/5 text-slate-300 rounded-tl-sm"
-                    }`}>{m.content}</div>
-                  </div>
-                ))}
-                {chatLoading && <div className="text-[11px] text-slate-500 animate-pulse">Analysing…</div>}
-                <div ref={chatEndRef} />
-              </div>
-              <div className="px-3 py-2.5 border-t border-white/6 flex gap-2">
-                <input
-                  value={chatInput}
-                  onChange={e => onChatInputChange(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }}
-                  placeholder="Ask about this compound…"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white px-3 py-1.5 placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
-                />
-                <button
-                  onClick={() => sendChatMessage(chatInput)}
-                  disabled={!chatInput.trim() || chatLoading}
-                  className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-white text-[11px] font-medium transition-colors"
-                >Send</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Simulation Data Sources & References Panel ────────────────────────────
 type SrcEntry = { name: string; status: "live" | "estimated" | "unavailable"; detail: string; url?: string };
@@ -4479,33 +3872,14 @@ function RegulatoryInsightCard({
 }
 
 // ── Layer 1 Results ───────────────────────────────────────────────────
-type AiReport = {
-  molecularOverview?: string;
-  safetyNarrative?: string;
-  pkAnalysis?: string;
-  targetEngagement?: string;
-  cohortInsights?: string;
-  trialDesignRationale?: string;
-  competitiveContext?: string;
-  regulatoryPathway?: string;
-  riskMitigations?: string[];
-  goNogoRationale?: string;
-  nextSteps?: string[];
-};
 
 function Layer1Results({
   molProps, simResults, indication,
-  l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
   indication: string;
-  l1AiReport: Record<string, unknown> | null;
-  l1AiLoading: boolean;
-  l1AiError: string | null;
-  l1AiStream: string;
-  runL1AiAnalysis: () => void;
   uniprotId?: string;
   pdbId?: string;
   alphafoldPlddt?: number | null;
@@ -4612,7 +3986,6 @@ function Layer1Results({
         alphafoldPlddt={alphafoldPlddt}
         proteinName={proteinName}
       />
-      <LayerAiPanel layer={1} report={l1AiReport} loading={l1AiLoading} error={l1AiError} stream={l1AiStream} onRun={runL1AiAnalysis} />
     </div>
   );
 }
@@ -4922,15 +4295,10 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
 }
 
 // ── Layer 2 Results ───────────────────────────────────────────────────
-function Layer2Results({ cohortResults, indication, simResults: sr2, aiReport: l2Rep, aiLoading: l2Load, aiError: l2Err, aiStream: l2Strm, onRunAi: runL2 }: {
+function Layer2Results({ cohortResults, indication, simResults: sr2 }: {
   cohortResults: CohortResults | null;
   indication: string;
   simResults: SimResults | null;
-  aiReport: Record<string, unknown> | null;
-  aiLoading: boolean;
-  aiError: string | null;
-  aiStream: string;
-  onRunAi: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("pkpd");
   const cr = cohortResults;
@@ -5026,7 +4394,6 @@ function Layer2Results({ cohortResults, indication, simResults: sr2, aiReport: l
 
       <RegulatoryInsightCard layer={2} indication={indication} cohortResults={cr} similarDrugs={sr2?.similarDrugs} />
       <SimulationDataSources layer={2} simResults={sr2} cohortResults={cr} />
-      <LayerAiPanel layer={2} report={l2Rep} loading={l2Load} error={l2Err} stream={l2Strm} onRun={runL2} />
     </div>
   );
 }
@@ -5325,16 +4692,11 @@ function DoseResponseCurve({ cr }: { cr: CohortResults | null }) {
 }
 
 // ── Layer 3 Results ───────────────────────────────────────────────────
-function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simResults: sr, aiReport: l3Rep, aiLoading: l3Load, aiError: l3Err, aiStream: l3Strm, onRunAi: runL3 }: {
+function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simResults: sr }: {
   trialResults: TrialResults | null;
   cohortResults: CohortResults | null;
   indication: string;
   simResults: SimResults | null;
-  aiReport: Record<string, unknown> | null;
-  aiLoading: boolean;
-  aiError: string | null;
-  aiStream: string;
-  onRunAi: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("success");
 
@@ -5418,7 +4780,6 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simRes
 
       <RegulatoryInsightCard layer={3} indication={indication} trialResults={tr} similarDrugs={sr?.similarDrugs} />
       <SimulationDataSources layer={3} simResults={sr} />
-      <LayerAiPanel layer={3} report={l3Rep} loading={l3Load} error={l3Err} stream={l3Strm} onRun={runL3} />
     </div>
   );
 }
