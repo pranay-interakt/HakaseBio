@@ -1026,8 +1026,11 @@ export function HakaseAI() {
                               <div>
                                 {!rdkitReady ? (
                                   <>
-                                    <div className="text-slate-400 text-[11px] font-medium">Loading chemistry engine…</div>
-                                    <div className="text-slate-600 text-[10px]">RDKit.js initialising</div>
+                                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
+                                      <RefreshCw className="w-3 h-3 animate-spin" />
+                                      Loading chemistry engine…
+                                    </div>
+                                    <div className="text-slate-600 text-[10px]">Downloading RDKit WASM (~7 MB)</div>
                                   </>
                                 ) : molProps?.isValid ? (
                                   <>
@@ -1679,16 +1682,20 @@ export function HakaseAI() {
                 <div className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[1] === "running" || !smiles || (rdkitReady && molProps !== null && !molProps.isValid)}
+                    disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
                     className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
                     {simStatus[1] === "running" ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
+                    ) : !rdkitReady ? (
+                      <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
                     ) : (
                       <><Play className="w-4 h-4" /> Run Molecular Simulation</>
                     )}
                   </Button>
-                  <p className="text-[10px] text-slate-600 text-center mt-2">Est. runtime: 5–30 seconds</p>
+                  <p className="text-[10px] text-slate-600 text-center mt-2">
+                    {!rdkitReady ? "Initialising RDKit.js — please wait" : "Est. runtime: 5–30 seconds"}
+                  </p>
                 </div>
               </div>
 
