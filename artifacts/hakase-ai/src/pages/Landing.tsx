@@ -167,10 +167,10 @@ export function Landing() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
           </button>
           <button
-            onClick={() => navigate("/login")}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-slate-300 hover:text-white hover:border-white/25 font-medium text-[14px] transition-all"
+            onClick={() => navigate("/dashboard?demo=true")}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-300 hover:text-amber-200 hover:border-amber-500/50 hover:bg-amber-500/10 font-medium text-[14px] transition-all"
           >
-            View Demo
+            ▶ View Demo
           </button>
         </div>
 

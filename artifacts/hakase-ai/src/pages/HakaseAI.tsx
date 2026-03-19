@@ -41,6 +41,7 @@ import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
+import { DemoRunner } from "@/components/DemoRunner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +83,13 @@ interface SecondaryEndpoint {
 }
 
 export function HakaseAI() {
+  const [demoOpen, setDemoOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("demo") === "true";
+    }
+    return false;
+  });
+
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
@@ -1019,7 +1027,7 @@ export function HakaseAI() {
         </div>
 
         {/* Layer Stepper */}
-        <div className="flex items-center gap-1 mx-auto">
+        <div id="demo-layer-nav" className="flex items-center gap-1 mx-auto">
           {([1, 2, 3, 4] as Layer[]).map((layer, i) => {
             const Icon = layerIcons[i];
             const status = getLayerStatus(layer);
@@ -1069,6 +1077,12 @@ export function HakaseAI() {
 
         {/* Right nav actions */}
         <div className="flex items-center gap-2 min-w-[220px] justify-end">
+          <button
+            onClick={() => setDemoOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/15 border border-amber-500/30 text-amber-300 hover:bg-amber-600/25 transition-colors text-[11px] font-semibold"
+          >
+            <Play className="w-3.5 h-3.5" /> Demo
+          </button>
           <button
             onClick={() => { setFullAiOpen(true); if (!aiReport && !aiLoading) runAiAnalysis(); }}
             disabled={!simResults}
@@ -1353,7 +1367,7 @@ export function HakaseAI() {
                     <SectionHeader icon={Atom} label="Primary Molecular Input" />
                     <div className="space-y-3">
                       <FieldGroup label="SMILES String" required hint="RDKit validated · MW 100–1500 Da">
-                        <div className="relative">
+                        <div id="demo-smiles-input" className="relative">
                           <Input
                             value={smiles}
                             onChange={e => setSmiles(e.target.value)}
@@ -2049,7 +2063,7 @@ export function HakaseAI() {
                 </div>
 
                 {/* Run Button */}
-                <div className="p-5 border-t border-white/8 mt-auto">
+                <div id="demo-run-l1" className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
                     disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
@@ -2328,7 +2342,7 @@ export function HakaseAI() {
                   )}
                 </div>
 
-                <div className="p-5 border-t border-white/8 mt-auto">
+                <div id="demo-run-l2" className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
                     disabled={simStatus[2] === "running" || !simResults}
@@ -2782,7 +2796,7 @@ export function HakaseAI() {
                   </section>
                 </div>
 
-                <div className="p-5 border-t border-white/8 mt-auto">
+                <div id="demo-run-l3" className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
                     disabled={simStatus[3] === "running"}
@@ -3329,7 +3343,7 @@ export function HakaseAI() {
                   </section>
                 </div>
 
-                <div className="p-5 border-t border-white/8 mt-auto">
+                <div id="demo-run-l4" className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
                     disabled={simStatus[4] === "running"}
@@ -3384,6 +3398,19 @@ export function HakaseAI() {
           )}
         </main>
       </div>
+
+      {demoOpen && (
+        <DemoRunner
+          onClose={() => setDemoOpen(false)}
+          setSmiles={setSmiles}
+          setMolName={setMolName}
+          setUniprotId={setUniprotId}
+          setActiveLayer={setActiveLayer}
+          runSimulation={runSimulation}
+          simStatus={simStatus}
+          activeLayer={activeLayer}
+        />
+      )}
 
       <FullAiOverlay
         open={fullAiOpen}
