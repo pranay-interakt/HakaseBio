@@ -36,12 +36,12 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   }, [mobileOpen]);
 
   const platformItems = [
-    { label: "Overview",                     sub: "What BioDigital Twin is",             anchor: "",           route: "",            color: "violet"  },
-    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",          anchor: "#layer1",    route: "",            color: "violet"  },
-    { label: "Layer 2 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events", anchor: "#layer2",    route: "",            color: "blue"    },
-    { label: "VPSE · Live",                  sub: "PBPK · NHANES · ChEMBL · FAERS",      anchor: "#vpse",      route: "",            color: "blue"    },
-    { label: "Layer 3 — Trial Digital Twin", sub: "Power · Enrollment · Verdict",         anchor: "#layer3",    route: "",            color: "emerald" },
-    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",    anchor: "",           route: "/regulatory", color: "blue"    },
+    { label: "Overview",                     sub: "What BioDigital Twin is",                   anchor: "",        route: "",            color: "violet"  },
+    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",                anchor: "#layer1", route: "",            color: "violet"  },
+    { label: "Layer 2 — Animal Cohort",      sub: "PBPK · Formulation · FIH Dose Scaling",     anchor: "#layer2", route: "",            color: "amber"   },
+    { label: "Layer 3 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",       anchor: "#layer3", route: "",            color: "blue"    },
+    { label: "Layer 4 — Trial Digital Twin", sub: "Power · Enrollment · Adaptive · Verdict",   anchor: "#layer4", route: "",            color: "emerald" },
+    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",         anchor: "",        route: "/regulatory", color: "blue"    },
   ];
 
   const techItems = [
@@ -80,7 +80,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     },
   ];
 
-  const landingAnchors = new Set(["#ai-v2", "#vpse"]);
+  const landingAnchors = new Set(["#ai-v2"]);
 
   function handlePlatformNav(anchor: string, route: string) {
     setPlatformOpen(false);
