@@ -34,6 +34,32 @@ const LAYERS = [
   },
   {
     num: "02",
+    name: "Animal Cohort Twin",
+    color: "amber",
+    border: "border-amber-500/30",
+    bg: "bg-amber-500/5",
+    dot: "bg-amber-500",
+    glow: "shadow-amber-500/20",
+    badge: "bg-amber-500/15 text-amber-300",
+    icon: (
+      <svg viewBox="0 0 48 48" className="w-10 h-10" fill="none">
+        <ellipse cx="24" cy="22" rx="12" ry="8" stroke="#f59e0b" strokeWidth="1.5" />
+        <circle cx="14" cy="16" r="3.5" stroke="#f59e0b" strokeWidth="1.5" />
+        <circle cx="34" cy="16" r="3.5" stroke="#f59e0b" strokeWidth="1.5" />
+        <path d="M12 30 Q8 38 14 40" stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+        <path d="M36 30 Q40 38 34 40" stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+        <path d="M20 30 Q22 38 24 40" stroke="#f59e0b" strokeWidth="1.5" fill="none" />
+        <path d="M28 30 Q26 38 24 40" stroke="#f59e0b" strokeWidth="1.5" fill="none" opacity="0.5" />
+        <path d="M30 22 Q38 18 42 12" stroke="#f59e0b" strokeWidth="1.5" fill="none" opacity="0.4" />
+        <path d="M18 22 Q10 18 6 12" stroke="#f59e0b" strokeWidth="1.5" fill="none" opacity="0.4" />
+      </svg>
+    ),
+    runtime: "10–60 sec",
+    question: "How does the drug behave in preclinical species?",
+    metrics: ["Multi-species PBPK (rat/dog/monkey)", "BCS-aware Formulation Selection", "Allometric FIH Dose Scaling", "Organ Toxicity by Species", "Regulatory NOAEL Estimate"],
+  },
+  {
+    num: "03",
     name: "Patient Cohort Twin",
     color: "blue",
     border: "border-blue-500/30",
@@ -57,7 +83,7 @@ const LAYERS = [
     metrics: ["PK/PD Concentration Curves", "Responder Classification", "Adverse Event Predictions", "Subgroup Heatmap", "Dose-Response Curve"],
   },
   {
-    num: "03",
+    num: "04",
     name: "Trial Digital Twin",
     color: "emerald",
     border: "border-emerald-500/30",
@@ -129,7 +155,7 @@ export function Landing() {
         </h1>
 
         <p className="text-[17px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10">
-          HakaseAI simulates the full drug development journey — molecular safety, patient cohort response, and clinical trial outcomes — before committing a single dollar to physical trials.
+          HakaseAI simulates the full drug development journey — molecular safety, preclinical species, patient cohort response, and clinical trial outcomes — before committing a single dollar to physical trials.
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -166,11 +192,13 @@ export function Landing() {
           </div>
 
           {[
-            { label: "LAYER 1", sub: "Molecular Twin", color: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5" },
+            { label: "LAYER 1", sub: "Molecular Twin",    color: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5" },
             null,
-            { label: "LAYER 2", sub: "Cohort Twin",    color: "text-blue-300",   border: "border-blue-500/20",   bg: "bg-blue-500/5"   },
+            { label: "LAYER 2", sub: "Animal Cohort",     color: "text-amber-300",  border: "border-amber-500/20",  bg: "bg-amber-500/5"  },
             null,
-            { label: "LAYER 3", sub: "Trial Twin",     color: "text-emerald-300",border: "border-emerald-500/20",bg: "bg-emerald-500/5" },
+            { label: "LAYER 3", sub: "Patient Cohort",    color: "text-blue-300",   border: "border-blue-500/20",   bg: "bg-blue-500/5"   },
+            null,
+            { label: "LAYER 4", sub: "Trial Twin",        color: "text-emerald-300",border: "border-emerald-500/20",bg: "bg-emerald-500/5" },
           ].map((item, i) =>
             item === null ? (
               <div key={i} className="flex items-center px-1 text-slate-600">
@@ -202,14 +230,14 @@ export function Landing() {
       <section id="layers" className="relative z-10 py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">Three Cascading Layers</div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">Four Cascading Layers</div>
             <h2 className="text-[40px] font-black tracking-tight text-white">One end-to-end pipeline</h2>
             <p className="text-[15px] text-slate-500 mt-3 max-w-xl mx-auto">
-              Each layer builds on the previous. Outputs cascade automatically — no copy-paste, no data loss.
+              Each layer builds on the previous — molecular → preclinical → clinical → trial. Outputs cascade automatically with no copy-paste and no data loss.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
             {LAYERS.map((layer) => (
               <div
                 key={layer.num}
@@ -258,7 +286,7 @@ export function Landing() {
                 {[
                   { mode: "Synchronous", desc: "Single molecule import in under 30 seconds", color: "text-violet-400" },
                   { mode: "Async Batch", desc: "Webhook-driven batch processing with job IDs", color: "text-blue-400" },
-                  { mode: "Cascade", desc: "Auto-runs L1 → L2 → L3 in one pipeline call", color: "text-emerald-400" },
+                  { mode: "Cascade", desc: "Auto-runs L1 → L2 → L3 → L4 in one pipeline call", color: "text-emerald-400" },
                 ].map(({ mode, desc, color }) => (
                   <div key={mode} className="flex items-start gap-3">
                     <span className={`text-[12px] font-semibold w-28 shrink-0 pt-0.5 ${color}`}>{mode}</span>
@@ -284,7 +312,7 @@ export function Landing() {
                 <div><span className="text-blue-400">mode</span><span className="text-slate-500">:</span> <span className="text-emerald-400">"cascade"</span></div>
               </div>
               <div><span className="text-slate-400">{"}"}</span></div>
-              <div className="pt-2 border-t border-white/5 text-slate-600">{`// → Triggers L1 → L2 → L3 automatically`}</div>
+              <div className="pt-2 border-t border-white/5 text-slate-600">{`// → Triggers L1 → L2 → L3 → L4 automatically`}</div>
             </div>
           </div>
         </div>
@@ -318,8 +346,8 @@ export function Landing() {
               <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-3">The Validator</div>
               <h3 className="text-[22px] font-black text-white mb-3">BioDigital Twin</h3>
               <p className="text-[14px] text-slate-400 leading-relaxed">
-                Tests those molecules against virtual patients and simulated clinical trials across three cascading layers —
-                Molecular, Cohort, and Trial — proving what will work before physical trials begin.
+                Tests those molecules across four cascading layers — Molecular, Animal Cohort, Patient Cohort, and Trial —
+                proving what will work before physical trials begin.
               </p>
             </div>
           </div>
@@ -365,7 +393,7 @@ export function Landing() {
                       Three integration modes:&nbsp;
                       <span className="text-violet-400">Synchronous</span> (single molecule, &lt;30 s) ·&nbsp;
                       <span className="text-blue-400">Async Batch</span> (webhook callbacks) ·&nbsp;
-                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3 in one call)
+                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3→L4 in one call)
                     </div>
                   </div>
                 </div>
@@ -400,16 +428,45 @@ export function Landing() {
                 </div>
               </div>
 
-              {/* Layer 2 */}
+              {/* Layer 2 — Animal Cohort */}
               <div className="flex gap-8">
-                <div className="shrink-0 w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400 z-10">L2</div>
+                <div className="shrink-0 w-12 h-12 rounded-full border border-amber-500/40 bg-amber-500/10 flex items-center justify-center text-[11px] font-black text-amber-400 z-10">L2</div>
                 <div className="flex-1 pt-1 pb-10 border-b border-white/5">
-                  <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 2 · Patient Cohort Twin</div>
+                  <div className="text-[9px] uppercase tracking-widest text-amber-500 font-semibold mb-1">Layer 2 · Animal Cohort Twin</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">How Does It Behave Preclinically?</h4>
+                  <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                    A multi-species PBPK engine simulates the drug across rat, dog, and monkey cohorts using allometric scaling
+                    and BCS-aware formulation modeling. Outputs species-specific PK curves, organ toxicity flags, and a
+                    regulatory-grade first-in-human dose estimate — bridging the gap between bench chemistry and the clinic.
+                  </p>
+                  <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
+                    <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
+                      {[
+                        ["Multi-species PBPK", "Rat · Dog · Monkey — Cmax, AUC, t½, Vd, CL per species"],
+                        ["Formulation Engine", "FDA IIG excipients · BCS class-aware bioavailability boost"],
+                        ["Allometric FIH Scaling", "Body weight exponent scaling → safe starting dose for humans"],
+                        ["NOAEL Estimate", "Species-by-species NOAEL with regulatory safety factor"],
+                      ].map(([label, desc]) => (
+                        <div key={label} className="p-4">
+                          <div className="text-[11px] font-semibold text-amber-300 mb-1">{label}</div>
+                          <div className="text-[11px] text-slate-500 leading-snug">{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Layer 3 — Patient Cohort */}
+              <div className="flex gap-8">
+                <div className="shrink-0 w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400 z-10">L3</div>
+                <div className="flex-1 pt-1 pb-10 border-b border-white/5">
+                  <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 3 · Patient Cohort Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Who Will It Work For?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
                     A statistical cohort engine constructs 500–10,000 virtual patients with configurable demographics,
-                    comorbidities, organ function levels, and pharmacogenomic profiles. Simulates PK/PD curves,
-                    dose-response, responder classification, and adverse events entirely in-browser.
+                    comorbidities, organ function levels, and pharmacogenomic profiles. Starting dose is automatically
+                    seeded from the Layer 2 FIH estimate. Simulates PK/PD curves, dose-response, responder classification, and adverse events entirely in-browser.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
@@ -429,11 +486,11 @@ export function Landing() {
                 </div>
               </div>
 
-              {/* Layer 3 */}
+              {/* Layer 4 — Trial */}
               <div className="flex gap-8">
-                <div className="shrink-0 w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400 z-10">L3</div>
+                <div className="shrink-0 w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400 z-10">L4</div>
                 <div className="flex-1 pt-1">
-                  <div className="text-[9px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Layer 3 · Trial Digital Twin</div>
+                  <div className="text-[9px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Layer 4 · Trial Digital Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Will the Trial Succeed?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
                     A statistical power and survival engine models the entire trial —

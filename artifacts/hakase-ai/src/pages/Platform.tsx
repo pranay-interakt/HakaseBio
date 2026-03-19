@@ -31,33 +31,36 @@ export function Platform() {
           From molecule to trial
         </h1>
         <p className="text-[16px] text-slate-400 max-w-2xl mx-auto">
-          Three simulation layers that cascade — each building on the last — to answer the questions that determine whether a drug program succeeds or fails.
+          Four simulation layers that cascade — molecular safety, preclinical species, patient cohort, and clinical trial — each building on the last to answer the questions that determine whether a drug program succeeds or fails.
         </p>
       </div>
 
       {/* ── Overview ── */}
-      <section className="max-w-5xl mx-auto px-6 py-20 border-b border-white/5">
+      <section className="max-w-6xl mx-auto px-6 py-20 border-b border-white/5">
         <div className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold mb-3">Overview</div>
         <h2 className="text-[32px] font-black tracking-tight text-white mb-8">How the platform works</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           {[
-            { num: "L1", label: "Molecular Digital Twin", q: "Is this molecule safe?", color: "violet", desc: "Takes a SMILES string, computes real molecular descriptors via RDKit.js, scores ADMET profiles, estimates binding affinity, and returns a GO / WATCH / NO-GO verdict in ~3 seconds." },
-            { num: "L2", label: "Patient Cohort Twin",    q: "Who will it work for?", color: "blue",   desc: "Takes L1 results and dose parameters, simulates PK/PD concentration curves, responder rates, adverse event profiles, and dose-limiting toxicity across a virtual patient cohort." },
-            { num: "L3", label: "Trial Digital Twin",     q: "Will the trial succeed?", color: "emerald", desc: "Takes L1+L2 outputs and trial design parameters, calculates statistical power, models enrollment trajectories, adaptive interim analyses, site rankings, and budget projections." },
+            { num: "L1", label: "Molecular Digital Twin", q: "Is this molecule safe?",          color: "violet", desc: "Takes a SMILES string, computes real molecular descriptors via RDKit.js, scores ADMET profiles, estimates binding affinity, and returns a GO / WATCH / NO-GO verdict in ~3 seconds." },
+            { num: "L2", label: "Animal Cohort Twin",     q: "How does it behave preclinically?", color: "amber",  desc: "Multi-species PBPK across rat, dog, and monkey with BCS-aware formulation modeling, allometric FIH dose scaling, and regulatory NOAEL estimation." },
+            { num: "L3", label: "Patient Cohort Twin",    q: "Who will it work for?",           color: "blue",   desc: "Takes L1+L2 results and dose parameters, simulates PK/PD concentration curves, responder rates, adverse event profiles, and dose-limiting toxicity across a virtual patient cohort." },
+            { num: "L4", label: "Trial Digital Twin",     q: "Will the trial succeed?",         color: "emerald", desc: "Takes L1–L3 outputs and trial design parameters, calculates statistical power, models enrollment trajectories, adaptive interim analyses, site rankings, and budget projections." },
           ].map(({ num, label, q, color, desc }) => (
             <div key={num} className={`rounded-2xl border p-6 ${
               color === "violet" ? "border-violet-500/20 bg-violet-500/5"
+              : color === "amber" ? "border-amber-500/20 bg-amber-500/5"
               : color === "blue" ? "border-blue-500/20 bg-blue-500/5"
               : "border-emerald-500/20 bg-emerald-500/5"
             }`}>
               <div className={`w-10 h-10 rounded-full border flex items-center justify-center text-[11px] font-black mb-4 ${
                 color === "violet" ? "border-violet-500/40 bg-violet-500/10 text-violet-400"
+                : color === "amber" ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
                 : color === "blue" ? "border-blue-500/40 bg-blue-500/10 text-blue-400"
                 : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
               }`}>{num}</div>
               <div className={`text-[10px] uppercase tracking-widest font-semibold mb-1 ${
-                color === "violet" ? "text-violet-500" : color === "blue" ? "text-blue-500" : "text-emerald-500"
+                color === "violet" ? "text-violet-500" : color === "amber" ? "text-amber-500" : color === "blue" ? "text-blue-500" : "text-emerald-500"
               }`}>{label}</div>
               <div className="text-[17px] font-bold text-white mb-3">{q}</div>
               <div className="text-[13px] text-slate-400 leading-relaxed">{desc}</div>
@@ -72,9 +75,11 @@ export function Platform() {
             { arrow: true },
             { label: "L1 · Molecular", color: "violet" },
             { arrow: true },
-            { label: "L2 · Cohort", color: "blue" },
+            { label: "L2 · Animal", color: "amber" },
             { arrow: true },
-            { label: "L3 · Trial", color: "emerald" },
+            { label: "L3 · Cohort", color: "blue" },
+            { arrow: true },
+            { label: "L4 · Trial", color: "emerald" },
             { arrow: true },
             { label: "GO / NO-GO + Full Report", color: "slate" },
           ].map((item, i) =>
@@ -85,6 +90,7 @@ export function Platform() {
             ) : (
               <div key={i} className={`text-[11px] px-3 py-1.5 rounded-lg border font-medium ${
                 item.color === "violet" ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+                : item.color === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
                 : item.color === "blue" ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
                 : item.color === "emerald" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                 : "border-white/10 bg-white/5 text-slate-400"
@@ -136,12 +142,65 @@ export function Platform() {
         </div>
       </section>
 
-      {/* ── Layer 2 ── */}
+      {/* ── Layer 2 — Animal Cohort ── */}
       <section id="layer2" className="max-w-6xl mx-auto px-6 py-20 border-b border-white/5 scroll-mt-20">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[12px] font-black text-blue-400 shrink-0">L2</div>
+          <div className="w-12 h-12 rounded-full border border-amber-500/40 bg-amber-500/10 flex items-center justify-center text-[12px] font-black text-amber-400 shrink-0">L2</div>
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold">Layer 2</div>
+            <div className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">Layer 2</div>
+            <h2 className="text-[28px] font-black tracking-tight text-white">Animal Cohort Twin</h2>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
+          <div className="lg:col-span-2 space-y-5">
+            <p className="text-[14px] text-slate-400 leading-relaxed">
+              Layer 1 ADMET results flow into a multi-species PBPK engine. Choose species (rat, dog, monkey) and study type, select an FDA IIG-validated formulation, and run allometric scaling to generate a safe first-in-human dose estimate — the same methodology required for IND filings.
+            </p>
+            <div className="space-y-3">
+              {[
+                ["Multi-species PBPK", "Two-compartment RK4 ODE solver for rat, dog, and monkey. Species-specific physiological parameters — volume of distribution, clearance, protein binding — allometrically scaled."],
+                ["Formulation Engine", "Six FDA IIG-compliant formulations (plain tablet, micronized, SD, NLC, SNEDDS, nanosuspension). BCS classification automatically selects the highest-boost option for the molecule."],
+                ["FIH Dose Scaling", "Body weight exponent (0.75 for CL, 1.0 for Vd). Safety factor 1/10 of NOAEL applied per ICH M3(R2) guidance."],
+                ["Human Reference Panel", "Read-only translation of animal PK to predicted human Cmax, AUC, t½ and Vd for cross-species comparison."],
+              ].map(([title, desc]) => (
+                <div key={title} className="rounded-xl border border-amber-500/10 bg-amber-500/4 p-4">
+                  <div className="text-[11px] font-semibold text-amber-300 mb-1">{title}</div>
+                  <div className="text-[12px] text-slate-400 leading-relaxed">{desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-3">
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-8 flex flex-col gap-4">
+              <div className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">Layer 2 Outputs</div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Rat Cmax",       val: "2.8 µg/mL",    col: "text-amber-300" },
+                  { label: "Dog AUC",        val: "18.4 µg·h/mL", col: "text-amber-300" },
+                  { label: "Monkey t½",      val: "6.2 h",         col: "text-amber-300" },
+                  { label: "FIH Start Dose", val: "1.2 mg/kg",    col: "text-amber-200" },
+                  { label: "NOAEL (rat)",    val: "100 mg/kg",     col: "text-green-400" },
+                  { label: "Formulation",    val: "SNEDDS (BCS II)", col: "text-amber-300" },
+                ].map(({ label, val, col }) => (
+                  <div key={label} className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">{label}</div>
+                    <div className={`text-[15px] font-bold ${col}`}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-600 text-center mt-2">Layer 2 — Animal cohort · PBPK modeling · Allometric FIH scaling · FDA IIG formulation</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Layer 3 — Patient Cohort ── */}
+      <section id="layer3" className="max-w-6xl mx-auto px-6 py-20 border-b border-white/5 scroll-mt-20">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[12px] font-black text-blue-400 shrink-0">L3</div>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold">Layer 3</div>
             <h2 className="text-[28px] font-black tracking-tight text-white">Patient Cohort Twin</h2>
           </div>
         </div>
@@ -151,15 +210,15 @@ export function Platform() {
             <div className="rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-black/60">
               <img
                 src={screenshotL2}
-                alt="Layer 2 — Patient Cohort Twin interface showing PK/PD concentration curves, responder rates, and adverse events"
+                alt="Layer 3 — Patient Cohort Twin interface showing PK/PD concentration curves, responder rates, and adverse events"
                 className="w-full h-auto block"
               />
             </div>
-            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 2 — Cohort simulation · PK/PD curves · 80% responder rate · Dose-response</p>
+            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 3 — Cohort simulation · PK/PD curves · 80% responder rate · Dose-response</p>
           </div>
           <div className="lg:col-span-2 order-1 lg:order-2 space-y-5">
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              Layer 1 results flow directly into a population pharmacokinetics engine. Configure dose, route, cohort size, age range, and disease severity — the simulation builds a virtual patient population and runs PK/PD in ~1–2 seconds.
+              Layer 2's FIH dose estimate auto-seeds the starting dose here. Configure cohort size, age range, and disease severity — the simulation builds a virtual patient population and runs PK/PD for the full cohort.
             </p>
             <div className="space-y-3">
               {[
@@ -178,12 +237,12 @@ export function Platform() {
         </div>
       </section>
 
-      {/* ── Layer 3 ── */}
-      <section id="layer3" className="max-w-6xl mx-auto px-6 py-20 scroll-mt-20">
+      {/* ── Layer 4 — Trial ── */}
+      <section id="layer4" className="max-w-6xl mx-auto px-6 py-20 scroll-mt-20">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[12px] font-black text-emerald-400 shrink-0">L3</div>
+          <div className="w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[12px] font-black text-emerald-400 shrink-0">L4</div>
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">Layer 3</div>
+            <div className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">Layer 4</div>
             <h2 className="text-[28px] font-black tracking-tight text-white">Trial Digital Twin</h2>
           </div>
         </div>
@@ -191,7 +250,7 @@ export function Platform() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              The final layer takes everything from L1 and L2, adds your trial design parameters, and produces a complete virtual clinical trial — power calculations, enrollment modeling, adaptive design boundaries, site rankings, and a cost breakdown.
+              The final layer takes everything from L1–L3, adds your trial design parameters, and produces a complete virtual clinical trial — power calculations, enrollment modeling, adaptive design boundaries, site rankings, and a cost breakdown.
             </p>
             <div className="space-y-3">
               {[
@@ -211,11 +270,11 @@ export function Platform() {
             <div className="rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-black/60">
               <img
                 src={screenshotL3}
-                alt="Layer 3 — Trial Digital Twin interface showing 99.2% trial success probability, enrollment modeling, and risk factors"
+                alt="Layer 4 — Trial Digital Twin interface showing 99.2% trial success probability, enrollment modeling, and risk factors"
                 className="w-full h-auto block"
               />
             </div>
-            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 3 — Trial simulation · 99.2% success probability · 240 patients · 26-month timeline</p>
+            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 4 — Trial simulation · 99.2% success probability · 240 patients · 26-month timeline</p>
           </div>
         </div>
       </section>
