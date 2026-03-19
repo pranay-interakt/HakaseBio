@@ -1,3 +1,31 @@
+# HakaseAI — BioDigital Twin Platform
+
+## Four-Layer Simulation Pipeline
+- **Layer 1 (Violet)**: Molecular — SMILES input, RDKit ADMET, binding, PK, 3D viewer
+- **Layer 2 (Amber)**: Animal Cohort — in-silico PBPK, 7 species/strain sets, NOAEL/MTD, FIH dose projection, Human Translation Panel
+- **Layer 3 (Blue)**: Patient Cohort — virtual patients, PK/PD, FAERS, responder analysis
+- **Layer 4 (Emerald)**: Trial Digital Twin — Monte Carlo, adaptive design, regulatory outputs
+
+## Key Files
+- `artifacts/hakase-ai/src/pages/HakaseAI.tsx` — main 5900+ line dashboard (all 4 layers)
+- `artifacts/hakase-ai/src/lib/animalSim.ts` — Layer 2 engine (allometric scaling, PBPK, NOAEL/MTD, FIH)
+- `artifacts/hakase-ai/src/lib/admet.ts` — ADMET simulation
+- `artifacts/hakase-ai/src/lib/cohortSim.ts` — Layer 3 patient cohort
+- `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model)
+- `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
+- `artifacts/api-server/src/routes/bio-chat/` — Claude chat
+
+## Animal Cohort (Layer 2) Species Library
+7 validated parameter sets: Mouse CD-1, Mouse C57BL/6, Rat Sprague Dawley, Rat Wistar, Dog Beagle, Cynomolgus Monkey. Human reference is a **background translation target only** — not selectable in the species picker; appears as the Human Translation Panel in results.
+
+## Critical Rules
+- Tailwind: NEVER dynamic class interpolation — use explicit lookup maps or ternary chains
+- `estimatedCost` in trialSim.ts stored in millions — do NOT divide by 1e6 at display
+- Routing: wouter — routes: `/`, `/login`, `/story`, `/platform`, `/regulatory`, `/apis`, `/privacy`, `/dashboard`
+- Layer 2 (Animal) auto-populates Layer 3 starting dose with the FIH dose after simulation
+
+---
+
 # Workspace
 
 ## Overview

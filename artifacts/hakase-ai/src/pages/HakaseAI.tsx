@@ -19,6 +19,10 @@ import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
 import { fetchFAERSSignals } from "@/lib/faersApi";
 import { fetchPDParameters } from "@/lib/pdModel";
 import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
+import {
+  runAnimalCohortSimulation, type AnimalCohortResults,
+  SPECIES_LIST, STUDY_TYPE_LIST, type SpeciesId, type StudyType,
+} from "@/lib/animalSim";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -41,10 +45,11 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
+  TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight
 } from "lucide-react";
 
-type Layer = 1 | 2 | 3;
+type Layer = 1 | 2 | 3 | 4;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
 
 interface CriteriaRow {
@@ -68,6 +73,7 @@ export function HakaseAI() {
     1: "idle",
     2: "idle",
     3: "idle",
+    4: "idle",
   });
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -291,7 +297,13 @@ export function HakaseAI() {
     { code: "K50",   label: "Crohn's Disease" },
   ];
 
-  // Layer 2 state
+  // Layer 2 — Animal Cohort state
+  const [animalSpecies, setAnimalSpecies] = useState<SpeciesId>("rat_sd");
+  const [animalStudyType, setAnimalStudyType] = useState<StudyType>("sub_chronic_28d");
+  const [animalRoute, setAnimalRoute] = useState("Oral");
+  const [animalResults, setAnimalResults] = useState<AnimalCohortResults | null>(null);
+
+  // Layer 3 state
   const [indication, setIndication] = useState("C34.1 – Non-small-cell lung carcinoma");
   const [severity, setSeverity] = useState("Moderate");
   const [comorbidConditions, setComorbidConditions] = useState<Array<{ code: string; label: string }>>([
@@ -638,9 +650,10 @@ export function HakaseAI() {
     setUniprotId(proj.uniprotId);
     setIndication(proj.indicationCode);
     setSimResults(null);
+    setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
-    setSimStatus({ 1: "idle", 2: "idle", 3: "idle" });
+    setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
     setActiveLayer(1);
     setAiReport(null);
@@ -657,13 +670,34 @@ export function HakaseAI() {
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
-    const steps = activeLayer === 1 ? 18 : activeLayer === 2 ? 22 : 28;
+    const steps = activeLayer === 1 ? 18 : activeLayer === 2 ? 16 : activeLayer === 3 ? 22 : 28;
     let tick = 0;
 
+    // ── Layer 2: Animal Cohort ────────────────────────────────────────────────
     if (activeLayer === 2) {
       const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+      const seedStr = layer1.smiles + animalSpecies + animalStudyType;
+      let seedH = 0;
+      for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
+      const interval2 = setInterval(() => {
+        tick++;
+        setSimProgress(Math.min(99, (tick / steps) * 100));
+        if (tick >= steps) {
+          clearInterval(interval2);
+          const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, seedH);
+          setAnimalResults(results);
+          // Auto-populate Layer 3 starting dose from FIH dose
+          setStartingDose(results.fihDoseMgKg.toFixed(2));
+          setSimProgress(100);
+          setSimStatus(prev => ({ ...prev, 2: "complete" }));
+        }
+      }, 200);
+      return;
+    }
 
-      // Kick off real-data fetches (FAERS + ChEMBL PD) concurrently with progress animation
+    // ── Layer 3: Patient Cohort (async — real FAERS + PD fetch) ───────────────
+    if (activeLayer === 3) {
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -692,11 +726,11 @@ export function HakaseAI() {
       );
       setCohortResults(results);
       setSimProgress(100);
-      setSimStatus(prev => ({ ...prev, 2: "complete" }));
+      setSimStatus(prev => ({ ...prev, 3: "complete" }));
       return;
     }
 
-    // L1 / L3: original synchronous flow unchanged
+    // ── Layer 1 / Layer 4: synchronous flow ──────────────────────────────────
     const interval = setInterval(() => {
       tick++;
       setSimProgress(Math.min(99, (tick / steps) * 100));
@@ -707,13 +741,14 @@ export function HakaseAI() {
           const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
           setSimResults(results);
         } else {
+          // Layer 4: Trial
           const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
-          const layer2 = cohortResults ?? runCohortSimulation(
+          const layer3 = cohortResults ?? runCohortSimulation(
             layer1, cohortSize[0], Number(startingDose) || 100,
             routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
           );
           const results = runTrialSimulation(
-            layer1, layer2, trialPhase, primaryEndpointName,
+            layer1, layer3, trialPhase, primaryEndpointName,
             Number(clinicalDiff) || 2.5, Number(targetSampleSize) || 240,
             Number(sigLevel) || 0.05, Number(powerTarget) || 0.80,
             (dropoutRate[0] ?? 15) / 100, numArms, adaptiveEnabled,
@@ -726,7 +761,8 @@ export function HakaseAI() {
         setSimStatus(prev => ({ ...prev, [activeLayer]: "complete" }));
       }
     }, 180);
-  }, [activeLayer, molProps, smiles, molName, uniprotId, simResults, cohortResults,
+  }, [activeLayer, molProps, smiles, molName, uniprotId, simResults, animalResults, cohortResults,
+      animalSpecies, animalStudyType, animalRoute,
       cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
       powerTarget, dropoutRate, numArms, adaptiveEnabled]);
@@ -886,9 +922,9 @@ export function HakaseAI() {
     return "disabled";
   };
 
-  const layerIcons = [FlaskConical, Users, Beaker] as const;
-  const layerLabels = ["Molecular", "Cohort", "Trial"] as const;
-  const layerColors = ["violet", "blue", "green"] as const;
+  const layerIcons = [FlaskConical, Rabbit, Users, Beaker] as const;
+  const layerLabels = ["Molecular", "Animal Cohort", "Patient Cohort", "Trial"] as const;
+  const layerColors = ["violet", "amber", "blue", "emerald"] as const;
 
   return (
     <div className="h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -904,30 +940,38 @@ export function HakaseAI() {
 
         {/* Layer Stepper */}
         <div className="flex items-center gap-1 mx-auto">
-          {([1, 2, 3] as Layer[]).map((layer, i) => {
+          {([1, 2, 3, 4] as Layer[]).map((layer, i) => {
             const Icon = layerIcons[i];
             const status = getLayerStatus(layer);
             const isActive = activeLayer === layer;
+            const activeColor = layer === 1 ? "bg-violet-600/20 border-violet-500/50 text-violet-300"
+              : layer === 2 ? "bg-amber-600/20 border-amber-500/50 text-amber-300"
+              : layer === 3 ? "bg-blue-600/20 border-blue-500/50 text-blue-300"
+              : "bg-emerald-600/20 border-emerald-500/50 text-emerald-300";
+            const badgeColor = layer === 1 ? "border-violet-400 text-violet-400 bg-violet-400/10"
+              : layer === 2 ? "border-amber-400 text-amber-400 bg-amber-400/10"
+              : layer === 3 ? "border-blue-400 text-blue-400 bg-blue-400/10"
+              : "border-emerald-400 text-emerald-400 bg-emerald-400/10";
             return (
               <div key={layer} className="flex items-center">
                 <button
                   onClick={() => setActiveLayer(layer)}
                   disabled={status === "disabled"}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 border ${
                     isActive
-                      ? "bg-violet-600/20 border border-violet-500/50 text-violet-300"
+                      ? activeColor
                       : status === "complete"
-                      ? "text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                      ? "text-emerald-400 hover:bg-emerald-500/10 border-transparent cursor-pointer"
                       : status === "available"
-                      ? "text-slate-400 hover:bg-white/5 cursor-pointer"
-                      : "text-slate-600 cursor-not-allowed"
+                      ? "text-slate-400 hover:bg-white/5 border-transparent cursor-pointer"
+                      : "text-slate-600 border-transparent cursor-not-allowed"
                   }`}
                 >
                   {status === "complete" ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border ${
-                      isActive ? "border-violet-400 text-violet-400 bg-violet-400/10" : "border-slate-600 text-slate-500"
+                      isActive ? badgeColor : "border-slate-600 text-slate-500"
                     }`}>
                       {layer}
                     </div>
@@ -935,7 +979,7 @@ export function HakaseAI() {
                   <Icon className="w-3.5 h-3.5" />
                   {layerLabels[i]}
                 </button>
-                {i < 2 && (
+                {i < 3 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
                 )}
               </div>
@@ -969,7 +1013,7 @@ export function HakaseAI() {
         <div className="h-10 bg-violet-900/30 border-b border-violet-500/20 flex items-center px-6 gap-4 shrink-0">
           <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
           <span className="text-[12px] text-violet-300 font-medium">
-            Layer {activeLayer} Simulation Running — {layerLabels[activeLayer - 1]} Digital Twin
+            Layer {activeLayer} Simulation Running — {layerLabels[activeLayer - 1]}
           </span>
           <div className="flex-1 max-w-[300px]">
             <Progress value={simProgress} className="h-1.5 bg-violet-900/50" />
@@ -987,12 +1031,12 @@ export function HakaseAI() {
           <span className="text-[12px] text-emerald-300 font-medium">
             Layer {activeLayer} simulation complete
           </span>
-          {activeLayer < 3 && (
+          {activeLayer < 4 && (
             <button
               onClick={() => setActiveLayer((activeLayer + 1) as Layer)}
               className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
             >
-              Continue to {layerLabels[activeLayer as 0 | 1 | 2]} Simulation
+              Continue to {(layerLabels as readonly string[])[activeLayer]} →
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -2034,14 +2078,187 @@ export function HakaseAI() {
             </div>
           )}
 
-          {/* Layer 2 — Patient Cohort Twin */}
+          {/* Layer 2 — Animal Cohort */}
           {activeLayer === 2 && (
+            <div className="flex-1 flex overflow-hidden">
+              <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
+                <div className="p-5 border-b border-white/8">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Rabbit className="w-4 h-4 text-amber-400" />
+                    <h2 className="text-[15px] font-semibold text-white">Layer 2 — Animal Cohort</h2>
+                  </div>
+                  <p className="text-[12px] text-slate-500">In-silico pre-clinical simulation · PBPK allometric scaling · FIH dose projection</p>
+                </div>
+
+                <div className="flex-1 p-5 space-y-6">
+                  {/* Species Selection */}
+                  <section>
+                    <div className="flex items-center gap-2 mb-3">
+                      <TestTube2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Species Selection</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {SPECIES_LIST.map(sp => (
+                        <button
+                          key={sp.id}
+                          onClick={() => setAnimalSpecies(sp.id)}
+                          className={`p-3 rounded-lg border text-left transition-all ${
+                            animalSpecies === sp.id
+                              ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                              : "bg-white/3 border-white/8 text-slate-400 hover:border-white/20 hover:text-slate-200"
+                          }`}
+                        >
+                          <div className="text-[12px] font-semibold">{sp.species}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{sp.strain}</div>
+                          <div className="text-[9px] text-slate-600 mt-1 leading-tight">{sp.regulatory}</div>
+                        </button>
+                      ))}
+                    </div>
+                    {animalSpecies && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                        <div className="text-[10px] text-amber-400 font-semibold mb-1">FDA Km factor: {SPECIES_LIST.find(s => s.id === animalSpecies)?.kmFactor} · Body weight: {((SPECIES_LIST.find(s => s.id === animalSpecies)?.bodyWeight ?? 0) * 1000).toFixed(0)} g</div>
+                        <div className="text-[10px] text-slate-500">{SPECIES_LIST.find(s => s.id === animalSpecies)?.regulatory}</div>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Study Type */}
+                  <section>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Study Design</span>
+                    </div>
+                    <div className="space-y-2">
+                      {STUDY_TYPE_LIST.map(st => (
+                        <button
+                          key={st.id}
+                          onClick={() => setAnimalStudyType(st.id)}
+                          className={`w-full p-3 rounded-lg border text-left transition-all ${
+                            animalStudyType === st.id
+                              ? "bg-amber-500/10 border-amber-500/40"
+                              : "bg-white/3 border-white/8 hover:border-white/20"
+                          }`}
+                        >
+                          <div className={`text-[12px] font-semibold ${animalStudyType === st.id ? "text-amber-300" : "text-slate-300"}`}>{st.label}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{st.oecd} · {st.ich}</div>
+                          <div className="text-[10px] text-slate-600 mt-1">
+                            Rodent: {st.animalsPerSexRodent}/sex · Non-rodent: {st.animalsPerSexNonRodent}/sex
+                            {st.recoveryGroup && " · Recovery group"}
+                            {st.satelliteTK && " · Satellite TK"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Route of Administration */}
+                  <section>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Activity className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Route of Administration</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["Oral", "IV", "SC", "IM", "Topical", "Inhalation"].map(r => (
+                        <button
+                          key={r}
+                          onClick={() => setAnimalRoute(r)}
+                          className={`py-2 px-3 rounded-lg border text-[11px] font-medium transition-all ${
+                            animalRoute === r
+                              ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                              : "bg-white/3 border-white/8 text-slate-400 hover:border-white/20"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Layer 1 handoff summary */}
+                  {simResults && (
+                    <section>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Database className="w-3.5 h-3.5 text-violet-400" />
+                        <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Layer 1 Handoff</span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/15 space-y-1.5">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500">Compound</span>
+                          <span className="text-violet-300 font-medium">{simResults.molName}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500">MW</span>
+                          <span className="text-slate-300">{simResults.lipinski.mw.toFixed(1)} Da</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500">LogP</span>
+                          <span className="text-slate-300">{simResults.lipinski.logP.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-500">ADMET toxicity</span>
+                          <span className={`font-medium ${simResults.admet.toxicity > 0.6 ? "text-red-400" : simResults.admet.toxicity > 0.35 ? "text-amber-400" : "text-emerald-400"}`}>
+                            {(simResults.admet.toxicity * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+                </div>
+
+                <div className="p-5 border-t border-white/8 mt-auto">
+                  <Button
+                    onClick={runSimulation}
+                    disabled={simStatus[2] === "running" || !simResults}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                  >
+                    {simStatus[2] === "running" ? (
+                      <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating Animal Cohort…</>
+                    ) : (
+                      <><Rabbit className="w-4 h-4" /> Run Animal Cohort Simulation</>
+                    )}
+                  </Button>
+                  {!simResults && (
+                    <p className="text-[10px] text-amber-700 text-center mt-2">Complete Layer 1 (Molecular) first</p>
+                  )}
+                  <p className="text-[10px] text-slate-600 text-center mt-1">PBPK · Allometric scaling · NOAEL/MTD · FIH dose</p>
+                </div>
+              </div>
+
+              {/* L2 Animal Output */}
+              <div className="flex-1 overflow-y-auto p-5">
+                {simStatus[2] === "idle" && (
+                  <EmptyState
+                    icon={Rabbit}
+                    title="No animal cohort results yet"
+                    description="Select a species, study design, and route of administration, then run the simulation to see PBPK outputs, NOAEL/MTD predictions, study group design, and the Human Translation Panel with FIH dose."
+                  />
+                )}
+                {simStatus[2] === "running" && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                      <Rabbit className="w-8 h-8 text-amber-400 animate-pulse" />
+                    </div>
+                    <div className="text-[14px] font-medium text-white">Running Animal Cohort Simulation</div>
+                    <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
+                    <p className="text-[11px] text-slate-500">PBPK modeling · Allometric scaling · Tox prediction</p>
+                  </div>
+                )}
+                {simStatus[2] === "complete" && animalResults && (
+                  <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Layer 3 — Patient Cohort Twin */}
+          {activeLayer === 3 && (
+
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[440px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Users className="w-4 h-4 text-blue-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 2 — Patient Cohort Twin</h2>
+                    <h2 className="text-[15px] font-semibold text-white">Layer 3 — Patient Cohort Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure virtual patient population for PK/PD simulation</p>
                 </div>
@@ -2445,10 +2662,10 @@ export function HakaseAI() {
                 <div className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[2] === "running"}
+                    disabled={simStatus[3] === "running"}
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
-                    {simStatus[2] === "running" ? (
+                    {simStatus[3] === "running" ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating Cohort…</>
                     ) : (
                       <><Play className="w-4 h-4" /> Run Cohort Simulation</>
@@ -2458,16 +2675,16 @@ export function HakaseAI() {
                 </div>
               </div>
 
-              {/* L2 Output */}
+              {/* L3 Patient Cohort Output */}
               <div className="flex-1 overflow-y-auto p-5">
-                {simStatus[2] === "idle" && (
+                {simStatus[3] === "idle" && (
                   <EmptyState
                     icon={Users}
                     title="No cohort results yet"
                     description="Configure patient cohort parameters and run the simulation to see PK/PD curves, responder classification, and adverse event predictions."
                   />
                 )}
-                {simStatus[2] === "running" && (
+                {simStatus[3] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
                     <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
                       <Users className="w-8 h-8 text-blue-400 animate-pulse" />
@@ -2477,19 +2694,19 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />}
+                {simStatus[3] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />}
               </div>
             </div>
           )}
 
-          {/* Layer 3 — Trial Digital Twin */}
-          {activeLayer === 3 && (
+          {/* Layer 4 — Trial Digital Twin */}
+          {activeLayer === 4 && (
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Beaker className="w-4 h-4 text-emerald-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 3 — Trial Digital Twin</h2>
+                    <h2 className="text-[15px] font-semibold text-white">Layer 4 — Trial Digital Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure clinical trial design, endpoints, and simulation parameters</p>
                 </div>
@@ -2980,10 +3197,10 @@ export function HakaseAI() {
                 <div className="p-5 border-t border-white/8 mt-auto">
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[3] === "running"}
+                    disabled={simStatus[4] === "running"}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
-                    {simStatus[3] === "running" ? (
+                    {simStatus[4] === "running" ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating Trial…</>
                     ) : (
                       <><Play className="w-4 h-4" /> Run Trial Simulation</>
@@ -2993,16 +3210,16 @@ export function HakaseAI() {
                 </div>
               </div>
 
-              {/* L3 Output */}
+              {/* L4 Trial Output */}
               <div className="flex-1 overflow-y-auto p-5">
-                {simStatus[3] === "idle" && (
+                {simStatus[4] === "idle" && (
                   <EmptyState
                     icon={Beaker}
                     title="No trial results yet"
                     description="Configure your trial design and simulation parameters, then run the trial simulation to see success probability, power curves, enrollment trajectories, and adaptive decision trees."
                   />
                 )}
-                {simStatus[3] === "running" && (
+                {simStatus[4] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
                     <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
                       <BarChart3 className="w-8 h-8 text-emerald-400 animate-pulse" />
@@ -3012,7 +3229,7 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">Monte Carlo · {monteCarloReps[0].toLocaleString()} replications · Power analysis</p>
                   </div>
                 )}
-                {simStatus[3] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />}
+                {simStatus[4] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />}
               </div>
             </div>
           )}
@@ -4497,6 +4714,215 @@ type AiReport = {
   goNogoRationale?: string;
   nextSteps?: string[];
 };
+
+// ── Layer 2 Animal Cohort Results ─────────────────────────────────────────────
+
+function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName: string }) {
+  const riskColors = { low: "text-emerald-400", moderate: "text-amber-400", high: "text-red-400" } as const;
+  const riskBgs   = { low: "bg-emerald-500/10 border-emerald-500/25", moderate: "bg-amber-500/10 border-amber-500/25", high: "bg-red-500/10 border-red-500/25" } as const;
+  const groupColors: Record<string, string> = {
+    control: "bg-slate-500/20 text-slate-300", low: "bg-blue-500/20 text-blue-300",
+    mid: "bg-amber-500/20 text-amber-300", high: "bg-red-500/20 text-red-300",
+    recovery: "bg-emerald-500/20 text-emerald-300", satellite: "bg-violet-500/20 text-violet-300",
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Rabbit className="w-4 h-4 text-amber-400" />
+            <h3 className="text-[15px] font-semibold text-white">Animal Cohort Results</h3>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${riskBgs[ar.overallRisk]}`}>
+              {ar.overallRisk.toUpperCase()} RISK
+            </span>
+          </div>
+          <p className="text-[12px] text-slate-500">{ar.species.displayName} · {ar.studyType.label} · {ar.routeOfAdmin}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-[11px] text-slate-500">Total animals</div>
+          <div className="text-[20px] font-bold text-amber-300">{ar.totalAnimals}</div>
+          <div className="text-[10px] text-slate-600">${ar.estimatedCostM.toFixed(2)}M est.</div>
+        </div>
+      </div>
+
+      {/* Core PBPK Metrics */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "NOAEL", val: `${ar.noael} mg/kg`, sub: `Range ${ar.loqNoael}–${ar.hiNoael}`, color: "emerald" },
+          { label: "MTD", val: `${ar.mtd.toFixed(1)} mg/kg`, sub: "Maximum tolerated dose", color: "amber" },
+          { label: "t½ (animal)", val: `${ar.animalHalfLife.toFixed(1)}h`, sub: `Cmax ${ar.animalCmax.toFixed(0)} ng/mL`, color: "blue" },
+        ].map(m => (
+          <div key={m.label} className={`p-3 rounded-xl border bg-${m.color}-500/8 border-${m.color}-500/20`}>
+            <div className={`text-[10px] font-semibold text-${m.color}-400 uppercase tracking-widest mb-1`}>{m.label}</div>
+            <div className="text-[18px] font-bold text-white">{m.val}</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* PK Curves: Animal vs Projected Human */}
+      <div className="p-4 rounded-xl bg-white/3 border border-white/8">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">PK Profiles</span>
+          <div className="flex items-center gap-3 text-[10px]">
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-amber-400 rounded"/><span className="text-amber-300">{ar.species.species}</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-blue-400 rounded border-dashed"/><span className="text-blue-300">Human (projected)</span></div>
+          </div>
+        </div>
+        <div className="h-36 flex items-end gap-px overflow-hidden">
+          {(() => {
+            const maxA = Math.max(...ar.animalPkCurve.map(p => p.conc), 1);
+            const maxH = Math.max(...ar.humanPkCurve.map(p => p.conc), 1);
+            const overallMax = Math.max(maxA, maxH);
+            const points = 40;
+            const stepA = Math.max(1, Math.floor(ar.animalPkCurve.length / points));
+            const stepH = Math.max(1, Math.floor(ar.humanPkCurve.length / points));
+            const a = ar.animalPkCurve.filter((_, i) => i % stepA === 0).slice(0, points);
+            const h = ar.humanPkCurve.filter((_, i) => i % stepH === 0).slice(0, points);
+            const n = Math.max(a.length, h.length);
+            return Array.from({ length: n }, (_, i) => (
+              <div key={i} className="flex-1 flex flex-col justify-end gap-px">
+                {h[i] !== undefined && (
+                  <div className="w-full bg-blue-500/40 rounded-sm min-h-px" style={{ height: `${(h[i].conc / overallMax) * 100}%` }} />
+                )}
+                {a[i] !== undefined && (
+                  <div className="w-full bg-amber-500/60 rounded-sm min-h-px" style={{ height: `${(a[i].conc / overallMax) * 100}%` }} />
+                )}
+              </div>
+            ));
+          })()}
+        </div>
+        <div className="flex justify-between text-[9px] text-slate-600 mt-1">
+          <span>0h</span><span>Time</span><span>Peak → Elimination</span>
+        </div>
+      </div>
+
+      {/* Study Groups */}
+      <div className="p-4 rounded-xl bg-white/3 border border-white/8">
+        <div className="flex items-center gap-2 mb-3">
+          <Database className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">Study Groups</span>
+        </div>
+        <div className="space-y-1.5">
+          {ar.studyGroups.map((g, i) => (
+            <div key={i} className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${groupColors[g.type]}`}>{g.name}</span>
+              </div>
+              <div className="flex items-center gap-4 text-slate-400">
+                <span>{g.doseLevel > 0 ? `${g.doseLevel} mg/kg/day` : "Vehicle only"}</span>
+                {g.doseMultiple > 0 && <span className="text-slate-600">{g.doseMultiple}×</span>}
+                <span className="text-slate-500">{g.nPerSex}/sex</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-white/8 flex justify-between text-[10px] text-slate-500">
+          <span>Total: {ar.totalAnimals} animals ({Math.ceil(ar.totalAnimals / 2)}/sex)</span>
+          <span>{ar.studyType.durationWeeks > 0 ? `${ar.studyType.durationWeeks}w duration` : "Single dose"}</span>
+        </div>
+      </div>
+
+      {/* Toxicity Flags */}
+      <div className="p-4 rounded-xl bg-white/3 border border-white/8">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">Predicted Toxicity Signals</span>
+        </div>
+        <div className="space-y-2">
+          {ar.toxicityFlags.map((f, i) => (
+            <div key={i} className={`p-2.5 rounded-lg border ${riskBgs[f.risk]}`}>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[11px] font-semibold text-white">{f.organ}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] font-bold uppercase ${riskColors[f.risk]}`}>{f.risk}</span>
+                  <span className="text-[9px] text-slate-600">{f.ich}</span>
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-400">{f.finding}</div>
+              <div className="text-[9px] text-slate-600 mt-0.5">{f.basis}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ HUMAN TRANSLATION PANEL ═══ */}
+      <div className="p-4 rounded-xl border border-blue-500/25 bg-blue-500/5">
+        <div className="flex items-center gap-2 mb-4">
+          <ArrowUpRight className="w-4 h-4 text-blue-400" />
+          <span className="text-[13px] font-bold text-blue-300 uppercase tracking-widest">Human Translation Panel</span>
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/25 text-blue-400 font-semibold">PROJECTED — not a clinical simulation</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {[
+            { label: "HED (BSA / Km method)", val: `${ar.hedBsa.toFixed(2)} mg/kg`, sub: `FDA 2005 guidance · Km=${ar.species.kmFactor}`, color: "blue" },
+            { label: "HED (PBPK-refined)", val: `${ar.hedPbpk.toFixed(2)} mg/kg`, sub: "Clearance-corrected allometric", color: "violet" },
+            { label: "Proposed FIH Dose", val: `${ar.fihDose.toFixed(1)} mg`, sub: `${ar.fihDoseMgKg.toFixed(3)} mg/kg · 1/10 HED (conservative)`, color: "emerald" },
+            { label: "Safety Margin (NOAEL)", val: `${ar.safetyMarginNoael.toFixed(1)}×`, sub: `HED ÷ NOAEL · ${ar.safetyMarginNoael > 10 ? "Excellent" : ar.safetyMarginNoael > 5 ? "Acceptable" : "Narrow — review"}`, color: ar.safetyMarginNoael > 10 ? "emerald" : ar.safetyMarginNoael > 5 ? "amber" : "red" },
+          ].map(m => (
+            <div key={m.label} className={`p-3 rounded-lg bg-${m.color}-500/8 border border-${m.color}-500/20`}>
+              <div className={`text-[9px] font-bold text-${m.color}-400 uppercase tracking-widest mb-1`}>{m.label}</div>
+              <div className="text-[16px] font-bold text-white">{m.val}</div>
+              <div className="text-[9px] text-slate-500 mt-0.5">{m.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-3 rounded-lg bg-white/3 border border-white/8 mb-3">
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Projected Human PK at FIH Dose</div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div><div className="text-[14px] font-bold text-blue-300">{ar.humanCmax.toFixed(0)} ng/mL</div><div className="text-[9px] text-slate-600">Projected Cmax</div></div>
+            <div><div className="text-[14px] font-bold text-blue-300">{ar.humanAuc.toFixed(0)} ng·h/mL</div><div className="text-[9px] text-slate-600">Projected AUC</div></div>
+            <div><div className="text-[14px] font-bold text-blue-300">{ar.humanHalfLife.toFixed(1)}h</div><div className="text-[9px] text-slate-600">Projected t½</div></div>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/15 text-[10px] text-slate-400 leading-relaxed">
+          <span className="font-semibold text-blue-300">Species Justification: </span>
+          {ar.speciesJustification}
+        </div>
+
+        <div className="mt-3 p-2.5 rounded-lg bg-emerald-500/8 border border-emerald-500/20 flex items-center gap-2">
+          <ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <p className="text-[10px] text-emerald-300">
+            <span className="font-semibold">Layer 3 pre-populated:</span> FIH dose of {ar.fihDoseMgKg.toFixed(3)} mg/kg has been set as the starting dose for Patient Cohort simulation.
+          </p>
+        </div>
+      </div>
+
+      {/* Regulatory Checklist */}
+      <div className="p-4 rounded-xl bg-white/3 border border-white/8">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Shield className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">IND-Enabling Regulatory Checklist</span>
+          </div>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ar.indEnablingComplete ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25" : "bg-amber-500/15 text-amber-400 border border-amber-500/25"}`}>
+            {ar.indEnablingComplete ? "IND-READY" : "GAPS DETECTED"}
+          </span>
+        </div>
+        <div className="space-y-2">
+          {ar.checklist.map((item, i) => (
+            <div key={i} className="flex items-start gap-2.5 text-[11px]">
+              <div className="mt-0.5 shrink-0">
+                {item.status === "pass" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  : item.status === "warn" ? <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  : <div className="w-3.5 h-3.5 rounded-full border border-slate-600" />}
+              </div>
+              <div>
+                <div className="font-semibold text-slate-300">{item.guideline} — {item.requirement}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{item.note}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Layer1Results({
   molProps, simResults, indication,
