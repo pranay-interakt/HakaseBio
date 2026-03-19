@@ -1,4 +1,5 @@
 import type { SimResults } from "./admet";
+import { computeFormulationImpact, type FormulationType, type FormulationResult } from "./formulationDB";
 
 // ─── Species / Strain Parameter Sets ─────────────────────────────────────────
 
@@ -189,7 +190,12 @@ export interface AnimalCohortResults {
 
   // Species justification text (AI-style summary)
   speciesJustification: string;
+
+  // Formulation / BCS
+  formulationResult: FormulationResult;
 }
+
+export type { FormulationType, FormulationResult };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,6 +247,7 @@ export function runAnimalCohortSimulation(
   speciesId: SpeciesId,
   studyTypeId: StudyType,
   routeOfAdmin: string,
+  formulationType: FormulationType = "plain",
   seed: number = 42,
 ): AnimalCohortResults {
   const rng = seededRng(seed);
@@ -254,22 +261,43 @@ export function runAnimalCohortSimulation(
   const tpsa    = lipinski.tpsa ?? (hbd * 20 + 30);
   const bw      = sp.bodyWeight;
 
-  // ── Bioavailability estimation ────────────────────────────────────────────
-  // Biopharmaceutics Classification: oral F% from LogP + TPSA + MW
+  // ── Bioavailability estimation (BCS-aware, formulation-adjusted) ─────────
   let bioavail = 0.85;
-  if (routeOfAdmin === "IV") bioavail = 1.0;
-  else if (routeOfAdmin === "SC") bioavail = 0.75 + rng() * 0.15;
-  else {
-    // Oral: penalise poor absorption
-    if (mw > 500)   bioavail -= 0.15;
-    if (mw > 700)   bioavail -= 0.10;
-    if (logP < 0)   bioavail -= 0.12;
-    if (logP > 5)   bioavail -= 0.10;
-    if (tpsa > 120) bioavail -= 0.15;
-    if (tpsa > 180) bioavail -= 0.15;
-    if (hbd > 5)    bioavail -= 0.10;
-    bioavail = Math.max(0.05, Math.min(0.95, bioavail));
+  if (routeOfAdmin === "IV") {
+    bioavail = 1.0;
+  } else if (routeOfAdmin === "SC") {
+    bioavail = 0.75 + rng() * 0.15;
+  } else {
+    // Base physicochemical F%
+    let baseF = 0.85;
+    if (mw > 500)   baseF -= 0.15;
+    if (mw > 700)   baseF -= 0.10;
+    if (logP < 0)   baseF -= 0.12;
+    if (logP > 5)   baseF -= 0.10;
+    if (tpsa > 120) baseF -= 0.15;
+    if (tpsa > 180) baseF -= 0.15;
+    if (hbd > 5)    baseF -= 0.10;
+    baseF = Math.max(0.05, Math.min(0.90, baseF));
+
+    // Apply BCS classification + formulation modifier
+    // Estimate aromatic ring count from logP (structural proxy; ~0.5 per ring)
+    const numArRings = Math.max(0, Math.round(logP * 0.5));
+    const rotBonds   = lipinski.rotBonds ?? 3;
+    const fResult = computeFormulationImpact(logP, tpsa, mw, hbd, numArRings, rotBonds, baseF, formulationType);
+    bioavail = fResult.formulatedF;
   }
+
+  // Computed once — stored below for inclusion in results
+  const _baseF_for_result = routeOfAdmin === "Oral"
+    ? Math.max(0.05, Math.min(0.90, 0.85
+        - (mw > 500 ? 0.15 : 0)
+        - (mw > 700 ? 0.10 : 0)
+        - (logP < 0 ? 0.12 : 0)
+        - (logP > 5 ? 0.10 : 0)
+        - (tpsa > 120 ? 0.15 : 0)
+        - (tpsa > 180 ? 0.15 : 0)
+        - (hbd > 5 ? 0.10 : 0)))
+    : (routeOfAdmin === "IV" ? 1.0 : 0.75);
 
   // ── Volume of distribution ────────────────────────────────────────────────
   // Vd in L/kg — allometrically scale a human estimate
@@ -520,6 +548,14 @@ export function runAnimalCohortSimulation(
     `${fihDoseMgKg.toFixed(2)} mg/kg (${fihDose.toFixed(0)} mg absolute) with a ` +
     `${safetyMarginNoael.toFixed(1)}× safety margin over NOAEL.`;
 
+  // ── Formulation result ────────────────────────────────────────────────────
+  const numArRingsFinal = Math.max(0, Math.round(logP * 0.5));
+  const rotBondsFinal   = lipinski.rotBonds ?? 3;
+  const formulationResult = computeFormulationImpact(
+    logP, tpsa, mw, hbd, numArRingsFinal, rotBondsFinal,
+    _baseF_for_result, formulationType,
+  );
+
   return {
     species: sp,
     studyType: st,
@@ -551,5 +587,6 @@ export function runAnimalCohortSimulation(
     checklist,
     indEnablingComplete,
     speciesJustification,
+    formulationResult,
   };
 }

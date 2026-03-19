@@ -22,11 +22,25 @@ import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
 import {
   runAnimalCohortSimulation, type AnimalCohortResults,
   SPECIES_LIST, STUDY_TYPE_LIST, type SpeciesId, type StudyType,
+  type FormulationType, type FormulationResult,
 } from "@/lib/animalSim";
+import { FORMULATION_LIST } from "@/lib/formulationDB";
+import { fetchBindingDB, type BindingDBResult } from "@/lib/bindingDB";
+import { fetchCompTox, type ToxCastResult } from "@/lib/toxcast";
+import { searchClinicalTrials, type CTGSearchResult } from "@/lib/clinicalTrials";
+import { fetchOpenTargets, type OTTargetResult } from "@/lib/openTargets";
+import { fetchStringInteractions, type StringResult } from "@/lib/stringApi";
+import { fetchKEGGPathways, type KEGGResult } from "@/lib/kegg";
+import { fetchReactomePathways, type ReactomeResult } from "@/lib/reactome";
+import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
+import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
+import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
+import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
+import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -301,7 +315,22 @@ export function HakaseAI() {
   const [animalSpecies, setAnimalSpecies] = useState<SpeciesId>("rat_sd");
   const [animalStudyType, setAnimalStudyType] = useState<StudyType>("sub_chronic_28d");
   const [animalRoute, setAnimalRoute] = useState("Oral");
+  const [animalFormulation, setAnimalFormulation] = useState<FormulationType>("plain");
   const [animalResults, setAnimalResults] = useState<AnimalCohortResults | null>(null);
+
+  // ── External DB enrichment state ──────────────────────────────────────────
+  const [extBindingDB, setExtBindingDB]   = useState<BindingDBResult | null>(null);
+  const [extToxCast, setExtToxCast]       = useState<ToxCastResult | null>(null);
+  const [extClinTrials, setExtClinTrials] = useState<CTGSearchResult | null>(null);
+  const [extOpenTargets, setExtOpenTargets] = useState<OTTargetResult | null>(null);
+  const [extString, setExtString]         = useState<StringResult | null>(null);
+  const [extKEGG, setExtKEGG]             = useState<KEGGResult | null>(null);
+  const [extReactome, setExtReactome]     = useState<ReactomeResult | null>(null);
+  const [extPharmGKB, setExtPharmGKB]     = useState<PharmGKBResult | null>(null);
+  const [extDisGeNET, setExtDisGeNET]     = useState<DisGeNETGeneResult | null>(null);
+  const [extGnomAD, setExtGnomAD]         = useState<GnomADResult | null>(null);
+  const [extEcotox, setExtEcotox]         = useState<ECOTOXResult | null>(null);
+  const [extDbLoading, setExtDbLoading]   = useState(false);
 
   // Layer 3 state
   const [indication, setIndication] = useState("C34.1 – Non-small-cell lung carcinoma");
@@ -653,6 +682,10 @@ export function HakaseAI() {
     setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
+    setExtBindingDB(null); setExtToxCast(null); setExtClinTrials(null);
+    setExtOpenTargets(null); setExtString(null); setExtKEGG(null);
+    setExtReactome(null); setExtPharmGKB(null); setExtDisGeNET(null);
+    setExtGnomAD(null); setExtEcotox(null);
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
     setActiveLayer(1);
@@ -684,12 +717,22 @@ export function HakaseAI() {
         setSimProgress(Math.min(99, (tick / steps) * 100));
         if (tick >= steps) {
           clearInterval(interval2);
-          const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, seedH);
+          const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
           // Auto-populate Layer 3 starting dose from FIH dose
           setStartingDose(results.fihDoseMgKg.toFixed(2));
           setSimProgress(100);
           setSimStatus(prev => ({ ...prev, 2: "complete" }));
+          // ── Layer 2 external DB enrichment ──────────────────────────────
+          setExtDbLoading(true);
+          Promise.allSettled([
+            fetchCompTox(smiles),
+            fetchEcotox("", layer1.molName),
+          ]).then(([toxSettled, ecotoxSettled]) => {
+            if (toxSettled.status === "fulfilled") setExtToxCast(toxSettled.value);
+            if (ecotoxSettled.status === "fulfilled") setExtEcotox(ecotoxSettled.value);
+            setExtDbLoading(false);
+          });
         }
       }, 200);
       return;
@@ -727,6 +770,22 @@ export function HakaseAI() {
       setCohortResults(results);
       setSimProgress(100);
       setSimStatus(prev => ({ ...prev, 3: "complete" }));
+      // ── Layer 3 external DB enrichment ──────────────────────────────────
+      const gene3 = proteinInfo?.gene ?? "";
+      const indicationClean = indication.replace(/[A-Z][0-9]+\.?[0-9]*\s*[–-]\s*/i, "").trim();
+      setExtDbLoading(true);
+      Promise.allSettled([
+        searchClinicalTrials(indicationClean, layer1.molName),
+        gene3 ? fetchPharmGKB(gene3) : Promise.resolve(null),
+        gene3 ? fetchDisGeNET(gene3) : Promise.resolve(null),
+        gene3 ? fetchGnomAD(gene3) : Promise.resolve(null),
+      ]).then(([ct, pgkb, dgn, gad]) => {
+        if (ct.status   === "fulfilled" && ct.value)   setExtClinTrials(ct.value);
+        if (pgkb.status === "fulfilled" && pgkb.value) setExtPharmGKB(pgkb.value);
+        if (dgn.status  === "fulfilled" && dgn.value)  setExtDisGeNET(dgn.value);
+        if (gad.status  === "fulfilled" && gad.value)  setExtGnomAD(gad.value);
+        setExtDbLoading(false);
+      });
       return;
     }
 
@@ -740,6 +799,26 @@ export function HakaseAI() {
         if (activeLayer === 1) {
           const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
           setSimResults(results);
+          // ── Layer 1 external DB enrichment ──────────────────────────────
+          const gene = proteinInfo?.gene ?? "";
+          const target = gene || uniprotId;
+          if (target) {
+            setExtDbLoading(true);
+            Promise.allSettled([
+              uniprotId ? fetchBindingDB(uniprotId) : Promise.resolve(null),
+              gene ? fetchStringInteractions(gene) : Promise.resolve(null),
+              gene ? fetchKEGGPathways(gene) : Promise.resolve(null),
+              uniprotId ? fetchReactomePathways(uniprotId) : Promise.resolve(null),
+              fetchOpenTargets(target),
+            ]).then(([bdb, str, kegg, react, ot]) => {
+              if (bdb.status    === "fulfilled" && bdb.value)   setExtBindingDB(bdb.value);
+              if (str.status    === "fulfilled" && str.value)   setExtString(str.value);
+              if (kegg.status   === "fulfilled" && kegg.value)  setExtKEGG(kegg.value);
+              if (react.status  === "fulfilled" && react.value) setExtReactome(react.value);
+              if (ot.status     === "fulfilled" && ot.value)    setExtOpenTargets(ot.value);
+              setExtDbLoading(false);
+            });
+          }
         } else {
           // Layer 4: Trial
           const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
@@ -762,7 +841,8 @@ export function HakaseAI() {
       }
     }, 180);
   }, [activeLayer, molProps, smiles, molName, uniprotId, simResults, animalResults, cohortResults,
-      animalSpecies, animalStudyType, animalRoute,
+      animalSpecies, animalStudyType, animalRoute, animalFormulation,
+      proteinInfo, indication,
       cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
       powerTarget, dropoutRate, numArms, adaptiveEnabled]);
@@ -2072,6 +2152,17 @@ export function HakaseAI() {
                       alphafoldPlddt={alphafoldData?.meanPlddt ?? null}
                       proteinName={proteinInfo?.name ?? ""}
                     />
+                    <div className="px-6 pb-6">
+                      <ExternalDbPanel
+                        layer={1}
+                        loading={extDbLoading}
+                        extBindingDB={extBindingDB}
+                        extString={extString}
+                        extKEGG={extKEGG}
+                        extReactome={extReactome}
+                        extOpenTargets={extOpenTargets}
+                      />
+                    </div>
                   </>
                 )}
               </div>
@@ -2173,6 +2264,38 @@ export function HakaseAI() {
                       ))}
                     </div>
                   </section>
+
+                  {/* Formulation Type — BCS-aware */}
+                  {animalRoute === "Oral" && (
+                    <section>
+                      <div className="flex items-center gap-2 mb-3">
+                        <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Formulation / Drug Delivery</span>
+                        <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-semibold">FDA IIG</span>
+                      </div>
+                      <div className="space-y-2">
+                        {FORMULATION_LIST.map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setAnimalFormulation(f.id)}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                              animalFormulation === f.id
+                                ? "bg-amber-500/10 border-amber-500/35 text-amber-200"
+                                : "bg-white/[0.02] border-white/8 text-slate-400 hover:border-white/20"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold">{f.label}</span>
+                              {f.bestFor.includes("II") && (
+                                <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded">BCS II/IV</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{f.keyExcipients.slice(0, 2).join(" · ")}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Layer 1 handoff summary */}
                   {simResults && (
@@ -2694,7 +2817,19 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PK/PD modeling · Responder analysis · AE prediction</p>
                   </div>
                 )}
-                {simStatus[3] === "complete" && <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />}
+                {simStatus[3] === "complete" && (
+                  <>
+                    <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />
+                    <div className="px-6 pb-6">
+                      <ExternalDbPanel
+                        layer={2}
+                        loading={extDbLoading}
+                        extToxCast={extToxCast}
+                        extEcotox={extEcotox}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -3229,7 +3364,21 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">Monte Carlo · {monteCarloReps[0].toLocaleString()} replications · Power analysis</p>
                   </div>
                 )}
-                {simStatus[4] === "complete" && <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />}
+                {simStatus[4] === "complete" && (
+                  <>
+                    <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />
+                    <div className="px-6 pb-6">
+                      <ExternalDbPanel
+                        layer={3}
+                        loading={extDbLoading}
+                        extClinTrials={extClinTrials}
+                        extPharmGKB={extPharmGKB}
+                        extDisGeNET={extDisGeNET}
+                        extGnomAD={extGnomAD}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -4026,6 +4175,40 @@ function buildL1Sources(
       status: "estimated",
       detail: "Absorption / Distribution / Metabolism / Excretion / Toxicity — rule-based estimates, 0–1 scale",
     },
+    {
+      name: "BindingDB",
+      status: uniprotId ? "live" : "unavailable",
+      detail: uniprotId
+        ? "Experimental binding affinities (Ki, IC50, Kd) for the target protein — fetched via server proxy"
+        : "No UniProt ID — BindingDB not queried",
+      url: "https://www.bindingdb.org",
+    },
+    {
+      name: "STRING DB v12",
+      status: "live",
+      detail: "Protein–protein interaction network — functional associations, co-expression, experimental evidence",
+      url: "https://string-db.org",
+    },
+    {
+      name: "KEGG PATHWAY",
+      status: "live",
+      detail: "KEGG pathway enrichment for gene — maps to molecular pathways and biological processes",
+      url: "https://www.kegg.jp",
+    },
+    {
+      name: "Reactome v88",
+      status: uniprotId ? "live" : "unavailable",
+      detail: uniprotId
+        ? "Biological pathway participation for the target — curated reaction-level detail"
+        : "No UniProt ID — Reactome not queried",
+      url: "https://reactome.org",
+    },
+    {
+      name: "Open Targets Platform",
+      status: "live",
+      detail: "Target–disease associations, approved drugs, tractability scores, safety liabilities",
+      url: "https://platform.opentargets.org",
+    },
   ];
 }
 
@@ -4061,6 +4244,24 @@ function buildL2Sources(
         ? `Post-market AE reports for ${sr?.similarDrugs?.[0] ?? "reference drug"} — MedDRA v26.0 terminology`
         : "FAERS unavailable — AE rates estimated from ADMET tox profile",
       url: "https://api.fda.gov/drug/event.json",
+    },
+    {
+      name: "EPA CompTox Dashboard (ToxCast/DSSTox)",
+      status: "live",
+      detail: "High-throughput toxicology assay panel — ToxCast AC50 endpoint hits, oral LD50 estimates",
+      url: "https://comptox.epa.gov/dashboard",
+    },
+    {
+      name: "ECOTOX Knowledgebase (EPA)",
+      status: "live",
+      detail: "Environmental toxicology — ecotoxicological endpoints (NOAEC, LOAEC, LD50, LC50) across species",
+      url: "https://cfpub.epa.gov/ecotox",
+    },
+    {
+      name: "FDA Inactive Ingredient Guide (IIG)",
+      status: "live",
+      detail: "Formulation excipient safety limits — BCS-based bioavailability enhancement selection",
+      url: "https://www.accessdata.fda.gov/scripts/cder/iig",
     },
   ];
 }
