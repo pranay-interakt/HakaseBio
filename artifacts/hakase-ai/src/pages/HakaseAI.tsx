@@ -60,7 +60,7 @@ import {
   Info, CheckCircle2, AlertTriangle, XCircle, Atom, Activity, TrendingUp,
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
-  Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
+  Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard,
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
   TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
   Sun, Moon
@@ -1251,12 +1251,6 @@ export function HakaseAI() {
             className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors"
           >
             {lightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-          </button>
-          <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
-            <Bell className="w-4 h-4" />
-          </button>
-          <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
-            <Settings2 className="w-4 h-4" />
           </button>
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-[11px] font-bold">
             HC
