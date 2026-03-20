@@ -229,6 +229,25 @@ export function HakaseAI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [smiles, molProps?.isValid],
   );
+
+  // ── Auto-sync top target suggestion → UniProt field ───────────────────────
+  // Track whether the user has manually overridden the target.
+  // When false (default), changing the molecule auto-populates the best target.
+  const uniprotManual = useRef(false);
+  const [uniprotAutoMode, setUniprotAutoMode] = useState(true);
+
+  useEffect(() => {
+    if (uniprotManual.current) return;           // user has taken manual control
+    const top = targetSuggestions[0];
+    if (!top) return;
+    if (top.uniprotId === uniprotId) return;     // already in sync
+    setUniprotId(top.uniprotId);
+    setProteinInfo(null);
+    setProteinError(null);
+    setAlphafoldData(null);
+  // Only fire when the suggestions list itself changes (molecule changed)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSuggestions]);
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
@@ -1068,6 +1087,9 @@ export function HakaseAI() {
   }, [apiSource, apiCompoundId]);
 
   const handleNewProject = useCallback(() => {
+    // Allow molecule → target auto-sync again
+    uniprotManual.current = false;
+    setUniprotAutoMode(true);
     // Reset molecule / compound
     setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
     setMolName("New-Compound-001");
@@ -1915,8 +1937,22 @@ export function HakaseAI() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Target UniProt ID</span>
                             <span className="text-[9px] text-red-400">*</span>
+                            {uniprotAutoMode && targetSuggestions.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/25 text-[8px] text-violet-400 font-medium">
+                                Auto-matched
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[9px] text-slate-600">Required for binding simulation</span>
+                          {uniprotAutoMode ? (
+                            <span className="text-[9px] text-slate-600">Follows top molecule suggestion</span>
+                          ) : (
+                            <button
+                              onClick={() => { uniprotManual.current = false; setUniprotAutoMode(true); }}
+                              className="text-[9px] text-violet-500 hover:text-violet-400 transition-colors"
+                            >
+                              ↺ Auto-match
+                            </button>
+                          )}
                         </div>
 
                         {/* Format guide */}
@@ -1929,7 +1965,7 @@ export function HakaseAI() {
                           ].map(({ id, label }) => (
                             <button
                               key={id}
-                              onClick={() => { setUniprotId(id); setProteinInfo(null); setProteinError(null); }}
+                              onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(id); setProteinInfo(null); setProteinError(null); }}
                               className="text-[9px] text-slate-600 hover:text-violet-400 transition-colors font-mono"
                             >
                               {id} <span className="text-slate-700 not-italic">({label})</span>
@@ -1942,7 +1978,13 @@ export function HakaseAI() {
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                             <Input
                               value={uniprotId}
-                              onChange={e => { setUniprotId(e.target.value.toUpperCase()); setProteinInfo(null); setProteinError(null); }}
+                              onChange={e => {
+                                uniprotManual.current = true;
+                                setUniprotAutoMode(false);
+                                setUniprotId(e.target.value.toUpperCase());
+                                setProteinInfo(null);
+                                setProteinError(null);
+                              }}
                               onKeyDown={e => e.key === "Enter" && handleProteinFetch()}
                               className="bg-white/5 border-white/10 text-white text-[12px] pl-8 font-mono focus:border-violet-500/60 uppercase"
                               placeholder="UniProt accession e.g. P00533"
@@ -2014,6 +2056,8 @@ export function HakaseAI() {
                                         </div>
                                         <button
                                           onClick={() => {
+                                            uniprotManual.current = true;
+                                            setUniprotAutoMode(false);
                                             setUniprotId(sugg.uniprotId);
                                             setProteinInfo(null);
                                             setProteinError(null);
