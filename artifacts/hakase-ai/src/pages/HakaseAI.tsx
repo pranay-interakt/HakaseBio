@@ -223,7 +223,7 @@ export function HakaseAI() {
   }, [smiles, rdkitReady]);
 
   // ── Molecule-aware target protein suggestions ──────────────────────────────
-  const [targetSuggOpen, setTargetSuggOpen] = useState(true);
+  const [targetSuggOpen, setTargetSuggOpen] = useState(false);
   const targetSuggestions = useMemo<TargetSuggestion[]>(
     () => (molProps?.isValid ? suggestTargets(smiles, molProps, 5) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
