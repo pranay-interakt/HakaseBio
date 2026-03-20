@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import hakaseLogo from "@assets/image_1773504202272.png";
 import {
   initChemistry,
@@ -36,6 +36,7 @@ import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
 import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
+import { suggestTargets, type TargetSuggestion } from "@/lib/targetSuggestion";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -216,6 +217,14 @@ export function HakaseAI() {
     }, 250);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [smiles, rdkitReady]);
+
+  // ── Molecule-aware target protein suggestions ──────────────────────────────
+  const [targetSuggOpen, setTargetSuggOpen] = useState(true);
+  const targetSuggestions = useMemo<TargetSuggestion[]>(
+    () => (molProps?.isValid ? suggestTargets(smiles, molProps, 5) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [smiles, molProps?.isValid],
+  );
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
@@ -1867,6 +1876,89 @@ export function HakaseAI() {
                             <span className="text-violet-500">uniprot.org</span> by searching the protein or gene name.
                           </span>
                         </div>
+
+                        {/* Molecule-aware target suggestions */}
+                        {targetSuggestions.length > 0 && (
+                          <div className="mt-2 rounded-xl border border-violet-500/20 bg-violet-500/5 overflow-hidden">
+                            <button
+                              onClick={() => setTargetSuggOpen(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-violet-300 hover:bg-violet-500/8 transition-colors"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-violet-400" />
+                                <span>Molecule-Based Target Suggestions</span>
+                                <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-[9px]">{targetSuggestions.length}</span>
+                              </div>
+                              <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${targetSuggOpen ? "rotate-180" : ""}`} />
+                            </button>
+                            {targetSuggOpen && (
+                              <div className="px-2 pb-2 space-y-1.5">
+                                <p className="text-[9px] text-slate-500 px-1 pb-1">
+                                  Ranked by structural and physicochemical match to your molecule. Click <span className="text-violet-400 font-medium">Use</span> to set a UniProt ID.
+                                </p>
+                                {targetSuggestions.map((sugg, i) => {
+                                  const barColor = sugg.color === "violet" ? "bg-violet-500"  :
+                                                   sugg.color === "blue"   ? "bg-blue-500"    :
+                                                   sugg.color === "emerald"? "bg-emerald-500" :
+                                                   sugg.color === "amber"  ? "bg-amber-500"   :
+                                                   sugg.color === "red"    ? "bg-red-500"     :
+                                                                             "bg-cyan-500";
+                                  const badgeColor = sugg.color === "violet" ? "bg-violet-500/15 text-violet-300 border-violet-500/25"  :
+                                                     sugg.color === "blue"   ? "bg-blue-500/15 text-blue-300 border-blue-500/25"        :
+                                                     sugg.color === "emerald"? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25":
+                                                     sugg.color === "amber"  ? "bg-amber-500/15 text-amber-300 border-amber-500/25"     :
+                                                     sugg.color === "red"    ? "bg-red-500/15 text-red-300 border-red-500/25"           :
+                                                                               "bg-cyan-500/15 text-cyan-300 border-cyan-500/25";
+                                  return (
+                                    <div key={sugg.uniprotId}
+                                      className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1.5 hover:border-white/15 transition-colors"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border font-mono ${badgeColor}`}>
+                                            {sugg.geneName}
+                                          </span>
+                                          <span className="text-[10px] font-medium text-slate-300 leading-tight">{sugg.fullName}</span>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            setUniprotId(sugg.uniprotId);
+                                            setProteinInfo(null);
+                                            setProteinError(null);
+                                          }}
+                                          className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/35 transition-all"
+                                        >
+                                          Use
+                                        </button>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[9px] text-slate-500">
+                                        <span className="text-slate-600">{sugg.targetClass}</span>
+                                        <span className="text-slate-700">·</span>
+                                        <span className="text-slate-600">{sugg.area}</span>
+                                      </div>
+                                      {/* Confidence bar */}
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="flex-1 h-0.5 rounded-full bg-white/8">
+                                          <div className={`h-full rounded-full ${barColor} opacity-70`} style={{ width: `${(sugg.confidence * 100).toFixed(0)}%` }} />
+                                        </div>
+                                        <span className="text-[9px] text-slate-600 w-6 text-right">{(sugg.confidence * 100).toFixed(0)}%</span>
+                                      </div>
+                                      {/* Rationale bullets */}
+                                      <ul className="space-y-0.5">
+                                        {sugg.rationale.map((r, ri) => (
+                                          <li key={ri} className="flex items-start gap-1 text-[9px] text-slate-500 leading-relaxed">
+                                            <span className="shrink-0 mt-0.5 text-slate-700">→</span>
+                                            <span>{r}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Result card */}
                         {proteinInfo && (
