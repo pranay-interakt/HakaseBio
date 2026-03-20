@@ -708,6 +708,7 @@ export function HakaseAI() {
   const runSimulation = useCallback(async () => {
     if (!molProps?.isValid) return;
 
+    setSidebarOpen(false);
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
@@ -2113,6 +2114,61 @@ export function HakaseAI() {
                   </CollapsibleSection>
                 </div>
 
+                {/* L1 → L2 Cascade Preview + Recommendations */}
+                <div className="px-5 pb-3 space-y-3">
+                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
+                      <span className="text-[11px] font-semibold text-violet-300">L1 → L2 Cascade Preview</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">These molecular properties will auto-populate Layer 2 Animal Cohort configuration:</p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                      {[
+                        ["MW",         simResults ? `${simResults.lipinski.mw.toFixed(0)} Da`                      : "pending"],
+                        ["LogP",       simResults ? simResults.lipinski.logP.toFixed(2)                              : "pending"],
+                        ["TPSA",       simResults ? `${simResults.lipinski.tpsa.toFixed(0)} Å²`                     : "pending"],
+                        ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`             : "pending"],
+                        ["Toxicity",   simResults ? `${(simResults.admet.toxicity   * 100).toFixed(0)}%`             : "pending"],
+                        ["Go/No-Go",   simResults ? simResults.goNogo                                                 : "pending"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-1">
+                          <span className="text-slate-500">{k}</span>
+                          <span className={v === "pending" ? "text-slate-600 italic" : "text-violet-300 font-semibold"}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* L1 Recommendations */}
+                  {(() => {
+                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
+                    if (!smiles)       recs.push({ text: "Enter a SMILES string to begin molecular simulation.", level: "info" });
+                    else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
+                    if (simResults) {
+                      if (simResults.admet.toxicity > 0.6)    recs.push({ text: "High toxicity signal — consider structural optimization to reduce hERG/CYP3A4 liability before animal studies.", level: "warn" });
+                      if (simResults.lipinski.logP > 5)        recs.push({ text: "LogP > 5 exceeds Lipinski limit — oral bioavailability may be low. Plan formulation strategies in L2.", level: "warn" });
+                      if (simResults.lipinski.mw > 500)        recs.push({ text: "MW > 500 Da — consider lead optimization to improve membrane permeability.", level: "warn" });
+                      if (simResults.admet.absorption < 0.45)  recs.push({ text: "Low predicted absorption — review TPSA and HBD count. Bioisostere substitutions may improve F%.", level: "warn" });
+                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Clean physicochemical profile — well-positioned for in vivo translation to L2.", level: "ok" });
+                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 Animal Cohort to project FIH dose and system exposure.", level: "ok" });
+                      else if (simResults.goNogo === "WATCH") recs.push({ text: "WATCH decision — proceed with caution and monitor flagged liabilities in L2.", level: "info" });
+                    }
+                    if (recs.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Recommendations</p>
+                        {recs.map((r, i) => (
+                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
+                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
+                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
+                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
+                          }`}>{r.text}</div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Run Button */}
                 <div id="demo-run-l1" className="p-5 border-t border-white/8 mt-auto">
                   <Button
@@ -2362,35 +2418,68 @@ export function HakaseAI() {
                     </section>
                   )}
 
-                  {/* Layer 1 handoff summary */}
-                  {simResults && (
-                    <section>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Database className="w-3.5 h-3.5 text-violet-400" />
-                        <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Layer 1 Handoff</span>
+                  {/* L1 → L2 Cascade Applied */}
+                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
+                      <span className="text-[11px] font-semibold text-violet-300">
+                        {simResults ? "Layer 1 → Layer 2 Cascade Applied" : "Layer 1 → Layer 2 Cascade Pending"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {simResults
+                        ? `Molecular properties from ${simResults.molName} are informing this animal simulation:`
+                        : "Complete Layer 1 first. Molecular properties will auto-populate animal PK parameters."}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
+                      {[
+                        ["Compound",   simResults ? simResults.molName                                        : "–"],
+                        ["MW",         simResults ? `${simResults.lipinski.mw.toFixed(0)} Da`                 : "–"],
+                        ["LogP",       simResults ? simResults.lipinski.logP.toFixed(2)                        : "–"],
+                        ["TPSA",       simResults ? `${simResults.lipinski.tpsa.toFixed(0)} Å²`               : "–"],
+                        ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`       : "–"],
+                        ["Go/No-Go",   simResults ? simResults.goNogo                                           : "–"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-1">
+                          <span className="text-slate-500">{k}</span>
+                          <span className={v === "–" ? "text-slate-600" : "text-violet-300 font-semibold"}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* L2 Recommendations */}
+                  {(() => {
+                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
+                    if (!simResults) {
+                      recs.push({ text: "Run Layer 1 (Molecular) first to unlock animal PK simulation.", level: "info" });
+                    } else {
+                      if (simResults.admet.toxicity > 0.6) recs.push({ text: "High L1 toxicity — choose a species with higher metabolic tolerance (e.g. beagle dog) and use a conservative starting dose.", level: "warn" });
+                      if (simResults.lipinski.logP > 5)    recs.push({ text: "High LogP compounds often show poor aqueous solubility. Consider lipid-based or nanoparticle formulations in L2.", level: "warn" });
+                      if (simResults.lipinski.logP < 0)    recs.push({ text: "Very low LogP may limit tissue distribution. IV dosing in the animal study will give cleaner PK data.", level: "info" });
+                      if (simResults.goNogo === "NO-GO")   recs.push({ text: "L1 returned NO-GO. Animal study data may support re-assessment if structural liabilities are formulation-addressable.", level: "warn" });
+                    }
+                    if (animalResults) {
+                      if (animalResults.humanHalfLife < 2)   recs.push({ text: "Very short projected human t½ < 2 h — multiple daily doses or modified-release formulation likely required.", level: "warn" });
+                      if (animalResults.humanHalfLife > 24)  recs.push({ text: "Long projected t½ > 24 h — QD dosing feasible; monitor accumulation in renally-impaired patients in L3.", level: "ok" });
+                      if (animalResults.formulationResult.formulatedF < 0.4) recs.push({ text: "Low formulated bioavailability — explore nanocrystal, solid dispersion, or self-emulsifying strategies.", level: "warn" });
+                      if (animalResults.noael < 3 * animalResults.fihDoseMgKg) recs.push({ text: "Narrow NOAEL safety margin (< 3× FIH dose) — consider a more conservative starting dose in L3.", level: "warn" });
+                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Animal PK complete — parameters are cascading to L3 Patient Cohort with allometric scaling applied.", level: "ok" });
+                    }
+                    if (recs.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Recommendations</p>
+                        {recs.map((r, i) => (
+                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
+                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
+                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
+                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
+                          }`}>{r.text}</div>
+                        ))}
                       </div>
-                      <div className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/15 space-y-1.5">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-slate-500">Compound</span>
-                          <span className="text-violet-300 font-medium">{simResults.molName}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-slate-500">MW</span>
-                          <span className="text-slate-300">{simResults.lipinski.mw.toFixed(1)} Da</span>
-                        </div>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-slate-500">LogP</span>
-                          <span className="text-slate-300">{simResults.lipinski.logP.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-slate-500">ADMET toxicity</span>
-                          <span className={`font-medium ${simResults.admet.toxicity > 0.6 ? "text-red-400" : simResults.admet.toxicity > 0.35 ? "text-amber-400" : "text-emerald-400"}`}>
-                            {(simResults.admet.toxicity * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      </div>
-                    </section>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 <div id="demo-run-l2" className="p-5 border-t border-white/8 mt-auto">
@@ -2480,6 +2569,36 @@ export function HakaseAI() {
                       </div>
                     </div>
                   )}
+
+                  {/* L3 Recommendations */}
+                  {(() => {
+                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
+                    if (!animalResults) {
+                      recs.push({ text: "Run Layers 1 & 2 first. Animal study results will cascade here and inform patient PK/PD parameters.", level: "info" });
+                    } else if (!cohortResults) {
+                      recs.push({ text: "Review the cascaded dose and PK parameters above before running. Adjust patient demographics and disease severity as needed.", level: "info" });
+                      if (animalResults.humanHalfLife < 4)  recs.push({ text: "Short projected t½ — BID or TID dosing is auto-selected. Verify patients can comply with frequent dosing in this indication.", level: "info" });
+                      if (cohortSize[0] < 100)              recs.push({ text: "Small cohort size may underpower subgroup analyses. Consider ≥ 200 patients for reliable PK variability estimates.", level: "info" });
+                    } else {
+                      if (cohortResults.responderRate < 0.40) recs.push({ text: "Low predicted responder rate (< 40%) — revisit indication alignment and consider patient stratification by biomarker status.", level: "warn" });
+                      if (cohortResults.dltRate > 0.20)       recs.push({ text: "Elevated DLT rate (> 20%) — consider starting at 50% of the FIH dose in the escalation scheme.", level: "warn" });
+                      if (cohortResults.dltRate < 0.10 && cohortResults.responderRate > 0.60) recs.push({ text: "Excellent efficacy/safety profile — strong foundation for Phase II design in L4.", level: "ok" });
+                      if (cohortResults.halfLifeHr > 0 && cohortResults.halfLifeHr < 6) recs.push({ text: "Short effective half-life in the cohort — document PK rationale for dosing interval in your IND application.", level: "info" });
+                    }
+                    if (recs.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Recommendations</p>
+                        {recs.map((r, i) => (
+                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
+                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
+                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
+                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
+                          }`}>{r.text}</div>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* 3.1 Indication */}
                   <section>
@@ -2941,6 +3060,69 @@ export function HakaseAI() {
                 </div>
 
                 <div className="p-5 space-y-5">
+                  {/* L3 → L4 Cascade Banner */}
+                  <div className="rounded-xl border border-blue-500/25 bg-blue-500/6 p-3.5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                      <span className="text-[11px] font-semibold text-blue-300">
+                        {cohortResults ? "Layer 3 → Layer 4 Cascade Applied" : "Layer 3 → Layer 4 Cascade Pending"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {cohortResults
+                        ? "Patient Cohort PK/PD results are informing trial design and statistical power:"
+                        : "Complete Layers 1–3 first. Cohort PK/PD results will auto-populate trial parameters."}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
+                      {[
+                        ["Responder Rate",  cohortResults ? `${(cohortResults.responderRate * 100).toFixed(0)}%`  : "–"],
+                        ["DLT Rate",        cohortResults ? `${(cohortResults.dltRate * 100).toFixed(0)}%`        : "–"],
+                        ["Cmax (ng/mL)",    cohortResults ? cohortResults.cmax.toFixed(2)                         : "–"],
+                        ["t½ (h)",          cohortResults ? cohortResults.halfLifeHr.toFixed(1)                   : "–"],
+                        ["AUC (ng·h/mL)",   cohortResults ? cohortResults.auc.toFixed(0)                         : "–"],
+                        ["Vdss (L/kg)",     cohortResults ? cohortResults.vdss.toFixed(2)                         : "–"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-1">
+                          <span className="text-slate-500">{k}</span>
+                          <span className={v === "–" ? "text-slate-600" : "text-blue-300 font-semibold"}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* L4 Recommendations */}
+                  {(() => {
+                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
+                    if (!cohortResults) {
+                      recs.push({ text: "Run Layers 1, 2, and 3 first. Cohort results will cascade here to inform sample size and power calculations.", level: "info" });
+                    } else {
+                      if (cohortResults.responderRate < 0.35)  recs.push({ text: "Low responder rate from L3 — increase sample size or broaden inclusion criteria to achieve adequate statistical power.", level: "warn" });
+                      if (cohortResults.dltRate > 0.25)        recs.push({ text: "High DLT rate (> 25%) from L3 — consider Phase I dose escalation before moving to Phase II efficacy testing.", level: "warn" });
+                      if (trialPhase === "Phase I" || trialPhase === "Phase I/II") recs.push({ text: "Phase I focus: define the DLT window (typically Cycle 1, 28 days), document PK sampling schedule, and pre-specify dose escalation rules.", level: "info" });
+                      if (trialPhase === "Phase II" || trialPhase === "Phase II/III") recs.push({ text: "Phase II: pre-specify your primary endpoint, specify an interim futility analysis, and document the Bayesian or frequentist adaptation rules.", level: "info" });
+                      if (trialPhase === "Phase III") recs.push({ text: "Phase III: ensure the MCID aligns with your regulatory discussion. Document all multiplicity adjustments in the SAP.", level: "info" });
+                      if (adaptiveEnabled) recs.push({ text: "Adaptive design enabled — pre-specify adaptation rules, blinding protocols, and DMC charter in the Statistical Analysis Plan.", level: "info" });
+                      if (cohortResults.dltRate < 0.10 && cohortResults.responderRate > 0.55) recs.push({ text: "Strong L3 efficacy/safety profile — consider accelerated approval pathway discussion with regulatory agency.", level: "ok" });
+                    }
+                    if (trialResults) {
+                      if (trialResults.power < 0.80)  recs.push({ text: `Simulated power (${(trialResults.power * 100).toFixed(0)}%) is below 80% — increase sample size or widen primary endpoint window.`, level: "warn" });
+                      if (trialResults.power >= 0.80) recs.push({ text: `Statistical power target met (${(trialResults.power * 100).toFixed(0)}%) — design is well-powered for the primary endpoint.`, level: "ok" });
+                    }
+                    if (recs.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Recommendations</p>
+                        {recs.map((r, i) => (
+                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
+                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
+                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
+                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
+                          }`}>{r.text}</div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   {/* 4.1 Trial Design */}
                   <section>
                     <SectionHeader icon={GitBranch} label="Trial Design Parameters" />
