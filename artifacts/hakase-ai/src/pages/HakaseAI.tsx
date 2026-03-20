@@ -823,7 +823,7 @@ export function HakaseAI() {
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
 
       const fetchPromise = Promise.allSettled([
-        fetchFAERSSignals(layer1.similarDrugs[0] ?? layer1.molName),
+        toxOn ? fetchFAERSSignals(layer1.similarDrugs[0] ?? layer1.molName) : Promise.resolve(undefined),
         fetchPDParameters(layer1.similarDrugs, layer1.lipinski.mw, seedH),
       ]);
 
@@ -889,7 +889,7 @@ export function HakaseAI() {
           if (target) {
             setExtDbLoading(true);
             Promise.allSettled([
-              uniprotId ? fetchBindingDB(uniprotId) : Promise.resolve(null),
+              (bindingOn && uniprotId) ? fetchBindingDB(uniprotId) : Promise.resolve(null),
               gene ? fetchStringInteractions(gene) : Promise.resolve(null),
               gene ? fetchKEGGPathways(gene) : Promise.resolve(null),
               uniprotId ? fetchReactomePathways(uniprotId) : Promise.resolve(null),
@@ -936,7 +936,8 @@ export function HakaseAI() {
       proteinInfo, indication,
       cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
-      powerTarget, dropoutRate, numArms, adaptiveEnabled]);
+      powerTarget, dropoutRate, numArms, adaptiveEnabled,
+      bindingOn, toxOn]);
 
   const handleDiagenFetch = useCallback(() => {
     if (!diagenJobId.trim()) return;
@@ -5710,19 +5711,32 @@ function Layer1Results({
       </div>
 
 
+      {/* Confidence threshold warning */}
+      {simResults && simResults.confidence < confidenceThreshold[0] && (
+        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-[10px] text-amber-300 leading-relaxed">
+            <span className="font-semibold">Below confidence threshold</span> — simulation confidence {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold. Results are indicative; consider refining the structure.
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
         {[
-          { id: "admet", label: "ADMET Radar", icon: Activity },
-          { id: "binding", label: "Binding", icon: Microscope },
-          { id: "toxicity", label: "Toxicity", icon: Shield },
-          { id: "batch", label: "Batch Table", icon: BarChart3 },
-        ].map(({ id, label, icon: Icon }) => (
+          { id: "admet",    label: "ADMET Radar", icon: Activity,   disabled: false },
+          { id: "binding",  label: "Binding",     icon: Microscope, disabled: !bindingOn },
+          { id: "toxicity", label: "Toxicity",    icon: Shield,     disabled: !toxOn },
+          { id: "batch",    label: "Batch Table", icon: BarChart3,  disabled: false },
+        ].map(({ id, label, icon: Icon, disabled }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id)}
+            onClick={() => !disabled && setActiveTab(id)}
+            title={disabled ? `${label} is disabled — enable it in Simulation Options` : undefined}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
-              activeTab === id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
+              disabled
+                ? "text-slate-700 cursor-not-allowed line-through"
+                : activeTab === id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
             }`}
           >
             <Icon className="w-3 h-3" />
@@ -5731,10 +5745,26 @@ function Layer1Results({
         ))}
       </div>
 
-      {activeTab === "admet"    && <ADMETRadarChart admet={simResults?.admet ?? null} molProps={molProps} />}
-      {activeTab === "binding"  && <BindingHeatmap  binding={simResults?.binding ?? null} uniprotId={simResults?.uniprotId ?? ""} />}
-      {activeTab === "toxicity" && <ToxicityPanel   organs={simResults?.organs ?? null} toxAlerts={simResults?.toxAlerts ?? null} />}
-      {activeTab === "batch"    && <BatchTable       simResults={simResults} molName={simResults?.molName ?? "Molecule"} />}
+      {activeTab === "admet" && <ADMETRadarChart admet={simResults?.admet ?? null} molProps={molProps} />}
+      {activeTab === "binding" && (
+        bindingOn
+          ? <BindingHeatmap binding={simResults?.binding ?? null} uniprotId={simResults?.uniprotId ?? ""} />
+          : <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+              <Microscope className="w-6 h-6" />
+              <p className="text-[11px]">Binding Simulation is disabled</p>
+              <p className="text-[10px]">Enable it in Simulation Options to see binding data</p>
+            </div>
+      )}
+      {activeTab === "toxicity" && (
+        toxOn
+          ? <ToxicityPanel organs={simResults?.organs ?? null} toxAlerts={simResults?.toxAlerts ?? null} />
+          : <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+              <Shield className="w-6 h-6" />
+              <p className="text-[11px]">Toxicity Signal Detection is disabled</p>
+              <p className="text-[10px]">Enable it in Simulation Options to see FAERS signals</p>
+            </div>
+      )}
+      {activeTab === "batch" && <BatchTable simResults={simResults} molName={simResults?.molName ?? "Molecule"} />}
 
       {/* Export Options */}
       <div className="flex gap-2 justify-end">
