@@ -1744,7 +1744,7 @@ export function HakaseAI() {
                   <Separator className="bg-white/8" />
 
                   {/* 2.2 Target Protein */}
-                  <section>
+                  <section id="demo-target-protein">
                     <SectionHeader icon={Dna} label="Target Protein Configuration" />
                     <div className="space-y-3">
 
@@ -1946,7 +1946,7 @@ export function HakaseAI() {
                   <Separator className="bg-white/8" />
 
                   {/* 2.3 Simulation Options */}
-                  <section>
+                  <section id="demo-sim-options">
                     <SectionHeader icon={Settings2} label="Simulation Options" />
                     <div className="space-y-2.5">
                       <ToggleRow
@@ -2084,7 +2084,7 @@ export function HakaseAI() {
               </div>
 
               {/* Output Panel — Layer 1 */}
-              <div className="flex-1 overflow-y-auto p-5">
+              <div id="demo-results" className="flex-1 overflow-y-auto p-5">
                 {simStatus[1] === "idle" && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
