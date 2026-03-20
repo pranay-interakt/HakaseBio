@@ -2501,6 +2501,9 @@ export function HakaseAI() {
                       pdbId={pdbId}
                       alphafoldPlddt={alphafoldData?.meanPlddt ?? null}
                       proteinName={proteinInfo?.name ?? ""}
+                      bindingOn={bindingOn}
+                      toxOn={toxOn}
+                      confidenceThreshold={confidenceThreshold}
                     />
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
@@ -5647,6 +5650,7 @@ function Layer1Results({
   molProps, simResults, indication,
   l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
+  bindingOn, toxOn, confidenceThreshold,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
@@ -5660,6 +5664,9 @@ function Layer1Results({
   pdbId?: string;
   alphafoldPlddt?: number | null;
   proteinName?: string;
+  bindingOn: boolean;
+  toxOn: boolean;
+  confidenceThreshold: number[];
 }) {
   const [activeTab, setActiveTab] = useState("admet");
 
