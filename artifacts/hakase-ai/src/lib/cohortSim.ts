@@ -69,6 +69,14 @@ function hashStr(s: string): number {
   return h;
 }
 
+// PK parameter overrides derived from Layer 2 animal study allometric scaling
+export interface L2PkOverrides {
+  bioavailF?:       number;   // formulation-adjusted F% (0–1) from formulationResult.formulatedF
+  humanHalfLifeHr?: number;   // allometrically-projected human t½ (h) — used to blend PBPK output
+  humanCmaxNgMl?:  number;   // projected Cmax at FIH dose for PD calibration
+  humanAucNgHMl?:  number;   // projected AUC — used to derive CL for Vd calculation
+}
+
 export function runCohortSimulation(
   simResults:    SimResults,
   cohortSize:    number,
@@ -79,12 +87,14 @@ export function runCohortSimulation(
   severity:      string,
   pdParams?:     PDParameters,
   faersResult?:  FAERSResult,
+  l2pk?:         L2PkOverrides,
 ): CohortResults {
   const seed    = hashStr(simResults.smiles + String(cohortSize));
   const { absorption, distribution, metabolism, excretion } = simResults.admet;
   const { mw, logP, tpsa, hbd } = simResults.lipinski;
   const routeIV = routeOfAdmin === "IV Bolus" || routeOfAdmin === "IV Infusion";
-  const bioavail = routeIV ? 1.0 : absorption;
+  // L2 formulation-adjusted bioavailability overrides L1 ADMET score when available
+  const bioavail = routeIV ? 1.0 : (l2pk?.bioavailF ?? absorption);
   const doseInMg = startingDose || 100;
 
   // ── NHANES population summary ─────────────────────────────────────────────
@@ -107,7 +117,20 @@ export function runCohortSimulation(
   };
   const pk = runPBPK(drugParams, patientParams);
 
-  const { pkCurve, cmax, tmax, auc, halfLifeHr, vdss, clearance } = pk;
+  // When L2 animal data is available, blend the PBPK half-life with the
+  // allometrically-scaled human projection (weighted 40/60 toward L2 — measured > modelled).
+  const rawHalfLife = l2pk?.humanHalfLifeHr != null
+    ? 0.4 * pk.halfLifeHr + 0.6 * l2pk.humanHalfLifeHr
+    : pk.halfLifeHr;
+
+  // If L2 gives a projected Cmax, blend it into the PBPK Cmax for PD calibration
+  const blendedCmax = l2pk?.humanCmaxNgMl != null
+    ? 0.4 * pk.cmax + 0.6 * l2pk.humanCmaxNgMl
+    : pk.cmax;
+
+  const { pkCurve, tmax, auc, vdss, clearance } = pk;
+  const halfLifeHr = rawHalfLife;
+  const cmax = blendedCmax;
 
   // ── PD Response: Emax model ───────────────────────────────────────────────
   let responderBase: number;

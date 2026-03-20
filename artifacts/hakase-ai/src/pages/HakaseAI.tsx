@@ -15,7 +15,7 @@ import {
   fetchUniProt, fetchPdbStructure, fetchAlphaFold,
   type ProteinInfo, type PdbStructure, type AlphafoldPrediction,
 } from "@/lib/proteinApi";
-import { runCohortSimulation, type CohortResults } from "@/lib/cohortSim";
+import { runCohortSimulation, type CohortResults, type L2PkOverrides } from "@/lib/cohortSim";
 import { fetchFAERSSignals } from "@/lib/faersApi";
 import { fetchPDParameters } from "@/lib/pdModel";
 import { runTrialSimulation, type TrialResults } from "@/lib/trialSim";
@@ -727,8 +727,44 @@ export function HakaseAI() {
           clearInterval(interval2);
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
-          // Auto-populate Layer 3 starting dose from FIH dose
-          setStartingDose(results.fihDoseMgKg.toFixed(2));
+
+          // ── Full L2 → L3 cascade ──────────────────────────────────────
+          // Starting dose: FIH mg/kg (conservative 1/10 HED)
+          setStartingDose(results.fihDoseMgKg.toFixed(3));
+          setDoseUnit("mg/kg");
+
+          // Human projected half-life drives dosing frequency
+          const t12 = results.humanHalfLife;
+          setHalfLife(t12.toFixed(1));
+          setDosingFreq(t12 < 8 ? "BID" : t12 < 20 ? "QD" : "QD");
+
+          // Route of admin: map animal route to human equivalent
+          const routeMap: Record<string, string> = {
+            "Oral": "Oral", "IV": "IV Bolus", "SC": "Subcutaneous",
+            "IM": "Intramuscular", "Topical": "Transdermal", "Inhalation": "Oral",
+          };
+          setRouteOfAdmin(routeMap[results.routeOfAdmin] ?? "Oral");
+
+          // Formulation-adjusted oral bioavailability → absorption probability
+          setAbsorptionProb(Math.min(0.99, results.formulationResult.formulatedF).toFixed(2));
+
+          // Compute human PK from allometric projection:
+          // CL (L/h) = FIH_dose_mg × 1000 / humanAUC_ng·h/mL  (units: L/h for 70 kg)
+          // Vd (L/kg) = CL × t½ / (ln2 × BW)
+          const humanCL_Lh = (results.fihDose * 1000) / Math.max(1, results.humanAuc);
+          const humanVd_Lkg = (humanCL_Lh * t12) / (0.693 * 70);
+          setDistribVolume(Math.max(0.3, Math.min(50, humanVd_Lkg)).toFixed(1));
+
+          // Renal clearance: total CL × renal fraction (from L1 excretion score if available)
+          const renalFrac = simResults
+            ? Math.min(0.9, Math.max(0.1, simResults.admet.excretion))
+            : 0.35;
+          setRenalClearance(String(Math.round((humanCL_Lh * 1000 / 60) * renalFrac)));
+
+          // Disease severity: mirror animal overall risk level
+          setSeverity(results.overallRisk === "high" ? "Severe" : results.overallRisk === "low" ? "Mild" : "Moderate");
+          // ─────────────────────────────────────────────────────────────
+
           setSimProgress(100);
           setSimStatus(prev => ({ ...prev, 2: "complete" }));
           // ── Layer 2 external DB enrichment ──────────────────────────────
@@ -770,10 +806,17 @@ export function HakaseAI() {
       const faersResult = faersSettled.status === "fulfilled" ? faersSettled.value : undefined;
       const pdParams    = pdSettled.status === "fulfilled"    ? pdSettled.value    : undefined;
 
+      const l2pk: L2PkOverrides | undefined = animalResults ? {
+        bioavailF:       animalResults.formulationResult.formulatedF,
+        humanHalfLifeHr: animalResults.humanHalfLife,
+        humanCmaxNgMl:   animalResults.humanCmax,
+        humanAucNgHMl:   animalResults.humanAuc,
+      } : undefined;
+
       const results = runCohortSimulation(
         layer1, cohortSize[0], Number(startingDose) || 100,
         routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
-        pdParams, faersResult,
+        pdParams, faersResult, l2pk,
       );
       setCohortResults(results);
       setSimProgress(100);
@@ -830,9 +873,16 @@ export function HakaseAI() {
         } else {
           // Layer 4: Trial
           const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
+            bioavailF:       animalResults.formulationResult.formulatedF,
+            humanHalfLifeHr: animalResults.humanHalfLife,
+            humanCmaxNgMl:   animalResults.humanCmax,
+            humanAucNgHMl:   animalResults.humanAuc,
+          } : undefined;
           const layer3 = cohortResults ?? runCohortSimulation(
             layer1, cohortSize[0], Number(startingDose) || 100,
             routeOfAdmin, dosingFreq, [ageRange[0], ageRange[1]], severity,
+            undefined, undefined, l2pkFallback,
           );
           const results = runTrialSimulation(
             layer1, layer3, trialPhase, primaryEndpointName,
@@ -2402,6 +2452,35 @@ export function HakaseAI() {
                 </div>
 
                 <div className="p-5 space-y-5">
+
+                  {/* L2 → L3 cascade banner */}
+                  {animalResults && (
+                    <div className="rounded-xl border border-amber-500/25 bg-amber-500/6 p-3.5 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        <span className="text-[11px] font-semibold text-amber-300">Layer 2 → Layer 3 Cascade Applied</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Parameters below were auto-populated from your Animal Cohort results ({animalResults.species.displayName} study, {animalResults.routeOfAdmin} route):
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
+                        {[
+                          ["FIH Starting Dose",    `${animalResults.fihDoseMgKg.toFixed(3)} mg/kg`],
+                          ["Human t½ (projected)", `${animalResults.humanHalfLife.toFixed(1)} h`],
+                          ["Bioavailability (F%)", `${(animalResults.formulationResult.formulatedF * 100).toFixed(0)}%`],
+                          ["Route of Admin.",      routeOfAdmin],
+                          ["Dosing Frequency",     dosingFreq],
+                          ["Disease Severity",     severity],
+                        ].map(([k, v]) => (
+                          <div key={k} className="flex justify-between gap-1">
+                            <span className="text-slate-500">{k}</span>
+                            <span className="text-amber-300 font-semibold">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* 3.1 Indication */}
                   <section>
                     <SectionHeader icon={Target} label="Indication & Disease" />
