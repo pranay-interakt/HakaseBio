@@ -1955,23 +1955,20 @@ export function HakaseAI() {
                           )}
                         </div>
 
-                        {/* Format guide */}
-                        <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                          {[
-                            { id: "P00533", label: "EGFR" },
-                            { id: "P01116", label: "KRAS" },
-                            { id: "P11802", label: "CDK4" },
-                            { id: "Q06187", label: "BTK" },
-                          ].map(({ id, label }) => (
-                            <button
-                              key={id}
-                              onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(id); setProteinInfo(null); setProteinError(null); }}
-                              className="text-[9px] text-slate-600 hover:text-violet-400 transition-colors font-mono"
-                            >
-                              {id} <span className="text-slate-700 not-italic">({label})</span>
-                            </button>
-                          ))}
-                        </div>
+                        {/* Quick-select from molecule-matched suggestions */}
+                        {targetSuggestions.length > 0 && (
+                          <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                            {targetSuggestions.slice(0, 4).map(sugg => (
+                              <button
+                                key={sugg.uniprotId}
+                                onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setProteinInfo(null); setProteinError(null); }}
+                                className={`text-[9px] transition-colors font-mono ${uniprotId === sugg.uniprotId ? "text-violet-400" : "text-slate-600 hover:text-violet-400"}`}
+                              >
+                                {sugg.uniprotId} <span className={`not-italic ${uniprotId === sugg.uniprotId ? "text-violet-500" : "text-slate-700"}`}>({sugg.geneName})</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
                         <div className="flex gap-2">
                           <div className="relative flex-1">
