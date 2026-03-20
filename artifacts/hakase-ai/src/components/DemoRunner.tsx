@@ -231,7 +231,7 @@ export function DemoRunner({
     },
     {
       id: "end",
-      title: "Demo Complete · 4 Layers, ~90 Seconds",
+      title: "Demo Complete · All 4 Layers",
       body: "You just ran a complete drug development simulation — from SMILES string to trial verdict — entirely in the browser with no server-side computation. This is HakaseAI: BioDigital Twin for drug discovery.",
       position: "center",
       icon: "🚀",
