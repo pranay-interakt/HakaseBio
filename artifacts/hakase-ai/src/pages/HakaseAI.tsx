@@ -121,7 +121,11 @@ export function HakaseAI() {
   const [projImportSource, setProjImportSource] = useState("clinicaltrials");
   const [projImportId, setProjImportId] = useState("");
   const [projImportLoading, setProjImportLoading] = useState(false);
-  const [projImportResult, setProjImportResult] = useState<{ name: string; indication: string; phase: string; sponsor: string } | null>(null);
+  const [projImportResult, setProjImportResult] = useState<{
+    name: string; indication: string; phase: string; sponsor: string;
+    enrollment?: number | null; nctId?: string | null;
+    abstract?: string;
+  } | null>(null);
   const [savedProjects, setSavedProjects] = useState([
     {
       name: "CDK4/6 Inhibitor Screen",
@@ -962,43 +966,89 @@ export function HakaseAI() {
     }, delay);
   }, [diagenJobId, diagenMode]);
 
-  const handleProjFetch = useCallback(() => {
-    if (!projImportId.trim()) return;
+  const handleProjFetch = useCallback(async () => {
+    const id = projImportId.trim();
+    if (!id) return;
     setProjImportLoading(true);
     setProjImportResult(null);
-    const mockDb: Record<string, Record<string, { name: string; indication: string; phase: string; sponsor: string }>> = {
-      clinicaltrials: {
-        "nct04292899": { name: "Osimertinib NSCLC Study",    indication: "Non-small-cell lung carcinoma", phase: "Phase III", sponsor: "AstraZeneca" },
-        "nct03410134": { name: "KRAS G12C Inhibitor AMG510", indication: "Colorectal / NSCLC",          phase: "Phase II", sponsor: "Amgen" },
-        "nct02395913": { name: "CDK4/6 + Letrozole HR+ BC",  indication: "Breast Cancer (HR+/HER2-)",   phase: "Phase III", sponsor: "Novartis" },
-        "nct01772004": { name: "Pembrolizumab NSCLC",        indication: "Non-small-cell lung carcinoma", phase: "Phase II", sponsor: "Merck" },
-        "nct03505866": { name: "BTK Inhibitor CLL Trial",    indication: "Chronic lymphocytic leukemia", phase: "Phase III", sponsor: "AbbVie" },
-      },
-      ehr: {
-        "pat-001": { name: "EGFR-T790M Cohort Study",     indication: "NSCLC",         phase: "Real-World", sponsor: "Internal EHR" },
-        "pat-002": { name: "HER2+ Breast Cohort",         indication: "Breast Cancer", phase: "Real-World", sponsor: "Internal EHR" },
-        "study-007": { name: "GI Toxicity Assessment",   indication: "Colorectal",    phase: "Observational", sponsor: "Site LIMS" },
-      },
-      lims: {
-        "lims-2024-001": { name: "Compound Library Screen A", indication: "Oncology", phase: "Pre-clinical", sponsor: "Internal R&D" },
-        "lims-2024-012": { name: "ADMET Panel Q1-2024",       indication: "Multiple",  phase: "Pre-clinical", sponsor: "DMPK Dept." },
-      },
-      pubmed: {
-        "36150754": { name: "Erlotinib Resistance Mechanisms", indication: "NSCLC",        phase: "Literature", sponsor: "Dana-Farber" },
-        "34555354": { name: "KRAS G12C Covalent Inhibitors",   indication: "Solid Tumors", phase: "Literature", sponsor: "UCSF / Nature" },
-        "33004079": { name: "Osimertinib vs Gefitinib",        indication: "EGFR+ NSCLC",  phase: "Literature", sponsor: "NEJM" },
-      },
-    };
-    setTimeout(() => {
-      const sourceDb = mockDb[projImportSource] ?? {};
-      const hit = sourceDb[projImportId.toLowerCase().trim()];
-      if (hit) {
-        setProjImportResult(hit);
+
+    function ctgParsePhase(phases: string[] | string | null | undefined): string {
+      if (!phases) return "Unknown";
+      const arr = Array.isArray(phases) ? phases : [phases];
+      const p = arr[0] ?? "";
+      return p.replace(/^PHASE_?/i, "Phase ").replace(/_/g, " ").trim() || "Unknown";
+    }
+
+    try {
+      if (projImportSource === "clinicaltrials") {
+        // ── ClinicalTrials.gov v2 API — fetch by NCT ID ──────────────────────
+        const nctId = id.toUpperCase().replace(/\s/g, "");
+        const res = await fetch(
+          `https://clinicaltrials.gov/api/v2/studies/${nctId}?format=json`,
+        );
+        if (!res.ok) throw new Error(`Study ${nctId} not found on ClinicalTrials.gov (${res.status})`);
+        const data = await res.json();
+        const ps = data.protocolSection ?? {};
+        const id_mod   = ps.identificationModule ?? {};
+        const cond_mod = ps.conditionsModule ?? {};
+        const des_mod  = ps.designModule ?? {};
+        const spon_mod = ps.sponsorCollaboratorsModule ?? {};
+        setProjImportResult({
+          name:       id_mod.briefTitle ?? nctId,
+          indication: (cond_mod.conditions ?? [])[0] ?? "Unknown",
+          phase:      ctgParsePhase(des_mod.phases),
+          sponsor:    spon_mod.leadSponsor?.name ?? "Unknown",
+          enrollment: des_mod.enrollmentInfo?.count ?? null,
+          nctId,
+        });
+
+      } else if (projImportSource === "pubmed") {
+        // ── NCBI E-utilities — fetch PubMed article by PMID ─────────────────
+        const pmid = id.replace(/\D/g, "");
+        if (!pmid) throw new Error("Enter a valid PubMed ID (numbers only)");
+        const res = await fetch(
+          `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmid}&retmode=json`,
+        );
+        if (!res.ok) throw new Error(`PubMed: failed to fetch PMID ${pmid} (${res.status})`);
+        const data = await res.json();
+        const article = (data.result ?? {})[pmid] as Record<string, any> | undefined;
+        if (!article || article.error) throw new Error(`PubMed: article ${pmid} not found`);
+        const firstAuthor = (article.authors as any[])?.[0]?.name ?? "Unknown";
+        setProjImportResult({
+          name:       article.title ?? `PubMed PMID ${pmid}`,
+          indication: article.source ?? "Journal Article",
+          phase:      "Literature",
+          sponsor:    `${firstAuthor} · ${article.source ?? ""}`,
+          abstract:   article.sortpubdate ?? undefined,
+        });
+
+      } else if (projImportSource === "ehr") {
+        // EHR/Epic — simulated (requires institutional OAuth integration)
+        await new Promise(r => setTimeout(r, 600));
+        const mock: Record<string, { name: string; indication: string; phase: string; sponsor: string; enrollment: number }> = {
+          "pat-001":   { name: "EGFR-T790M Cohort",      indication: "Non-small-cell lung carcinoma", phase: "Real-World Evidence", sponsor: "Internal EHR",  enrollment: 142 },
+          "pat-002":   { name: "HER2+ Breast Cohort",    indication: "Breast Cancer (HER2+)",         phase: "Real-World Evidence", sponsor: "Internal EHR",  enrollment: 87 },
+          "study-007": { name: "GI Toxicity Assessment", indication: "Colorectal Cancer",             phase: "Observational",       sponsor: "Site LIMS",     enrollment: 63 },
+        };
+        const hit = mock[id.toLowerCase()];
+        setProjImportResult(hit ?? { name: `EHR Study ${id.toUpperCase()}`, indication: "Oncology", phase: "Real-World Evidence", sponsor: "EHR Import" });
+
       } else {
-        setProjImportResult({ name: `Project-${projImportId.toUpperCase()}`, indication: "Oncology", phase: "Phase II", sponsor: "Imported" });
+        // LIMS — simulated (requires institutional API key)
+        await new Promise(r => setTimeout(r, 600));
+        const mock: Record<string, { name: string; indication: string; phase: string; sponsor: string; enrollment: number }> = {
+          "lims-2024-001": { name: "Compound Library Screen A", indication: "Oncology",         phase: "Pre-clinical", sponsor: "Internal R&D",  enrollment: 0 },
+          "lims-2024-012": { name: "ADMET Panel Q1-2024",       indication: "Multiple targets", phase: "Pre-clinical", sponsor: "DMPK Dept.",    enrollment: 0 },
+        };
+        const hit = mock[id.toLowerCase()];
+        setProjImportResult(hit ?? { name: `LIMS Study ${id.toUpperCase()}`, indication: "Drug Discovery", phase: "Pre-clinical", sponsor: "Internal R&D" });
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Import failed — check the ID and try again.";
+      setProjImportResult({ name: "Import Error", indication: msg, phase: "—", sponsor: "—" });
+    } finally {
       setProjImportLoading(false);
-    }, 800);
+    }
   }, [projImportSource, projImportId]);
 
   const handleApiFetch = useCallback(async () => {
@@ -1016,6 +1066,25 @@ export function HakaseAI() {
       setApiLoading(false);
     }
   }, [apiSource, apiCompoundId]);
+
+  const handleNewProject = useCallback(() => {
+    // Reset molecule / compound
+    setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
+    setMolName("New-Compound-001");
+    setUniprotId("P00533");
+    setPdbId("4HJO");
+    setProteinInfo(null);
+    setPdbStructure(null);
+    // Reset all simulation results
+    setSimResults(null);
+    setAnimalResults(null);
+    setCohortResults(null);
+    setTrialResults(null);
+    setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
+    setSimProgress(0);
+    // Reset to Layer 1 so the user starts from the beginning
+    setActiveLayer(1);
+  }, []);
 
   const toggleTissue = (tissue: string) => {
     setTissueTypes(prev =>
@@ -1296,7 +1365,10 @@ export function HakaseAI() {
                   );
                 })}
 
-                <button className="w-full mt-3 py-2 text-[11px] text-violet-400 hover:text-violet-300 border border-dashed border-violet-500/30 hover:border-violet-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                <button
+                  onClick={handleNewProject}
+                  className="w-full mt-3 py-2 text-[11px] text-violet-400 hover:text-violet-300 border border-dashed border-violet-500/30 hover:border-violet-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
                   <Plus className="w-3 h-3" /> New Project
                 </button>
 
@@ -1365,37 +1437,57 @@ export function HakaseAI() {
 
                       {/* Result */}
                       {projImportResult && (
-                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-2">
-                          <div className="text-[11px] font-semibold text-emerald-300 leading-tight">{projImportResult.name}</div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">{projImportResult.indication}</div>
-                          <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[9px] text-slate-600">{projImportResult.phase} · {projImportResult.sponsor}</span>
-                            <button
-                              onClick={() => {
-                                setSavedProjects(prev => [{
-                                  name: projImportResult.name,
-                                  indication: projImportResult.indication,
-                                  indicationCode: projImportResult.indication,
-                                  molName: "Imported",
-                                  smiles: "",
-                                  uniprotId: "",
-                                  layers: 0,
-                                  goNogo: "WATCH" as const,
-                                  qed: 0,
-                                  binding: "—",
-                                  responderRate: null,
-                                  successProb: null,
-                                  lastRun: "Just now",
-                                }, ...prev]);
-                                setProjImportOpen(false);
-                                setProjImportResult(null);
-                                setProjImportId("");
-                              }}
-                              className="flex items-center gap-0.5 px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[10px] font-medium transition-all"
-                            >
-                              <CheckCircle2 className="w-2.5 h-2.5" /> Add
-                            </button>
-                          </div>
+                        <div className={`rounded-lg p-2.5 space-y-1.5 border ${projImportResult.name === "Import Error" ? "bg-red-500/5 border-red-500/20" : "bg-emerald-500/5 border-emerald-500/20"}`}>
+                          <div className={`text-[11px] font-semibold leading-snug ${projImportResult.name === "Import Error" ? "text-red-300" : "text-emerald-300"}`}>{projImportResult.name}</div>
+                          {projImportResult.name === "Import Error" ? (
+                            <div className="text-[10px] text-red-400">{projImportResult.indication}</div>
+                          ) : (
+                            <>
+                              <div className="text-[10px] text-slate-400 leading-snug">{projImportResult.indication}</div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-slate-600">
+                                <span>{projImportResult.phase}</span>
+                                <span>{projImportResult.sponsor}</span>
+                                {projImportResult.enrollment != null && projImportResult.enrollment > 0 && (
+                                  <span>n={projImportResult.enrollment.toLocaleString()}</span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (projImportResult.indication && projImportResult.indication !== "—") {
+                                    setIndication(projImportResult.indication);
+                                  }
+                                  if (projImportResult.phase && projImportResult.phase !== "—" && projImportResult.phase !== "Literature" && projImportResult.phase !== "Unknown") {
+                                    setTrialPhase(projImportResult.phase);
+                                  }
+                                  if (projImportResult.enrollment && projImportResult.enrollment > 0) {
+                                    setTargetSampleSize(String(projImportResult.enrollment));
+                                  }
+                                  setSavedProjects(prev => [{
+                                    name: projImportResult.name,
+                                    indication: projImportResult.indication,
+                                    indicationCode: projImportResult.indication,
+                                    molName: "Imported",
+                                    smiles: "",
+                                    uniprotId: "",
+                                    layers: 0,
+                                    goNogo: "WATCH" as const,
+                                    qed: 0,
+                                    binding: "—",
+                                    responderRate: null,
+                                    successProb: null,
+                                    lastRun: "Just now",
+                                  }, ...prev]);
+                                  setActiveLayer(1);
+                                  setProjImportOpen(false);
+                                  setProjImportResult(null);
+                                  setProjImportId("");
+                                }}
+                                className="w-full flex items-center justify-center gap-1 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[10px] font-medium transition-all"
+                              >
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Use — Load into Simulation
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
