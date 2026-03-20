@@ -220,6 +220,16 @@ export function DemoRunner({
       layerColor: "emerald",
     },
     {
+      id: "full-ai-report",
+      title: "Full AI Report · Cross-Layer Intelligence",
+      body: "Click \"Full AI Report\" to generate a comprehensive Claude-powered analysis synthesizing all 4 layers — molecular safety, preclinical findings, patient cohort outcomes, and trial projections — into a single structured report with GO/NO-GO rationale, risk flags, and recommended next steps. Available after any layer completes.",
+      targetId: "demo-full-ai-report",
+      position: "bottom",
+      autoSecs: 9,
+      icon: "✨",
+      layerColor: "violet",
+    },
+    {
       id: "end",
       title: "Demo Complete · 4 Layers, ~90 Seconds",
       body: "You just ran a complete drug development simulation — from SMILES string to trial verdict — entirely in the browser with no server-side computation. This is HakaseAI: BioDigital Twin for drug discovery.",
@@ -293,7 +303,7 @@ export function DemoRunner({
   const calloutStyle = useMemo(() => {
     if (!spotRect || currentStep.position === "center" || !currentStep.targetId) return {};
     const PAD = 16;
-    const CARD_W = 340;
+    const CARD_W = 420;
     const pos = currentStep.position ?? "bottom";
 
     if (pos === "bottom") {
@@ -342,7 +352,7 @@ export function DemoRunner({
 
       {/* Callout card */}
       <div
-        className={`fixed z-[999] w-[340px] rounded-2xl border bg-[#0d0f17]/98 backdrop-blur-xl shadow-2xl shadow-black/80 ${
+        className={`fixed z-[999] w-[420px] rounded-2xl border bg-[#0d0f17]/98 backdrop-blur-xl shadow-2xl shadow-black/80 ${
           isCentered ? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" : ""
         }`}
         style={isCentered ? {} : { ...calloutStyle, position: "fixed" }}

@@ -1086,6 +1086,7 @@ export function HakaseAI() {
           <button
             onClick={() => { setFullAiOpen(true); if (!aiReport && !aiLoading) runAiAnalysis(); }}
             disabled={!simResults}
+            id="demo-full-ai-report"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
           >
             <Sparkles className="w-3.5 h-3.5" /> Full AI Report
