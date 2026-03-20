@@ -265,3 +265,175 @@
     inset: -1px;
   }
 }
+
+/* ── HakaseAI Light Mode ─────────────────────────────────────────────────── */
+
+.hk-light {
+  --hk-bg:         #f5f7fa;
+  --hk-surface:    #ffffff;
+  --hk-surface2:   #f0f2f8;
+  --hk-surface3:   #e8ebf4;
+  --hk-border:     #d1d8e8;
+  --hk-border2:    #c5cde0;
+  --hk-text:       #111827;
+  --hk-text2:      #374151;
+  --hk-text3:      #6b7280;
+  --hk-text4:      #9ca3af;
+  background-color: var(--hk-bg) !important;
+  color: var(--hk-text) !important;
+}
+
+/* Header & sidebar chrome */
+.hk-light header {
+  background-color: var(--hk-surface) !important;
+  border-color: var(--hk-border) !important;
+}
+.hk-light aside {
+  background-color: var(--hk-surface2) !important;
+  border-color: var(--hk-border) !important;
+}
+
+/* Every panel/card that uses the dark hex backgrounds */
+.hk-light [class*="bg-[#07080c]"],
+.hk-light [class*="bg-[#0d0f17]"],
+.hk-light [class*="bg-[#0d0f1a]"],
+.hk-light [class*="bg-[#080a12]"],
+.hk-light [class*="bg-[#0b0d14]"] {
+  background-color: var(--hk-surface) !important;
+}
+
+/* Semi-transparent white surfaces → light equivalents */
+.hk-light [class*="bg-white/3"],
+.hk-light [class*="bg-white/5"] {
+  background-color: var(--hk-surface2) !important;
+}
+.hk-light [class*="bg-white/8"],
+.hk-light [class*="bg-white/10"] {
+  background-color: var(--hk-surface3) !important;
+}
+.hk-light [class*="bg-white/15"],
+.hk-light [class*="bg-white/20"] {
+  background-color: #dde2ef !important;
+}
+
+/* Slate/dark tinted surfaces */
+.hk-light [class*="bg-slate-900"],
+.hk-light [class*="bg-slate-800"],
+.hk-light [class*="bg-slate-950"] {
+  background-color: var(--hk-surface) !important;
+}
+.hk-light [class*="bg-slate-800/"] {
+  background-color: var(--hk-surface2) !important;
+}
+
+/* Main scroll areas */
+.hk-light main,
+.hk-light [class*="overflow-y-auto"]:not(aside) {
+  background-color: var(--hk-bg);
+}
+
+/* Borders */
+.hk-light [class*="border-white/8"],
+.hk-light [class*="border-white/10"],
+.hk-light [class*="border-white/5"],
+.hk-light [class*="border-white/15"],
+.hk-light [class*="border-white/20"] {
+  border-color: var(--hk-border) !important;
+}
+.hk-light [class*="border-white/25"],
+.hk-light [class*="border-white/30"],
+.hk-light [class*="border-white/40"],
+.hk-light [class*="border-white/50"] {
+  border-color: var(--hk-border2) !important;
+}
+.hk-light [class*="border-slate-700"],
+.hk-light [class*="border-slate-800"],
+.hk-light [class*="border-slate-600"] {
+  border-color: var(--hk-border) !important;
+}
+
+/* Text colours */
+.hk-light [class*="text-white"] {
+  color: var(--hk-text) !important;
+}
+.hk-light [class*="text-slate-100"],
+.hk-light [class*="text-slate-200"],
+.hk-light [class*="text-slate-300"] {
+  color: var(--hk-text2) !important;
+}
+.hk-light [class*="text-slate-400"] {
+  color: var(--hk-text3) !important;
+}
+.hk-light [class*="text-slate-500"],
+.hk-light [class*="text-slate-600"] {
+  color: var(--hk-text4) !important;
+}
+.hk-light [class*="text-slate-700"] {
+  color: #6b7280 !important;
+}
+
+/* Inputs */
+.hk-light input,
+.hk-light textarea,
+.hk-light select {
+  background-color: var(--hk-surface) !important;
+  color: var(--hk-text) !important;
+  border-color: var(--hk-border) !important;
+}
+.hk-light input::placeholder,
+.hk-light textarea::placeholder {
+  color: var(--hk-text4) !important;
+}
+
+/* Active/hover surfaces in nav */
+.hk-light [class*="hover:bg-white/5"]:hover,
+.hk-light [class*="hover:bg-white/8"]:hover,
+.hk-light [class*="hover:bg-white/10"]:hover {
+  background-color: var(--hk-surface3) !important;
+}
+
+/* Separator / dividers */
+.hk-light [class*="divide-white"],
+.hk-light hr {
+  border-color: var(--hk-border) !important;
+}
+
+/* Shadows */
+.hk-light [class*="shadow-black"] {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10) !important;
+}
+
+/* Tab row that uses bg-white/5 as container */
+.hk-light [class*="bg-white/5"].rounded-lg,
+.hk-light [class*="bg-white/8"].rounded-lg,
+.hk-light [class*="bg-white/10"].rounded-lg {
+  background-color: var(--hk-surface3) !important;
+}
+
+/* Backdrop blur headers should be solid in light mode */
+.hk-light [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  background-color: var(--hk-surface) !important;
+}
+
+/* Keep accent colours intact for all layer/status indicators */
+.hk-light [class*="text-violet"],
+.hk-light [class*="text-amber"],
+.hk-light [class*="text-blue"],
+.hk-light [class*="text-emerald"],
+.hk-light [class*="text-red"],
+.hk-light [class*="text-green"],
+.hk-light [class*="text-yellow"] {
+  /* inherit accent — do not override */
+}
+
+/* Scrollbar */
+.hk-light ::-webkit-scrollbar-track {
+  background: var(--hk-surface2);
+}
+.hk-light ::-webkit-scrollbar-thumb {
+  background: var(--hk-border2);
+}
+.hk-light ::-webkit-scrollbar-thumb:hover {
+  background: #a0abc4;
+}

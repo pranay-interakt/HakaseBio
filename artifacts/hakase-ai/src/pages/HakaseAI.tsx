@@ -62,7 +62,8 @@ import {
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
-  TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight
+  TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
+  Sun, Moon
 } from "lucide-react";
 
 type Layer = 1 | 2 | 3 | 4;
@@ -100,6 +101,7 @@ export function HakaseAI() {
   });
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [lightMode, setLightMode] = useState(false);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
   const [diagenOpen, setDiagenOpen] = useState(false);
@@ -1167,7 +1169,7 @@ export function HakaseAI() {
   const layerColors = ["violet", "amber", "blue", "emerald"] as const;
 
   return (
-    <div className="h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className={`h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']${lightMode ? " hk-light" : ""}`} style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Top Navigation Bar */}
       <header className="h-14 border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md flex items-center px-4 gap-4 shrink-0 z-50">
         {/* Logo */}
@@ -1242,6 +1244,13 @@ export function HakaseAI() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
           >
             <Sparkles className="w-3.5 h-3.5" /> Full AI Report
+          </button>
+          <button
+            onClick={() => setLightMode(lm => !lm)}
+            title={lightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            {lightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </button>
           <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
             <Bell className="w-4 h-4" />
