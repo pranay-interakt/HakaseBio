@@ -94,8 +94,8 @@ export function DemoRunner({
     },
     {
       id: "l1-run",
-      title: "Layer 1 · Running Molecular Simulation",
-      body: "Launching the full Layer 1 pipeline now: RDKit molecular descriptors, 5-axis ADMET scoring, QSAR-estimated binding affinity against EGFR, organ-risk heat-map, and a GO / WATCH / NO-GO decision tree.",
+      title: "Layer 1 · Running In Vitro Simulation",
+      body: "Launching the full Layer 1 pipeline: in vitro assay simulation (IC50 dose-response, Caco-2 permeability, metabolic clearance, hERG safety, selectivity panel) plus directional ADMET scoring and GO / WATCH / NO-GO decision tree.",
       targetId: "demo-run-l1",
       position: "top",
       onEnter: () => { setTimeout(() => runSimulation(), 400); },
@@ -106,7 +106,7 @@ export function DemoRunner({
     {
       id: "results-explained",
       title: "Results · What You're Seeing",
-      body: "The right panel now shows: GO/NO-GO verdict with rationale, QED drug-likeness score (0–1), ADMET axis scores (Absorption, Distribution, Metabolism, Excretion, Toxicity), estimated binding affinity in nM, Lipinski Rule-of-5 compliance, organ-risk flags, and an AI-generated analysis. Every metric links to its scientific source.",
+      body: "The right panel now shows: GO/NO-GO verdict, in vitro score, IC50 dose-response curve, Caco-2 permeability, metabolic clearance with CYP panel, hERG channel safety, selectivity profile, and a collapsible directional ADMET radar. Every metric derives from the molecular structure.",
       targetId: "demo-results",
       position: "center",
       autoSecs: 8,
@@ -116,7 +116,7 @@ export function DemoRunner({
     {
       id: "l1-complete",
       title: "Layer 1 Complete · GO Verdict",
-      body: "The molecule passed all ADMET thresholds. Binding affinity estimated at ~8 nM for EGFR. Lipinski compliant with QED > 0.7. The Molecular Digital Twin gives a GO verdict — safe to advance to preclinical species studies.",
+      body: "The molecule passed in vitro safety screening. IC50 in the nanomolar range for EGFR, good Caco-2 permeability, acceptable hERG margin, and a favourable selectivity profile. The In Vitro Digital Twin gives a GO verdict — safe to advance to preclinical species studies.",
       targetId: "demo-layer-nav",
       position: "bottom",
       autoSecs: 6,
@@ -222,7 +222,7 @@ export function DemoRunner({
     {
       id: "full-ai-report",
       title: "Full AI Report · Cross-Layer Intelligence",
-      body: "Click \"Full AI Report\" to generate a comprehensive Claude-powered analysis synthesizing all 4 layers — molecular safety, preclinical findings, patient cohort outcomes, and trial projections — into a single structured report with GO/NO-GO rationale, risk flags, and recommended next steps. Available after any layer completes.",
+      body: "Click \"Full AI Report\" to generate a comprehensive Claude-powered analysis synthesizing all 4 layers — in vitro assay data, preclinical findings, patient cohort outcomes, and trial projections — into a single structured report with GO/NO-GO rationale, risk flags, and recommended next steps. Available after any layer completes.",
       targetId: "demo-full-ai-report",
       position: "bottom",
       autoSecs: 9,

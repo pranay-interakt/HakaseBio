@@ -37,6 +37,7 @@ import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
 import { suggestTargets, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -461,6 +462,7 @@ export function HakaseAI() {
   const [syntheticDataSources, setSyntheticDataSources] = useState<string[]>(["MIMIC-IV"]);
 
   const [simResults,    setSimResults]    = useState<SimResults | null>(null);
+  const [inVitroResults, setInVitroResults] = useState<InVitroResults | null>(null);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
@@ -721,6 +723,7 @@ export function HakaseAI() {
     setUniprotId(proj.uniprotId);
     setIndication(proj.indicationCode);
     setSimResults(null);
+    setInVitroResults(null);
     setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
@@ -885,6 +888,8 @@ export function HakaseAI() {
         if (activeLayer === 1) {
           const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
           setSimResults(results);
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId);
+          setInVitroResults(ivResults);
           // ── Layer 1 external DB enrichment ──────────────────────────────
           const gene = proteinInfo?.gene ?? "";
           const target = gene || uniprotId;
@@ -1102,6 +1107,7 @@ export function HakaseAI() {
     setPdbStructure(null);
     // Reset all simulation results
     setSimResults(null);
+    setInVitroResults(null);
     setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
@@ -1164,8 +1170,8 @@ export function HakaseAI() {
     return "disabled";
   };
 
-  const layerIcons = [FlaskConical, Rabbit, Users, Beaker] as const;
-  const layerLabels = ["Molecular", "Animal Cohort", "Patient Cohort", "Trial"] as const;
+  const layerIcons = [TestTube2, Rabbit, Users, Beaker] as const;
+  const layerLabels = ["In Vitro", "Animal Cohort", "Patient Cohort", "Trial"] as const;
   const layerColors = ["violet", "amber", "blue", "emerald"] as const;
 
   return (
@@ -1527,15 +1533,15 @@ export function HakaseAI() {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col overflow-hidden">
 
-          {/* Layer 1 — Molecular Digital Twin */}
+          {/* Layer 1 — In Vitro Digital Twin */}
           {activeLayer === 1 && (
             <div className="flex-1 flex overflow-hidden">
               {/* Input Panel */}
               <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
-                    <FlaskConical className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 1 — Molecular Digital Twin</h2>
+                    <TestTube2 className="w-4 h-4 text-violet-400" />
+                    <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure molecular structure and simulation parameters</p>
                 </div>
@@ -2410,7 +2416,7 @@ export function HakaseAI() {
                     ) : !rdkitReady ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
                     ) : (
-                      <><Play className="w-4 h-4" /> Run Molecular Simulation</>
+                      <><Play className="w-4 h-4" /> Run In Vitro Simulation</>
                     )}
                   </Button>
                   <p className="text-[10px] text-slate-600 text-center mt-2">
@@ -2425,7 +2431,7 @@ export function HakaseAI() {
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                        <FlaskConical className="w-7 h-7 text-violet-400/50" />
+                        <TestTube2 className="w-7 h-7 text-violet-400/50" />
                       </div>
                       <div className="text-center">
                         <div className="text-[14px] font-medium text-slate-400">No simulation results yet</div>
@@ -2462,7 +2468,7 @@ export function HakaseAI() {
                     <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
                       <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
                     </div>
-                    <div className="text-[14px] font-medium text-white">Running Molecular Simulation</div>
+                    <div className="text-[14px] font-medium text-white">Running In Vitro Simulation</div>
                     <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
                     <p className="text-[11px] text-slate-500">ADMET prediction · Binding analysis · Toxicity screening</p>
                   </div>
@@ -2491,6 +2497,7 @@ export function HakaseAI() {
                     <Layer1Results
                       molProps={molProps}
                       simResults={simResults}
+                      inVitroResults={inVitroResults}
                       indication={indication}
                       l1AiReport={l1AiReport}
                       l1AiLoading={l1AiLoading}
@@ -2660,8 +2667,8 @@ export function HakaseAI() {
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
                       {simResults
-                        ? `Molecular properties from ${simResults.molName} are informing this animal simulation:`
-                        : "Complete Layer 1 first. Molecular properties will auto-populate animal PK parameters."}
+                        ? `In vitro results from ${simResults.molName} are informing this animal simulation:`
+                        : "Complete Layer 1 (In Vitro) first. Assay results will auto-populate animal PK parameters."}
                     </p>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
                       {[
@@ -2684,7 +2691,7 @@ export function HakaseAI() {
                   {(() => {
                     const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
                     if (!simResults) {
-                      recs.push({ text: "Run Layer 1 (Molecular) first to unlock animal PK simulation.", level: "info" });
+                      recs.push({ text: "Run Layer 1 (In Vitro) first to unlock animal PK simulation.", level: "info" });
                     } else {
                       if (simResults.admet.toxicity > 0.6) recs.push({ text: "High L1 toxicity — choose a species with higher metabolic tolerance (e.g. beagle dog) and use a conservative starting dose.", level: "warn" });
                       if (simResults.lipinski.logP > 5)    recs.push({ text: "High LogP compounds often show poor aqueous solubility. Consider lipid-based or nanoparticle formulations in L2.", level: "warn" });
@@ -2727,7 +2734,7 @@ export function HakaseAI() {
                     )}
                   </Button>
                   {!simResults && (
-                    <p className="text-[10px] text-amber-700 text-center mt-2">Complete Layer 1 (Molecular) first</p>
+                    <p className="text-[10px] text-amber-700 text-center mt-2">Complete Layer 1 (In Vitro) first</p>
                   )}
                   <p className="text-[10px] text-slate-600 text-center mt-1">PBPK · Allometric scaling · NOAEL/MTD · FIH dose</p>
                 </div>
@@ -4288,7 +4295,7 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 
 // ── Layer AI Analysis Panel ───────────────────────────────────────────────
 const LAYER_AI_LABELS: Record<number, { title: string; subtitle: string; accent: string; border: string; badge: string; btn: string }> = {
-  1: { title: "Molecular AI Analysis", subtitle: "Medicinal chemistry · ADMET · Target engagement", accent: "text-violet-400", border: "border-violet-500/20", badge: "bg-violet-500/10 text-violet-400", btn: "bg-violet-600 hover:bg-violet-500" },
+  1: { title: "In Vitro AI Analysis", subtitle: "Assay data · Permeability · Clearance · Safety", accent: "text-violet-400", border: "border-violet-500/20", badge: "bg-violet-500/10 text-violet-400", btn: "bg-violet-600 hover:bg-violet-500" },
   2: { title: "Clinical PK/PD AI Analysis", subtitle: "PBPK · Cohort response · Adverse events · Dosing", accent: "text-blue-400", border: "border-blue-500/20", badge: "bg-blue-500/10 text-blue-400", btn: "bg-blue-600 hover:bg-blue-500" },
   3: { title: "Trial & Regulatory AI Analysis", subtitle: "Trial design · Power · Regulatory pathway · GO/NO-GO", accent: "text-emerald-400", border: "border-emerald-500/20", badge: "bg-emerald-500/10 text-emerald-400", btn: "bg-emerald-600 hover:bg-emerald-500" },
 };
@@ -5093,7 +5100,7 @@ function RegulatoryInsightCard({
   // ─────────────────────────────────────────────────────────────────────
 
   const subtitles: Record<number, string> = {
-    1: "Molecular & Preclinical Regulatory Flags",
+    1: "In Vitro & Preclinical Regulatory Flags",
     2: "Clinical Pharmacology Regulatory Package",
     3: "Development Pathway & Designation Strategy",
   };
@@ -5115,7 +5122,7 @@ function RegulatoryInsightCard({
         </div>
       </div>
 
-      {/* ── LAYER 1: Molecular / Preclinical ── */}
+      {/* ── LAYER 1: In Vitro / Preclinical ── */}
       {layer === 1 && (
         <div className="space-y-3">
           {/* Preclinical Flags */}
@@ -5647,13 +5654,14 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
 }
 
 function Layer1Results({
-  molProps, simResults, indication,
+  molProps, simResults, inVitroResults, indication,
   l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
   bindingOn, toxOn, confidenceThreshold,
 }: {
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
+  inVitroResults: InVitroResults | null;
   indication: string;
   l1AiReport: Record<string, unknown> | null;
   l1AiLoading: boolean;
@@ -5668,18 +5676,17 @@ function Layer1Results({
   toxOn: boolean;
   confidenceThreshold: number[];
 }) {
-  const [activeTab, setActiveTab] = useState("admet");
+  const [activeTab, setActiveTab] = useState("dose-response");
+  const [admetOpen, setAdmetOpen] = useState(false);
 
-  const goColor = simResults?.goNogo === "GO" ? "emerald" : simResults?.goNogo === "WATCH" ? "yellow" : "red";
+  const iv = inVitroResults;
+  const goColor = !iv ? "emerald" : iv.overallRisk === "Low" ? "emerald" : iv.overallRisk === "Moderate" ? "yellow" : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
                 : goColor === "yellow"  ? "from-yellow-950/60 to-yellow-900/30 border-yellow-500/25"
                 :                        "from-red-950/60 to-red-900/30 border-red-500/25";
   const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : "text-red-400";
   const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : "bg-red-400 shadow-red-400";
-
-  const binding = simResults?.binding;
-  const toxAlerts = simResults?.toxAlerts ?? [];
-  const toxRisk   = toxAlerts.some(a => a.severity === "High") ? "High" : toxAlerts.some(a => a.severity === "Medium") ? "Medium" : "Low";
+  const goLabel = !iv ? "PENDING" : iv.overallRisk === "Low" ? "GO" : iv.overallRisk === "Moderate" ? "WATCH" : "NO-GO";
 
   return (
     <div className="space-y-4">
@@ -5689,28 +5696,36 @@ function Layer1Results({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] ${glowCls}`} />
-              <span className={`text-[20px] font-bold ${goText}`}>{simResults?.goNogo ?? "GO"}</span>
+              <span className={`text-[20px] font-bold ${goText}`}>{goLabel}</span>
             </div>
-            <p className="text-[13px] text-white font-medium">{simResults?.recommendation ?? "Recommendation: Advance to Cohort Simulation"}</p>
-            <p className={`text-[11px] text-slate-400 mt-0.5`}>
-              Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "87.3"}%</span>
+            <p className="text-[13px] text-white font-medium">
+              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Animal Studies" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
             </p>
           </div>
           <div className="text-right">
-            <div className="text-[11px] text-slate-500 mb-2">Similar approved drugs</div>
+            <div className="text-[11px] text-slate-500 mb-2">Key metrics</div>
             <div className="flex gap-1.5 flex-wrap justify-end">
-              {(simResults?.similarDrugs ?? ["Erlotinib","Gefitinib","Osimertinib"]).map(d => (
-                <Badge key={d} className="text-[9px] bg-white/5 text-slate-400">{d}</Badge>
+              {iv && [
+                { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
+                { l: "Perm", v: iv.permeability.caco2Class },
+                { l: "hERG", v: iv.herg.riskCategory },
+              ].map(m => (
+                <Badge key={m.l} className="text-[9px] bg-white/5 text-slate-400">{m.l}: {m.v}</Badge>
               ))}
             </div>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "QED Score",        val: simResults ? simResults.qed.toFixed(3) : (molProps?.qed != null ? molProps.qed.toFixed(3) : "—"), good: (simResults?.qed ?? molProps?.qed ?? 0.5) > 0.5 },
-            { label: "Toxicity Risk",    val: toxRisk, good: toxRisk === "Low" },
-            { label: "Binding Affinity", val: binding ? `${binding.primaryKd.toFixed(1)} nM` : "—", good: (binding?.primaryKd ?? 999) < 100 },
-            { label: "logP",             val: molProps?.logP != null ? molProps.logP.toFixed(2) : "—", good: molProps?.lipinskiLogP ?? true },
+            { label: "IC50",         val: iv ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
+            { label: "Caco-2",       val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
+            { label: "CLint",        val: iv ? `${iv.metabolicStability.microsomalCLint.toFixed(1)} µL/min/mg` : "—", good: iv?.metabolicStability.microsomalClass !== "Unstable" },
+            { label: "fu%",          val: iv ? `${iv.plasmaProteinBinding.fuPercent.toFixed(1)}%` : "—", good: (iv?.plasmaProteinBinding.fuPercent ?? 0) > 5 },
+            { label: "hERG IC50",    val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
+            { label: "TI",           val: iv ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
           ].map(({ label, val, good }) => (
             <div key={label}>
               <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
@@ -5720,33 +5735,29 @@ function Layer1Results({
         </div>
       </div>
 
-
       {/* Confidence threshold warning */}
       {simResults && simResults.confidence < confidenceThreshold[0] && (
         <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
           <div className="text-[10px] text-amber-300 leading-relaxed">
-            <span className="font-semibold">Below confidence threshold</span> — simulation confidence {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold. Results are indicative; consider refining the structure.
+            <span className="font-semibold">Below confidence threshold</span> — simulation confidence {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold.
           </div>
         </div>
       )}
 
-      {/* Tabs */}
+      {/* In Vitro Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
         {[
-          { id: "admet",    label: "ADMET Radar", icon: Activity,   disabled: false },
-          { id: "binding",  label: "Binding",     icon: Microscope, disabled: !bindingOn },
-          { id: "toxicity", label: "Toxicity",    icon: Shield,     disabled: !toxOn },
-          { id: "batch",    label: "Batch Table", icon: BarChart3,  disabled: false },
-        ].map(({ id, label, icon: Icon, disabled }) => (
+          { id: "dose-response", label: "Dose-Response", icon: TrendingUp },
+          { id: "permeability",  label: "Permeability",  icon: Layers },
+          { id: "clearance",     label: "Clearance",     icon: Activity },
+          { id: "safety",        label: "Safety",        icon: Shield },
+        ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => !disabled && setActiveTab(id)}
-            title={disabled ? `${label} is disabled — enable it in Simulation Options` : undefined}
+            onClick={() => setActiveTab(id)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
-              disabled
-                ? "text-slate-700 cursor-not-allowed line-through"
-                : activeTab === id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
+              activeTab === id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
             }`}
           >
             <Icon className="w-3 h-3" />
@@ -5755,26 +5766,258 @@ function Layer1Results({
         ))}
       </div>
 
-      {activeTab === "admet" && <ADMETRadarChart admet={simResults?.admet ?? null} molProps={molProps} />}
-      {activeTab === "binding" && (
-        bindingOn
-          ? <BindingHeatmap binding={simResults?.binding ?? null} uniprotId={simResults?.uniprotId ?? ""} />
-          : <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
-              <Microscope className="w-6 h-6" />
-              <p className="text-[11px]">Binding Simulation is disabled</p>
-              <p className="text-[10px]">Enable it in Simulation Options to see binding data</p>
+      {/* Dose-Response Tab */}
+      {activeTab === "dose-response" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-slate-300">Dose-Response Curve</h3>
+            <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+              {iv.doseResponse.potencyClass} Potency
+            </Badge>
+          </div>
+          <svg viewBox="0 0 400 200" className="w-full h-auto">
+            <defs>
+              <linearGradient id="drGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            {[0, 25, 50, 75, 100].map(v => (
+              <g key={v}>
+                <line x1="50" y1={180 - v * 1.6} x2="390" y2={180 - v * 1.6} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                <text x="45" y={183 - v * 1.6} fill="#64748b" fontSize="8" textAnchor="end">{v}%</text>
+              </g>
+            ))}
+            {(() => {
+              const pts = iv.doseResponse.curve;
+              const minLog = -2, maxLog = 5;
+              const toX = (c: number) => 50 + ((Math.log10(Math.max(0.01, c)) - minLog) / (maxLog - minLog)) * 340;
+              const toY = (r: number) => 180 - (r / 100) * 160;
+              const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.concentration).toFixed(1)},${toY(p.response).toFixed(1)}`).join(" ");
+              const areaPath = linePath + ` L${toX(pts[pts.length - 1].concentration).toFixed(1)},180 L${toX(pts[0].concentration).toFixed(1)},180 Z`;
+              return (
+                <>
+                  <path d={areaPath} fill="url(#drGrad)" />
+                  <path d={linePath} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+                  {pts.map((p, i) => (
+                    <circle key={i} cx={toX(p.concentration)} cy={toY(p.response)} r="2" fill="#8b5cf6" />
+                  ))}
+                  <line x1={toX(iv.doseResponse.ic50_nM)} y1={20} x2={toX(iv.doseResponse.ic50_nM)} y2={180} stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" />
+                  <text x={toX(iv.doseResponse.ic50_nM)} y={16} fill="#f59e0b" fontSize="8" textAnchor="middle">IC50 = {iv.doseResponse.ic50_nM.toFixed(1)} nM</text>
+                </>
+              );
+            })()}
+            <text x="220" y="198" fill="#64748b" fontSize="8" textAnchor="middle">Concentration (nM, log scale)</text>
+          </svg>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
+              { l: "EC50", v: `${iv.doseResponse.ec50_nM.toFixed(1)} nM` },
+              { l: "Hill Coefficient", v: iv.doseResponse.hillCoefficient.toFixed(2) },
+              { l: "Max Inhibition", v: `${iv.doseResponse.maxInhibition.toFixed(1)}%` },
+            ].map(m => (
+              <div key={m.l} className="bg-white/5 rounded-lg p-2.5 text-center">
+                <div className="text-[9px] text-slate-500 uppercase">{m.l}</div>
+                <div className="text-[13px] font-bold text-violet-300 mt-0.5">{m.v}</div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white/5 rounded-lg p-3">
+            <div className="text-[10px] font-semibold text-slate-400 mb-2">Cell Viability ({iv.cellViability.cellLine})</div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><div className="text-[9px] text-slate-500">CC50</div><div className="text-[12px] font-semibold text-white">{iv.cellViability.cc50_uM.toFixed(1)} µM</div></div>
+              <div><div className="text-[9px] text-slate-500">Therapeutic Index</div><div className={`text-[12px] font-semibold ${iv.cellViability.therapeuticIndex > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.therapeuticIndex.toFixed(0)}×</div></div>
+              <div><div className="text-[9px] text-slate-500">Viability @10µM</div><div className={`text-[12px] font-semibold ${iv.cellViability.viabilityAt10uM > 80 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.viabilityAt10uM.toFixed(0)}%</div></div>
             </div>
+          </div>
+        </div>
       )}
-      {activeTab === "toxicity" && (
-        toxOn
-          ? <ToxicityPanel organs={simResults?.organs ?? null} toxAlerts={simResults?.toxAlerts ?? null} />
-          : <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
-              <Shield className="w-6 h-6" />
-              <p className="text-[11px]">Toxicity Signal Detection is disabled</p>
-              <p className="text-[10px]">Enable it in Simulation Options to see FAERS signals</p>
+
+      {/* Permeability Tab */}
+      {activeTab === "permeability" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <h3 className="text-[12px] font-semibold text-slate-300">Permeability & Absorption</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white/5 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-300">Caco-2 Papp</span>
+                <Badge className={`text-[9px] ${iv.permeability.caco2Class === "High" ? "bg-emerald-500/15 text-emerald-400" : iv.permeability.caco2Class === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>
+                  {iv.permeability.caco2Class}
+                </Badge>
+              </div>
+              <div className="text-[24px] font-bold text-white">{iv.permeability.caco2Papp.toFixed(1)}</div>
+              <div className="text-[9px] text-slate-500">×10⁻⁶ cm/s</div>
+              <div className="w-full bg-white/5 rounded-full h-2">
+                <div className={`h-2 rounded-full ${iv.permeability.caco2Class === "High" ? "bg-emerald-500" : iv.permeability.caco2Class === "Moderate" ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${Math.min(100, (iv.permeability.caco2Papp / 60) * 100)}%` }} />
+              </div>
             </div>
+            <div className="bg-white/5 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-300">PAMPA Pe</span>
+                <Badge className={`text-[9px] ${iv.permeability.pampaClass === "High" ? "bg-emerald-500/15 text-emerald-400" : iv.permeability.pampaClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>
+                  {iv.permeability.pampaClass}
+                </Badge>
+              </div>
+              <div className="text-[24px] font-bold text-white">{iv.permeability.pampaPe.toFixed(1)}</div>
+              <div className="text-[9px] text-slate-500">×10⁻⁶ cm/s</div>
+              <div className="w-full bg-white/5 rounded-full h-2">
+                <div className={`h-2 rounded-full ${iv.permeability.pampaClass === "High" ? "bg-emerald-500" : iv.permeability.pampaClass === "Moderate" ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${Math.min(100, (iv.permeability.pampaPe / 50) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 mb-1">Efflux Ratio</div>
+              <div className={`text-[16px] font-bold ${iv.permeability.effluxRatio < 2.5 ? "text-emerald-400" : "text-red-400"}`}>{iv.permeability.effluxRatio.toFixed(1)}</div>
+              <div className="text-[9px] text-slate-500 mt-0.5">{iv.permeability.effluxRatio < 2.5 ? "Not P-gp limited" : "P-gp efflux likely"}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 mb-1">P-gp Substrate</div>
+              <div className={`text-[16px] font-bold ${iv.permeability.pgpSubstrate ? "text-amber-400" : "text-emerald-400"}`}>{iv.permeability.pgpSubstrate ? "Yes" : "No"}</div>
+              <div className="text-[9px] text-slate-500 mt-0.5">{iv.permeability.pgpSubstrate ? "May limit oral absorption" : "No efflux concern"}</div>
+            </div>
+          </div>
+          <div className="bg-white/5 rounded-lg p-3">
+            <div className="text-[10px] font-semibold text-slate-400 mb-2">Plasma Protein Binding</div>
+            <div className="flex items-center gap-4">
+              <div>
+                <div className="text-[20px] font-bold text-white">{iv.plasmaProteinBinding.boundPercent.toFixed(1)}%</div>
+                <div className="text-[9px] text-slate-500">Bound</div>
+              </div>
+              <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden flex">
+                <div className="bg-violet-500/60 h-full" style={{ width: `${iv.plasmaProteinBinding.boundPercent}%` }} />
+                <div className="bg-emerald-500/40 h-full" style={{ width: `${iv.plasmaProteinBinding.fuPercent}%` }} />
+              </div>
+              <div>
+                <div className="text-[20px] font-bold text-emerald-400">{iv.plasmaProteinBinding.fuPercent.toFixed(1)}%</div>
+                <div className="text-[9px] text-slate-500">Free (fu)</div>
+              </div>
+            </div>
+            <div className="text-[9px] text-slate-500 mt-1 text-center">{iv.plasmaProteinBinding.bindingClass}</div>
+          </div>
+        </div>
       )}
-      {activeTab === "batch" && <BatchTable simResults={simResults} molName={simResults?.molName ?? "Molecule"} />}
+
+      {/* Clearance Tab */}
+      {activeTab === "clearance" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <h3 className="text-[12px] font-semibold text-slate-300">Metabolic Stability & CYP Panel</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { l: "Microsomal CLint", v: `${iv.metabolicStability.microsomalCLint.toFixed(1)}`, u: "µL/min/mg", cls: iv.metabolicStability.microsomalClass },
+              { l: "Hepatocyte CLint", v: `${iv.metabolicStability.hepatocyteCLint.toFixed(1)}`, u: "µL/min/10⁶", cls: iv.metabolicStability.hepatocyteClass },
+              { l: "t½ (microsomal)", v: `${iv.metabolicStability.halfLifeMin.toFixed(0)}`, u: "min", cls: iv.metabolicStability.microsomalClass },
+            ].map(m => (
+              <div key={m.l} className="bg-white/5 rounded-lg p-3 text-center">
+                <div className="text-[9px] text-slate-500 mb-1">{m.l}</div>
+                <div className={`text-[18px] font-bold ${m.cls === "Stable" ? "text-emerald-400" : m.cls === "Moderate" ? "text-yellow-400" : "text-red-400"}`}>{m.v}</div>
+                <div className="text-[8px] text-slate-600">{m.u}</div>
+                <Badge className={`mt-1 text-[8px] ${m.cls === "Stable" ? "bg-emerald-500/15 text-emerald-400" : m.cls === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>{m.cls}</Badge>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white/5 rounded-lg p-4">
+            <div className="text-[10px] font-semibold text-slate-400 mb-3">CYP Inhibition Panel</div>
+            <div className="space-y-2">
+              {Object.entries(iv.metabolicStability.cypInhibition).map(([enzyme, data]) => (
+                <div key={enzyme} className="flex items-center gap-3">
+                  <span className="text-[10px] text-slate-400 w-16 font-mono">{enzyme}</span>
+                  <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${data.risk === "Low" ? "bg-emerald-500/60" : data.risk === "Moderate" ? "bg-yellow-500/60" : "bg-red-500/60"}`}
+                      style={{ width: `${Math.min(100, (1 - data.ic50_uM / 50) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-300 w-16 text-right">{data.ic50_uM} µM</span>
+                  <Badge className={`text-[8px] w-16 justify-center ${data.risk === "Low" ? "bg-emerald-500/15 text-emerald-400" : data.risk === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>{data.risk}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Tab */}
+      {activeTab === "safety" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <h3 className="text-[12px] font-semibold text-slate-300">Safety Assessment</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-slate-300">hERG Channel</span>
+                <Badge className={`text-[9px] ${iv.herg.riskCategory === "Low" ? "bg-emerald-500/15 text-emerald-400" : iv.herg.riskCategory === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>
+                  {iv.herg.riskCategory} Risk
+                </Badge>
+              </div>
+              <div className="text-[24px] font-bold text-white mb-1">{iv.herg.ic50_uM.toFixed(2)} <span className="text-[12px] text-slate-400">µM</span></div>
+              <div className="text-[9px] text-slate-500 mb-2">{iv.herg.patchClampResult}</div>
+              <div className="flex justify-between text-[9px]">
+                <span className="text-slate-500">Safety Margin</span>
+                <span className={`font-semibold ${iv.herg.safetyMargin > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.herg.safetyMargin.toFixed(0)}×</span>
+              </div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-slate-300">Selectivity</span>
+                <Badge className={`text-[9px] ${iv.selectivity.selectivityClass === "Selective" ? "bg-emerald-500/15 text-emerald-400" : iv.selectivity.selectivityClass === "Moderately Selective" ? "bg-yellow-500/15 text-yellow-400" : "bg-red-500/15 text-red-400"}`}>
+                  {iv.selectivity.selectivityClass}
+                </Badge>
+              </div>
+              <div className="text-[24px] font-bold text-white mb-1">{(iv.selectivity.kinaseSelectivityScore * 100).toFixed(0)}<span className="text-[12px] text-slate-400">%</span></div>
+              <div className="text-[9px] text-slate-500 mb-2">{iv.selectivity.offTargetHits} off-target hits / {iv.selectivity.totalTargetsTested} tested</div>
+            </div>
+          </div>
+          {iv.selectivity.topOffTargets.length > 0 && (
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="text-[10px] font-semibold text-slate-400 mb-2">Top Off-Target Hits</div>
+              <div className="space-y-1.5">
+                {iv.selectivity.topOffTargets.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-300 font-medium">{t.name}</span>
+                    <div className="flex gap-3">
+                      <span className="text-slate-400">IC50: {t.ic50_nM.toFixed(0)} nM</span>
+                      <span className="text-slate-500">Ratio: {t.selectivityRatio.toFixed(0)}×</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "dose-response" && !iv && (
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
+          <TestTube2 className="w-8 h-8" />
+          <p className="text-[11px]">Run the simulation to generate in vitro assay data</p>
+        </div>
+      )}
+      {(activeTab === "permeability" || activeTab === "clearance" || activeTab === "safety") && !iv && (
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
+          <Activity className="w-8 h-8" />
+          <p className="text-[11px]">Run the simulation first</p>
+        </div>
+      )}
+
+      {/* Directional ADMET — collapsible */}
+      <div className="bg-[#0d0f17] border border-white/8 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAdmetOpen(o => !o)}
+          className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-[12px] font-semibold text-slate-300">Directional ADMET Indicators</span>
+            <Badge className="text-[8px] bg-violet-500/10 text-violet-400 border-violet-500/20">Computational</Badge>
+          </div>
+          {admetOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+        </button>
+        {admetOpen && (
+          <div className="px-5 pb-4">
+            <ADMETRadarChart admet={simResults?.admet ?? null} molProps={molProps} />
+          </div>
+        )}
+      </div>
 
       {/* Export Options */}
       <div className="flex gap-2 justify-end">
