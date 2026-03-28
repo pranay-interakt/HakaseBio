@@ -9,7 +9,7 @@ import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 const LAYERS = [
   {
     num: "01",
-    name: "Molecular Digital Twin",
+    name: "In Vitro Digital Twin",
     color: "violet",
     border: "border-violet-500/30",
     bg: "bg-violet-500/5",
@@ -192,7 +192,7 @@ export function Landing() {
           </div>
 
           {[
-            { label: "LAYER 1", sub: "Molecular Twin",    color: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5" },
+            { label: "LAYER 1", sub: "In Vitro Twin",      color: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5" },
             null,
             { label: "LAYER 2", sub: "Animal Cohort",     color: "text-amber-300",  border: "border-amber-500/20",  bg: "bg-amber-500/5"  },
             null,
@@ -346,7 +346,7 @@ export function Landing() {
               <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-3">The Validator</div>
               <h3 className="text-[22px] font-black text-white mb-3">BioDigital Twin</h3>
               <p className="text-[14px] text-slate-400 leading-relaxed">
-                Tests those molecules across four cascading layers — Molecular, Animal Cohort, Patient Cohort, and Trial —
+                Tests those molecules across four cascading layers — In Vitro, Animal Cohort, Patient Cohort, and Trial —
                 proving what will work before physical trials begin.
               </p>
             </div>
@@ -403,7 +403,7 @@ export function Landing() {
               <div className="flex gap-8">
                 <div className="shrink-0 w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400 z-10">L1</div>
                 <div className="flex-1 pt-1 pb-10 border-b border-white/5">
-                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · Molecular Digital Twin</div>
+                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · In Vitro Digital Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Is This Molecule Safe?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
                     Using RDKit.js and a browser-native QSAR engine, it predicts the full ADMET profile,
@@ -692,7 +692,7 @@ export function Landing() {
             <div className="rounded-2xl border border-violet-500/15 bg-violet-500/4 p-5">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-7 h-7 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[10px] font-black text-violet-400">L1</div>
-                <span className="text-[11px] font-semibold text-violet-400 uppercase tracking-widest">Molecular</span>
+                <span className="text-[11px] font-semibold text-violet-400 uppercase tracking-widest">In Vitro</span>
               </div>
               <div className="space-y-3">
                 {[

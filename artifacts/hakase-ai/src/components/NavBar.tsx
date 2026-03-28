@@ -37,7 +37,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
 
   const platformItems = [
     { label: "Overview",                     sub: "What BioDigital Twin is",                   anchor: "",        route: "",            color: "violet"  },
-    { label: "Layer 1 — Molecular",          sub: "ADMET · Binding · Go/No-Go",                anchor: "#layer1", route: "",            color: "violet"  },
+    { label: "Layer 1 — In Vitro",            sub: "ADMET · Binding · Go/No-Go",                anchor: "#layer1", route: "",            color: "violet"  },
     { label: "Layer 2 — Animal Cohort",      sub: "PBPK · Formulation · FIH Dose Scaling",     anchor: "#layer2", route: "",            color: "amber"   },
     { label: "Layer 3 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",       anchor: "#layer3", route: "",            color: "blue"    },
     { label: "Layer 4 — Trial Digital Twin", sub: "Power · Enrollment · Adaptive · Verdict",   anchor: "#layer4", route: "",            color: "emerald" },

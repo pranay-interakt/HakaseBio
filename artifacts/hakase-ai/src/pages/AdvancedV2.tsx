@@ -3,7 +3,7 @@ import { NavBar } from "@/components/NavBar";
 const LAYERS = [
   {
     id: "L1",
-    name: "Molecular Twin",
+    name: "In Vitro Twin",
     color: "violet" as const,
     upgrades: [
       {

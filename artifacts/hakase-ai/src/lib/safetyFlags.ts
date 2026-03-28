@@ -239,3 +239,89 @@ export const SAFETY_FLAG_ICONS: Record<SafetyFlagType, string> = {
   "high-grade-ae": "AlertTriangle",
   "subgroup-disparity": "Users",
 };
+
+export interface HAIOpsContext {
+  flags: SafetyFlag[];
+  overrides: SafetyOverride[];
+  provenance: Partial<Record<number, ProvenanceRecord>>;
+  dbStatus: Record<string, DatabaseQueryRecord>;
+  reviewAcknowledged: boolean;
+}
+
+export function createHAIOpsContext(): HAIOpsContext {
+  return {
+    flags: [],
+    overrides: [],
+    provenance: {},
+    dbStatus: {},
+    reviewAcknowledged: false,
+  };
+}
+
+export function mergeLayerProvenance(
+  ctx: HAIOpsContext,
+  layer: number,
+  prov: ProvenanceRecord
+): HAIOpsContext {
+  const next = { ...ctx, provenance: { ...ctx.provenance, [layer]: prov } };
+  const newDbStatus = { ...next.dbStatus };
+  for (const q of prov.databaseQueries) {
+    newDbStatus[q.database] = q;
+  }
+  next.dbStatus = newDbStatus;
+  return next;
+}
+
+export function mergeLayerFlags(
+  ctx: HAIOpsContext,
+  layer: number,
+  newFlags: SafetyFlag[]
+): HAIOpsContext {
+  const updatedFlags = [...ctx.flags.filter(f => f.originLayer !== layer), ...newFlags];
+  const hasUnacknowledged = updatedFlags.some(f => f.reviewRequired && !f.acknowledged);
+  return {
+    ...ctx,
+    flags: updatedFlags,
+    reviewAcknowledged: hasUnacknowledged ? false : ctx.reviewAcknowledged,
+  };
+}
+
+export function addOverride(ctx: HAIOpsContext, override: SafetyOverride): HAIOpsContext {
+  return { ...ctx, overrides: [...ctx.overrides, override] };
+}
+
+export function acknowledgeReview(ctx: HAIOpsContext): HAIOpsContext {
+  return {
+    ...ctx,
+    reviewAcknowledged: true,
+    flags: ctx.flags.map(f => ({ ...f, acknowledged: true })),
+  };
+}
+
+export function getDbDegradationWarnings(ctx: HAIOpsContext): DatabaseQueryRecord[] {
+  return Object.values(ctx.dbStatus).filter(q => q.status === "failed" || q.status === "cached");
+}
+
+export function serializeForExport(ctx: HAIOpsContext): Record<string, unknown> {
+  return {
+    _haiopsMeta: {
+      version: "1.0.0",
+      framework: "HAIOps",
+      exportTimestamp: new Date().toISOString(),
+    },
+    _safetyFlags: ctx.flags.map(f => ({
+      type: f.type,
+      severity: f.severity,
+      label: f.label,
+      originLayer: f.originLayer,
+      ichReference: f.ichReference,
+      value: f.value,
+      reviewRequired: f.reviewRequired,
+      acknowledged: f.acknowledged,
+    })),
+    _overrides: ctx.overrides,
+    _provenance: ctx.provenance,
+    _dbStatus: ctx.dbStatus,
+    _reviewAcknowledged: ctx.reviewAcknowledged,
+  };
+}

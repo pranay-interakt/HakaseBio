@@ -42,7 +42,7 @@ export function Platform() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           {[
-            { num: "L1", label: "Molecular Digital Twin", q: "Is this molecule safe?",          color: "violet", desc: "Takes a SMILES string, computes real molecular descriptors via RDKit.js, scores ADMET profiles, estimates binding affinity, and returns a GO / WATCH / NO-GO verdict in ~3 seconds." },
+            { num: "L1", label: "In Vitro Digital Twin",   q: "Is this molecule safe?",          color: "violet", desc: "Takes a SMILES string, computes real molecular descriptors via RDKit.js, scores ADMET profiles, estimates binding affinity, and returns a GO / WATCH / NO-GO verdict in ~3 seconds." },
             { num: "L2", label: "Animal Cohort Twin",     q: "How does it behave preclinically?", color: "amber",  desc: "Multi-species PBPK across rat, dog, and monkey with BCS-aware formulation modeling, allometric FIH dose scaling, and regulatory NOAEL estimation." },
             { num: "L3", label: "Patient Cohort Twin",    q: "Who will it work for?",           color: "blue",   desc: "Takes L1+L2 results and dose parameters, simulates PK/PD concentration curves, responder rates, adverse event profiles, and dose-limiting toxicity across a virtual patient cohort." },
             { num: "L4", label: "Trial Digital Twin",     q: "Will the trial succeed?",         color: "emerald", desc: "Takes L1–L3 outputs and trial design parameters, calculates statistical power, models enrollment trajectories, adaptive interim analyses, site rankings, and budget projections." },
@@ -73,7 +73,7 @@ export function Platform() {
           {[
             { label: "SMILES + Target ID", color: "slate" },
             { arrow: true },
-            { label: "L1 · Molecular", color: "violet" },
+            { label: "L1 · In Vitro", color: "violet" },
             { arrow: true },
             { label: "L2 · Animal", color: "amber" },
             { arrow: true },
@@ -106,7 +106,7 @@ export function Platform() {
           <div className="w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[12px] font-black text-violet-400 shrink-0">L1</div>
           <div>
             <div className="text-[10px] uppercase tracking-widest text-violet-500 font-semibold">Layer 1</div>
-            <h2 className="text-[28px] font-black tracking-tight text-white">Molecular Digital Twin</h2>
+            <h2 className="text-[28px] font-black tracking-tight text-white">In Vitro Digital Twin</h2>
           </div>
         </div>
 
@@ -133,11 +133,11 @@ export function Platform() {
             <div className="rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-black/60">
               <img
                 src={screenshotL1}
-                alt="Layer 1 — Molecular Digital Twin interface showing ADMET radar, binding scores, and Go/No-Go verdict"
+                alt="Layer 1 — In Vitro Digital Twin interface showing ADMET radar, binding scores, and Go/No-Go verdict"
                 className="w-full h-auto block"
               />
             </div>
-            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 1 — Molecular simulation complete · ADMET radar · Binding affinity · Go verdict</p>
+            <p className="text-[11px] text-slate-600 mt-3 text-center">Layer 1 — In Vitro simulation complete · ADMET radar · Binding affinity · Go verdict</p>
           </div>
         </div>
       </section>

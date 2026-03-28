@@ -250,14 +250,14 @@ const ENGINES: EngineEntry[] = [
   {
     name: "ADMET Prediction Engine",
     color: "violet",
-    layer: "Layer 1 — Molecular Digital Twin",
+    layer: "Layer 1 — In Vitro Digital Twin",
     description: "Browser-side cheminformatics engine computing drug-likeness filters and toxicity risk from molecular descriptors without any server call or data transmission.",
     capabilities: ["Lipinski Rule-of-5 (MW, LogP, HBD, HBA violations)", "Veber oral bioavailability filters (TPSA, RotBonds)", "QED (Quantitative Estimate of Drug-likeness, 0–1)", "Synthetic Accessibility Score (1–10 scale)", "ADMET composite score with flagged structural alerts", "Ames mutagenicity and hERG cardiotoxicity risk scoring"],
   },
   {
     name: "PBPK Simulation Engine",
     color: "blue",
-    layer: "Layer 1–2 — Molecular + Patient Cohort Twin",
+    layer: "Layer 1–2 — In Vitro + Patient Cohort Twin",
     description: "Physiologically-based pharmacokinetic compartmental model running in the browser, simulating concentration–time profiles using patient physiological parameters scaled from NHANES distributions.",
     capabilities: ["Oral absorption (first-pass, bioavailability estimation)", "1- and 2-compartment distribution models", "Hepatic clearance (intrinsic CLh, fu scaling)", "Renal clearance (eGFR-adjusted)", "Cmax, Tmax, AUC, t½ prediction", "Multi-dose accumulation simulation"],
   },

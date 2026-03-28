@@ -285,7 +285,7 @@ export function Story() {
                 <div className="w-10 h-10 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400">L1</div>
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-violet-500 font-semibold">Layer 1</div>
-                  <div className="text-[18px] font-bold text-white">Molecular Digital Twin</div>
+                  <div className="text-[18px] font-bold text-white">In Vitro Digital Twin</div>
                 </div>
               </div>
               <p className="text-[14px] text-slate-400 leading-relaxed mb-5">

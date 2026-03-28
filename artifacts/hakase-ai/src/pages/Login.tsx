@@ -172,7 +172,7 @@ export function Login() {
             ))}
           </div>
           <div className="text-center mt-2 text-[10px] text-slate-700">
-            Molecular Twin · Cohort Twin · Trial Twin
+            In Vitro Twin · Cohort Twin · Trial Twin
           </div>
         </div>
       </div>

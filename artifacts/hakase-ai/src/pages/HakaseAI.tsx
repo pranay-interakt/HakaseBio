@@ -41,9 +41,11 @@ import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
 import {
   computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
   getFlagsForLayer, getActiveFlags, hasReviewRequired,
-  createProvenance,
+  createProvenance, createHAIOpsContext, mergeLayerProvenance,
+  mergeLayerFlags, addOverride, acknowledgeReview, getDbDegradationWarnings,
   SAFETY_FLAG_COLORS,
   type SafetyFlag, type SafetyOverride, type ProvenanceRecord,
+  type HAIOpsContext, type DatabaseQueryRecord,
 } from "@/lib/safetyFlags";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
@@ -473,12 +475,14 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
-  const [safetyFlags,     setSafetyFlags]     = useState<SafetyFlag[]>([]);
-  const [safetyOverrides, setSafetyOverrides] = useState<SafetyOverride[]>([]);
-  const [provenanceL1,    setProvenanceL1]    = useState<ProvenanceRecord | null>(null);
-  const [provenanceL2,    setProvenanceL2]    = useState<ProvenanceRecord | null>(null);
-  const [provenanceL3,    setProvenanceL3]    = useState<ProvenanceRecord | null>(null);
-  const [provenanceL4,    setProvenanceL4]    = useState<ProvenanceRecord | null>(null);
+  const [haIOpsCtx, setHAIOpsCtx] = useState<HAIOpsContext>(createHAIOpsContext());
+  const safetyFlags = haIOpsCtx.flags;
+  const safetyOverrides = haIOpsCtx.overrides;
+  const provenanceL1 = haIOpsCtx.provenance[1] ?? null;
+  const provenanceL2 = haIOpsCtx.provenance[2] ?? null;
+  const provenanceL3 = haIOpsCtx.provenance[3] ?? null;
+  const provenanceL4 = haIOpsCtx.provenance[4] ?? null;
+  const dbDegradationWarnings = getDbDegradationWarnings(haIOpsCtx);
 
   const [aiReport,   setAiReport]   = useState<AiReport | null>(null);
   const [aiLoading,  setAiLoading]  = useState(false);
@@ -636,7 +640,7 @@ export function HakaseAI() {
   const runL1AiAnalysis = useCallback(() => {
     if (!simResults) return;
     streamAiLayer({
-      focus: "molecular",
+      focus: "in-vitro",
       body: { molName: simResults.molName, smiles: simResults.smiles, indication, layer1: simResults, proteinInfo },
       setLoading: setL1AiLoading,
       setError:   setL1AiError,
@@ -747,6 +751,7 @@ export function HakaseAI() {
     setExtGnomAD(null); setExtEcotox(null);
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
+    setHAIOpsCtx(createHAIOpsContext());
     setActiveLayer(1);
     setAiReport(null);
     setAiError(null);
@@ -780,14 +785,13 @@ export function HakaseAI() {
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
           const l2Flags = computeLayer2Flags({ safetyMargin: results.safetyMarginNoael, noael: results.noael, hedConservative: results.hedBsa });
-          setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 2), ...l2Flags]);
           const prov2 = createProvenance("animalSim.ts", "browser", smiles);
           prov2.databaseQueries = [
             { database: "CompTox", status: "success" },
             { database: "ECOTOX", status: "success" },
             { database: "ToxRefDB", status: "success" },
           ];
-          setProvenanceL2(prov2);
+          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 2, l2Flags), 2, prov2));
 
           // ── Full L2 → L3 cascade ──────────────────────────────────────
           // Starting dose: FIH mg/kg (conservative 1/10 HED)
@@ -885,14 +889,13 @@ export function HakaseAI() {
         subgroupBreakdown: results.subgroupBreakdown,
         overallAeRate: results.adverseEvents.reduce((s, e) => s + e.anyGrade, 0) / Math.max(1, results.adverseEvents.length) / 100,
       });
-      setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 3), ...l3Flags]);
       const prov3 = createProvenance("cohortSim.ts", "browser", smiles);
       prov3.databaseQueries = [
         { database: "NHANES", status: "success" },
-        { database: "FAERS", status: faersSettled.status === "fulfilled" ? "success" : "failed" },
+        { database: "FAERS", status: faersSettled.status === "fulfilled" ? "success" : "failed", staleness: faersSettled.status !== "fulfilled" ? "API unavailable — used cached reference data" : undefined },
         { database: "SIDER", status: "success" },
       ];
-      setProvenanceL3(prov3);
+      setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 3, l3Flags), 3, prov3));
       setSimProgress(100);
       setSimStatus(prev => ({ ...prev, 3: "complete" }));
       // ── Layer 3 external DB enrichment ──────────────────────────────────
@@ -927,14 +930,13 @@ export function HakaseAI() {
           const ivResults = runInVitroSimulation(molProps, smiles, uniprotId);
           setInVitroResults(ivResults);
           const l1Flags = computeLayer1Flags(ivResults);
-          setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 1), ...l1Flags]);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
           prov1.databaseQueries = [
             { database: "RDKit.js", status: "success", version: "2024.03.5", resultCount: 1 },
             { database: "BindingDB", status: bindingOn ? "success" : "skipped" },
             { database: "OpenTargets", status: "success" },
           ];
-          setProvenanceL1(prov1);
+          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 1, l1Flags), 1, prov1));
           // ── Layer 1 external DB enrichment ──────────────────────────────
           const gene = proteinInfo?.gene ?? "";
           const target = gene || uniprotId;
@@ -982,7 +984,7 @@ export function HakaseAI() {
             { database: "ClinicalTrials.gov", status: "success" },
             { database: "Drugs@FDA", status: "success" },
           ];
-          setProvenanceL4(prov4);
+          setHAIOpsCtx(prev => mergeLayerProvenance(prev, 4, prov4));
         }
 
         setSimProgress(100);
@@ -1164,12 +1166,7 @@ export function HakaseAI() {
     setTrialResults(null);
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
-    setSafetyFlags([]);
-    setSafetyOverrides([]);
-    setProvenanceL1(null);
-    setProvenanceL2(null);
-    setProvenanceL3(null);
-    setProvenanceL4(null);
+    setHAIOpsCtx(createHAIOpsContext());
     // Reset to Layer 1 so the user starts from the beginning
     setActiveLayer(1);
   }, []);
@@ -1352,13 +1349,13 @@ export function HakaseAI() {
                     ? (inVitroResults.overallRisk === "High" ? "NO-GO" : inVitroResults.overallRisk === "Moderate" ? "WATCH" : "GO")
                     : "GO";
                   if (verdict === "NO-GO") {
-                    setSafetyOverrides(prev => [...prev, {
+                    setHAIOpsCtx(prev => addOverride(prev, {
                       fromLayer: activeLayer,
                       toLayer: (activeLayer + 1) as Layer,
                       verdict,
                       timestamp: new Date().toISOString(),
                       reason: "User advanced past NO-GO verdict",
-                    }]);
+                    }));
                   }
                   setActiveLayer((activeLayer + 1) as Layer);
                 }}
@@ -1630,13 +1627,13 @@ export function HakaseAI() {
                     <TestTube2 className="w-4 h-4 text-violet-400" />
                     <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
                   </div>
-                  <p className="text-[11px] text-slate-500">Configure molecular structure and simulation parameters</p>
+                  <p className="text-[11px] text-slate-500">Configure in vitro structure and simulation parameters</p>
                 </div>
 
                 <div className="p-5 space-y-5">
-                  {/* 2.1 Primary Molecular Input */}
+                  {/* 2.1 Primary Input */}
                   <section>
-                    <SectionHeader icon={Atom} label="Primary Molecular Input" />
+                    <SectionHeader icon={Atom} label="Primary In Vitro Input" />
                     <div className="space-y-3">
                       <FieldGroup label="SMILES String" required hint="RDKit validated · MW 100–1500 Da">
                         <div id="demo-smiles-input" className="relative">
@@ -2443,7 +2440,7 @@ export function HakaseAI() {
                       <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
                       <span className="text-[11px] font-semibold text-violet-300">L1 → L2 Cascade Preview</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">These molecular properties will auto-populate Layer 2 Animal Cohort configuration:</p>
+                    <p className="text-[10px] text-slate-500">These in vitro properties will auto-populate Layer 2 Animal Cohort configuration:</p>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
                       {[
                         ["MW",         simResults ? `${simResults.lipinski.mw.toFixed(0)} Da`                      : "pending"],
@@ -2464,7 +2461,7 @@ export function HakaseAI() {
                   {/* L1 Recommendations */}
                   {(() => {
                     const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
-                    if (!smiles)       recs.push({ text: "Enter a SMILES string to begin molecular simulation.", level: "info" });
+                    if (!smiles)       recs.push({ text: "Enter a SMILES string to begin in vitro simulation.", level: "info" });
                     else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
                     if (simResults) {
                       if (simResults.admet.toxicity > 0.6)    recs.push({ text: "High toxicity signal — consider structural optimization to reduce hERG/CYP3A4 liability before animal studies.", level: "warn" });
@@ -2522,7 +2519,7 @@ export function HakaseAI() {
                       </div>
                       <div className="text-center">
                         <div className="text-[14px] font-medium text-slate-400">No simulation results yet</div>
-                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Configure your molecular inputs on the left and run the simulation to see ADMET predictions, binding analysis, and toxicity signals.</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Configure your in vitro inputs on the left and run the simulation to see ADMET predictions, binding analysis, and toxicity signals.</div>
                       </div>
                     </div>
 
@@ -2602,6 +2599,13 @@ export function HakaseAI() {
                     {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
                       <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
                     )}
+                    <ReviewAcknowledgmentButton
+                      flags={safetyFlags.filter(f => f.originLayer === 1)}
+                      acknowledged={haIOpsCtx.reviewAcknowledged}
+                      onAcknowledge={() => setHAIOpsCtx(prev => acknowledgeReview(prev))}
+                    />
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL1?.databaseQueries ?? []).some(q => q.database === w.database))} />
+                    <CrossSourceConsistencyCheck simIC50_uM={inVitroResults ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
                     {provenanceL1 && <ProvenanceFooter provenance={provenanceL1} layer={1} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
@@ -2858,6 +2862,7 @@ export function HakaseAI() {
                     {safetyOverrides.some(o => o.toLayer <= 2) && (
                       <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 2)} />
                     )}
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL2?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
                     {provenanceL2 && <ProvenanceFooter provenance={provenanceL2} layer={2} />}
                   </>
@@ -3377,6 +3382,7 @@ export function HakaseAI() {
                     {safetyOverrides.some(o => o.toLayer <= 3) && (
                       <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 3)} />
                     )}
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL3?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />
                     {provenanceL3 && <ProvenanceFooter provenance={provenanceL3} layer={3} />}
                     <div className="px-6 pb-6">
@@ -3994,6 +4000,7 @@ export function HakaseAI() {
                     {safetyOverrides.length > 0 && (
                       <OverrideBanner overrides={safetyOverrides} />
                     )}
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL4?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />
                     {provenanceL4 && <ProvenanceFooter provenance={provenanceL4} layer={4} />}
                     <div className="px-6 pb-6">
@@ -4445,7 +4452,7 @@ function splitSentences(text: string): string[] {
 }
 
 const LAYER_AI_KEY_LABELS: Record<string, string> = {
-  molecularOverview:            "Molecular Overview",
+  molecularOverview:            "In Vitro Overview",
   safetyNarrative:              "Safety Assessment",
   targetEngagement:             "Target Engagement",
   structuralAlerts:             "Structural Alerts",
@@ -4596,7 +4603,7 @@ function FullAiOverlay({
   if (!open) return null;
 
   const FULL_KEY_LABELS: Record<string, string> = {
-    molecularOverview: "Molecular Overview", safetyNarrative: "Safety Assessment",
+    molecularOverview: "In Vitro Overview", safetyNarrative: "Safety Assessment",
     pkAnalysis: "PK Analysis", targetEngagement: "Target Engagement",
     cohortInsights: "Cohort Insights", trialDesignRationale: "Trial Design",
     competitiveContext: "Competitive Context", regulatoryPathway: "Regulatory Pathway",
@@ -5762,6 +5769,105 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function GracefulDegradationBanner({ warnings }: { warnings: DatabaseQueryRecord[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="mx-4 mt-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-3">
+      <div className="flex items-center gap-2 mb-2">
+        <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0" />
+        <span className="text-[11px] font-semibold text-yellow-300">Database Degradation Notice</span>
+        <span className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{warnings.length} source{warnings.length > 1 ? "s" : ""}</span>
+      </div>
+      <div className="space-y-1.5">
+        {warnings.map((w, i) => (
+          <div key={i} className="flex items-center gap-2 text-[10px]">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${w.status === "failed" ? "bg-red-400" : "bg-yellow-400"}`} />
+            <span className="text-slate-300 font-medium">{w.database}</span>
+            <span className={`${w.status === "failed" ? "text-red-400" : "text-yellow-400"}`}>
+              {w.status === "failed" ? "unavailable" : "stale cache"}
+            </span>
+            {w.staleness && <span className="text-slate-500 italic">— {w.staleness}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="text-[9px] text-slate-500 mt-2 leading-relaxed">
+        Results may be based on cached or fallback reference data. Re-run when connectivity is restored for full fidelity.
+      </div>
+    </div>
+  );
+}
+
+function ReviewAcknowledgmentButton({ flags, acknowledged, onAcknowledge }: { flags: SafetyFlag[]; acknowledged: boolean; onAcknowledge: () => void }) {
+  const reviewRequired = flags.some(f => f.reviewRequired && !f.acknowledged);
+  if (!reviewRequired && !acknowledged) return null;
+  if (acknowledged) {
+    return (
+      <div className="mx-4 mt-2 bg-emerald-500/8 border border-emerald-500/25 rounded-lg px-4 py-2.5 flex items-center gap-2">
+        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div>
+          <span className="text-[11px] font-semibold text-emerald-300">Findings Reviewed</span>
+          <span className="text-[10px] text-emerald-400/70 ml-2">All safety flags have been acknowledged by the reviewer</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-4 mt-2 bg-red-500/8 border border-red-500/25 rounded-lg px-4 py-2.5 flex items-center gap-2.5">
+      <Shield className="w-4 h-4 text-red-400 shrink-0 animate-pulse" />
+      <div className="flex-1">
+        <span className="text-[11px] font-semibold text-red-300">Review Required</span>
+        <span className="text-[10px] text-red-400/70 ml-2">{flags.filter(f => f.reviewRequired && !f.acknowledged).length} flag(s) require clinical review before proceeding</span>
+      </div>
+      <button
+        onClick={onAcknowledge}
+        className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-md font-medium transition-colors border border-red-500/30 hover:border-red-500/50 shrink-0"
+      >
+        I have reviewed these findings
+      </button>
+    </div>
+  );
+}
+
+function CrossSourceConsistencyCheck({ simIC50_uM, bindingDB }: { simIC50_uM: number | null; bindingDB: BindingDBResult | null }) {
+  if (!simIC50_uM || !bindingDB || bindingDB.medianIC50_nM === null) return null;
+  const simIC50_nM = simIC50_uM * 1000;
+  const dbIC50_nM = bindingDB.medianIC50_nM;
+  const ratio = simIC50_nM > dbIC50_nM ? simIC50_nM / dbIC50_nM : dbIC50_nM / simIC50_nM;
+  const isDiscrepant = ratio > 10;
+  if (!isDiscrepant) {
+    return (
+      <div className="mx-4 mt-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-4 py-2.5 flex items-center gap-2">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="text-[10px] text-emerald-300">Cross-source IC50 consistent — Sim: {simIC50_nM.toFixed(1)} nM vs BindingDB: {dbIC50_nM.toFixed(1)} nM ({ratio.toFixed(1)}× ratio)</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-4 mt-2 bg-orange-500/8 border border-orange-500/25 rounded-xl px-4 py-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0" />
+        <span className="text-[11px] font-semibold text-orange-300">Cross-Source IC50 Discrepancy Detected</span>
+        <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-semibold">&gt;10× DIVERGENCE</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mt-2">
+        <div className="bg-white/3 rounded-lg p-2.5 border border-white/5">
+          <div className="text-[9px] text-slate-500 mb-0.5">Simulation Engine</div>
+          <div className="text-[13px] font-bold text-violet-300">{simIC50_nM.toFixed(1)} nM</div>
+          <div className="text-[9px] text-slate-500">inVitroSim.ts (RDKit-derived)</div>
+        </div>
+        <div className="bg-white/3 rounded-lg p-2.5 border border-white/5">
+          <div className="text-[9px] text-slate-500 mb-0.5">BindingDB (Experimental)</div>
+          <div className="text-[13px] font-bold text-blue-300">{dbIC50_nM.toFixed(1)} nM</div>
+          <div className="text-[9px] text-slate-500">Median of {bindingDB.ligandCount} ligands</div>
+        </div>
+      </div>
+      <div className="text-[9px] text-orange-400/70 mt-2 leading-relaxed">
+        {ratio.toFixed(1)}× discrepancy between simulated and experimental IC50. Consider: (1) verify SMILES structure accuracy, (2) check assay conditions in BindingDB source, (3) experimental IC50 may reflect different binding mode.
       </div>
     </div>
   );

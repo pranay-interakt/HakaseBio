@@ -84,7 +84,7 @@ export function Regulatory() {
             {
               layer: "L1",
               color: "violet",
-              title: "Molecular & Preclinical",
+              title: "In Vitro & Preclinical",
               items: ["hERG / Cardiac QT flags", "Mutagenicity / Genotox alerts", "Required IND-enabling studies", "Physicochemical vs FDA guidance", "CMC & GMP synthesis estimate"],
             },
             {
@@ -128,13 +128,13 @@ export function Regulatory() {
         </div>
       </section>
 
-      {/* ── L1: Molecular & Preclinical ── */}
+      {/* ── L1: In Vitro & Preclinical ── */}
       <section id="preclinical" className="max-w-6xl mx-auto px-6 py-20 border-b border-white/5 scroll-mt-20">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[12px] font-black text-violet-400 shrink-0">L1</div>
           <div>
             <div className="text-[10px] uppercase tracking-widest text-violet-500 font-semibold">Layer 1 — Regulatory Outlook</div>
-            <h2 className="text-[28px] font-black tracking-tight text-white">Molecular & Preclinical Regulatory Flags</h2>
+            <h2 className="text-[28px] font-black tracking-tight text-white">In Vitro & Preclinical Regulatory Flags</h2>
           </div>
         </div>
 
