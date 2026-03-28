@@ -5618,34 +5618,87 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
           <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">PK Profiles</span>
           <div className="flex items-center gap-3 text-[10px]">
             <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-amber-400 rounded"/><span className="text-amber-300">{ar.species.species}</span></div>
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-blue-400 rounded border-dashed"/><span className="text-blue-300">Human (projected)</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-blue-400 rounded"/><span className="text-blue-300">Human (projected)</span></div>
           </div>
         </div>
-        <div className="h-36 flex items-end gap-px overflow-hidden">
-          {(() => {
-            const maxA = Math.max(...ar.animalPkCurve.map(p => p.conc), 1);
-            const maxH = Math.max(...ar.humanPkCurve.map(p => p.conc), 1);
-            const overallMax = Math.max(maxA, maxH);
-            const points = 40;
-            const stepA = Math.max(1, Math.floor(ar.animalPkCurve.length / points));
-            const stepH = Math.max(1, Math.floor(ar.humanPkCurve.length / points));
-            const a = ar.animalPkCurve.filter((_, i) => i % stepA === 0).slice(0, points);
-            const h = ar.humanPkCurve.filter((_, i) => i % stepH === 0).slice(0, points);
-            const n = Math.max(a.length, h.length);
-            return Array.from({ length: n }, (_, i) => (
-              <div key={i} className="flex-1 flex flex-col justify-end gap-px">
-                {h[i] !== undefined && (
-                  <div className="w-full bg-blue-500/40 rounded-sm min-h-px" style={{ height: `${(h[i].conc / overallMax) * 100}%` }} />
-                )}
-                {a[i] !== undefined && (
-                  <div className="w-full bg-amber-500/60 rounded-sm min-h-px" style={{ height: `${(a[i].conc / overallMax) * 100}%` }} />
-                )}
-              </div>
-            ));
-          })()}
-        </div>
+        {(() => {
+          const W = 500;
+          const H = 150;
+          const pad = { t: 10, r: 10, b: 22, l: 44 };
+          const pw = W - pad.l - pad.r;
+          const ph = H - pad.t - pad.b;
+
+          const aCurve = ar.animalPkCurve;
+          const hCurve = ar.humanPkCurve;
+          const allConc = [...aCurve.map(p => p.conc), ...hCurve.map(p => p.conc)];
+          const maxConc = Math.max(...allConc, 0.01);
+          const maxTime = Math.max(aCurve[aCurve.length - 1]?.time ?? 1, hCurve[hCurve.length - 1]?.time ?? 1);
+
+          const toX = (t: number) => pad.l + (t / maxTime) * pw;
+          const toY = (c: number) => pad.t + ph - (c / maxConc) * ph;
+
+          const subsample = (curve: typeof aCurve, n: number) => {
+            if (curve.length <= n) return curve;
+            const step = Math.max(1, Math.floor(curve.length / n));
+            return curve.filter((_, i) => i % step === 0).slice(0, n);
+          };
+
+          const aPoints = subsample(aCurve, 60);
+          const hPoints = subsample(hCurve, 60);
+
+          const buildPath = (pts: typeof aPoints) =>
+            pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(p.time).toFixed(1)},${toY(p.conc).toFixed(1)}`).join(" ");
+
+          const buildAreaPath = (pts: typeof aPoints) =>
+            buildPath(pts) + ` L${toX(pts[pts.length - 1].time).toFixed(1)},${toY(0).toFixed(1)} L${toX(pts[0].time).toFixed(1)},${toY(0).toFixed(1)} Z`;
+
+          const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => f * maxConc);
+          const xTicks = [0, 0.25, 0.5, 0.75, 1].map(f => f * maxTime);
+
+          const formatConc = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v >= 1 ? v.toFixed(0) : v.toFixed(2);
+
+          return (
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+              {yTicks.map((v, i) => (
+                <g key={`y${i}`}>
+                  <line x1={pad.l} x2={W - pad.r} y1={toY(v)} y2={toY(v)} stroke="#334155" strokeWidth="0.5" strokeDasharray={i === 0 ? "none" : "2,2"} />
+                  <text x={pad.l - 4} y={toY(v) + 3} textAnchor="end" fill="#64748b" fontSize="7" fontFamily="monospace">{formatConc(v)}</text>
+                </g>
+              ))}
+              {xTicks.map((v, i) => (
+                <text key={`x${i}`} x={toX(v)} y={H - 4} textAnchor="middle" fill="#64748b" fontSize="7" fontFamily="monospace">{v.toFixed(0)}h</text>
+              ))}
+              <text x={2} y={pad.t + ph / 2} textAnchor="middle" fill="#64748b" fontSize="6" fontFamily="monospace" transform={`rotate(-90, 2, ${pad.t + ph / 2})`}>ng/mL</text>
+
+              <path d={buildAreaPath(hPoints)} fill="rgba(59,130,246,0.08)" />
+              <path d={buildPath(hPoints)} fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="4,2" opacity="0.8" />
+
+              <path d={buildAreaPath(aPoints)} fill="rgba(245,158,11,0.1)" />
+              <path d={buildPath(aPoints)} fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.9" />
+
+              {aPoints.length > 0 && (() => {
+                const peak = aPoints.reduce((best, p) => p.conc > best.conc ? p : best, aPoints[0]);
+                return (
+                  <g>
+                    <circle cx={toX(peak.time)} cy={toY(peak.conc)} r="2.5" fill="#f59e0b" stroke="#0f172a" strokeWidth="1" />
+                    <text x={toX(peak.time)} y={toY(peak.conc) - 5} textAnchor="middle" fill="#fbbf24" fontSize="6.5" fontFamily="monospace" fontWeight="bold">
+                      Cmax {formatConc(peak.conc)}
+                    </text>
+                  </g>
+                );
+              })()}
+              {hPoints.length > 0 && (() => {
+                const peak = hPoints.reduce((best, p) => p.conc > best.conc ? p : best, hPoints[0]);
+                return (
+                  <circle cx={toX(peak.time)} cy={toY(peak.conc)} r="2" fill="#3b82f6" stroke="#0f172a" strokeWidth="1" />
+                );
+              })()}
+            </svg>
+          );
+        })()}
         <div className="flex justify-between text-[9px] text-slate-600 mt-1">
-          <span>0h</span><span>Time</span><span>Peak → Elimination</span>
+          <span>Concentration–Time Profile</span>
+          <span>Cmax / AUC derived from 1-compartment PBPK</span>
         </div>
       </div>
 
