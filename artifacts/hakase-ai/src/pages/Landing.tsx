@@ -151,16 +151,19 @@ export function Landing() {
           <span className="px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-[10px] font-semibold text-violet-400 uppercase tracking-widest">HAIOps Governed</span>
         </div>
 
-        <h1 className="text-[56px] md:text-[72px] font-black tracking-tighter leading-none mb-6 max-w-4xl mx-auto">
-          <span className="text-white">Simulate the Drug.</span>
+        <h1 className="text-[56px] md:text-[72px] font-black tracking-tighter leading-none mb-4 max-w-5xl mx-auto">
+          <span className="text-white">Your Drug's Digital Twin.</span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            Protect the Data.
+            Built on Privacy.
           </span>
         </h1>
+        <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-8 max-w-3xl mx-auto">
+          Powered by 12+ live databases, Claude AI analysis, and four layers of cascading validation.
+        </p>
 
-        <p className="text-[17px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
-          Four simulation layers — in vitro safety, preclinical species, patient cohort, and clinical trial — running entirely in your browser. Your SMILES never leave the client. Every decision is governed by HAIOps: safety flag cascades, provenance tracking, and clinician-in-the-loop overrides.
+        <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
+          In vitro safety, preclinical species, patient cohort, and clinical trial — all running client-side. Your SMILES never leave the browser. Every decision governed by HAIOps: safety cascades, provenance tracking, and clinician-in-the-loop overrides.
         </p>
 
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
