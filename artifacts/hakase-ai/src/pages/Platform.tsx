@@ -31,7 +31,7 @@ export function Platform() {
           From molecule to trial
         </h1>
         <p className="text-[16px] text-slate-400 max-w-2xl mx-auto">
-          Four simulation layers that cascade — molecular safety, preclinical species, patient cohort, and clinical trial — each building on the last to answer the questions that determine whether a drug program succeeds or fails.
+          Four simulation layers that cascade — in vitro safety, preclinical species, patient cohort, and clinical trial — each building on the last to answer the questions that determine whether a drug program succeeds or fails.
         </p>
       </div>
 

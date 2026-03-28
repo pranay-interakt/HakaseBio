@@ -146,17 +146,37 @@ export function Landing() {
 
       {/* ── Hero ── */}
       <section id="platform" className="relative z-10 pt-28 pb-20 px-6 text-center">
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <span className="px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">Privacy-First</span>
+          <span className="px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-[10px] font-semibold text-violet-400 uppercase tracking-widest">HAIOps Governed</span>
+        </div>
+
         <h1 className="text-[56px] md:text-[72px] font-black tracking-tighter leading-none mb-6 max-w-4xl mx-auto">
-          <span className="text-white">From Molecule</span>
+          <span className="text-white">Simulate the Drug.</span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            to Medicine.
+            Protect the Data.
           </span>
         </h1>
 
-        <p className="text-[17px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10">
-          HakaseAI simulates the full drug development journey — molecular safety, preclinical species, patient cohort response, and clinical trial outcomes — before committing a single dollar to physical trials.
+        <p className="text-[17px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
+          Four simulation layers — in vitro safety, preclinical species, patient cohort, and clinical trial — running entirely in your browser. Your SMILES never leave the client. Every decision is governed by HAIOps: safety flag cascades, provenance tracking, and clinician-in-the-loop overrides.
         </p>
+
+        <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Zero server-side SMILES transmission
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+            6-flag safety cascade engine
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            Full audit provenance per layer
+          </span>
+        </div>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <button
@@ -318,17 +338,17 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── From Molecule to Medicine Story ── */}
+      {/* ── From In Vitro to Trial — Privacy-First Pipeline ── */}
       <section id="story" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
 
           {/* Header */}
           <div className="text-center mb-20">
             <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">The Complete Pipeline</div>
-            <h2 className="text-[40px] font-black tracking-tight text-white mb-4">From Molecule to Medicine</h2>
+            <h2 className="text-[40px] font-black tracking-tight text-white mb-4">From In Vitro to Trial</h2>
             <p className="text-[15px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
               Drug discovery takes 10–15 years and $2.6 billion per approved drug, with a 90% clinical trial failure rate.
-              Hakase AI connects two powerful engines into one seamless pipeline that compresses that timeline dramatically.
+              HakaseAI connects four simulation layers into one HAIOps-governed pipeline — with zero data leaving your browser.
             </p>
           </div>
 
