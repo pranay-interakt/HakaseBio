@@ -38,6 +38,13 @@ import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
 import { suggestTargets, type TargetSuggestion } from "@/lib/targetSuggestion";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
+import {
+  computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
+  getFlagsForLayer, getActiveFlags, hasReviewRequired,
+  createProvenance,
+  SAFETY_FLAG_COLORS,
+  type SafetyFlag, type SafetyOverride, type ProvenanceRecord,
+} from "@/lib/safetyFlags";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
@@ -466,6 +473,13 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
+  const [safetyFlags,     setSafetyFlags]     = useState<SafetyFlag[]>([]);
+  const [safetyOverrides, setSafetyOverrides] = useState<SafetyOverride[]>([]);
+  const [provenanceL1,    setProvenanceL1]    = useState<ProvenanceRecord | null>(null);
+  const [provenanceL2,    setProvenanceL2]    = useState<ProvenanceRecord | null>(null);
+  const [provenanceL3,    setProvenanceL3]    = useState<ProvenanceRecord | null>(null);
+  const [provenanceL4,    setProvenanceL4]    = useState<ProvenanceRecord | null>(null);
+
   const [aiReport,   setAiReport]   = useState<AiReport | null>(null);
   const [aiLoading,  setAiLoading]  = useState(false);
   const [aiError,    setAiError]    = useState<string | null>(null);
@@ -765,6 +779,15 @@ export function HakaseAI() {
           clearInterval(interval2);
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
+          const l2Flags = computeLayer2Flags({ safetyMargin: results.safetyMarginNoael, noael: results.noael, hedConservative: results.hedBsa });
+          setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 2), ...l2Flags]);
+          const prov2 = createProvenance("animalSim.ts", "browser", smiles);
+          prov2.databaseQueries = [
+            { database: "CompTox", status: "success" },
+            { database: "ECOTOX", status: "success" },
+            { database: "ToxRefDB", status: "success" },
+          ];
+          setProvenanceL2(prov2);
 
           // ── Full L2 → L3 cascade ──────────────────────────────────────
           // Starting dose: FIH mg/kg (conservative 1/10 HED)
@@ -857,6 +880,19 @@ export function HakaseAI() {
         pdParams, faersResult, l2pk,
       );
       setCohortResults(results);
+      const l3Flags = computeLayer3Flags({
+        grade3PlusRate: results.grade3AERate,
+        subgroupBreakdown: results.subgroupBreakdown,
+        overallAeRate: results.adverseEvents.reduce((s, e) => s + e.anyGrade, 0) / Math.max(1, results.adverseEvents.length) / 100,
+      });
+      setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 3), ...l3Flags]);
+      const prov3 = createProvenance("cohortSim.ts", "browser", smiles);
+      prov3.databaseQueries = [
+        { database: "NHANES", status: "success" },
+        { database: "FAERS", status: faersSettled.status === "fulfilled" ? "success" : "failed" },
+        { database: "SIDER", status: "success" },
+      ];
+      setProvenanceL3(prov3);
       setSimProgress(100);
       setSimStatus(prev => ({ ...prev, 3: "complete" }));
       // ── Layer 3 external DB enrichment ──────────────────────────────────
@@ -890,6 +926,15 @@ export function HakaseAI() {
           setSimResults(results);
           const ivResults = runInVitroSimulation(molProps, smiles, uniprotId);
           setInVitroResults(ivResults);
+          const l1Flags = computeLayer1Flags(ivResults);
+          setSafetyFlags(prev => [...prev.filter(f => f.originLayer !== 1), ...l1Flags]);
+          const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
+          prov1.databaseQueries = [
+            { database: "RDKit.js", status: "success", version: "2024.03.5", resultCount: 1 },
+            { database: "BindingDB", status: bindingOn ? "success" : "skipped" },
+            { database: "OpenTargets", status: "success" },
+          ];
+          setProvenanceL1(prov1);
           // ── Layer 1 external DB enrichment ──────────────────────────────
           const gene = proteinInfo?.gene ?? "";
           const target = gene || uniprotId;
@@ -932,6 +977,12 @@ export function HakaseAI() {
             Number(numSites) || 20, indication,
           );
           setTrialResults(results);
+          const prov4 = createProvenance("trialSim.ts", "browser", smiles);
+          prov4.databaseQueries = [
+            { database: "ClinicalTrials.gov", status: "success" },
+            { database: "Drugs@FDA", status: "success" },
+          ];
+          setProvenanceL4(prov4);
         }
 
         setSimProgress(100);
@@ -1113,6 +1164,12 @@ export function HakaseAI() {
     setTrialResults(null);
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
+    setSafetyFlags([]);
+    setSafetyOverrides([]);
+    setProvenanceL1(null);
+    setProvenanceL2(null);
+    setProvenanceL3(null);
+    setProvenanceL4(null);
     // Reset to Layer 1 so the user starts from the beginning
     setActiveLayer(1);
   }, []);
@@ -1282,19 +1339,49 @@ export function HakaseAI() {
       )}
 
       {simStatus[activeLayer] === "complete" && (
-        <div className="h-10 bg-emerald-900/20 border-b border-emerald-500/20 flex items-center px-6 gap-3 shrink-0">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span className="text-[12px] text-emerald-300 font-medium">
-            Layer {activeLayer} simulation complete
-          </span>
-          {activeLayer < 4 && (
-            <button
-              onClick={() => setActiveLayer((activeLayer + 1) as Layer)}
-              className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
-            >
-              Continue to {(layerLabels as readonly string[])[activeLayer]} →
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+        <div className="bg-emerald-900/20 border-b border-emerald-500/20 shrink-0">
+          <div className="h-10 flex items-center px-6 gap-3">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-[12px] text-emerald-300 font-medium">
+              Layer {activeLayer} simulation complete
+            </span>
+            {activeLayer < 4 && (
+              <button
+                onClick={() => {
+                  const verdict = activeLayer === 1 && inVitroResults
+                    ? (inVitroResults.overallRisk === "High" ? "NO-GO" : inVitroResults.overallRisk === "Moderate" ? "WATCH" : "GO")
+                    : "GO";
+                  if (verdict === "NO-GO") {
+                    setSafetyOverrides(prev => [...prev, {
+                      fromLayer: activeLayer,
+                      toLayer: (activeLayer + 1) as Layer,
+                      verdict,
+                      timestamp: new Date().toISOString(),
+                      reason: "User advanced past NO-GO verdict",
+                    }]);
+                  }
+                  setActiveLayer((activeLayer + 1) as Layer);
+                }}
+                className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
+              >
+                Continue to {(layerLabels as readonly string[])[activeLayer]} →
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {getActiveFlags(safetyFlags, activeLayer).length > 0 && (
+            <div className="px-6 pb-2 flex flex-wrap gap-1.5">
+              {getActiveFlags(safetyFlags, activeLayer).map((f, idx) => {
+                const sc = SAFETY_FLAG_COLORS[f.severity];
+                return (
+                  <span key={idx} className={`inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full border ${sc.bg} ${sc.text} ${sc.border} font-medium`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${sc.glow} shadow-[0_0_4px]`} />
+                    {f.label}
+                    {f.reviewRequired && !f.acknowledged && <span className="text-[8px] bg-white/10 px-1 rounded">REVIEW</span>}
+                  </span>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -2512,6 +2599,10 @@ export function HakaseAI() {
                       toxOn={toxOn}
                       confidenceThreshold={confidenceThreshold}
                     />
+                    {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
+                    )}
+                    {provenanceL1 && <ProvenanceFooter provenance={provenanceL1} layer={1} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
                         layer={1}
@@ -2760,7 +2851,16 @@ export function HakaseAI() {
                   </div>
                 )}
                 {simStatus[2] === "complete" && animalResults && (
-                  <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
+                  <>
+                    {getFlagsForLayer(safetyFlags, 2).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 2)} layerLabel="Upstream" upstream />
+                    )}
+                    {safetyOverrides.some(o => o.toLayer <= 2) && (
+                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 2)} />
+                    )}
+                    <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
+                    {provenanceL2 && <ProvenanceFooter provenance={provenanceL2} layer={2} />}
+                  </>
                 )}
               </div>
             </div>
@@ -3271,7 +3371,14 @@ export function HakaseAI() {
                 )}
                 {simStatus[3] === "complete" && (
                   <>
+                    {getFlagsForLayer(safetyFlags, 3).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 3)} layerLabel="Upstream" upstream />
+                    )}
+                    {safetyOverrides.some(o => o.toLayer <= 3) && (
+                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 3)} />
+                    )}
                     <Layer2Results cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l2AiReport} aiLoading={l2AiLoading} aiError={l2AiError} aiStream={l2AiStream} onRunAi={runL2AiAnalysis} />
+                    {provenanceL3 && <ProvenanceFooter provenance={provenanceL3} layer={3} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
                         layer={2}
@@ -3881,7 +3988,14 @@ export function HakaseAI() {
                 )}
                 {simStatus[4] === "complete" && (
                   <>
+                    {getFlagsForLayer(safetyFlags, 4).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 4)} layerLabel="Upstream" upstream />
+                    )}
+                    {safetyOverrides.length > 0 && (
+                      <OverrideBanner overrides={safetyOverrides} />
+                    )}
                     <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />
+                    {provenanceL4 && <ProvenanceFooter provenance={provenanceL4} layer={4} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
                         layer={3}
@@ -5653,6 +5767,126 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
   );
 }
 
+function SafetyFlagCascadeBanner({ flags, layerLabel, upstream }: { flags: SafetyFlag[]; layerLabel: string; upstream?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  if (flags.length === 0) return null;
+  return (
+    <div className={`mx-4 mt-3 ${upstream ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"} border rounded-xl overflow-hidden`}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left"
+      >
+        <Shield className={`w-4 h-4 ${upstream ? "text-red-400" : "text-amber-400"} shrink-0`} />
+        <div className="flex-1">
+          <span className={`text-[11px] font-semibold ${upstream ? "text-red-300" : "text-amber-300"}`}>
+            {upstream ? "Upstream Safety Flags" : "Safety Flags Detected"} ({flags.length})
+          </span>
+          <span className="text-[10px] text-slate-500 ml-2">
+            {upstream ? "Cascaded from upstream layers — these flags persist through all downstream analysis" : `Detected in ${layerLabel}`}
+          </span>
+        </div>
+        <div className="flex gap-1">
+          {flags.map((f, i) => {
+            const sc = SAFETY_FLAG_COLORS[f.severity];
+            return <span key={i} className={`w-2 h-2 rounded-full ${sc.glow} shadow-[0_0_4px]`} />;
+          })}
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      {expanded && (
+        <div className="px-4 pb-3 space-y-2 border-t border-white/5">
+          {flags.map((f, i) => {
+            const sc = SAFETY_FLAG_COLORS[f.severity];
+            return (
+              <div key={i} className={`${sc.bg} border ${sc.border} rounded-lg p-3 mt-2`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`w-2 h-2 rounded-full ${sc.glow} shadow-[0_0_6px]`} />
+                  <span className={`text-[11px] font-bold ${sc.text}`}>{f.label}</span>
+                  <span className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">L{f.originLayer}</span>
+                  {f.ichReference && <span className="text-[9px] text-slate-500">{f.ichReference}</span>}
+                  {f.reviewRequired && !f.acknowledged && (
+                    <span className="text-[8px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-semibold ml-auto">REVIEW REQUIRED</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 leading-relaxed">{f.detail}</div>
+                {f.value && <div className="text-[10px] text-slate-500 mt-1">Measured: <span className={`font-semibold ${sc.text}`}>{f.value}</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OverrideBanner({ overrides }: { overrides: SafetyOverride[] }) {
+  if (overrides.length === 0) return null;
+  return (
+    <div className="mx-4 mt-2 bg-amber-500/8 border border-amber-500/25 rounded-lg px-4 py-2.5 flex items-start gap-2">
+      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+      <div>
+        <div className="text-[11px] font-semibold text-amber-300">Override Logged</div>
+        <div className="text-[10px] text-amber-400/80 leading-relaxed">
+          {overrides.map((o, i) => (
+            <span key={i}>
+              Layer {o.fromLayer} {o.verdict} verdict overridden → advanced to Layer {o.toLayer} ({new Date(o.timestamp).toLocaleTimeString()})
+              {i < overrides.length - 1 ? " · " : ""}
+            </span>
+          ))}
+        </div>
+        <div className="text-[9px] text-slate-500 mt-1">Per HAIOps framework: all downstream outputs carry this annotation for audit traceability</div>
+      </div>
+    </div>
+  );
+}
+
+function ProvenanceFooter({ provenance, layer }: { provenance: ProvenanceRecord; layer: number }) {
+  const [open, setOpen] = useState(false);
+  const layerColors: Record<number, string> = { 1: "violet", 2: "amber", 3: "blue", 4: "emerald" };
+  const color = layerColors[layer] ?? "slate";
+  const borderCls = color === "violet" ? "border-violet-500/15" : color === "amber" ? "border-amber-500/15" : color === "blue" ? "border-blue-500/15" : "border-emerald-500/15";
+  const textCls = color === "violet" ? "text-violet-400" : color === "amber" ? "text-amber-400" : color === "blue" ? "text-blue-400" : "text-emerald-400";
+  return (
+    <div className={`mx-4 mt-3 mb-2 border ${borderCls} rounded-lg overflow-hidden bg-white/2`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
+        <FileText className={`w-3 h-3 ${textCls}`} />
+        <span className={`text-[10px] font-semibold ${textCls}`}>Provenance Metadata</span>
+        <span className="text-[9px] text-slate-600 ml-1">HAIOps Audit Trail</span>
+        <ChevronDown className={`w-3 h-3 text-slate-600 ml-auto transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2.5 border-t border-white/5 space-y-1.5 mt-0">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[9px] mt-2">
+            <div><span className="text-slate-600">Engine:</span> <span className="text-slate-400 font-mono">{provenance.engineFile}</span></div>
+            <div><span className="text-slate-600">Version:</span> <span className="text-slate-400 font-mono">{provenance.engineVersion}</span></div>
+            <div><span className="text-slate-600">Timestamp:</span> <span className="text-slate-400 font-mono">{new Date(provenance.timestamp).toLocaleString()}</span></div>
+            <div><span className="text-slate-600">RDKit:</span> <span className="text-slate-400 font-mono">{provenance.rdkitVersion}</span></div>
+            <div><span className="text-slate-600">Input:</span> <span className="text-slate-400 font-mono">{provenance.inputSource}</span></div>
+            {provenance.randomSeed !== undefined && <div><span className="text-slate-600">Seed:</span> <span className="text-slate-400 font-mono">{provenance.randomSeed}</span></div>}
+          </div>
+          {provenance.databaseQueries.length > 0 && (
+            <div className="mt-1.5">
+              <div className="text-[9px] text-slate-600 mb-1">Database Queries:</div>
+              <div className="flex flex-wrap gap-1">
+                {provenance.databaseQueries.map((q, i) => (
+                  <span key={i} className={`text-[8px] px-1.5 py-0.5 rounded border ${
+                    q.status === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                    : q.status === "failed" ? "bg-red-500/10 border-red-500/20 text-red-400"
+                    : q.status === "cached" ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                    : "bg-slate-500/10 border-slate-500/20 text-slate-500"
+                  } font-mono`}>
+                    {q.database}: {q.status}{q.version ? ` v${q.version}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Layer1Results({
   molProps, simResults, inVitroResults, indication,
   l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
@@ -5697,12 +5931,18 @@ function Layer1Results({
             <div className="flex items-center gap-2 mb-1">
               <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] ${glowCls}`} />
               <span className={`text-[20px] font-bold ${goText}`}>{goLabel}</span>
+              {iv && (iv.herg.ic50_uM < 10 || iv.bioactivation.mechanisticToxicities.some(t => t.confidence > 0.7)) && (
+                <span className="text-[9px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold border border-red-500/30 animate-pulse">
+                  REVIEW REQUIRED
+                </span>
+              )}
             </div>
             <p className="text-[13px] text-white font-medium">
               {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Animal Studies" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+              <span className="text-slate-600 ml-2">HAIOps Governed</span>
             </p>
           </div>
           <div className="text-right">

@@ -23,8 +23,16 @@
 ## Critical Rules
 - Tailwind: NEVER dynamic class interpolation — use explicit lookup maps or ternary chains
 - `estimatedCost` in trialSim.ts stored in millions — do NOT divide by 1e6 at display
-- Routing: wouter — routes: `/`, `/login`, `/story`, `/platform`, `/regulatory`, `/apis`, `/privacy`, `/dashboard`
+- Routing: wouter — routes: `/`, `/login`, `/story`, `/platform`, `/regulatory`, `/apis`, `/privacy`, `/advanced-v2`, `/haiopsdna`, `/dashboard`
 - Layer 2 (Animal) auto-populates Layer 3 starting dose with the FIH dose after simulation
+
+## HAIOps Framework (Healthcare AI Operations)
+- `artifacts/hakase-ai/src/lib/safetyFlags.ts` — Safety Flag Cascade engine (6 flags: cardiac, hepatotoxicity, DDI, narrow-margin, high-grade-ae, subgroup-disparity)
+- `artifacts/hakase-ai/src/pages/HAIOps.tsx` — HAIOps page at `/haiopsdna` (5 pillars, safety cascade, model governance, lifecycle, compliance)
+- Safety flags propagate through all downstream layers; computed from simulation results at L1/L2/L3
+- Override logging: advancing past NO-GO logs the override and annotates all downstream outputs
+- Provenance metadata: engine version, timestamp, database query status displayed in collapsible footers per layer
+- "REVIEW REQUIRED" badge on GO/NO-GO card when hERG < 10 µM or structural alert confidence > 70%
 
 ---
 
