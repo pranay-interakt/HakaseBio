@@ -159,7 +159,7 @@ export function Landing() {
           </span>
         </h1>
         <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-8 max-w-3xl mx-auto">
-          Powered by 12+ live databases, Claude AI analysis, and four layers of cascading validation.
+          Powered by live databases and cascading validation across four simulation layers.
         </p>
 
         <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
