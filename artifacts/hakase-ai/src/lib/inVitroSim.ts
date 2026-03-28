@@ -1,4 +1,5 @@
 import type { MolecularProperties } from "./chemistry";
+import { runBioactivationAssessment, type BioactivationAssessment } from "./bioactivationEngine";
 
 export interface DoseResponsePoint {
   concentration: number;
@@ -76,6 +77,7 @@ export interface InVitroResults {
   herg: HERGData;
   selectivity: SelectivityData;
   cellViability: CellViabilityData;
+  bioactivation: BioactivationAssessment;
   overallRisk: "Low" | "Moderate" | "High";
   inVitroScore: number;
   timestamp: string;
@@ -223,6 +225,26 @@ export function runInVitroSimulation(
 
   const inVitroScore = clamp(1 - (totalRisk / 8), 0, 1);
 
+  const bioactivation = runBioactivationAssessment(
+    {
+      smiles,
+      molecularWeight: mw,
+      logP,
+      tpsa,
+      hbdCount: hbd,
+      hbaCount: hba,
+      rotatableBonds: rotBonds,
+    },
+    {
+      hergRisk,
+      microsomalCLint: microCLint,
+      cypInhibition: cypInhibition as unknown as { [key: string]: { ic50_uM: number; risk: string } },
+      fuPercent,
+      caco2Papp,
+      ic50_nM,
+    }
+  );
+
   return {
     doseResponse: { ic50_nM, ec50_nM, hillCoefficient: hillCoeff, maxInhibition, curve, potencyClass },
     permeability: { caco2Papp, caco2Class, pampaPe, pampaClass, effluxRatio, pgpSubstrate },
@@ -235,6 +257,7 @@ export function runInVitroSimulation(
     herg: { ic50_uM: herg_ic50_uM, safetyMargin, riskCategory: hergRisk, patchClampResult },
     selectivity: { kinaseSelectivityScore: kinaseScore, offTargetHits, totalTargetsTested: totalTargets, selectivityClass, topOffTargets },
     cellViability: { cc50_uM, therapeuticIndex, cellLine, viabilityAt10uM },
+    bioactivation,
     overallRisk,
     inVitroScore,
     timestamp: new Date().toISOString(),

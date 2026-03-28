@@ -5746,12 +5746,14 @@ function Layer1Results({
       )}
 
       {/* In Vitro Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
+      <div className="flex gap-1 bg-white/5 p-1 rounded-lg flex-wrap">
         {[
           { id: "dose-response", label: "Dose-Response", icon: TrendingUp },
           { id: "permeability",  label: "Permeability",  icon: Layers },
           { id: "clearance",     label: "Clearance",     icon: Activity },
           { id: "safety",        label: "Safety",        icon: Shield },
+          { id: "mechanism",     label: "Mechanism",     icon: GitBranch },
+          { id: "bioactivation", label: "Bioactivation", icon: Zap },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -5986,13 +5988,196 @@ function Layer1Results({
         </div>
       )}
 
+      {/* Mechanism Tab */}
+      {activeTab === "mechanism" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-slate-300">Mechanistic Toxicity Analysis</h3>
+            <Badge className={`text-[9px] ${iv.bioactivation.overallBioactivationRisk === "Low" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.bioactivation.overallBioactivationRisk === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+              {iv.bioactivation.totalAlertsDetected} Alert{iv.bioactivation.totalAlertsDetected !== 1 ? "s" : ""} Detected
+            </Badge>
+          </div>
+
+          {iv.bioactivation.mechanisticToxicities.length === 0 && (
+            <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-[11px] font-semibold text-emerald-300">No Structural Alerts Detected</div>
+                <div className="text-[10px] text-slate-400 mt-1">No known bioactivation-prone structural motifs were identified. Standard safety pharmacology package recommended.</div>
+              </div>
+            </div>
+          )}
+
+          {iv.bioactivation.mechanisticToxicities.map((tox, idx) => (
+            <div key={idx} className="bg-white/3 border border-white/8 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${tox.risk === "High" ? "bg-red-400 shadow-[0_0_6px] shadow-red-400" : tox.risk === "Moderate" ? "bg-yellow-400 shadow-[0_0_6px] shadow-yellow-400" : "bg-emerald-400"}`} />
+                  <span className="text-[11px] font-semibold text-white">{tox.organ}</span>
+                  <Badge className="text-[8px] bg-white/5 text-slate-500">{tox.aopId}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-slate-500">Confidence</span>
+                  <span className={`text-[10px] font-bold ${tox.confidence > 0.7 ? "text-red-400" : tox.confidence > 0.5 ? "text-yellow-400" : "text-emerald-400"}`}>{(tox.confidence * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-1">Structural Alert</div>
+                  <div className="text-[10px] text-violet-300 font-medium">{tox.structuralAlert}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-1.5">Adverse Outcome Pathway</div>
+                  <div className="space-y-1">
+                    {tox.aopChain.map((step, si) => (
+                      <div key={si} className="flex items-start gap-2">
+                        <div className="flex flex-col items-center shrink-0 mt-0.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${si === tox.aopChain.length - 1 ? "bg-red-400" : "bg-violet-400/60"}`} />
+                          {si < tox.aopChain.length - 1 && <div className="w-px h-3 bg-violet-400/20" />}
+                        </div>
+                        <span className={`text-[10px] leading-tight ${si === tox.aopChain.length - 1 ? "text-red-300 font-medium" : "text-slate-400"}`}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-1">Mechanistic Explanation</div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed">{tox.mechanism}</div>
+                </div>
+                <div className="bg-blue-500/8 border border-blue-500/15 rounded-lg p-3">
+                  <div className="text-[9px] uppercase tracking-wider text-blue-400 mb-1">Mitigation Strategy</div>
+                  <div className="text-[10px] text-blue-200 leading-relaxed">{tox.mitigationStrategy}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {iv.bioactivation.recommendedStudies.length > 0 && (
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="text-[10px] font-semibold text-slate-400 mb-2">Recommended Follow-Up Studies</div>
+              <div className="space-y-1.5">
+                {iv.bioactivation.recommendedStudies.map((s, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="w-1 h-1 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                    <span className="text-[10px] text-slate-300">{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bioactivation Tab */}
+      {activeTab === "bioactivation" && iv && (
+        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-slate-300">Metabolic Bioactivation Pathways</h3>
+            <div className="flex items-center gap-2">
+              {iv.bioactivation.gshTrappingRecommended && (
+                <Badge className="text-[8px] bg-amber-500/15 text-amber-400 border-amber-500/30">GSH Trapping Recommended</Badge>
+              )}
+              <Badge className={`text-[9px] ${iv.bioactivation.overallBioactivationRisk === "Low" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.bioactivation.overallBioactivationRisk === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+                {iv.bioactivation.overallBioactivationRisk} Risk
+              </Badge>
+            </div>
+          </div>
+
+          {iv.bioactivation.bioactivationPathways.length === 0 && (
+            <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-[11px] font-semibold text-emerald-300">No Bioactivation Pathways Identified</div>
+                <div className="text-[10px] text-slate-400 mt-1">No structural motifs susceptible to metabolic bioactivation were detected. Standard in vitro metabolism studies are sufficient.</div>
+              </div>
+            </div>
+          )}
+
+          {iv.bioactivation.bioactivationPathways.map((pw, idx) => (
+            <div key={idx} className="bg-white/3 border border-white/8 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <Zap className={`w-3.5 h-3.5 ${pw.riskLevel === "High" ? "text-red-400" : pw.riskLevel === "Moderate" ? "text-yellow-400" : "text-emerald-400"}`} />
+                  <span className="text-[11px] font-semibold text-white">{pw.alertName}</span>
+                </div>
+                <Badge className={`text-[8px] ${pw.riskLevel === "High" ? "bg-red-500/15 text-red-400" : pw.riskLevel === "Moderate" ? "bg-yellow-500/15 text-yellow-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+                  {pw.riskLevel}
+                </Badge>
+              </div>
+              <div className="px-4 py-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Structural Motif</div>
+                    <div className="text-[10px] text-violet-300 font-medium">{pw.structuralMotif}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">CYP Enzyme(s)</div>
+                    <div className="text-[10px] text-blue-300 font-medium">{pw.cypEnzyme}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Reactive Intermediate</div>
+                    <div className="text-[10px] text-amber-300 font-medium">{pw.reactiveIntermediate}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Target Macromolecule</div>
+                    <div className="text-[10px] text-red-300 font-medium">{pw.targetMacromolecule}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Detoxification Pathway</div>
+                    <div className="text-[10px] text-emerald-300">{pw.detoxPathway}</div>
+                  </div>
+                </div>
+                <div className="mt-3 bg-white/3 rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Clinical Relevance</div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed">{pw.clinicalRelevance}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {iv.bioactivation.metabolicSoftSpots.length > 0 && (
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="text-[10px] font-semibold text-slate-400 mb-3">Metabolic Soft Spots</div>
+              <div className="space-y-2">
+                {iv.bioactivation.metabolicSoftSpots.map((ss, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-white/3 rounded-lg p-2.5">
+                    <div className="text-[10px] text-slate-500 font-mono w-12 shrink-0">{ss.position}</div>
+                    <div className="flex-1">
+                      <div className="text-[10px] text-white font-medium">{ss.moiety}</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">{ss.primaryCyp} → {ss.metaboliteType}</div>
+                    </div>
+                    <Badge className={`text-[8px] ${ss.reactivityRisk === "Reactive" ? "bg-red-500/15 text-red-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+                      {ss.reactivityRisk}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {iv.bioactivation.bioactivationPathways.length > 0 && (
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="text-[10px] font-semibold text-slate-400 mb-2">Bioactivation → Toxicity Flow</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {["Parent Compound", "CYP Oxidation", "Reactive Intermediate", "Macromolecule Adduct", "Cellular Stress", "Organ Toxicity"].map((step, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <div className={`text-[9px] px-2 py-1 rounded ${i === 0 ? "bg-violet-500/15 text-violet-300" : i === 2 ? "bg-red-500/15 text-red-300" : i === 5 ? "bg-red-500/20 text-red-300 font-semibold" : "bg-white/5 text-slate-400"}`}>{step}</div>
+                    {i < 5 && <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === "dose-response" && !iv && (
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
           <TestTube2 className="w-8 h-8" />
           <p className="text-[11px]">Run the simulation to generate in vitro assay data</p>
         </div>
       )}
-      {(activeTab === "permeability" || activeTab === "clearance" || activeTab === "safety") && !iv && (
+      {(activeTab === "permeability" || activeTab === "clearance" || activeTab === "safety" || activeTab === "mechanism" || activeTab === "bioactivation") && !iv && (
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
           <Activity className="w-8 h-8" />
           <p className="text-[11px]">Run the simulation first</p>

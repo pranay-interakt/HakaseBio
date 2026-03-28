@@ -11,6 +11,7 @@
 - `artifacts/hakase-ai/src/lib/animalSim.ts` — Layer 2 engine (allometric scaling, PBPK, NOAEL/MTD, FIH)
 - `artifacts/hakase-ai/src/lib/admet.ts` — ADMET simulation (directional, secondary to in vitro)
 - `artifacts/hakase-ai/src/lib/inVitroSim.ts` — In Vitro assay simulation engine (IC50, permeability, clearance, hERG, selectivity)
+- `artifacts/hakase-ai/src/lib/bioactivationEngine.ts` — Mechanistic toxicity (10 AOP pathways) & metabolic bioactivation assessment
 - `artifacts/hakase-ai/src/lib/cohortSim.ts` — Layer 3 patient cohort
 - `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model)
 - `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
