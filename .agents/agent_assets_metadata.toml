@@ -18,3 +18,9 @@ id = "zgNaZN6RullwilETexfDF"
 uri = "file://hakase-ai-input-fields.md"
 type = "text"
 title = "HakaseAI — 72 Input Fields Reference"
+
+[[outputs]]
+id = "eprKSWQx4Po5o02B1_Q6a"
+uri = "file://artifacts/hakase-ai/HakaseBio_Platform_Documentation.md"
+type = "text"
+title = "HakaseBio Platform Documentation"
