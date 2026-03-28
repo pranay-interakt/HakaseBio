@@ -151,7 +151,7 @@ export function Landing() {
           <span className="px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-[10px] font-semibold text-violet-400 uppercase tracking-widest">HAIOps Governed</span>
         </div>
 
-        <h1 className="text-[56px] md:text-[72px] font-black tracking-tighter leading-none mb-4 max-w-5xl mx-auto">
+        <h1 className="text-[44px] md:text-[56px] font-black tracking-tighter leading-none mb-4 max-w-5xl mx-auto">
           <span className="text-white">Your Drug's Digital Twin.</span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400 bg-clip-text text-transparent">
@@ -181,21 +181,6 @@ export function Landing() {
           </span>
         </div>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <button
-            onClick={() => navigate("/login")}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-[14px] transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
-          >
-            Launch BioDigital Twin
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-          </button>
-          <button
-            onClick={() => navigate("/dashboard?demo=true")}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-300 hover:text-amber-200 hover:border-amber-500/50 hover:bg-amber-500/10 font-medium text-[14px] transition-all"
-          >
-            ▶ View Demo
-          </button>
-        </div>
 
         {/* Pipeline visual */}
         <div className="mt-20 flex items-center justify-center gap-0 flex-wrap">
