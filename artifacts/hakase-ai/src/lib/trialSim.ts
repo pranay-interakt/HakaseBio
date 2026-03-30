@@ -1,6 +1,319 @@
 import type { SimResults } from "./admet";
 import type { CohortResults } from "./cohortSim";
 
+export interface VarianceReductionEntry {
+  area: string;
+  endpointType: string;
+  minR: number;
+  maxR: number;
+  defaultR: number;
+  source: string;
+}
+
+export const VARIANCE_REDUCTION_TABLE: VarianceReductionEntry[] = [
+  { area: "alzheimer",           endpointType: "Continuous",     minR: 0.15, maxR: 0.20, defaultR: 0.17, source: "EMA Qualification Opinion; Unlearn published studies" },
+  { area: "multiple sclerosis",  endpointType: "Continuous",     minR: 0.12, maxR: 0.18, defaultR: 0.15, source: "Published PROCOVA validation studies" },
+  { area: "als",                 endpointType: "Continuous",     minR: 0.14, maxR: 0.19, defaultR: 0.16, source: "VectorY PIONEER-ALS collaboration data" },
+  { area: "parkinson",           endpointType: "Continuous",     minR: 0.10, maxR: 0.16, defaultR: 0.13, source: "Extrapolated from neurology data" },
+  { area: "oncology",            endpointType: "Time-to-Event",  minR: 0.05, maxR: 0.10, defaultR: 0.07, source: "Estimated; PROCOVA-MMRM adaptation needed" },
+  { area: "rare disease",        endpointType: "Continuous",     minR: 0.08, maxR: 0.15, defaultR: 0.11, source: "Extrapolated from neurology data" },
+  { area: "general",             endpointType: "Binary",         minR: 0.05, maxR: 0.12, defaultR: 0.08, source: "Estimated; logistic PROCOVA extension" },
+  { area: "general",             endpointType: "Continuous",     minR: 0.10, maxR: 0.18, defaultR: 0.14, source: "Meta-analysis of published PROCOVA results" },
+  { area: "general",             endpointType: "Time-to-Event",  minR: 0.05, maxR: 0.10, defaultR: 0.07, source: "Estimated; requires PROCOVA-MMRM extension" },
+];
+
+export function lookupVarianceReduction(indication: string, endpointType: string): VarianceReductionEntry {
+  const ind = indication.toLowerCase();
+  const areaMatchers: Array<[string, string[]]> = [
+    ["alzheimer",          ["alzheimer"]],
+    ["multiple sclerosis", ["multiple sclerosis", "ms"]],
+    ["als",                ["als", "amyotrophic"]],
+    ["parkinson",          ["parkinson"]],
+    ["oncology",           ["nsclc", "lung", "breast", "colorect", "cancer", "oncol", "carcinoma", "leukemia", "lymphoma", "myeloma", "glioma", "tumor", "melanoma", "sarcoma"]],
+    ["rare disease",       ["rare", "orphan", "huntington", "sickle"]],
+  ];
+
+  let matchedArea = "general";
+  for (const [area, keywords] of areaMatchers) {
+    if (keywords.some(k => ind.includes(k))) { matchedArea = area; break; }
+  }
+
+  const endNorm = endpointType || "Continuous";
+  const exact = VARIANCE_REDUCTION_TABLE.find(e => e.area === matchedArea && e.endpointType === endNorm);
+  if (exact) return exact;
+  const endpointFallback = VARIANCE_REDUCTION_TABLE.find(e => e.area === "general" && e.endpointType === endNorm);
+  if (endpointFallback) return endpointFallback;
+  const areaFallback = VARIANCE_REDUCTION_TABLE.find(e => e.area === matchedArea);
+  if (areaFallback) return areaFallback;
+  return VARIANCE_REDUCTION_TABLE[VARIANCE_REDUCTION_TABLE.length - 1];
+}
+
+export interface ProcovaConfig {
+  enabled: boolean;
+  varianceReduction: number;
+  randomizationRatio: string;
+  customRatioT?: number;
+  customRatioC?: number;
+}
+
+export interface ProcovaResults {
+  standardN: number;
+  standardNt: number;
+  standardNc: number;
+  enhancedN: number;
+  enhancedNt: number;
+  enhancedNc: number;
+  varianceReductionApplied: number;
+  ratioLabel: string;
+
+  standardPower: number;
+  enhancedPower: number;
+  standardCost: number;
+  enhancedCost: number;
+  costSavings: number;
+  costSavingsPct: number;
+
+  standardDuration: number;
+  enhancedDuration: number;
+  durationSavingsMonths: number;
+
+  placeboReduction: number;
+
+  dualPowerCurve: Array<{ n: number; standardPower: number; enhancedPower: number }>;
+  dualEnrollment: Array<{ month: number; standardEnrolled: number; enhancedEnrolled: number }>;
+
+  costBreakdown: {
+    category: string;
+    standard: number;
+    enhanced: number;
+    savings: number;
+  }[];
+
+  sensitivityGrid: Array<{
+    varianceReduction: number;
+    ratio: string;
+    sampleSize: number;
+    controlArm: number;
+    power: number;
+    viable: boolean;
+  }>;
+
+  lookupEntry: VarianceReductionEntry;
+}
+
+function parseRatio(ratio: string): [number, number] {
+  const parts = ratio.split(":").map(Number);
+  if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return [parts[0], parts[1]];
+  return [1, 1];
+}
+
+function inverseNormalCDF(p: number): number {
+  const a1 = -3.969683028665376e+01, a2 =  2.209460984245205e+02;
+  const a3 = -2.759285104469687e+02, a4 =  1.383577518672690e+02;
+  const a5 = -3.066479806614716e+01, a6 =  2.506628277459239e+00;
+  const b1 = -5.447609879822406e+01, b2 =  1.615858368580409e+02;
+  const b3 = -1.556989798598866e+02, b4 =  6.680131188771972e+01;
+  const b5 = -1.328068155288572e+01;
+  const c1 = -7.784894002430293e-03, c2 = -3.223964580411365e-01;
+  const c3 = -2.400758277161838e+00, c4 = -2.549732539343734e+00;
+  const c5 =  4.374664141464968e+00, c6 =  2.938163982698783e+00;
+  const d1 =  7.784695709041462e-03, d2 =  3.224671290700398e-01;
+  const d3 =  2.445134137142996e+00, d4 =  3.754408661907416e+00;
+  const pLow = 0.02425, pHigh = 1 - pLow;
+  let q: number, r: number;
+  if (p < pLow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6) / ((((d1*q+d2)*q+d3)*q+d4)*q+1);
+  } else if (p <= pHigh) {
+    q = p - 0.5; r = q * q;
+    return (((((a1*r+a2)*r+a3)*r+a4)*r+a5)*r+a6)*q / (((((b1*r+b2)*r+b3)*r+b4)*r+b5)*r+1);
+  } else {
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6) / ((((d1*q+d2)*q+d3)*q+d4)*q+1);
+  }
+}
+
+function computePowerAsymmetric(
+  nT: number, nC: number, hr: number, alpha: number, dropoutRate: number, varianceReduction: number
+): number {
+  const eventFraction = 0.75 * (1 - dropoutRate);
+  const eventsT = nT * eventFraction;
+  const eventsC = nC * eventFraction;
+  const totalEvents = eventsT + eventsC;
+  if (totalEvents <= 0) return 0;
+
+  const R = clamp(varianceReduction, 0, 0.99);
+  const pT = nT / (nT + nC);
+  const pC = nC / (nT + nC);
+  const effectiveEvents = totalEvents * 4 * pT * pC;
+  const logHR = Math.log(hr);
+  const se = Math.sqrt((1 - R) * (4 / effectiveEvents));
+  const z_alpha = inverseNormalCDF(1 - alpha / 2);
+  const z_beta = (Math.abs(logHR) / se) - z_alpha;
+  return clamp(normalCDF(z_beta));
+}
+
+function solveNForPower(
+  targetPower: number, hr: number, alpha: number, dropoutRate: number,
+  varianceReduction: number, ratioT: number, ratioC: number
+): number {
+  let lo = 10, hi = 5000;
+  for (let iter = 0; iter < 50; iter++) {
+    const mid = Math.round((lo + hi) / 2);
+    const nT = Math.round(mid * ratioT / (ratioT + ratioC));
+    const nC = mid - nT;
+    const p = computePowerAsymmetric(nT, nC, hr, alpha, dropoutRate, varianceReduction);
+    if (p < targetPower) lo = mid; else hi = mid;
+    if (hi - lo <= 1) break;
+  }
+  return hi;
+}
+
+export function runProcovaAnalysis(
+  standardResults: TrialResults,
+  config: ProcovaConfig,
+  indication: string,
+  endpointType: string,
+  trialPhase: string,
+  numSites: number,
+  dropoutRate: number,
+  powerTarget: number,
+  sigLevel: number,
+): ProcovaResults {
+  const hr = standardResults.hazardRatio;
+  const R = config.varianceReduction;
+  const lookupEntry = lookupVarianceReduction(indication, endpointType);
+
+  const [ratioT, ratioC] = parseRatio(config.randomizationRatio);
+  const ratioLabel = `${ratioT}:${ratioC}`;
+
+  const stdN = standardResults.sampleSize;
+  const stdNt = Math.round(stdN / 2);
+  const stdNc = stdN - stdNt;
+  const stdPower = standardResults.power;
+
+  const enhN = solveNForPower(powerTarget, hr, sigLevel, dropoutRate, R, ratioT, ratioC);
+  const enhNt = Math.round(enhN * ratioT / (ratioT + ratioC));
+  const enhNc = enhN - enhNt;
+  const enhPower = computePowerAsymmetric(enhNt, enhNc, hr, sigLevel, dropoutRate, R);
+
+  const nSamples = [50, 100, 150, 200, 250, 300, 350, 400, 500, 600, 800];
+  if (!nSamples.includes(stdN)) nSamples.push(stdN);
+  if (!nSamples.includes(enhN)) nSamples.push(enhN);
+  nSamples.sort((a, b) => a - b);
+
+  const dualPowerCurve = nSamples.map(n => {
+    const sNt = Math.round(n / 2);
+    const sNc = n - sNt;
+    const eNt = Math.round(n * ratioT / (ratioT + ratioC));
+    const eNc = n - eNt;
+    return {
+      n,
+      standardPower: parseFloat(computePowerAsymmetric(sNt, sNc, hr, sigLevel, dropoutRate, 0).toFixed(3)),
+      enhancedPower: parseFloat(computePowerAsymmetric(eNt, eNc, hr, sigLevel, dropoutRate, R).toFixed(3)),
+    };
+  });
+
+  const enrollRate = 4.2;
+  const totalRate = enrollRate * numSites;
+  const months = Array.from({ length: 37 }, (_, i) => i);
+  const dualEnrollment = months.map(m => ({
+    month: m,
+    standardEnrolled: Math.min(stdN, Math.round(stdN * (1 - Math.exp(-0.15 * m)))),
+    enhancedEnrolled: Math.min(enhN, Math.round(enhN * (1 - Math.exp(-0.15 * m)))),
+  }));
+
+  const phLower = trialPhase.toLowerCase();
+  const isPhI = phLower.includes("i") && !phLower.includes("ii");
+  const isPhII = phLower.includes("ii") && !phLower.includes("iii");
+  const isPhIII = phLower.includes("iii");
+  const perPatientBase = isPhI ? 28_000 : isPhII ? 58_000 : isPhIII ? 105_000 : 42_000;
+
+  const ind = indication.toLowerCase();
+  const indicationMul =
+    (ind.includes("nsclc") || ind.includes("lung") || ind.includes("breast") || ind.includes("colorect") || ind.includes("cancer") || ind.includes("oncol") || ind.includes("carcinoma") || ind.includes("leukemia") || ind.includes("lymphoma") || ind.includes("myeloma") || ind.includes("glioma") || ind.includes("tumor")) ? 1.45 :
+    (ind.includes("alzheimer") || ind.includes("parkinson") || ind.includes("cns") || ind.includes("neuro") || ind.includes("psychiatr") || ind.includes("schizo") || ind.includes("ms") || ind.includes("multiple sclerosis")) ? 1.60 :
+    (ind.includes("rare") || ind.includes("orphan") || ind.includes("aml") || ind.includes("sickle") || ind.includes("huntington")) ? 1.55 :
+    (ind.includes("cardio") || ind.includes("heart") || ind.includes("hf ") || ind.includes("coronary") || ind.includes("stroke")) ? 1.30 :
+    (ind.includes("infect") || ind.includes("hiv") || ind.includes("hepatit") || ind.includes("covid") || ind.includes("antimicr")) ? 0.90 :
+    1.00;
+
+  const computeCostForN = (n: number) => {
+    const siteStartup = numSites * 90_000;
+    const siteMgmt = numSites * (isPhIII ? 1_800_000 : isPhII ? 900_000 : 320_000);
+    const fixedReg = isPhIII ? 5_500_000 : isPhII ? 2_200_000 : 1_100_000;
+    const mfg = 2 * (isPhIII ? 7_000_000 : isPhII ? 2_800_000 : 1_100_000);
+    return (n * perPatientBase * indicationMul + siteStartup + siteMgmt + fixedReg + mfg) * 1.33;
+  };
+
+  const stdCostRaw = computeCostForN(stdN);
+  const enhCostRaw = computeCostForN(enhN);
+  const stdCostM = Math.round(stdCostRaw / 1e5) / 10;
+  const enhCostM = Math.round(enhCostRaw / 1e5) / 10;
+
+  const patientSavings = stdN - enhN;
+  const siteOpsPct = 0.42;
+  const drugPct = 0.28;
+  const monitorPct = 0.20;
+  const labPct = 0.10;
+  const totalSavingsM = stdCostM - enhCostM;
+
+  const costBreakdown = [
+    { category: "Site Operations",     standard: parseFloat((stdCostM * siteOpsPct).toFixed(1)),   enhanced: parseFloat((enhCostM * siteOpsPct).toFixed(1)),   savings: 0 },
+    { category: "Drug Supply",         standard: parseFloat((stdCostM * drugPct).toFixed(1)),      enhanced: parseFloat((enhCostM * drugPct).toFixed(1)),      savings: 0 },
+    { category: "Clinical Monitoring", standard: parseFloat((stdCostM * monitorPct).toFixed(1)),   enhanced: parseFloat((enhCostM * monitorPct).toFixed(1)),   savings: 0 },
+    { category: "Lab & Biomarker",     standard: parseFloat((stdCostM * labPct).toFixed(1)),       enhanced: parseFloat((enhCostM * labPct).toFixed(1)),       savings: 0 },
+  ].map(c => ({ ...c, savings: parseFloat((c.standard - c.enhanced).toFixed(1)) }));
+
+  const enrollmentRate2 = totalRate > 0 ? totalRate : 20;
+  const medianPFS = standardResults.medianPFS_treatment;
+  const stdDur = Math.ceil(stdN / enrollmentRate2 + medianPFS * 1.5);
+  const enhDur = Math.ceil(enhN / enrollmentRate2 + medianPFS * 1.5);
+
+  const sensitivityGrid: ProcovaResults["sensitivityGrid"] = [];
+  const rValues = [0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25];
+  const ratios = ["1:1", "2:1", "3:1", "4:1"];
+  for (const rv of rValues) {
+    for (const rat of ratios) {
+      const [rT, rC] = parseRatio(rat);
+      const n = solveNForPower(powerTarget, hr, sigLevel, dropoutRate, rv, rT, rC);
+      const nT = Math.round(n * rT / (rT + rC));
+      const nC = n - nT;
+      const p = computePowerAsymmetric(nT, nC, hr, sigLevel, dropoutRate, rv);
+      sensitivityGrid.push({
+        varianceReduction: rv,
+        ratio: rat,
+        sampleSize: n,
+        controlArm: nC,
+        power: parseFloat(p.toFixed(3)),
+        viable: p >= powerTarget,
+      });
+    }
+  }
+
+  return {
+    standardN: stdN, standardNt: stdNt, standardNc: stdNc,
+    enhancedN: enhN, enhancedNt: enhNt, enhancedNc: enhNc,
+    varianceReductionApplied: R,
+    ratioLabel,
+    standardPower: stdPower,
+    enhancedPower: parseFloat(enhPower.toFixed(3)),
+    standardCost: stdCostM,
+    enhancedCost: enhCostM,
+    costSavings: parseFloat(totalSavingsM.toFixed(1)),
+    costSavingsPct: stdCostM > 0 ? parseFloat(((totalSavingsM / stdCostM) * 100).toFixed(1)) : 0,
+    standardDuration: stdDur,
+    enhancedDuration: enhDur,
+    durationSavingsMonths: stdDur - enhDur,
+    placeboReduction: stdNc - enhNc,
+    dualPowerCurve,
+    dualEnrollment,
+    costBreakdown,
+    sensitivityGrid,
+    lookupEntry,
+  };
+}
+
 export interface SurvivalPoint {
   month:     number;
   treatment: number;

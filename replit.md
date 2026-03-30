@@ -4,7 +4,7 @@
 - **Layer 1 (Violet)**: In Vitro — SMILES input, in vitro assay simulation (IC50, Caco-2, CYP panel, hERG, selectivity), directional ADMET, 3D viewer
 - **Layer 2 (Amber)**: Animal Cohort — in-silico PBPK, 7 species/strain sets, NOAEL/MTD, FIH dose projection, Human Translation Panel
 - **Layer 3 (Blue)**: Patient Cohort — virtual patients, PK/PD, FAERS, responder analysis
-- **Layer 4 (Emerald)**: Trial Digital Twin — Monte Carlo, adaptive design, regulatory outputs
+- **Layer 4 (Emerald)**: Trial Digital Twin — Monte Carlo, adaptive design, regulatory outputs, PROCOVA (Prognostic Covariate Adjustment) module
 
 ## Key Files
 - `artifacts/hakase-ai/src/pages/HakaseAI.tsx` — main 5900+ line dashboard (all 4 layers)
@@ -13,7 +13,7 @@
 - `artifacts/hakase-ai/src/lib/inVitroSim.ts` — In Vitro assay simulation engine (IC50, permeability, clearance, hERG, selectivity)
 - `artifacts/hakase-ai/src/lib/bioactivationEngine.ts` — Mechanistic toxicity (10 AOP pathways) & metabolic bioactivation assessment
 - `artifacts/hakase-ai/src/lib/cohortSim.ts` — Layer 3 patient cohort
-- `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model)
+- `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model, PROCOVA engine)
 - `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
 - `artifacts/api-server/src/routes/bio-chat/` — Claude chat
 
