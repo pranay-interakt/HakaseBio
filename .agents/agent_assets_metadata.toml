@@ -24,3 +24,9 @@ id = "eprKSWQx4Po5o02B1_Q6a"
 uri = "file://artifacts/hakase-ai/HakaseBio_Platform_Documentation.md"
 type = "text"
 title = "HakaseBio Platform Documentation"
+
+[[outputs]]
+id = "6nujMFaZpJ9mNEeo6J3aW"
+uri = "file://HakaseAI_Product_Features.md"
+type = "text"
+title = "HakaseAI -- Complete Product Feature Reference"
