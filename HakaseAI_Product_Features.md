@@ -17,9 +17,84 @@ HakaseAI is a privacy-first BioDigital Twin platform that simulates the entire d
 
 ---
 
-## Platform Architecture: Four Cascading Simulation Layers
+## Platform Documentation: "From Molecule to Trial"
 
-HakaseAI organizes drug development simulation into four sequential, interconnected layers. Each layer feeds forward into the next, creating a complete digital twin of the drug development lifecycle.
+The HakaseAI platform transforms drug development through a unified simulation pipeline that answers four critical questions, one at each layer:
+
+| Question | Layer | Answer |
+|----------|-------|--------|
+| "Is this molecule safe?" | Layer 1 -- In Vitro | Molecular screening and characterization |
+| "How does it behave preclinically?" | Layer 2 -- Animal Cohort | Species PK/tox and human dose projection |
+| "Who will it work for?" | Layer 3 -- Patient Cohort | Virtual patient populations and response modeling |
+| "Will the trial succeed?" | Layer 4 -- Trial | Monte Carlo trial simulation and design optimization |
+
+### Cascading Layer Architecture
+
+The four layers flow sequentially -- results from each layer cascade forward to inform the next:
+
+| Layer | Name | Color | Stage |
+|-------|------|-------|-------|
+| 1 | In Vitro Digital Twin | Violet | Early discovery -- compound screening & characterization |
+| 2 | Animal Cohort Digital Twin | Amber | Preclinical -- species PK/tox & human dose projection |
+| 3 | Patient Cohort Digital Twin | Blue | Clinical pharmacology -- virtual patient populations |
+| 4 | Trial Digital Twin | Emerald | Clinical trial -- Monte Carlo trial simulation & design |
+
+### Data Flow
+
+```
+Input: SMILES String + Target ID
+  |
+  v
+L1 (In Vitro) --> L2 (Animal) --> L3 (Cohort) --> L4 (Trial)
+  |                                                    |
+  v                                                    v
+Molecular Descriptors,                          GO / NO-GO Verdict
+ADMET, Safety Flags                             + Full Technical Report
+```
+
+Each layer produces a verdict (GO / WATCH / NO-GO) and feeds forward:
+- L1 molecular properties and safety flags inform L2 PBPK parameters
+- L2 FIH dose projection auto-populates L3 starting dose
+- L3 patient response data feeds L4 trial design parameters
+- Safety flags propagate through ALL downstream layers
+
+### Technical Underpinnings by Layer
+
+**Layer 1 -- RDKit.js Engine (C++ compiled to WebAssembly)**
+- Real molecular descriptor computation: MW, LogP, TPSA, HBD, HBA, QED, rotatable bonds
+- QSAR rules for 5-axis ADMET scoring (0-1 scale per axis)
+- Deterministic binding affinity estimation (Kd, Ki, IC50) for target protein classes
+- All computation runs in-browser -- zero server dependency for molecular processing
+
+**Layer 2 -- Two-Compartment RK4 ODE Solver**
+- Species-specific physiological parameters (Vd, clearance, protein binding)
+- Formulation Engine: 6 FDA IIG-compliant options auto-selected from BCS classification (SNEDDS, Nanosuspension, Amorphous Solid Dispersion, etc.)
+- FIH dose scaling: Body weight allometric exponents (0.75 for CL, 1.0 for Vd) per ICH M3(R2) guidance
+- Human Reference Panel: Cross-species comparison of Cmax, AUC, half-life, and Vd
+
+**Layer 3 -- Population Simulation Engine**
+- 100 time points per PK/PD curve with 90% confidence intervals
+- Responder rate segmentation: Biomarker-positive subgroups at 1.5-2x overall rate
+- Organ-risk flags mapped to CTCAE-graded adverse events
+- DLT (Dose-Limiting Toxicity) rate: Aggregated probability based on flag severity (High: 15-25%)
+
+**Layer 4 -- Monte Carlo Statistical Engine**
+- Exact normal CDF power formula accounting for dropout and multi-arm designs
+- Parametric Kaplan-Meier survival via Weibull distribution
+- O'Brien-Fleming spending function for adaptive early stopping
+- Final trial verdict: GO / CONDITIONAL / NO-GO based on power (target threshold), molecule status, and DLT (<33%)
+- PROCOVA engine: Asymmetric trial design with variance reduction from historical prognostic data
+
+### Ecosystem Integration
+
+The platform connects to the broader Hakase ecosystem:
+- **Diagen AI** (The Creator): Generative AI molecule design platform
+- **BioDigital Twin** (The Validator): Simulation and safety assessment pipeline
+- Molecules flow from Diagen into the Twin via Sync, Batch, or Cascade import modes
+
+---
+
+## Detailed Feature Reference: Four Simulation Layers
 
 ---
 
@@ -455,15 +530,35 @@ Seamless connection with the Diagen generative AI molecule design platform:
 | Page | Route | Purpose |
 |------|-------|---------|
 | **Landing** | `/` | Marketing homepage with statistics, pipeline overview, and Diagen integration showcase |
-| **Platform Overview** | `/platform` | Detailed breakdown of four simulation layers and ecosystem |
-| **Dashboard** | `/dashboard` | Core simulation interface (all 4 layers) |
-| **The Story** | `/story` | Dual-mode narrative (Simple for business; Technical for scientists) |
-| **Regulatory Intelligence** | `/regulatory` | Regulatory outlook and designation strategy |
-| **Advanced AI Roadmap** | `/advanced-v2` | Future deep learning upgrades (ESM-2, Transformer ADMET, etc.) |
-| **APIs & Data Sources** | `/apis` | Inventory of all external API integrations |
-| **HAIOps Framework** | `/haiopsdna` | Safety, governance, and compliance documentation |
-| **Privacy Policy** | `/privacy` | Zero-knowledge architecture and data handling |
+| **Platform Overview** | `/platform` | Detailed technical breakdown of all four simulation layers, ecosystem flow, and engine specifications |
+| **Dashboard** | `/dashboard` | Core simulation interface -- all 4 layers with full input controls and results panels |
+| **The Story** | `/story` | Dual-mode narrative with toggle: "Simple Story" (business/investor) and "Technical Story" (scientists/engineers) |
+| **Regulatory Intelligence** | `/regulatory` | Layer-by-layer regulatory outlook, designation strategy, and IND-to-NDA timeline |
+| **Advanced AI Roadmap** | `/advanced-v2` | Future deep learning upgrades: ESM-2 protein embeddings, Transformer-based ADMET, GNN molecular property prediction |
+| **APIs & Data Sources** | `/apis` | Complete inventory of all 12+ external API and database integrations with live status |
+| **HAIOps Framework** | `/haiopsdna` | Full documentation of 5 governance pillars, 6-flag safety cascade, model registry, and compliance framework |
+| **Privacy Policy** | `/privacy` | Zero-knowledge architecture details, data handling policies, and client-side processing guarantees |
 | **Login** | `/login` | User authentication |
+
+### Page Highlights
+
+**Landing Page (`/`)**
+- Hero: "Your Drug's Digital Twin. Built on Privacy."
+- Key statistics: 90% trial failure rate, 30-50% faster development, $5M saved per failure, 1-5 years compressed
+- Interactive pipeline visualization showing molecule flow through all 4 layers
+- Diagen AI integration showcase with JSON payload example
+- Three 3D molecular viewer demos (Cinematic, Scientific, Explorer)
+
+**The Story Page (`/story`)**
+- **Simple Version:** Uses a "flight simulator for drug molecules" analogy; frames around three core questions (Is it safe? What happens to patients? Should we run a trial?); compares Standard vs. Premium tiers using navigation software analogy
+- **Technical Version:** Explains the circular dependency problem in pre-clinical decision-making; details RDKit.js WASM pipeline, RK4 ODE solvers, and O'Brien-Fleming spending functions; step-by-step computational breakdown per layer
+
+**Platform Overview (`/platform`)**
+- Complete technical architecture of all four layers with engine specifications
+- Data flow diagram from SMILES input through GO/NO-GO verdict
+- Layer-by-layer deep dive: RDKit.js descriptors, PBPK solver parameters, population modeling methodology, Monte Carlo trial mechanics
+- Formulation Engine showcase (6 FDA IIG-compliant options)
+- Cross-species human reference panel specifications
 
 ---
 
