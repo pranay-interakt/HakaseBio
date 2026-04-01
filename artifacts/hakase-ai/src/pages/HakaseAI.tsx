@@ -780,7 +780,7 @@ export function HakaseAI() {
 
     // ── Layer 2: Animal Cohort ────────────────────────────────────────────────
     if (activeLayer === 2) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -856,7 +856,7 @@ export function HakaseAI() {
 
     // ── Layer 3: Patient Cohort (async — real FAERS + PD fetch) ───────────────
     if (activeLayer === 3) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -932,9 +932,9 @@ export function HakaseAI() {
         clearInterval(interval);
 
         if (activeLayer === 1) {
-          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
           setSimResults(results);
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId);
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea);
           setInVitroResults(ivResults);
           const l1Flags = computeLayer1Flags(ivResults);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
@@ -966,7 +966,7 @@ export function HakaseAI() {
           }
         } else {
           // Layer 4: Trial
-          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId);
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
           const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
             bioavailF:       animalResults.formulationResult.formulatedF,
             humanHalfLifeHr: animalResults.humanHalfLife,
@@ -1019,7 +1019,7 @@ export function HakaseAI() {
     }, 180);
   }, [activeLayer, molProps, smiles, molName, uniprotId, simResults, animalResults, cohortResults,
       animalSpecies, animalStudyType, animalRoute, animalFormulation,
-      proteinInfo, indication,
+      proteinInfo, indication, therapeuticArea,
       cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
       powerTarget, dropoutRate, numArms, adaptiveEnabled,

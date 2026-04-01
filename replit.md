@@ -1,7 +1,7 @@
 # HakaseAI — BioDigital Twin Platform
 
 ## Four-Layer Simulation Pipeline
-- **Layer 1 (Violet)**: In Vitro — SMILES input, in vitro assay simulation (IC50, Caco-2, CYP panel, hERG, selectivity), directional ADMET, 3D viewer
+- **Layer 1 (Violet)**: In Vitro — SMILES input, in vitro assay simulation (IC50, Caco-2, CYP panel, hERG, selectivity), directional ADMET, 3D viewer; **Therapeutic Area** dropdown (Oncology, CNS, Cardiovascular, Metabolic, Rare Disease, Infectious Disease, Immunology) actively modulates potency expectations, toxicity profile weighting, off-target panel composition, cell line selection, and ADMET scoring
 - **Layer 2 (Amber)**: Animal Cohort — in-silico PBPK, 7 species/strain sets, NOAEL/MTD, FIH dose projection, Human Translation Panel
 - **Layer 3 (Blue)**: Patient Cohort — virtual patients, PK/PD, FAERS, responder analysis
 - **Layer 4 (Emerald)**: Trial Digital Twin — Monte Carlo, adaptive design, regulatory outputs, PROCOVA (Prognostic Covariate Adjustment) module

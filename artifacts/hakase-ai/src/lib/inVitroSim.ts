@@ -104,10 +104,79 @@ function cypRisk(ic50: number): "Low" | "Moderate" | "High" {
   return "High";
 }
 
+export interface TherapeuticAreaProfile {
+  potencyMultiplier: number;
+  potencyThresholds: { high: number; moderate: number };
+  hergWeight: number;
+  hepatoWeight: number;
+  cnsWeight: number;
+  renalWeight: number;
+  giWeight: number;
+  offTargetPanelNames: string[];
+  cellLinePreference: string[];
+}
+
+const THERAPEUTIC_AREA_PROFILES: Record<string, TherapeuticAreaProfile> = {
+  "Oncology": {
+    potencyMultiplier: 0.7,
+    potencyThresholds: { high: 100, moderate: 1000 },
+    hergWeight: 1.0, hepatoWeight: 1.3, cnsWeight: 0.7, renalWeight: 1.0, giWeight: 1.2,
+    offTargetPanelNames: ["PIM1", "FLT3", "JAK2", "ALK", "ROS1", "MET", "FGFR1", "VEGFR2", "PDGFRα", "AXL", "KIT", "RET", "NTRK1", "BRAF", "MEK1"],
+    cellLinePreference: ["A549", "MCF-7", "HCT116", "MDA-MB-231", "HepG2"],
+  },
+  "CNS": {
+    potencyMultiplier: 0.9,
+    potencyThresholds: { high: 50, moderate: 500 },
+    hergWeight: 1.5, hepatoWeight: 0.8, cnsWeight: 2.0, renalWeight: 0.7, giWeight: 0.8,
+    offTargetPanelNames: ["5-HT2A", "D2R", "NMDAR", "GABA-A", "MAO-B", "AChE", "SERT", "NET", "DAT", "mGluR5", "PDE4", "GSK3β", "DYRK1A", "CDK5", "LRRK2"],
+    cellLinePreference: ["SH-SY5Y", "U-87 MG", "HEK293", "IMR-32", "Neuro-2a"],
+  },
+  "Cardiovascular": {
+    potencyMultiplier: 1.0,
+    potencyThresholds: { high: 50, moderate: 500 },
+    hergWeight: 2.5, hepatoWeight: 1.0, cnsWeight: 0.5, renalWeight: 1.5, giWeight: 0.8,
+    offTargetPanelNames: ["hERG", "Nav1.5", "Cav1.2", "KCNQ1", "Kir2.1", "ACE", "AT1R", "PDE3", "PDE5", "ROCK1", "PKCα", "eNOS", "SGLT2", "PCSK9", "Endothelin-A"],
+    cellLinePreference: ["HEK293", "CHO-hERG", "HL-1", "H9c2", "iPSC-CM"],
+  },
+  "Metabolic": {
+    potencyMultiplier: 1.1,
+    potencyThresholds: { high: 50, moderate: 500 },
+    hergWeight: 1.0, hepatoWeight: 1.8, cnsWeight: 0.5, renalWeight: 1.5, giWeight: 1.3,
+    offTargetPanelNames: ["PPAR-γ", "GLP-1R", "DPP-4", "SGLT2", "AMPK", "FXR", "LXR", "ACC1", "FASN", "SCD1", "DGAT2", "HMGCR", "CETP", "GPR40", "GPR119"],
+    cellLinePreference: ["HepG2", "3T3-L1", "INS-1", "MIN6", "Caco-2"],
+  },
+  "Rare Disease": {
+    potencyMultiplier: 0.8,
+    potencyThresholds: { high: 100, moderate: 1000 },
+    hergWeight: 1.2, hepatoWeight: 1.2, cnsWeight: 1.0, renalWeight: 1.0, giWeight: 1.0,
+    offTargetPanelNames: ["SMN2", "CFTR", "GCase", "ASM", "GAA", "IDUA", "GLA", "CLN3", "ATP7B", "HPRT", "PIM1", "JAK2", "DYRK1A", "GSK3β", "CLK1"],
+    cellLinePreference: ["HEK293", "HepG2", "iPSC-derived", "Fibroblasts", "SH-SY5Y"],
+  },
+  "Infectious Disease": {
+    potencyMultiplier: 0.6,
+    potencyThresholds: { high: 100, moderate: 1000 },
+    hergWeight: 1.0, hepatoWeight: 1.5, cnsWeight: 0.5, renalWeight: 1.3, giWeight: 1.5,
+    offTargetPanelNames: ["HIV-PR", "HIV-RT", "HIV-IN", "HCV-NS5B", "3CLpro", "RdRp", "Neuraminidase", "InhA", "GyrA", "PBP2a", "DHFR", "Topo-IV", "β-Lactamase", "EF-Tu", "MurA"],
+    cellLinePreference: ["Vero", "A549", "Calu-3", "MT-4", "HEK293"],
+  },
+  "Immunology": {
+    potencyMultiplier: 0.85,
+    potencyThresholds: { high: 50, moderate: 500 },
+    hergWeight: 1.0, hepatoWeight: 1.3, cnsWeight: 0.5, renalWeight: 1.0, giWeight: 1.2,
+    offTargetPanelNames: ["JAK1", "JAK2", "JAK3", "TYK2", "BTK", "SYK", "ITK", "PI3Kδ", "IRAK4", "RORγt", "IL-6R", "TNFα", "IL-17A", "S1PR1", "PDE4"],
+    cellLinePreference: ["Jurkat", "THP-1", "U937", "PBMC", "HEK293"],
+  },
+};
+
+function getTherapeuticProfile(therapeuticArea: string): TherapeuticAreaProfile {
+  return THERAPEUTIC_AREA_PROFILES[therapeuticArea] ?? THERAPEUTIC_AREA_PROFILES["Oncology"];
+}
+
 export function runInVitroSimulation(
   molProps: MolecularProperties,
   smiles: string,
   uniprotId: string,
+  therapeuticArea: string = "Oncology",
 ): InVitroResults {
   const seed = hashSmiles(smiles);
   const mw = molProps.molecularWeight ?? 300;
@@ -116,11 +185,12 @@ export function runInVitroSimulation(
   const hbd = molProps.hbdCount ?? 2;
   const hba = molProps.hbaCount ?? 5;
   const rotBonds = molProps.rotatableBonds ?? 4;
+  const taProfile = getTherapeuticProfile(therapeuticArea);
 
   const r = (offset: number) => seededRandom(seed + offset);
 
   const ic50Base = 10 + (mw / 100) * 8 + Math.abs(logP - 3) * 15;
-  const ic50_nM = clamp(ic50Base * (0.6 + r(1) * 0.8), 0.5, 5000);
+  const ic50_nM = clamp(ic50Base * taProfile.potencyMultiplier * (0.6 + r(1) * 0.8), 0.5, 5000);
   const ec50_nM = ic50_nM * (0.8 + r(2) * 0.4);
   const hillCoeff = clamp(0.8 + r(3) * 1.5, 0.7, 3.0);
   const maxInhibition = clamp(85 + r(4) * 15, 60, 100);
@@ -133,7 +203,7 @@ export function runInVitroSimulation(
   }
 
   const potencyClass: DoseResponseData["potencyClass"] =
-    ic50_nM < 50 ? "High" : ic50_nM < 500 ? "Moderate" : "Low";
+    ic50_nM < taProfile.potencyThresholds.high ? "High" : ic50_nM < taProfile.potencyThresholds.moderate ? "Moderate" : "Low";
 
   const caco2Base = logP > 0 && logP < 5 ? 15 + (logP * 5) : 5;
   const tpsaPenalty = tpsa > 140 ? 0.3 : tpsa > 90 ? 0.7 : 1.0;
@@ -181,9 +251,11 @@ export function runInVitroSimulation(
 
   const hergBase = logP > 3 ? 3 + r(17) * 10 : 10 + r(17) * 40;
   const herg_ic50_uM = clamp(hergBase * (mw > 400 ? 0.7 : 1.2), 0.3, 50);
+  const hergMarginThreshold = taProfile.hergWeight;
   const safetyMargin = (herg_ic50_uM * 1000) / Math.max(1, ic50_nM);
+  const adjustedHergIC50 = herg_ic50_uM / hergMarginThreshold;
   const hergRisk: HERGData["riskCategory"] =
-    herg_ic50_uM < 1 ? "High" : herg_ic50_uM < 10 ? "Moderate" : "Low";
+    adjustedHergIC50 < 1 ? "High" : adjustedHergIC50 < 10 ? "Moderate" : "Low";
   const patchClampResult = hergRisk === "High" ? "Significant block at 1 µM"
     : hergRisk === "Moderate" ? "Mild block at 10 µM" : "No significant block at 30 µM";
 
@@ -194,10 +266,7 @@ export function runInVitroSimulation(
   const selectivityClass: SelectivityData["selectivityClass"] =
     kinaseScore > 0.8 ? "Selective" : kinaseScore > 0.5 ? "Moderately Selective" : "Non-Selective";
 
-  const offTargetNames = [
-    "PIM1", "DYRK1A", "CLK1", "FLT3", "JAK2", "ROCK1", "PKCα", "GSK3β",
-    "AXL", "MET", "ROS1", "ALK", "FGFR1", "VEGFR2", "PDGFRα",
-  ];
+  const offTargetNames = taProfile.offTargetPanelNames;
   const topOffTargets = Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => ({
     name: offTargetNames[Math.floor(r(20 + i) * offTargetNames.length)],
     ic50_nM: clamp(ic50_nM * (5 + r(30 + i) * 50), 10, 10000),
@@ -207,7 +276,7 @@ export function runInVitroSimulation(
   const cc50_uM = clamp(10 + r(50) * 90, 1, 100);
   const therapeuticIndex = (cc50_uM * 1000) / Math.max(1, ic50_nM);
   const viabilityAt10uM = clamp(85 + r(51) * 15 - (logP > 4 ? 20 : 0), 30, 100);
-  const cellLines = ["HepG2", "HEK293", "A549", "MCF-7", "HeLa"];
+  const cellLines = taProfile.cellLinePreference;
   const cellLine = cellLines[Math.floor(r(52) * cellLines.length)];
 
   const riskFactors = [

@@ -73,6 +73,59 @@ const TARGET_MAP: Record<string, { name: string; class: string; offTargets: stri
   P15056: { name: "BRAF",  class: "Ser/Thr Kinase",       offTargets: ["CRAF (P04049)", "MAP2K1 (Q02750)"],             potencyRange: [1,  300]  },
 };
 
+interface AdmetTherapeuticModifiers {
+  absorptionBonus: number;
+  metabolismPenalty: number;
+  toxicitySensitivity: number;
+  hergSensitivity: number;
+  hepatoSensitivity: number;
+  cnsSensitivity: number;
+  renalSensitivity: number;
+  similarDrugsOverride: string[];
+}
+
+const ADMET_TA_MODIFIERS: Record<string, AdmetTherapeuticModifiers> = {
+  "Oncology": {
+    absorptionBonus: 0.0, metabolismPenalty: 0.0, toxicitySensitivity: 0.85,
+    hergSensitivity: 1.0, hepatoSensitivity: 1.3, cnsSensitivity: 0.7, renalSensitivity: 1.0,
+    similarDrugsOverride: [],
+  },
+  "CNS": {
+    absorptionBonus: 0.05, metabolismPenalty: -0.03, toxicitySensitivity: 1.1,
+    hergSensitivity: 1.5, hepatoSensitivity: 0.8, cnsSensitivity: 2.0, renalSensitivity: 0.7,
+    similarDrugsOverride: ["Donepezil", "Lecanemab", "Levodopa"],
+  },
+  "Cardiovascular": {
+    absorptionBonus: 0.03, metabolismPenalty: 0.0, toxicitySensitivity: 1.2,
+    hergSensitivity: 2.5, hepatoSensitivity: 1.0, cnsSensitivity: 0.5, renalSensitivity: 1.5,
+    similarDrugsOverride: ["Atorvastatin", "Entresto", "Empagliflozin"],
+  },
+  "Metabolic": {
+    absorptionBonus: 0.04, metabolismPenalty: 0.04, toxicitySensitivity: 1.0,
+    hergSensitivity: 1.0, hepatoSensitivity: 1.8, cnsSensitivity: 0.5, renalSensitivity: 1.5,
+    similarDrugsOverride: ["Semaglutide", "Tirzepatide", "Metformin"],
+  },
+  "Rare Disease": {
+    absorptionBonus: 0.0, metabolismPenalty: 0.0, toxicitySensitivity: 0.9,
+    hergSensitivity: 1.2, hepatoSensitivity: 1.2, cnsSensitivity: 1.0, renalSensitivity: 1.0,
+    similarDrugsOverride: ["Nusinersen", "Lumacaftor", "Migalastat"],
+  },
+  "Infectious Disease": {
+    absorptionBonus: 0.02, metabolismPenalty: 0.03, toxicitySensitivity: 1.0,
+    hergSensitivity: 1.0, hepatoSensitivity: 1.5, cnsSensitivity: 0.5, renalSensitivity: 1.3,
+    similarDrugsOverride: ["Nirmatrelvir", "Remdesivir", "Dolutegravir"],
+  },
+  "Immunology": {
+    absorptionBonus: 0.03, metabolismPenalty: 0.02, toxicitySensitivity: 1.05,
+    hergSensitivity: 1.0, hepatoSensitivity: 1.3, cnsSensitivity: 0.5, renalSensitivity: 1.0,
+    similarDrugsOverride: ["Tofacitinib", "Upadacitinib", "Dupilumab"],
+  },
+};
+
+function getAdmetModifiers(therapeuticArea: string): AdmetTherapeuticModifiers {
+  return ADMET_TA_MODIFIERS[therapeuticArea] ?? ADMET_TA_MODIFIERS["Oncology"];
+}
+
 function clamp(v: number, lo = 0, hi = 1): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -93,9 +146,11 @@ export function runAdmetSimulation(
   smiles:       string,
   molName:      string,
   uniprotId:    string,
+  therapeuticArea: string = "Oncology",
 ): SimResults {
   const { mw, logP, hbd, hba, tpsa, rotBonds, qed } = molProps;
   const seed = hashSmiles(smiles);
+  const taMod = getAdmetModifiers(therapeuticArea);
 
   // ── Absorption ─────────────────────────────────────────────────────────
   let abs = 0;
@@ -107,6 +162,7 @@ export function runAdmetSimulation(
   if (hbd > 5)                  abs -= 0.10;
   if (mw > 600)                 abs -= 0.08;
   if (molProps.lipinskiPass)    abs += 0.05;
+  abs += taMod.absorptionBonus;
   abs = clamp(abs);
 
   // ── Distribution ───────────────────────────────────────────────────────
@@ -123,6 +179,7 @@ export function runAdmetSimulation(
   if (logP > 5)                 met -= 0.08;
   if (rotBonds > 8)             met -= 0.06;
   if (hbd < 2)                  met += 0.05;
+  met -= taMod.metabolismPenalty;
   met = clamp(met);
 
   // ── Excretion ───────────────────────────────────────────────────────────
@@ -140,9 +197,10 @@ export function runAdmetSimulation(
   const genoRisk    = false;
   const bbbPenetrant = tpsa < 90 && mw < 450;
 
-  if (hergRisk)    tox -= 0.12;
-  if (hepatoRisk)  tox -= 0.08;
+  if (hergRisk)    tox -= 0.12 * taMod.hergSensitivity;
+  if (hepatoRisk)  tox -= 0.08 * taMod.hepatoSensitivity;
   if (mw > 600)    tox -= 0.05;
+  tox *= taMod.toxicitySensitivity;
   tox = clamp(tox);
 
   const overall = clamp((abs * 0.25 + dist * 0.20 + met * 0.20 + exc * 0.15 + tox * 0.20));
@@ -176,36 +234,54 @@ export function runAdmetSimulation(
     });
   }
 
-  // ── Organ Risks ─────────────────────────────────────────────────────────
+  // ── Organ Risks (weighted by therapeutic area sensitivity) ───────────────
+  const liverBaseRisk = hepatoRisk ? jitter(0.22, 0.06, seed + 10) : jitter(0.07, 0.04, seed + 10);
+  const heartBaseRisk = hergRisk ? jitter(0.18, 0.06, seed + 11) : jitter(0.10, 0.04, seed + 11);
+  const kidneyBaseRisk = mw < 300 ? jitter(0.05, 0.03, seed + 12) : jitter(0.08, 0.04, seed + 12);
+  const cnsBaseRisk = bbbPenetrant ? jitter(0.20, 0.06, seed + 13) : jitter(0.04, 0.03, seed + 13);
+  const giBaseRisk = tpsa > 120 ? jitter(0.15, 0.05, seed + 14) : jitter(0.07, 0.03, seed + 14);
+
+  const liverRisk = clamp(liverBaseRisk * taMod.hepatoSensitivity);
+  const heartRisk = clamp(heartBaseRisk * taMod.hergSensitivity);
+  const kidneyRisk = clamp(kidneyBaseRisk * taMod.renalSensitivity);
+  const cnsRisk = clamp(cnsBaseRisk * taMod.cnsSensitivity);
+  const giRisk = clamp(giBaseRisk);
+
+  function organColor(risk: number): "emerald" | "yellow" | "red" {
+    if (risk > 0.3) return "red";
+    if (risk > 0.15) return "yellow";
+    return "emerald";
+  }
+
   const organs: OrganRisk[] = [
     {
       name: "Liver",
-      risk: clamp(hepatoRisk ? jitter(0.22, 0.06, seed + 10) : jitter(0.07, 0.04, seed + 10)),
-      color: hepatoRisk ? "yellow" : "emerald",
+      risk: liverRisk,
+      color: organColor(liverRisk),
       alerts: hepatoRisk ? ["CYP3A4 reactive metabolite risk"] : [],
     },
     {
       name: "Heart (hERG)",
-      risk: clamp(hergRisk ? jitter(0.18, 0.06, seed + 11) : jitter(0.10, 0.04, seed + 11)),
-      color: hergRisk ? "yellow" : "emerald",
+      risk: heartRisk,
+      color: organColor(heartRisk),
       alerts: hergRisk ? ["Minor QT prolongation risk"] : [],
     },
     {
       name: "Kidney",
-      risk: clamp(mw < 300 ? jitter(0.05, 0.03, seed + 12) : jitter(0.08, 0.04, seed + 12)),
-      color: "emerald",
-      alerts: [],
+      risk: kidneyRisk,
+      color: organColor(kidneyRisk),
+      alerts: kidneyRisk > 0.15 ? ["Elevated renal clearance burden"] : [],
     },
     {
       name: "CNS",
-      risk: clamp(bbbPenetrant ? jitter(0.20, 0.06, seed + 13) : jitter(0.04, 0.03, seed + 13)),
-      color: bbbPenetrant ? "yellow" : "emerald",
+      risk: cnsRisk,
+      color: organColor(cnsRisk),
       alerts: bbbPenetrant ? ["BBB penetrant", "CNS active class"] : [],
     },
     {
       name: "GI Tract",
-      risk: clamp(tpsa > 120 ? jitter(0.15, 0.05, seed + 14) : jitter(0.07, 0.03, seed + 14)),
-      color: tpsa > 120 ? "yellow" : "emerald",
+      risk: giRisk,
+      color: organColor(giRisk),
       alerts: tpsa > 120 ? ["Reduced oral absorption predicted"] : [],
     },
     {
@@ -290,7 +366,8 @@ export function runAdmetSimulation(
     P00519: ["Imatinib", "Dasatinib", "Nilotinib"],
     P15056: ["Vemurafenib", "Dabrafenib", "Encorafenib"],
   };
-  const similarDrugs = similarByTarget[uniprotId] ?? ["Erlotinib", "Gefitinib", "Imatinib"];
+  const targetDrugs = similarByTarget[uniprotId];
+  const similarDrugs = targetDrugs ?? (taMod.similarDrugsOverride.length > 0 ? taMod.similarDrugsOverride : ["Erlotinib", "Gefitinib", "Imatinib"]);
 
   return {
     admet: { absorption: abs, distribution: dist, metabolism: met, excretion: exc, toxicity: tox, overall },
