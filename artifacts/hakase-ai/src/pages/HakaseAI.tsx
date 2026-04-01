@@ -775,7 +775,7 @@ export function HakaseAI() {
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
-    const steps = activeLayer === 1 ? 18 : activeLayer === 2 ? 16 : activeLayer === 3 ? 22 : 28;
+    const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 2 ? 16 : activeLayer === 3 ? 22 : 28;
     let tick = 0;
 
     // ── Layer 2: Animal Cohort ────────────────────────────────────────────────
@@ -933,6 +933,24 @@ export function HakaseAI() {
 
         if (activeLayer === 1) {
           const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+
+          if (fingerprintOn && tissueTypes.length > 0) {
+            const tissueOrganMap: Record<string, string> = {
+              "Liver": "Liver", "Kidney": "Kidney", "CNS": "CNS",
+              "Cardiac": "Heart (hERG)", "GI": "GI Tract", "Lung": "Lung",
+            };
+            for (const organ of results.organs) {
+              const matchedTissue = tissueTypes.find(t => tissueOrganMap[t] === organ.name);
+              if (matchedTissue) {
+                organ.risk = Math.min(1, organ.risk * 1.25);
+                organ.color = organ.risk > 0.3 ? "red" : organ.risk > 0.15 ? "yellow" : "emerald";
+                if (!organ.alerts.includes("Behavioral fingerprint: enhanced surveillance")) {
+                  organ.alerts.push("Behavioral fingerprint: enhanced surveillance");
+                }
+              }
+            }
+          }
+
           setSimResults(results);
           const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea);
           setInVitroResults(ivResults);
@@ -942,6 +960,7 @@ export function HakaseAI() {
             { database: "RDKit.js", status: "success", version: "2024.03.5", resultCount: 1 },
             { database: "BindingDB", status: bindingOn ? "success" : "skipped" },
             { database: "OpenTargets", status: "success" },
+            ...(fingerprintOn ? [{ database: "BehavioralFingerprint", status: "success" as const, resultCount: tissueTypes.length }] : []),
           ];
           setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 1, l1Flags), 1, prov1));
           // ── Layer 1 external DB enrichment ──────────────────────────────
@@ -1023,7 +1042,7 @@ export function HakaseAI() {
       cohortSize, startingDose, routeOfAdmin, dosingFreq, ageRange, severity,
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
       powerTarget, dropoutRate, numArms, adaptiveEnabled,
-      bindingOn, toxOn,
+      bindingOn, toxOn, fingerprintOn, tissueTypes,
       procovaEnabled, procovaVarManual, procovaVarReduction, procovaRatio, primaryEndpointType]);
 
   const handleDiagenFetch = useCallback(() => {
@@ -2349,8 +2368,8 @@ export function HakaseAI() {
                     <SectionHeader icon={Settings2} label="Simulation Options" />
                     <div className="space-y-2.5">
                       <ToggleRow
-                        label="ADMET Prediction"
-                        description="Always on — core prediction"
+                        label="ADMET Profiling"
+                        description="Directional — supports in vitro assays"
                         value={admetOn}
                         locked
                       />
