@@ -14,8 +14,10 @@
 - `artifacts/hakase-ai/src/lib/bioactivationEngine.ts` — Mechanistic toxicity (10 AOP pathways) & metabolic bioactivation assessment
 - `artifacts/hakase-ai/src/lib/cohortSim.ts` — Layer 3 patient cohort
 - `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model, PROCOVA engine)
+- `artifacts/hakase-ai/src/lib/chemblActivity.ts` — ChEMBL multi-target bioactivity fetcher (compound polypharmacology)
 - `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
 - `artifacts/api-server/src/routes/bio-chat/` — Claude chat
+- `artifacts/api-server/src/routes/chembl.ts` — ChEMBL proxy (compound lookup + activities)
 
 ## Animal Cohort (Layer 2) Species Library
 7 validated parameter sets: Mouse CD-1, Mouse C57BL/6, Rat Sprague Dawley, Rat Wistar, Dog Beagle, Cynomolgus Monkey. Human reference is a **background translation target only** — not selectable in the species picker; appears as the Human Translation Panel in results.

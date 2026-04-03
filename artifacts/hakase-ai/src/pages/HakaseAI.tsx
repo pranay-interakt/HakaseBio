@@ -26,6 +26,7 @@ import {
 } from "@/lib/animalSim";
 import { FORMULATION_LIST } from "@/lib/formulationDB";
 import { fetchBindingDB, type BindingDBResult } from "@/lib/bindingDB";
+import { fetchChEMBLMultiTarget, type ChEMBLMultiTargetResult } from "@/lib/chemblActivity";
 import { fetchCompTox, type ToxCastResult } from "@/lib/toxcast";
 import { searchClinicalTrials, type CTGSearchResult } from "@/lib/clinicalTrials";
 import { fetchOpenTargets, type OTTargetResult } from "@/lib/openTargets";
@@ -372,6 +373,7 @@ export function HakaseAI() {
 
   // ── External DB enrichment state ──────────────────────────────────────────
   const [extBindingDB, setExtBindingDB]   = useState<BindingDBResult | null>(null);
+  const [extChEMBL, setExtChEMBL]         = useState<ChEMBLMultiTargetResult | null>(null);
   const [extToxCast, setExtToxCast]       = useState<ToxCastResult | null>(null);
   const [extClinTrials, setExtClinTrials] = useState<CTGSearchResult | null>(null);
   const [extOpenTargets, setExtOpenTargets] = useState<OTTargetResult | null>(null);
@@ -752,7 +754,7 @@ export function HakaseAI() {
     setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
-    setExtBindingDB(null); setExtToxCast(null); setExtClinTrials(null);
+    setExtBindingDB(null); setExtChEMBL(null); setExtToxCast(null); setExtClinTrials(null);
     setExtOpenTargets(null); setExtString(null); setExtKEGG(null);
     setExtReactome(null); setExtPharmGKB(null); setExtDisGeNET(null);
     setExtGnomAD(null); setExtEcotox(null);
@@ -974,12 +976,14 @@ export function HakaseAI() {
               gene ? fetchKEGGPathways(gene) : Promise.resolve(null),
               uniprotId ? fetchReactomePathways(uniprotId) : Promise.resolve(null),
               fetchOpenTargets(target),
-            ]).then(([bdb, str, kegg, react, ot]) => {
+              smiles ? fetchChEMBLMultiTarget(smiles) : Promise.resolve(null),
+            ]).then(([bdb, str, kegg, react, ot, chembl]) => {
               if (bdb.status    === "fulfilled" && bdb.value)   setExtBindingDB(bdb.value);
               if (str.status    === "fulfilled" && str.value)   setExtString(str.value);
               if (kegg.status   === "fulfilled" && kegg.value)  setExtKEGG(kegg.value);
               if (react.status  === "fulfilled" && react.value) setExtReactome(react.value);
               if (ot.status     === "fulfilled" && ot.value)    setExtOpenTargets(ot.value);
+              if (chembl.status === "fulfilled" && chembl.value) setExtChEMBL(chembl.value);
               setExtDbLoading(false);
             });
           }
@@ -1211,6 +1215,10 @@ export function HakaseAI() {
     setCohortResults(null);
     setTrialResults(null);
     setProcovaResults(null);
+    setExtBindingDB(null); setExtChEMBL(null); setExtToxCast(null); setExtClinTrials(null);
+    setExtOpenTargets(null); setExtString(null); setExtKEGG(null);
+    setExtReactome(null); setExtPharmGKB(null); setExtDisGeNET(null);
+    setExtGnomAD(null); setExtEcotox(null);
     setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setSimProgress(0);
     setHAIOpsCtx(createHAIOpsContext());
@@ -2659,6 +2667,7 @@ export function HakaseAI() {
                         layer={1}
                         loading={extDbLoading}
                         extBindingDB={extBindingDB}
+                        extChEMBL={extChEMBL}
                         extString={extString}
                         extKEGG={extKEGG}
                         extReactome={extReactome}

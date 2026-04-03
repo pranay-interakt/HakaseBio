@@ -1,5 +1,6 @@
-import { ExternalLink, Dna, Link2, GitBranch, Activity, Globe, Beaker, Leaf, FileText, Pill, Users, ChevronRight } from "lucide-react";
+import { ExternalLink, Dna, Link2, GitBranch, Activity, Globe, Beaker, Leaf, FileText, Pill, Users, ChevronRight, Target } from "lucide-react";
 import type { BindingDBResult, BindingDBLigand } from "@/lib/bindingDB";
+import type { ChEMBLMultiTargetResult, ChEMBLTargetActivity } from "@/lib/chemblActivity";
 import type { ToxCastResult }         from "@/lib/toxcast";
 import type { CTGSearchResult, CTGTrial } from "@/lib/clinicalTrials";
 import type { OTTargetResult }        from "@/lib/openTargets";
@@ -15,6 +16,7 @@ interface Props {
   layer: 1 | 2 | 3;
   loading: boolean;
   extBindingDB?:   BindingDBResult   | null;
+  extChEMBL?:      ChEMBLMultiTargetResult | null;
   extString?:      StringResult      | null;
   extKEGG?:        KEGGResult        | null;
   extReactome?:    ReactomeResult    | null;
@@ -54,7 +56,7 @@ export function ExternalDbPanel(props: Props) {
   const { layer, loading } = props;
 
   const hasAnyData = layer === 1
-    ? (props.extBindingDB ?? props.extString ?? props.extKEGG ?? props.extReactome ?? props.extOpenTargets)
+    ? (props.extBindingDB ?? props.extChEMBL ?? props.extString ?? props.extKEGG ?? props.extReactome ?? props.extOpenTargets)
     : layer === 2
       ? (props.extToxCast ?? props.extEcotox)
       : (props.extClinTrials ?? props.extPharmGKB ?? props.extDisGeNET ?? props.extGnomAD);
@@ -99,6 +101,46 @@ export function ExternalDbPanel(props: Props) {
               <a href="https://www.bindingdb.org" target="_blank" rel="noreferrer"
                 className="flex items-center gap-1 text-[9px] text-slate-600 hover:text-slate-400 mt-2 transition-colors">
                 <ExternalLink className="w-3 h-3" /> BindingDB
+              </a>
+            </div>
+          )}
+
+          {/* ChEMBL Multi-Target Bioactivity */}
+          {props.extChEMBL && props.extChEMBL.activities.length > 0 && (
+            <div className="p-4 rounded-xl border border-amber-500/15 bg-amber-500/[0.03]">
+              <SectionHead icon={Target} label={`ChEMBL — Multi-Target Bioactivity (${props.extChEMBL.targetCount} target${props.extChEMBL.targetCount !== 1 ? "s" : ""})`} color="text-amber-400" />
+              {props.extChEMBL.compoundName && (
+                <div className="text-[10px] text-slate-500 mb-2">
+                  Compound: <span className="text-amber-300 font-semibold">{props.extChEMBL.compoundName}</span>
+                  <span className="text-slate-600 ml-1.5">({props.extChEMBL.compoundChemblId})</span>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                {props.extChEMBL.activities.slice(0, 10).map((act: ChEMBLTargetActivity, i: number) => (
+                  <div key={i} className="flex items-start justify-between text-[11px] py-1.5 border-b border-white/5 last:border-0">
+                    <div className="flex flex-col max-w-[55%]">
+                      <span className="text-slate-300 font-medium truncate">{act.targetName}</span>
+                      <span className="text-[9px] text-slate-600">{act.targetType}</span>
+                    </div>
+                    <div className="flex gap-1.5 items-center flex-shrink-0 flex-wrap justify-end">
+                      <Tag cls={act.value_nM < 100 ? "bg-emerald-500/15 text-emerald-400" : act.value_nM < 1000 ? "bg-amber-500/15 text-amber-400" : "bg-slate-700/50 text-slate-400"}>
+                        {act.activityType} {act.value_nM < 1000 ? `${act.value_nM.toFixed(0)} nM` : `${(act.value_nM / 1000).toFixed(1)} µM`}
+                      </Tag>
+                      {act.pChembl != null && (
+                        <Tag cls="bg-sky-500/10 text-sky-400">pChEMBL {act.pChembl.toFixed(1)}</Tag>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {props.extChEMBL.activities.length > 10 && (
+                <div className="mt-2 text-[9px] text-slate-600">
+                  + {props.extChEMBL.activities.length - 10} more activities
+                </div>
+              )}
+              <a href={`https://www.ebi.ac.uk/chembl/compound_report_card/${props.extChEMBL.compoundChemblId}/`} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1 text-[9px] text-slate-600 hover:text-slate-400 mt-2 transition-colors">
+                <ExternalLink className="w-3 h-3" /> ChEMBL Compound Report
               </a>
             </div>
           )}
