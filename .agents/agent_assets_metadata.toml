@@ -30,3 +30,9 @@ id = "6nujMFaZpJ9mNEeo6J3aW"
 uri = "file://HakaseAI_Product_Features.md"
 type = "text"
 title = "HakaseAI -- Complete Product Features + Story of a Molecule"
+
+[[outputs]]
+id = "agkBKLz0xJErgcfEieCIb"
+uri = "file://HakaseAI_Glossary.md"
+type = "text"
+title = "HakaseAI — Comprehensive Product Glossary"
