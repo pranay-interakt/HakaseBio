@@ -25,6 +25,31 @@ A complete reference of every term, acronym, metric, and concept used across the
 17. [Therapeutic Areas](#17-therapeutic-areas)
 18. [Diagen AI Ecosystem Integration](#18-diagen-ai-ecosystem-integration)
 19. [UI Components & Navigation](#19-ui-components--navigation)
+20. [Off-Target Panels by Therapeutic Area](#20-off-target-panels-by-therapeutic-area)
+21. [Cell Lines by Therapeutic Area](#21-cell-lines-by-therapeutic-area)
+22. [Predefined Target Proteins (ADMET Target Map)](#22-predefined-target-proteins-admet-target-map)
+23. [Demo Molecules](#23-demo-molecules)
+24. [Reference Drug Comparators by Therapeutic Area](#24-reference-drug-comparators-by-therapeutic-area)
+25. [Species Parameters (Animal Simulation Library)](#25-species-parameters-animal-simulation-library)
+26. [Study Designs (Animal Cohort)](#26-study-designs-animal-cohort)
+27. [Formulation Options](#27-formulation-options)
+28. [Dosing Frequencies & Escalation Schemes](#28-dosing-frequencies--escalation-schemes)
+29. [Comorbidities (ICD-10 Codes)](#29-comorbidities-icd-10-codes)
+30. [Clinical Trial Sites](#30-clinical-trial-sites)
+31. [PROCOVA Variance Reduction Lookup Table](#31-procova-variance-reduction-lookup-table)
+32. [Trial Cost Model Parameters](#32-trial-cost-model-parameters)
+33. [Adverse Event Types (Cohort Simulation)](#33-adverse-event-types-cohort-simulation)
+34. [Assay Thresholds & Classification Criteria](#34-assay-thresholds--classification-criteria)
+35. [AOP (Adverse Outcome Pathway) Reference Numbers](#35-aop-adverse-outcome-pathway-reference-numbers)
+36. [Geographic Regions (Trial Simulation)](#36-geographic-regions-trial-simulation)
+37. [Matching Variables (Adaptive / Stratified Randomization)](#37-matching-variables-adaptive--stratified-randomization)
+38. [3D Viewer Modes](#38-3d-viewer-modes)
+39. [Simulation Options (Layer 1 Toggles)](#39-simulation-options-layer-1-toggles)
+40. [Trial Blinding Options](#40-trial-blinding-options)
+41. [Statistical Boundary Methods](#41-statistical-boundary-methods)
+42. [Routes of Administration](#42-routes-of-administration)
+43. [Ranking Criteria (Batch Mode)](#43-ranking-criteria-batch-mode)
+44. [Data Import Sources](#44-data-import-sources)
 
 ---
 
@@ -541,6 +566,554 @@ A complete reference of every term, acronym, metric, and concept used across the
 | **Regulatory Insight Card** | A Layer 4 component showing designation eligibility (Breakthrough, Fast Track, Orphan, Accelerated Approval) and IND-enabling requirements. |
 | **Tag** | A color-coded label displaying a metric value (e.g., green for potent, amber for moderate, gray for weak). |
 | **SectionHead** | A panel header component combining an icon, label, and color theme for each data section. |
+
+---
+
+## 20. Off-Target Panels by Therapeutic Area
+
+Each therapeutic area defines a unique panel of 15 off-target proteins tested during Layer 1 simulation. These represent the most clinically relevant selectivity concerns for each field.
+
+### Oncology Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **PIM1** | Proto-oncogene serine/threonine-protein kinase Pim-1 |
+| **FLT3** | Fms-like tyrosine kinase 3 (mutated in AML) |
+| **JAK2** | Janus kinase 2 (myeloproliferative driver) |
+| **ALK** | Anaplastic lymphoma kinase |
+| **ROS1** | Proto-oncogene tyrosine-protein kinase ROS |
+| **MET** | Hepatocyte growth factor receptor |
+| **FGFR1** | Fibroblast growth factor receptor 1 |
+| **VEGFR2** | Vascular endothelial growth factor receptor 2 |
+| **PDGFRα** | Platelet-derived growth factor receptor alpha |
+| **AXL** | AXL receptor tyrosine kinase |
+| **KIT** | Mast/stem cell growth factor receptor (c-Kit) |
+| **RET** | RET proto-oncogene (thyroid/lung cancer) |
+| **NTRK1** | Neurotrophic receptor tyrosine kinase 1 |
+| **BRAF** | B-Raf proto-oncogene serine/threonine-protein kinase |
+| **MEK1** | Dual specificity mitogen-activated protein kinase kinase 1 |
+
+### CNS Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **5-HT2A** | Serotonin receptor 2A |
+| **D2R** | Dopamine receptor D2 |
+| **NMDAR** | N-methyl-D-aspartate receptor (glutamate) |
+| **GABA-A** | Gamma-aminobutyric acid receptor type A |
+| **MAO-B** | Monoamine oxidase B |
+| **AChE** | Acetylcholinesterase |
+| **SERT** | Serotonin transporter |
+| **NET** | Norepinephrine transporter |
+| **DAT** | Dopamine transporter |
+| **mGluR5** | Metabotropic glutamate receptor 5 |
+| **PDE4** | Phosphodiesterase 4 |
+| **GSK3β** | Glycogen synthase kinase 3 beta |
+| **DYRK1A** | Dual-specificity tyrosine-phosphorylation-regulated kinase 1A |
+| **CDK5** | Cyclin-dependent kinase 5 |
+| **LRRK2** | Leucine-rich repeat kinase 2 (Parkinson's gene) |
+
+### Cardiovascular Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **hERG** | Human Ether-à-go-go-Related Gene (cardiac potassium channel) |
+| **Nav1.5** | Voltage-gated sodium channel (cardiac) |
+| **Cav1.2** | L-type calcium channel (cardiac) |
+| **KCNQ1** | Potassium voltage-gated channel subfamily Q member 1 |
+| **Kir2.1** | Inward rectifier potassium channel |
+| **ACE** | Angiotensin-converting enzyme |
+| **AT1R** | Angiotensin II receptor type 1 |
+| **PDE3** | Phosphodiesterase 3 (cardiac contractility) |
+| **PDE5** | Phosphodiesterase 5 (vascular smooth muscle) |
+| **ROCK1** | Rho-associated coiled-coil containing protein kinase 1 |
+| **PKCα** | Protein kinase C alpha |
+| **eNOS** | Endothelial nitric oxide synthase |
+| **SGLT2** | Sodium-glucose co-transporter 2 |
+| **PCSK9** | Proprotein convertase subtilisin/kexin type 9 |
+| **Endothelin-A** | Endothelin receptor type A |
+
+### Metabolic Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **PPAR-γ** | Peroxisome proliferator-activated receptor gamma |
+| **GLP-1R** | Glucagon-like peptide-1 receptor |
+| **DPP-4** | Dipeptidyl peptidase-4 |
+| **SGLT2** | Sodium-glucose co-transporter 2 |
+| **AMPK** | AMP-activated protein kinase |
+| **FXR** | Farnesoid X receptor |
+| **LXR** | Liver X receptor |
+| **ACC1** | Acetyl-CoA carboxylase 1 |
+| **FASN** | Fatty acid synthase |
+| **SCD1** | Stearoyl-CoA desaturase 1 |
+| **DGAT2** | Diacylglycerol O-acyltransferase 2 |
+| **HMGCR** | HMG-CoA reductase (statin target) |
+| **CETP** | Cholesteryl ester transfer protein |
+| **GPR40** | Free fatty acid receptor 1 |
+| **GPR119** | G protein-coupled receptor 119 |
+
+### Rare Disease Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **SMN2** | Survival motor neuron 2 (spinal muscular atrophy) |
+| **CFTR** | Cystic fibrosis transmembrane conductance regulator |
+| **GCase** | Glucocerebrosidase (Gaucher disease) |
+| **ASM** | Acid sphingomyelinase (Niemann-Pick) |
+| **GAA** | Acid alpha-glucosidase (Pompe disease) |
+| **IDUA** | Alpha-L-iduronidase (Hurler syndrome) |
+| **GLA** | Alpha-galactosidase A (Fabry disease) |
+| **CLN3** | Ceroid-lipofuscinosis neuronal protein 3 (Batten disease) |
+| **ATP7B** | Copper-transporting ATPase 2 (Wilson disease) |
+| **HPRT** | Hypoxanthine-guanine phosphoribosyltransferase (Lesch-Nyhan) |
+| **PIM1** | Proto-oncogene serine/threonine-protein kinase Pim-1 |
+| **JAK2** | Janus kinase 2 |
+| **DYRK1A** | Dual-specificity tyrosine-phosphorylation-regulated kinase 1A |
+| **GSK3β** | Glycogen synthase kinase 3 beta |
+| **CLK1** | CDC-like kinase 1 |
+
+### Infectious Disease Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **HIV-PR** | HIV protease |
+| **HIV-RT** | HIV reverse transcriptase |
+| **HIV-IN** | HIV integrase |
+| **HCV-NS5B** | Hepatitis C virus NS5B RNA-dependent RNA polymerase |
+| **3CLpro** | 3C-like protease (SARS-CoV-2 main protease) |
+| **RdRp** | RNA-dependent RNA polymerase |
+| **Neuraminidase** | Influenza neuraminidase |
+| **InhA** | Enoyl-ACP reductase (tuberculosis) |
+| **GyrA** | DNA gyrase subunit A (antibacterial target) |
+| **PBP2a** | Penicillin-binding protein 2a (MRSA) |
+| **DHFR** | Dihydrofolate reductase (antifolate target) |
+| **Topo-IV** | Topoisomerase IV (antibacterial target) |
+| **β-Lactamase** | Beta-lactamase (antibiotic resistance enzyme) |
+| **EF-Tu** | Elongation factor Tu (bacterial translation) |
+| **MurA** | UDP-N-acetylglucosamine enolpyruvyl transferase (cell wall synthesis) |
+
+### Immunology Off-Targets
+
+| Target | Full Name |
+|--------|-----------|
+| **JAK1** | Janus kinase 1 |
+| **JAK2** | Janus kinase 2 |
+| **JAK3** | Janus kinase 3 |
+| **TYK2** | Tyrosine kinase 2 |
+| **BTK** | Bruton's tyrosine kinase |
+| **SYK** | Spleen tyrosine kinase |
+| **ITK** | IL-2-inducible T-cell kinase |
+| **PI3Kδ** | Phosphoinositide 3-kinase delta |
+| **IRAK4** | Interleukin-1 receptor-associated kinase 4 |
+| **RORγt** | Retinoic acid receptor-related orphan receptor gamma t |
+| **IL-6R** | Interleukin-6 receptor |
+| **TNFα** | Tumor necrosis factor alpha |
+| **IL-17A** | Interleukin-17A |
+| **S1PR1** | Sphingosine-1-phosphate receptor 1 |
+| **PDE4** | Phosphodiesterase 4 |
+
+---
+
+## 21. Cell Lines by Therapeutic Area
+
+Each therapeutic area uses a curated set of 5 cell lines for in vitro assay simulation.
+
+| Therapeutic Area | Cell Lines | Description |
+|------------------|-----------|-------------|
+| **Oncology** | A549 (lung adenocarcinoma), MCF-7 (breast cancer), HCT116 (colorectal cancer), MDA-MB-231 (triple-negative breast cancer), HepG2 (hepatocellular carcinoma) | Tumor-derived lines covering major solid tumor types |
+| **CNS** | SH-SY5Y (neuroblastoma), U-87 MG (glioblastoma), HEK293 (embryonic kidney / transfection host), IMR-32 (neuroblastoma), Neuro-2a (mouse neuroblastoma) | Neuronal and glial lines for CNS penetration and neurotoxicity |
+| **Cardiovascular** | HEK293 (transfection host), CHO-hERG (hERG-expressing CHO cells), HL-1 (atrial cardiomyocyte), H9c2 (rat cardiac myoblast), iPSC-CM (induced pluripotent stem cell-derived cardiomyocyte) | Cardiac and ion channel lines for cardiotoxicity |
+| **Metabolic** | HepG2 (hepatocellular), 3T3-L1 (pre-adipocyte), INS-1 (rat insulinoma), MIN6 (mouse insulinoma), Caco-2 (intestinal epithelial) | Hepatic, adipose, and pancreatic lines for metabolic endpoints |
+| **Rare Disease** | HEK293, HepG2, iPSC-derived (patient-specific), Fibroblasts (primary), SH-SY5Y | Patient-relevant lines including iPSC-derived disease models |
+| **Infectious Disease** | Vero (African green monkey kidney), A549 (lung), Calu-3 (human airway), MT-4 (T-lymphoblastoid / HIV), HEK293 | Virus-permissive and immune-relevant lines |
+| **Immunology** | Jurkat (T-cell leukemia), THP-1 (monocyte), U937 (histiocytic lymphoma), PBMC (peripheral blood mononuclear cells), HEK293 | Immune cell lines for cytokine and inflammatory assays |
+
+---
+
+## 22. Predefined Target Proteins (ADMET Target Map)
+
+The ADMET engine includes a curated map of well-characterized drug targets with their protein classes, known off-target liabilities, and expected potency ranges.
+
+| UniProt ID | Protein | Class | Known Off-Targets | Potency Range (nM) |
+|-----------|---------|-------|-------------------|-------------------|
+| **P00533** | EGFR | Tyrosine Kinase | HER2, HER3 | 1–200 |
+| **P04626** | HER2 | Tyrosine Kinase | EGFR, HER3 | 5–500 |
+| **P01116** | KRAS | GTPase | NRAS, HRAS | 50–5,000 |
+| **P11802** | CDK4 | Ser/Thr Kinase | CDK6, CDK2 | 1–100 |
+| **Q00534** | CDK6 | Ser/Thr Kinase | CDK4, CDK2 | 2–200 |
+| **Q06187** | BTK | Tyrosine Kinase | ITK, TEC | 1–150 |
+| **P00519** | ABL1 | Tyrosine Kinase | SRC, KIT | 1–100 |
+| **P15056** | BRAF | Ser/Thr Kinase | CRAF, MAP2K1 | 1–300 |
+
+---
+
+## 23. Demo Molecules
+
+Pre-loaded example compounds available in the platform for demonstration and testing.
+
+| Molecule | Target | UniProt ID | PDB ID | Description |
+|----------|--------|-----------|--------|-------------|
+| **Ibuprofen** | EGFR | P00533 | 4HJO | Default starting compound |
+| **EGFR Compound** | EGFR | P00533 | 4HJO | Epidermal growth factor receptor inhibitor |
+| **KRAS Compound** | KRAS | P01116 | 6GOF | GTPase KRAS oncogene inhibitor |
+| **CDK4 Compound** | CDK4 | P11802 | 2W96 | Cyclin-dependent kinase 4 inhibitor |
+
+---
+
+## 24. Reference Drug Comparators by Therapeutic Area
+
+The ADMET engine includes marketed drugs as comparators for benchmarking simulated compounds.
+
+| Therapeutic Area | Reference Drugs |
+|------------------|----------------|
+| **CNS** | Donepezil, Lecanemab, Levodopa |
+| **Cardiovascular** | Atorvastatin, Entresto (sacubitril/valsartan), Empagliflozin |
+| **Metabolic** | Semaglutide, Tirzepatide, Metformin |
+| **Rare Disease** | Nusinersen, Lumacaftor, Migalastat |
+| **Infectious Disease** | Nirmatrelvir (Paxlovid), Remdesivir, Dolutegravir |
+| **Immunology** | Tofacitinib, Upadacitinib, Dupilumab |
+
+---
+
+## 25. Species Parameters (Animal Simulation Library)
+
+Detailed physiological parameters used by the PBPK engine for each species.
+
+| Species | Body Weight (kg) | Km Factor | GFR (mL/min/kg) | Hepatic Blood Flow (mL/min/kg) | CL Scale Factor |
+|---------|-----------------|-----------|------------------|-------------------------------|----------------|
+| Mouse (CD-1) | 0.025 | 3 | 5.2 | 90 | 0.28 |
+| Mouse (C57BL/6) | 0.022 | 3 | 5.0 | 85 | 0.27 |
+| Rat (Sprague Dawley) | 0.300 | 6 | 5.5 | 70 | 0.40 |
+| Rat (Wistar) | 0.280 | 6 | 5.3 | 68 | 0.39 |
+| Dog (Beagle) | 10.0 | 20 | 3.2 | 31 | 0.62 |
+| Cynomolgus Monkey | 4.0 | 12 | 2.8 | 44 | 0.75 |
+| **Human (Reference)** | **70.0** | **37** | **1.8** | **20.7** | **1.00** |
+
+---
+
+## 26. Study Designs (Animal Cohort)
+
+| Study Type | Duration | Rodent N (per group) | Non-Rodent N (per group) | Recovery Group | Satellite TK |
+|-----------|----------|---------------------|------------------------|---------------|-------------|
+| Single Dose (Acute) | 0.3 weeks | 5 | 3 | No | No |
+| Sub-Acute (14-Day) | 2 weeks | 10 | 3 | No | Yes |
+| Sub-Chronic (28-Day GLP) | 4 weeks | 10 | 4 | Yes | Yes |
+| Chronic (90-Day GLP) | 13 weeks | 15 | 4 | Yes | Yes |
+
+---
+
+## 27. Formulation Options
+
+| Formulation | Description | Use Case |
+|-------------|-------------|----------|
+| **Plain Tablet / Capsule** | Simple oral solid dosage form | Well-soluble compounds (BCS Class I) |
+| **Lipid-Based LBDDS / SMEDDS** | Self-emulsifying drug delivery system | Poorly soluble, lipophilic compounds (BCS Class II) |
+| **Amorphous Solid Dispersion (ASD)** | Drug dispersed in polymer matrix | Compounds with poor crystalline solubility |
+| **Nanosuspension / Nanoparticle** | Drug milled to nanoparticle size | Enhancing dissolution rate of poorly soluble drugs |
+| **Cyclodextrin Inclusion Complex** | Drug encapsulated in cyclodextrin cage | Improving aqueous solubility and stability |
+| **Enteric-Coated / pH-Modified** | pH-dependent release coating | Protecting acid-labile drugs or targeting intestinal release |
+
+---
+
+## 28. Dosing Frequencies & Escalation Schemes
+
+### Dosing Frequencies
+
+| Abbreviation | Meaning | Schedule |
+|-------------|---------|----------|
+| **QD** | Quaque die | Once daily |
+| **BID** | Bis in die | Twice daily |
+| **TID** | Ter in die | Three times daily |
+| **QW** | Quaque week | Once weekly |
+| **Q2W** | Every 2 weeks | Biweekly |
+| **Q4W** | Every 4 weeks | Monthly |
+| **Single Dose** | One-time administration | Phase I / acute studies |
+
+### Dose Escalation Schemes
+
+| Scheme | Description |
+|--------|-------------|
+| **Linear** | Fixed dose increments (e.g., 25, 50, 75, 100 mg) |
+| **Modified Fibonacci** | Decreasing percentage increments (100%, 67%, 50%, 33%) |
+| **Bayesian Optimal Interval (BOIN)** | Statistical model-based escalation using target toxicity intervals |
+| **3+3 Design** | Classic rule-based design: 3 patients per cohort, expand if 1/3 has DLT |
+
+---
+
+## 29. Comorbidities (ICD-10 Codes)
+
+The patient cohort simulation includes 40+ selectable comorbid conditions. Key entries:
+
+| ICD-10 Code | Condition |
+|-------------|-----------|
+| **I10** | Essential (primary) hypertension |
+| **E11** | Type 2 diabetes mellitus |
+| **N18.3** | Chronic kidney disease, stage 3 |
+| **N18.4** | Chronic kidney disease, stage 4 |
+| **N18.5** | Chronic kidney disease, stage 5 |
+| **I50.9** | Heart failure, unspecified |
+| **J44.1** | COPD with acute exacerbation |
+| **E78.0** | Pure hypercholesterolemia |
+| **I25.1** | Atherosclerotic heart disease |
+| **E66.0** | Obesity due to excess calories |
+| **K76.0** | Fatty liver disease (non-alcoholic) |
+| **G30** | Alzheimer's disease |
+| **F32** | Major depressive disorder |
+| **M06.9** | Rheumatoid arthritis |
+| **K21.0** | Gastroesophageal reflux disease |
+
+---
+
+## 30. Clinical Trial Sites
+
+Pre-configured clinical trial sites used in Layer 4 simulation, each with quality and composite scores.
+
+| Site Name | Location | Region | Quality Score | Composite Score |
+|-----------|----------|--------|--------------|----------------|
+| **Johns Hopkins** | Baltimore, MD | North America | 9.2 | 91 |
+| **Royal Marsden** | London, UK | Europe | 9.4 | 88 |
+| **MD Anderson** | Houston, TX | North America | 8.9 | 86 |
+| **Memorial Sloan Kettering** | New York, NY | North America | 9.1 | 84 |
+| **Tokyo Medical University** | Tokyo, Japan | Asia-Pacific | 8.7 | 79 |
+
+---
+
+## 31. PROCOVA Variance Reduction Lookup Table
+
+Published or estimated R² values for prognostic covariate adjustment by indication.
+
+| Indication | Endpoint Type | R² Range | Default R² |
+|-----------|--------------|----------|-----------|
+| **Alzheimer's Disease** | Continuous | 0.15–0.20 | 0.17 |
+| **Multiple Sclerosis** | Continuous | 0.12–0.18 | 0.15 |
+| **ALS** | Continuous | 0.14–0.19 | 0.16 |
+| **Parkinson's Disease** | Continuous | 0.10–0.16 | 0.13 |
+| **Oncology** | Time-to-Event | 0.05–0.10 | 0.07 |
+| **Rare Disease** | Continuous | 0.08–0.15 | 0.11 |
+| **General (Binary)** | Binary | — | 0.08 |
+| **General (Continuous)** | Continuous | — | 0.14 |
+| **General (Time-to-Event)** | Time-to-Event | — | 0.07 |
+
+---
+
+## 32. Trial Cost Model Parameters
+
+### Per-Patient Base Costs
+
+| Phase | Cost per Patient |
+|-------|-----------------|
+| Phase I | $28,000 |
+| Phase II | $58,000 |
+| Phase III | $105,000 |
+
+### Indication Cost Multipliers
+
+| Therapeutic Area | Multiplier |
+|------------------|-----------|
+| CNS | 1.60x |
+| Rare Disease | 1.55x |
+| Oncology | 1.45x |
+| Cardiovascular | 1.30x |
+| Metabolic | 1.00x |
+| Immunology | 1.00x |
+| Infectious Disease | 0.90x |
+
+### Fixed Costs by Phase
+
+| Cost Category | Phase I | Phase II | Phase III |
+|---------------|---------|----------|-----------|
+| Site Startup | $90K/site | $90K/site | $90K/site |
+| Site Management | $320K/site | $900K/site | $1.8M/site |
+| Regulatory | $1.1M | $2.2M | $5.5M |
+| Manufacturing | $1.1M/arm | $2.8M/arm | $7.0M/arm |
+| **Adaptive Design Premium** | — | — | $1.4M |
+| **Overhead Multiplier (CRO)** | 1.33x | 1.33x | 1.33x |
+
+---
+
+## 33. Adverse Event Types (Cohort Simulation)
+
+Default adverse event profiles used in Layer 3 patient cohort simulation.
+
+| Adverse Event | Base Incidence | Modifiers |
+|--------------|---------------|-----------|
+| **Fatigue** | 42% | — |
+| **Nausea** | 35% | — |
+| **Diarrhoea** | 28% | — |
+| **ALT Elevation** | Variable | Scaled by Liver organ risk score |
+| **Rash** | 22% | — |
+| **QTc Prolongation** | Variable | Scaled by Heart organ risk score |
+
+---
+
+## 34. Assay Thresholds & Classification Criteria
+
+### CYP Inhibition Risk
+
+| Risk Level | IC50 Threshold |
+|-----------|---------------|
+| Low | > 20 µM |
+| Moderate | > 5 µM |
+| High | ≤ 5 µM |
+
+### Intestinal Permeability (Caco-2 Papp)
+
+| Classification | Papp (×10⁻⁶ cm/s) |
+|---------------|-------------------|
+| High | > 20 |
+| Moderate | > 5 |
+| Low | ≤ 5 |
+
+### Metabolic Stability (CLint)
+
+| Classification | CLint (µL/min/mg) |
+|---------------|-------------------|
+| Stable | < 15 |
+| Moderate | < 50 |
+| Unstable | ≥ 50 |
+
+### Plasma Protein Binding
+
+| Classification | Free Fraction (fu%) |
+|---------------|-------------------|
+| Weakly Bound | > 20% |
+| Moderately Bound | > 5% |
+| Highly Bound | ≤ 5% |
+
+### Organ Risk Color Coding
+
+| Risk Level | Threshold | Display Color |
+|-----------|-----------|--------------|
+| Low | ≤ 0.15 | Emerald (green) |
+| Moderate | ≤ 0.30 | Yellow (amber) |
+| High | > 0.30 | Red |
+
+---
+
+## 35. AOP (Adverse Outcome Pathway) Reference Numbers
+
+Bioactivation engine pathways mapped to internationally recognized AOP identifiers.
+
+| AOP ID | Pathway | Structural Alert |
+|--------|---------|-----------------|
+| **AOP-18** | Aniline/Aromatic Amine → CYP1A2 N-oxidation → Methemoglobinemia | Aniline |
+| **AOP-220** | Quinone/Hydroquinone → Keap1/Nrf2 disruption → Oxidative stress | Quinone |
+| **AOP-34** | Thiophene S-oxidation → Reactive sulfoxide → Hepatotoxicity | Thiophene |
+| **AOP-150** | Acyl Glucuronide reactivity → Protein adducts → Idiosyncratic DILI | Acyl Glucuronide |
+| **AOP-107** | Arene Oxide (Epoxide) formation → DNA adducts → Genotoxicity | Arene Oxide |
+| **AOP-96** | Phenol oxidation → Quinone-Imine (NAPQI-type) → Hepatonecrosis | Michael Acceptor |
+
+---
+
+## 36. Geographic Regions (Trial Simulation)
+
+| Region | Description |
+|--------|-------------|
+| **North America** | US, Canada — FDA regulatory framework |
+| **European Union** | EU member states — EMA regulatory framework |
+| **Japan** | PMDA regulatory framework |
+| **China** | NMPA regulatory framework |
+| **Rest of World** | All other regions |
+
+---
+
+## 37. Matching Variables (Adaptive / Stratified Randomization)
+
+Variables used to balance patient characteristics across treatment arms.
+
+| Variable | Description |
+|----------|-------------|
+| **Age** | Patient age at enrollment |
+| **Sex** | Biological sex (male/female) |
+| **Baseline Severity** | Disease severity score at screening |
+| **Biomarker Status** | Positive/negative for a pre-specified biomarker |
+| **BMI** | Body mass index |
+| **Comorbidities** | Presence of specific co-morbid conditions |
+
+---
+
+## 38. 3D Viewer Modes
+
+| Mode | Description |
+|------|-------------|
+| **Scientific** | Structural analysis view showing binding pockets, secondary structures, and electron density |
+| **Explorer** | Gallery-style view for comparing multiple ligands or viewing different protein conformations |
+| **Cinematic** | High-impact, presentation-quality visualization with dramatic lighting and depth of field |
+
+---
+
+## 39. Simulation Options (Layer 1 Toggles)
+
+| Option | Description |
+|--------|-------------|
+| **ADMET Profiling / Directional** | Directional ADMET assessment that supports and contextualizes in vitro results (not standalone) |
+| **Target Binding (Simulation)** | Simulated molecular docking and binding affinity prediction |
+| **Toxicity Screening (Deep Learning)** | Computational toxicity prediction using structural alerts and learned patterns |
+| **Molecular Fingerprint (ECFP4)** | Generation of extended connectivity fingerprints for similarity analysis |
+| **Behavioral Fingerprinting** | Enhanced tissue-specific surveillance with 1.25x organ risk amplification |
+
+---
+
+## 40. Trial Blinding Options
+
+| Blinding Level | Description |
+|----------------|-------------|
+| **Open-Label** | All parties know the treatment assignment |
+| **Single-Blind** | Patients do not know their assignment; investigators do |
+| **Double-Blind** | Neither patients nor investigators know the assignment |
+| **Triple-Blind** | Patients, investigators, and data analysts are all blinded |
+
+---
+
+## 41. Statistical Boundary Methods
+
+| Method | Description |
+|--------|-------------|
+| **O'Brien-Fleming** | Conservative spending function — uses very little alpha at early looks, preserving most for the final analysis. Standard for pivotal trials. |
+| **Pocock** | Equal alpha spending at each look — more likely to stop early but less power at the final analysis. |
+
+---
+
+## 42. Routes of Administration
+
+| Route | Abbreviation | Description |
+|-------|-------------|-------------|
+| **Oral** | PO | Administered by mouth (most common) |
+| **Intravenous Bolus** | IV | Direct injection into the bloodstream |
+| **Intravenous Infusion** | IV inf | Continuous drip into the bloodstream |
+| **Subcutaneous** | SC | Injection under the skin |
+| **Intramuscular** | IM | Injection into muscle tissue |
+| **Intraperitoneal** | IP | Injection into the abdominal cavity (primarily preclinical) |
+| **Transdermal** | TD | Absorption through the skin (patches) |
+
+---
+
+## 43. Ranking Criteria (Batch Mode)
+
+When comparing multiple compounds, the platform supports ranking by:
+
+| Criterion | Description |
+|-----------|-------------|
+| **QED Score** | Overall drug-likeness (higher = more drug-like) |
+| **Toxicity Risk** | Composite safety score (lower = safer) |
+| **Binding Affinity** | Predicted target binding strength (lower Kd/IC50 = stronger) |
+| **Composite (Weighted)** | User-configurable weighted combination of all criteria |
+
+---
+
+## 44. Data Import Sources
+
+| Source | Type | Identifier |
+|--------|------|-----------|
+| **ClinicalTrials.gov** | Clinical trial registry | NCT ID (e.g., NCT04012345) |
+| **PubMed** | Literature database | PMID |
+| **EHR / Epic** | Electronic health records | Patient ID |
+| **LIMS** | Laboratory information management system | Sample ID |
+| **PubChem** | Chemical compound database | CID |
+| **ChEMBL** | Bioactivity database | CHEMBL ID |
+| **DrugBank** | Drug database | DB ID |
+| **ZINC** | Commercial compound database | ZINC ID |
 
 ---
 
