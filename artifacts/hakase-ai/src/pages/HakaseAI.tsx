@@ -37,7 +37,8 @@ import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
 import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
-import { suggestTargets, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { suggestTargets, convertChEMBLHitsToSuggestions, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
 import {
   computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
@@ -237,28 +238,69 @@ export function HakaseAI() {
 
   // ── Molecule-aware target protein suggestions ──────────────────────────────
   const [targetSuggOpen, setTargetSuggOpen] = useState(false);
-  const targetSuggestions = useMemo<TargetSuggestion[]>(
+  const [chemblLookupLoading, setChemblLookupLoading] = useState(false);
+  const [chemblSuggestions, setChemblSuggestions] = useState<TargetSuggestion[]>([]);
+  const chemblLookupRef = useRef<string>("");
+
+  const heuristicSuggestions = useMemo<TargetSuggestion[]>(
     () => (molProps?.isValid ? suggestTargets(smiles, molProps, 5) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [smiles, molProps?.isValid],
   );
 
+  useEffect(() => {
+    if (!molProps?.isValid || !smiles) {
+      setChemblSuggestions([]);
+      return;
+    }
+    const currentSmiles = smiles;
+    chemblLookupRef.current = currentSmiles;
+    setChemblSuggestions([]);
+    setChemblLookupLoading(true);
+
+    fetchChEMBLTargets(currentSmiles)
+      .then((result) => {
+        if (chemblLookupRef.current !== currentSmiles) return;
+        if (result.status === "found" && result.targets.length > 0) {
+          const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
+          setChemblSuggestions(converted.length > 0 ? converted : []);
+        } else {
+          setChemblSuggestions([]);
+        }
+      })
+      .catch(() => {
+        if (chemblLookupRef.current === currentSmiles) setChemblSuggestions([]);
+      })
+      .finally(() => {
+        if (chemblLookupRef.current === currentSmiles) setChemblLookupLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smiles, molProps?.isValid]);
+
+  const targetSuggestions = useMemo<TargetSuggestion[]>(() => {
+    if (chemblSuggestions.length > 0) {
+      const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
+      const fallbacks = heuristicSuggestions
+        .filter(h => !chemblIds.has(h.uniprotId))
+        .slice(0, Math.max(0, 5 - chemblSuggestions.length));
+      return [...chemblSuggestions, ...fallbacks].slice(0, 5);
+    }
+    return heuristicSuggestions;
+  }, [chemblSuggestions, heuristicSuggestions]);
+
   // ── Auto-sync top target suggestion → UniProt field ───────────────────────
-  // Track whether the user has manually overridden the target.
-  // When false (default), changing the molecule auto-populates the best target.
   const uniprotManual = useRef(false);
   const [uniprotAutoMode, setUniprotAutoMode] = useState(true);
 
   useEffect(() => {
-    if (uniprotManual.current) return;           // user has taken manual control
+    if (uniprotManual.current) return;
     const top = targetSuggestions[0];
     if (!top) return;
-    if (top.uniprotId === uniprotId) return;     // already in sync
+    if (top.uniprotId === uniprotId) return;
     setUniprotId(top.uniprotId);
     setProteinInfo(null);
     setProteinError(null);
     setAlphafoldData(null);
-  // Only fire when the suggestions list itself changes (molecule changed)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions]);
   // ─────────────────────────────────────────────────────────────────────
@@ -2087,8 +2129,13 @@ export function HakaseAI() {
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Target UniProt ID</span>
                             <span className="text-[9px] text-red-400">*</span>
                             {uniprotAutoMode && targetSuggestions.length > 0 && (
-                              <span className="px-1.5 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/25 text-[8px] text-violet-400 font-medium">
-                                Auto-matched
+                              <span className={`px-1.5 py-0.5 rounded-full border text-[8px] font-medium ${targetSuggestions[0]?.source === "chembl" ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400" : "bg-violet-500/15 border-violet-500/25 text-violet-400"}`}>
+                                {targetSuggestions[0]?.source === "chembl" ? "ChEMBL Verified" : "Auto-matched"}
+                              </span>
+                            )}
+                            {chemblLookupLoading && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-[8px] text-sky-400 font-medium animate-pulse">
+                                Querying ChEMBL…
                               </span>
                             )}
                           </div>
@@ -2111,9 +2158,10 @@ export function HakaseAI() {
                               <button
                                 key={sugg.uniprotId}
                                 onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setProteinInfo(null); setProteinError(null); }}
-                                className={`text-[9px] transition-colors font-mono ${uniprotId === sugg.uniprotId ? "text-violet-400" : "text-slate-600 hover:text-violet-400"}`}
+                                className={`text-[9px] transition-colors font-mono ${uniprotId === sugg.uniprotId ? (sugg.source === "chembl" ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
                               >
-                                {sugg.uniprotId} <span className={`not-italic ${uniprotId === sugg.uniprotId ? "text-violet-500" : "text-slate-700"}`}>({sugg.geneName})</span>
+                                {sugg.uniprotId} <span className={`not-italic ${uniprotId === sugg.uniprotId ? (sugg.source === "chembl" ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
+                                {sugg.source === "chembl" && <span className="text-[7px] text-emerald-600 ml-0.5">●</span>}
                               </button>
                             ))}
                           </div>
@@ -2214,6 +2262,9 @@ export function HakaseAI() {
                                         </button>
                                       </div>
                                       <div className="flex items-center gap-2 text-[9px] text-slate-500">
+                                        <span className={`px-1 py-px rounded text-[7px] font-bold uppercase tracking-wider ${sugg.source === "chembl" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-700/50 text-slate-500"}`}>
+                                          {sugg.source === "chembl" ? "Experimental" : "Predicted"}
+                                        </span>
                                         <span className="text-slate-600">{sugg.targetClass}</span>
                                         <span className="text-slate-700">·</span>
                                         <span className="text-slate-600">{sugg.area}</span>

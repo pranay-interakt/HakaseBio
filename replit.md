@@ -17,7 +17,10 @@
 - `artifacts/hakase-ai/src/lib/chemblActivity.ts` — ChEMBL multi-target bioactivity fetcher (compound polypharmacology)
 - `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
 - `artifacts/api-server/src/routes/bio-chat/` — Claude chat
-- `artifacts/api-server/src/routes/chembl.ts` — ChEMBL proxy (compound lookup + activities)
+- `artifacts/hakase-ai/src/lib/chemblTargetLookup.ts` — ChEMBL target search client (SMILES→compound→targets with UniProt cross-refs)
+- `artifacts/hakase-ai/src/lib/targetSuggestion.ts` — Two-tier target suggestion: ChEMBL experimental data first, heuristic fallback second
+- `artifacts/api-server/src/routes/chembl.ts` — ChEMBL proxy (compound lookup, activities, target details, target-search pipeline)
+- `artifacts/api-server/src/routes/bindingdb.ts` — BindingDB CORS proxy
 
 ## Animal Cohort (Layer 2) Species Library
 7 validated parameter sets: Mouse CD-1, Mouse C57BL/6, Rat Sprague Dawley, Rat Wistar, Dog Beagle, Cynomolgus Monkey. Human reference is a **background translation target only** — not selectable in the species picker; appears as the Human Translation Panel in results.

@@ -1,4 +1,5 @@
 import type { MolecularProperties } from "./chemistry";
+import type { ChEMBLTargetHit } from "./chemblTargetLookup";
 
 export interface TargetSuggestion {
   uniprotId:   string;
@@ -9,6 +10,7 @@ export interface TargetSuggestion {
   rationale:   string[];     // short bullet reasons
   area:        string;       // therapeutic area label
   color:       "violet" | "blue" | "emerald" | "amber" | "red" | "cyan";
+  source:      "chembl" | "heuristic";
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -386,5 +388,60 @@ export function suggestTargets(
     rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
     area:        t.area,
     color:       t.color,
+    source:      "heuristic" as const,
   }));
+}
+
+function potencyColor(nM: number): TargetSuggestion["color"] {
+  if (nM < 100) return "emerald";
+  if (nM < 1000) return "amber";
+  if (nM < 10000) return "violet";
+  return "blue";
+}
+
+function formatNm(nM: number): string {
+  if (nM < 1000) return `${nM.toFixed(0)} nM`;
+  return `${(nM / 1000).toFixed(1)} µM`;
+}
+
+export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compoundName: string): TargetSuggestion[] {
+  const withUniprot = hits.filter(h => h.uniprotId != null);
+  if (withUniprot.length === 0) return [];
+
+  const best = withUniprot[0];
+  const bestNm = best.bestValue_nM;
+
+  return withUniprot.slice(0, 5).map((h) => {
+    const conf = Math.min(1, Math.max(0.1, bestNm / Math.max(h.bestValue_nM, 0.01)));
+    const rationale: string[] = [];
+    rationale.push(`Experimental ${h.bestActivityType}: ${formatNm(h.bestValue_nM)} (ChEMBL measured)`);
+    if (h.pChembl != null && !isNaN(h.pChembl)) {
+      rationale.push(`pChEMBL ${h.pChembl.toFixed(1)} — ${h.pChembl >= 7 ? "highly potent" : h.pChembl >= 5 ? "moderately potent" : "weak"} activity`);
+    }
+    if (compoundName && compoundName !== h.targetChemblId) {
+      rationale.push(`Compound: ${compoundName}`);
+    }
+
+    const geneName = extractGeneName(h.targetName);
+
+    return {
+      uniprotId: h.uniprotId!,
+      geneName,
+      fullName: h.targetName,
+      targetClass: h.targetType === "SINGLE PROTEIN" ? "Protein" : h.targetType,
+      confidence: conf,
+      rationale,
+      area: "ChEMBL",
+      color: potencyColor(h.bestValue_nM),
+      source: "chembl" as const,
+    };
+  });
+}
+
+function extractGeneName(targetName: string): string {
+  const match = targetName.match(/\(([A-Z0-9]{2,10})\)\s*$/);
+  if (match) return match[1];
+  const words = targetName.split(/\s+/);
+  if (words.length <= 2) return targetName;
+  return words.slice(0, 2).map(w => w[0]).join("").toUpperCase() || targetName.slice(0, 6);
 }

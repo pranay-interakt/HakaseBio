@@ -6,7 +6,7 @@ import { Router } from "express";
 
 const router = Router();
 
-router.get("/api/bindingdb", async (req, res) => {
+router.get("/bindingdb", async (req, res) => {
   const uniprot = req.query.uniprot as string | undefined;
   const smiles  = req.query.smiles  as string | undefined;
 
