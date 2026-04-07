@@ -236,11 +236,33 @@ export function HakaseAI() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [smiles, rdkitReady]);
 
+  const mol2dSvg = useMemo(() => {
+    if (!rdkitReady || !molProps?.isValid || !smiles) return null;
+    try {
+      const rdk = getRDKitInstance();
+      if (!rdk) return null;
+      const mol = rdk.get_mol(smiles);
+      if (!mol || !mol.is_valid()) { mol?.delete(); return null; }
+      const svg = mol.get_svg_with_highlights(JSON.stringify({
+        width: 200,
+        height: 150,
+        bondLineWidth: 1.5,
+        addAtomIndices: false,
+        addStereoAnnotation: true,
+      }));
+      mol.delete();
+      return svg;
+    } catch { return null; }
+  }, [smiles, rdkitReady, molProps?.isValid]);
+
   // ── Molecule-aware target protein suggestions ──────────────────────────────
   const [targetSuggOpen, setTargetSuggOpen] = useState(false);
   const [chemblLookupLoading, setChemblLookupLoading] = useState(false);
   const [chemblSuggestions, setChemblSuggestions] = useState<TargetSuggestion[]>([]);
   const chemblLookupRef = useRef<string>("");
+  const [chemblCompoundName, setChemblCompoundName] = useState<string | null>(null);
+  const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
+  const molNameManual = useRef(false);
 
   const heuristicSuggestions = useMemo<TargetSuggestion[]>(
     () => (molProps?.isValid ? suggestTargets(smiles, molProps, 5) : []),
@@ -255,15 +277,29 @@ export function HakaseAI() {
     }
     const currentSmiles = smiles;
     chemblLookupRef.current = currentSmiles;
+    molNameManual.current = false;
     setChemblSuggestions([]);
+    setChemblCompoundName(null);
+    setChemblCompoundId(null);
     setChemblLookupLoading(true);
 
     fetchChEMBLTargets(currentSmiles)
       .then((result) => {
         if (chemblLookupRef.current !== currentSmiles) return;
-        if (result.status === "found" && result.targets.length > 0) {
-          const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
-          setChemblSuggestions(converted.length > 0 ? converted : []);
+        if (result.status === "found") {
+          if (result.compoundName && result.compoundName !== result.compoundChemblId) {
+            setChemblCompoundName(result.compoundName);
+            setChemblCompoundId(result.compoundChemblId);
+            if (!molNameManual.current) {
+              setMolName(result.compoundName.charAt(0).toUpperCase() + result.compoundName.slice(1).toLowerCase());
+            }
+          } else if (result.compoundChemblId) {
+            setChemblCompoundId(result.compoundChemblId);
+          }
+          if (result.targets.length > 0) {
+            const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
+            setChemblSuggestions(converted.length > 0 ? converted : []);
+          }
         } else {
           setChemblSuggestions([]);
         }
@@ -1242,7 +1278,10 @@ export function HakaseAI() {
   const handleNewProject = useCallback(() => {
     // Allow molecule → target auto-sync again
     uniprotManual.current = false;
+    molNameManual.current = false;
     setUniprotAutoMode(true);
+    setChemblCompoundName(null);
+    setChemblCompoundId(null);
     // Reset molecule / compound
     setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
     setMolName("New-Compound-001");
@@ -1755,68 +1794,97 @@ export function HakaseAI() {
                           )}
                         </div>
                         {smiles && (
-                          <div className={`mt-2 border rounded-lg p-3 flex items-center justify-between h-20 text-[10px] transition-colors ${
+                          <div className={`mt-2 border rounded-lg overflow-hidden transition-colors ${
                             !rdkitReady || !molProps
                               ? "bg-white/5 border-white/10"
                               : molProps.isValid
                               ? "bg-emerald-500/5 border-emerald-500/20"
                               : "bg-red-500/5 border-red-500/20"
                           }`}>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-12 h-12 rounded border flex items-center justify-center ${
-                                !rdkitReady || !molProps
-                                  ? "border-slate-500/20 bg-slate-500/5"
-                                  : molProps.isValid
-                                  ? "border-emerald-500/30 bg-emerald-500/5"
-                                  : "border-red-500/30 bg-red-500/5"
-                              }`}>
-                                <Atom className={`w-5 h-5 ${
-                                  !rdkitReady || !molProps ? "text-slate-500/60"
-                                  : molProps.isValid ? "text-emerald-400/60"
-                                  : "text-red-400/60"
-                                }`} />
-                              </div>
-                              <div>
-                                {!rdkitReady ? (
-                                  <>
-                                    <div className="text-slate-400 text-[11px] font-medium">Loading chemistry engine…</div>
-                                    <div className="text-slate-600 text-[10px]">RDKit.js initialising</div>
-                                  </>
-                                ) : molProps?.isValid ? (
-                                  <>
-                                    <div className="text-emerald-400 text-[11px] font-medium">Valid structure · RDKit verified</div>
-                                    <div className="text-slate-400 text-[10px]">
-                                      MW {molProps.mw} Da · logP {molProps.logP} · HBD {molProps.hbd} · HBA {molProps.hba}
-                                    </div>
-                                  </>
-                                ) : molProps ? (
-                                  <>
-                                    <div className="text-red-400 text-[11px] font-medium">Invalid SMILES</div>
-                                    <div className="text-slate-600 text-[10px]">Check notation and try again</div>
-                                  </>
+                            <div className="p-3 flex items-center justify-between">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {mol2dSvg ? (
+                                  <div
+                                    className="w-16 h-14 rounded border border-emerald-500/20 bg-white/[0.03] shrink-0 flex items-center justify-center overflow-hidden cursor-pointer hover:border-violet-500/40 transition-colors"
+                                    onClick={() => setViewer3DOpen(true)}
+                                    title="Click for interactive 3D view"
+                                    dangerouslySetInnerHTML={{ __html: mol2dSvg.replace(/width=['"][^'"]*['"]/, 'width="100%"').replace(/height=['"][^'"]*['"]/, 'height="100%"') }}
+                                  />
                                 ) : (
-                                  <>
-                                    <div className="text-slate-400 text-[11px] font-medium">Validating…</div>
-                                    <div className="text-slate-600 text-[10px]">{smiles.length} chars</div>
-                                  </>
+                                  <div className={`w-16 h-14 rounded border flex items-center justify-center shrink-0 ${
+                                    !rdkitReady || !molProps
+                                      ? "border-slate-500/20 bg-slate-500/5"
+                                      : molProps.isValid
+                                      ? "border-emerald-500/30 bg-emerald-500/5"
+                                      : "border-red-500/30 bg-red-500/5"
+                                  }`}>
+                                    <Atom className={`w-5 h-5 ${
+                                      !rdkitReady || !molProps ? "text-slate-500/60"
+                                      : molProps.isValid ? "text-emerald-400/60"
+                                      : "text-red-400/60"
+                                    }`} />
+                                  </div>
                                 )}
+                                <div className="min-w-0">
+                                  {!rdkitReady ? (
+                                    <>
+                                      <div className="text-slate-400 text-[11px] font-medium">Loading chemistry engine…</div>
+                                      <div className="text-slate-600 text-[10px]">RDKit.js initialising</div>
+                                    </>
+                                  ) : molProps?.isValid ? (
+                                    <>
+                                      <div className="text-emerald-400 text-[11px] font-medium">Valid structure · RDKit verified</div>
+                                      <div className="text-slate-400 text-[10px]">
+                                        MW {molProps.mw} Da · logP {molProps.logP} · HBD {molProps.hbd} · HBA {molProps.hba}
+                                      </div>
+                                      {chemblLookupLoading && (
+                                        <div className="text-violet-400 text-[9px] mt-0.5 flex items-center gap-1">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                                          Identifying compound in ChEMBL…
+                                        </div>
+                                      )}
+                                      {!chemblLookupLoading && (chemblCompoundName || chemblCompoundId) && (
+                                        <div className="text-emerald-300 text-[9px] mt-0.5 flex items-center gap-1">
+                                          <CheckCircle2 className="w-2.5 h-2.5" />
+                                          {chemblCompoundName ? `${chemblCompoundName} (${chemblCompoundId})` : chemblCompoundId}
+                                        </div>
+                                      )}
+                                      {!chemblLookupLoading && !chemblCompoundName && !chemblCompoundId && molProps?.isValid && (
+                                        <div className="text-slate-600 text-[9px] mt-0.5">
+                                          Not found in ChEMBL — novel compound
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : molProps ? (
+                                    <>
+                                      <div className="text-red-400 text-[11px] font-medium">Invalid SMILES</div>
+                                      <div className="text-slate-600 text-[10px]">Check notation and try again</div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="text-slate-400 text-[11px] font-medium">Validating…</div>
+                                      <div className="text-slate-600 text-[10px]">{smiles.length} chars</div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
+                              <button
+                                onClick={() => setViewer3DOpen(true)}
+                                disabled={!molProps?.isValid}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-all text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                              >
+                                <Box className="w-3.5 h-3.5" />
+                                View 3D
+                              </button>
                             </div>
-                            <button
-                              onClick={() => setViewer3DOpen(true)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-all text-[11px] font-medium"
-                            >
-                              <Box className="w-3.5 h-3.5" />
-                              View 3D
-                            </button>
                           </div>
                         )}
                       </FieldGroup>
 
-                      <FieldGroup label="Molecule Name" hint="Auto-generated if blank">
+                      <FieldGroup label="Molecule Name" hint={chemblCompoundName ? `ChEMBL: ${chemblCompoundName}` : "Auto-identified from ChEMBL"}>
                         <Input
                           value={molName}
-                          onChange={e => setMolName(e.target.value)}
+                          onChange={e => { molNameManual.current = true; setMolName(e.target.value); }}
                           className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60"
                           placeholder="e.g. Compound-XYZ-001"
                         />
@@ -4485,8 +4553,8 @@ function MolFileUpload({ onLoaded }: { onLoaded: (smiles: string, name?: string)
         )}
         {status === "idle" && (
           <>
-            <div className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300">SDF / MOL2 Upload</div>
-            <div className="text-[9px] text-slate-600 mt-0.5">.sdf, .mol2, .mol · 10 MB</div>
+            <div className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300">Import Structure File</div>
+            <div className="text-[9px] text-slate-600 mt-0.5">.sdf, .mol2, .mol — extracts SMILES</div>
           </>
         )}
       </div>
@@ -4551,8 +4619,8 @@ function BatchCsvUpload({ onSelected }: { onSelected: (smiles: string, name?: st
           </>
         ) : (
           <>
-            <div className="text-[11px] font-medium text-slate-400 group-hover:text-blue-300">Batch CSV</div>
-            <div className="text-[9px] text-slate-600 mt-0.5">CSV with 'smiles' col · 500 rows</div>
+            <div className="text-[11px] font-medium text-slate-400 group-hover:text-blue-300">Load from CSV</div>
+            <div className="text-[9px] text-slate-600 mt-0.5">Pick compound from spreadsheet</div>
           </>
         )}
       </div>
