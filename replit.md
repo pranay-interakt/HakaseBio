@@ -10,7 +10,7 @@
 - `artifacts/hakase-ai/src/pages/HakaseAI.tsx` — main 5900+ line dashboard (all 4 layers)
 - `artifacts/hakase-ai/src/lib/animalSim.ts` — Layer 2 engine (allometric scaling, PBPK, NOAEL/MTD, FIH)
 - `artifacts/hakase-ai/src/lib/admet.ts` — ADMET simulation (directional, secondary to in vitro)
-- `artifacts/hakase-ai/src/lib/inVitroSim.ts` — In Vitro assay simulation engine (IC50, permeability, clearance, hERG, selectivity)
+- `artifacts/hakase-ai/src/lib/inVitroSim.ts` — In Vitro assay simulation engine with **descriptor-based QSAR IC50 model** (pIC50 from 40+ RDKit descriptors: logP, TPSA, MW, fsp3, chi/kappa shape indices, aromatic rings, HBD/HBA, etc.) + pharmacophore-aware therapeutic area modulation; Caco-2 permeability (Egan model), metabolic clearance, hERG, PPB, CYP inhibition all descriptor-driven
 - `artifacts/hakase-ai/src/lib/bioactivationEngine.ts` — Mechanistic toxicity (10 AOP pathways) & metabolic bioactivation assessment
 - `artifacts/hakase-ai/src/lib/cohortSim.ts` — Layer 3 patient cohort
 - `artifacts/hakase-ai/src/lib/trialSim.ts` — Layer 4 trial (realistic cost model, PROCOVA engine)
@@ -18,7 +18,8 @@
 - `artifacts/api-server/src/routes/bio-analysis/` — Claude streaming AI analysis
 - `artifacts/api-server/src/routes/bio-chat/` — Claude chat
 - `artifacts/hakase-ai/src/lib/chemblTargetLookup.ts` — ChEMBL target search client (SMILES→compound→targets with UniProt cross-refs)
-- `artifacts/hakase-ai/src/lib/targetSuggestion.ts` — Two-tier target suggestion: ChEMBL experimental data first, heuristic fallback second
+- `artifacts/hakase-ai/src/lib/targetSuggestion.ts` — Two-tier target suggestion: ChEMBL experimental data first, **RDKit SMARTS pharmacophore-based** fallback second (28 targets across kinases, GPCRs, proteases, nuclear receptors, epigenetic enzymes, ion channels, PPIs; scoring uses `PharmacophoreProfile` from `detectPharmacophores()` with 25+ SMARTS patterns)
+- `artifacts/hakase-ai/src/lib/chemistry.ts` — RDKit MinimalLib wrapper: `getMolecularProperties()` extracts 40+ descriptors, `detectPharmacophores()` runs 25+ SMARTS substructure matches, `generateFingerprint()` for Morgan FP, `computeTanimotoSimilarity()`
 - `artifacts/api-server/src/routes/chembl.ts` — ChEMBL proxy (compound lookup, activities, target details, target-search pipeline)
 - `artifacts/api-server/src/routes/bindingdb.ts` — BindingDB CORS proxy
 

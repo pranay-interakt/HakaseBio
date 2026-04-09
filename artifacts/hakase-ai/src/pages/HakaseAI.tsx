@@ -38,6 +38,7 @@ import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
 import { suggestTargets, convertChEMBLHitsToSuggestions, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { detectPharmacophores } from "@/lib/chemistry";
 import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
 import {
@@ -264,10 +265,16 @@ export function HakaseAI() {
   const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
   const molNameManual = useRef(false);
 
-  const heuristicSuggestions = useMemo<TargetSuggestion[]>(
-    () => (molProps?.isValid ? suggestTargets(smiles, molProps, 5) : []),
+  const pharmacophores = useMemo(
+    () => (molProps?.isValid && smiles ? detectPharmacophores(smiles) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [smiles, molProps?.isValid],
+  );
+
+  const heuristicSuggestions = useMemo<TargetSuggestion[]>(
+    () => (molProps?.isValid ? suggestTargets(smiles, molProps, pharmacophores, 5) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [smiles, molProps?.isValid, pharmacophores],
   );
 
   useEffect(() => {
