@@ -291,9 +291,13 @@ export function HakaseAI() {
       uniprotManual.current = false;
       molNameManual.current = false;
       setUniprotAutoMode(true);
+      setUniprotId("");
+      setChemblSuggestions([]);
       setProteinInfo(null);
       setProteinError(null);
       setAlphafoldData(null);
+      setPdbId("");
+      setPdbStructure(null);
       setActivatedSmiles(smiles.trim());
     }
   }, [smiles, molProps?.isValid]);
