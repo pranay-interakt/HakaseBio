@@ -359,6 +359,22 @@ export function HakaseAI() {
     setProteinInfo(null);
     setProteinError(null);
     setAlphafoldData(null);
+    const areaMap: Record<string, string> = {
+      "Oncology": "Oncology", "Oncology (CML)": "Oncology", "Oncology (Prostate) / Endocrinology": "Oncology",
+      "Oncology (Breast) / Endocrinology": "Oncology", "Oncology / Angiogenesis": "Oncology",
+      "Oncology (Hematology)": "Oncology", "Oncology / CNS": "Oncology",
+      "Inflammation / Oncology": "Oncology", "Immuno-Oncology": "Immunology",
+      "CNS / Psychiatry": "CNS", "CNS / Pain": "CNS", "CNS / Cardiovascular": "CNS",
+      "Cardiovascular": "Cardiovascular",
+      "Metabolic / Diabetes": "Metabolic",
+      "Inflammation": "Immunology", "Inflammation / Pain": "Immunology",
+      "Hematology / Autoimmune": "Immunology",
+      "Infectious Disease / Immunology": "Infectious Disease",
+      "Pain / Inflammation": "Immunology",
+      "ChEMBL": "Oncology",
+    };
+    const mapped = areaMap[top.area];
+    if (mapped) setTherapeuticArea(mapped);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions]);
   // ─────────────────────────────────────────────────────────────────────
