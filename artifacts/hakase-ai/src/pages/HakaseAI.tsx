@@ -2599,7 +2599,7 @@ export function HakaseAI() {
                         label="ADMET Profiling"
                         description="Directional — supports in vitro assays"
                         value={admetOn}
-                        locked
+                        onChange={setAdmetOn}
                       />
                       <ToggleRow
                         label="Binding Simulation"
