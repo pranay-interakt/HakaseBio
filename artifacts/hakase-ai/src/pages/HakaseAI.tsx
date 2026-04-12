@@ -868,16 +868,9 @@ export function HakaseAI() {
 
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
-    setActivatedSmiles(proj.smiles);
     setMolName(proj.molName);
     setUniprotId(proj.uniprotId);
     setIndication(proj.indicationCode);
-    uniprotManual.current = false;
-    molNameManual.current = false;
-    setUniprotAutoMode(true);
-    setProteinInfo(null);
-    setProteinError(null);
-    setAlphafoldData(null);
     setSimResults(null);
     setInVitroResults(null);
     setAnimalResults(null);
@@ -1958,8 +1951,8 @@ export function HakaseAI() {
                       </FieldGroup>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }} />
-                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }} />
+                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
+                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
                       </div>
 
                       {/* ── Diagen Integration ── */}
@@ -2092,7 +2085,6 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(diagenResult.smiles);
-                                      setActivatedSmiles(diagenResult.smiles);
                                       setMolName(diagenResult.name);
                                       setUniprotId(diagenResult.uniprotId);
                                       setDiagenOpen(false);
@@ -2105,14 +2097,7 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(diagenResult.smiles);
-                                      setActivatedSmiles(diagenResult.smiles);
                                       setMolName(diagenResult.name);
-                                      uniprotManual.current = false;
-                                      molNameManual.current = false;
-                                      setUniprotAutoMode(true);
-                                      setProteinInfo(null);
-                                      setProteinError(null);
-                                      setAlphafoldData(null);
                                       setDiagenOpen(false);
                                       setDiagenResult(null);
                                     }}
@@ -2232,14 +2217,7 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(apiResult.smiles);
-                                      setActivatedSmiles(apiResult.smiles);
                                       setMolName(apiResult.name);
-                                      uniprotManual.current = false;
-                                      molNameManual.current = false;
-                                      setUniprotAutoMode(true);
-                                      setProteinInfo(null);
-                                      setProteinError(null);
-                                      setAlphafoldData(null);
                                       setApiImportOpen(false);
                                       setApiResult(null);
                                     }}
@@ -4360,7 +4338,7 @@ export function HakaseAI() {
       {demoOpen && (
         <DemoRunner
           onClose={() => setDemoOpen(false)}
-          setSmiles={(s: string) => { setSmiles(s); setActivatedSmiles(s); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }}
+          setSmiles={(s: string) => { setSmiles(s); }}
           setMolName={setMolName}
           setUniprotId={setUniprotId}
           setActiveLayer={setActiveLayer}
