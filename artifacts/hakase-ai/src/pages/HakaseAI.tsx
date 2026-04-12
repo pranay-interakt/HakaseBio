@@ -390,8 +390,8 @@ export function HakaseAI() {
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
-  const handleProteinFetch = useCallback(async () => {
-    const id = uniprotId.trim();
+  const handleProteinFetch = useCallback(async (overrideId?: string) => {
+    const id = (overrideId ?? uniprotId).trim();
     if (!id) return;
     setProteinLoading(true);
     setProteinError(null);
@@ -2309,7 +2309,7 @@ export function HakaseAI() {
                               return (
                                 <button
                                   key={sugg.uniprotId}
-                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setProteinInfo(null); setProteinError(null); }}
+                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); handleProteinFetch(sugg.uniprotId); }}
                                   className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
                                 >
                                   {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
@@ -2406,8 +2406,11 @@ export function HakaseAI() {
                                             uniprotManual.current = true;
                                             setUniprotAutoMode(false);
                                             setUniprotId(sugg.uniprotId);
+                                            setPdbId("");
+                                            setPdbStructure(null);
                                             setProteinInfo(null);
                                             setProteinError(null);
+                                            handleProteinFetch(sugg.uniprotId);
                                           }}
                                           className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/35 transition-all"
                                         >
