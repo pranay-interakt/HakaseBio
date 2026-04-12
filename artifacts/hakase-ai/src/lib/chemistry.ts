@@ -44,7 +44,9 @@ export interface MolecularProperties {
 export interface PharmacophoreProfile {
   aromaticNCount: number;
   basicAmineCount: number;
+  aromaticAmineCount: number;
   acidicGroupCount: number;
+  amideCount: number;
   hasCarboxylicAcid: boolean;
   hasSulfonamide: boolean;
   hasSulfone: boolean;
@@ -67,6 +69,8 @@ export interface PharmacophoreProfile {
   hasNitro: boolean;
   hasEster: boolean;
   hasLactam: boolean;
+  hasAlkoxy: boolean;
+  hasAniline: boolean;
 }
 
 export interface FingerprintInfo {
@@ -268,8 +272,10 @@ export function detectPharmacophores(smiles: string): PharmacophoreProfile | nul
 
     return {
       aromaticNCount:    cnt("[n]"),
-      basicAmineCount:   cnt("[NX3;H1,H2;!$(NC=O);!$(NS=O);!$(N=*)]"),
+      basicAmineCount:   cnt("[NX3;H1,H2;!$(NC=O);!$(NS=O);!$(N=*);!$(Nc)]"),
+      aromaticAmineCount: cnt("[NX3;H1,H2;$(Nc);!$(NC=O)]"),
       acidicGroupCount:  cnt("[OX2H][CX3]=O") + cnt("[OX1H]S(=O)=O"),
+      amideCount:        cnt("[NX3][CX3](=O)[#6]"),
       hasCarboxylicAcid: has("[CX3](=O)[OX2H1]"),
       hasSulfonamide:    has("[NX3]S(=O)(=O)") || has("NS(=O)(=O)"),
       hasSulfone:        has("S(=O)(=O)"),
@@ -292,6 +298,8 @@ export function detectPharmacophores(smiles: string): PharmacophoreProfile | nul
       hasNitro:          has("[NX3](=O)=O") || has("[N+](=O)[O-]"),
       hasEster:          has("[#6][CX3](=O)[OX2][#6]"),
       hasLactam:         has("[NX3R][CX3R](=O)"),
+      hasAlkoxy:         has("[OX2]([#6;!$(C=O)])[#6;!$(C=O)]"),
+      hasAniline:        has("[NX3;H1,H2;$(Nc);!$(NC=O)]"),
     };
   } catch {
     return null;

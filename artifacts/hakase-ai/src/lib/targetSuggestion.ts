@@ -49,7 +49,9 @@ const CATALOGUE: TargetEntry[] = [
       if (inRange(p.hbd, 1, 4)) sc += 0.5;
       if (p.numAromaticRings >= 2) sc += 1.5;
       if (ph.aromaticNCount >= 2) sc += 2;
-      if (ph.hasQuinazoline || ph.hasPyrimidine) sc += 2;
+      if (ph.hasQuinazoline || ph.hasPyrimidine) sc += 2.5;
+      if (ph.hasAniline) sc += 1.5;
+      if (ph.hasAlkoxy) sc += 1;
       if (ph.hasAmide) sc += 0.5;
       if (ph.hasMichaelAcceptor) sc += 1.5;
       if (ph.hasHalogen) sc += 0.5;
@@ -59,6 +61,8 @@ const CATALOGUE: TargetEntry[] = [
       const r: string[] = [];
       if (ph.hasQuinazoline || ph.hasPyrimidine) r.push("Quinazoline/pyrimidine scaffold — core pharmacophore of EGFR inhibitors (erlotinib, gefitinib)");
       if (ph.aromaticNCount >= 2) r.push(`${ph.aromaticNCount} aromatic N atoms form hinge-binding pharmacophore with EGFR Met793/Thr790`);
+      if (ph.hasAniline) r.push("Aromatic amine (aniline) — characteristic of 4-anilinoquinazoline EGFR pharmacophore");
+      if (ph.hasAlkoxy) r.push("Alkoxy group(s) — consistent with erlotinib/gefitinib methoxy/ethoxy substituents");
       if (ph.hasMichaelAcceptor) r.push("Electrophilic warhead detected — consistent with covalent EGFR inhibition (osimertinib targets Cys797)");
       if (inRange(p.mw, 300, 560)) r.push(`MW ${p.mw.toFixed(0)} Da within EGFR inhibitor chemical space (300–560 Da)`);
       if (p.numAromaticRings >= 2) r.push(`${p.numAromaticRings} aromatic rings support anilinoquinazoline/pyrrolopyrimidine scaffold`);
@@ -78,6 +82,7 @@ const CATALOGUE: TargetEntry[] = [
       if (ph.hasPyrimidine) sc += 1.5;
       if (ph.hasPiperazine || ph.hasPiperidine) sc += 1;
       if (ph.hasAmide) sc += 0.5;
+      if (ph.hasAniline) sc += 1;
       return sc;
     },
     rationale(p, ph) {
@@ -147,6 +152,7 @@ const CATALOGUE: TargetEntry[] = [
       if (ph.hasUrea) sc += 2.5;
       if (ph.hasAmide) sc += 1;
       if (ph.hasTrifluoromethyl) sc += 1;
+      if (ph.hasAniline) sc += 0.5;
       return sc;
     },
     rationale(p, ph) {
@@ -239,6 +245,7 @@ const CATALOGUE: TargetEntry[] = [
       if (ph.hasPyrimidine) sc += 2;
       if (ph.hasAmide) sc += 1;
       if (ph.hasPiperazine) sc += 1;
+      if (ph.hasAniline) sc += 1;
       if (ph.hasTrifluoromethyl) sc += 0.5;
       return sc;
     },
@@ -259,15 +266,19 @@ const CATALOGUE: TargetEntry[] = [
       if (inRange(p.mw, 200, 430)) sc += 1.5;
       if (inRange(p.logP, 1.5, 5)) sc += 1;
       if (bbbPermeable(p)) sc += 2;
-      if (ph.basicAmineCount >= 1) sc += 2.5;
+      if (ph.basicAmineCount >= 1) sc += 3;
       if (ph.hasPiperidine || ph.hasPiperazine) sc += 2;
-      if (p.numAromaticRings >= 1) sc += 0.5;
+      if (p.numAromaticRings >= 1 && p.numAromaticRings <= 3) sc += 0.5;
       if (!ph.hasSulfonamide && !ph.hasCarboxylicAcid) sc += 0.5;
+      if (p.hbd > 3) sc -= 2;
+      if (p.tpsa > 90) sc -= 1.5;
+      if (ph.basicAmineCount === 0 && !ph.hasPiperidine && !ph.hasPiperazine) sc -= 3;
+      if (ph.hasAniline && ph.basicAmineCount === 0) sc -= 1;
       return sc;
     },
     rationale(p, ph) {
       const r: string[] = [];
-      if (ph.basicAmineCount >= 1) r.push("Basic nitrogen — forms critical Asp114³·³² salt bridge in DRD2 orthosteric binding pocket");
+      if (ph.basicAmineCount >= 1) r.push("Basic aliphatic nitrogen — forms critical Asp114³·³² salt bridge in DRD2 orthosteric binding pocket");
       if (bbbPermeable(p)) r.push(`CNS-penetrant profile: TPSA ${p.tpsa.toFixed(0)} Å² < 90, MW ${p.mw.toFixed(0)} Da → BBB permeability predicted`);
       if (ph.hasPiperidine || ph.hasPiperazine) r.push("Piperidine/piperazine ring — characteristic of antipsychotic/dopaminergic ligands (haloperidol, aripiprazole)");
       if (inRange(p.mw, 200, 430)) r.push("MW and logP in typical antipsychotic/dopaminergic ligand space");
@@ -282,16 +293,19 @@ const CATALOGUE: TargetEntry[] = [
       if (inRange(p.mw, 250, 420)) sc += 1;
       if (inRange(p.logP, 1, 4.5)) sc += 1;
       if (bbbPermeable(p)) sc += 1.5;
-      if (ph.basicAmineCount >= 1) sc += 2;
+      if (ph.basicAmineCount >= 1) sc += 2.5;
       if (ph.hasIndole) sc += 3;
       if (ph.hasPiperidine || ph.hasPiperazine) sc += 1;
       if (p.numAromaticRings >= 2) sc += 0.5;
+      if (p.hbd > 3) sc -= 1.5;
+      if (p.tpsa > 90) sc -= 1;
+      if (ph.basicAmineCount === 0 && !ph.hasPiperidine && !ph.hasPiperazine && !ph.hasIndole) sc -= 2;
       return sc;
     },
     rationale(p, ph) {
       const r: string[] = [];
       if (ph.hasIndole) r.push("Indole scaffold detected — serotonergic pharmacophore core (tryptamine mimicry for 5-HT2A binding)");
-      if (ph.basicAmineCount >= 1) r.push("Basic amine provides Asp155 salt bridge required for 5-HT2A binding");
+      if (ph.basicAmineCount >= 1) r.push("Basic aliphatic amine provides Asp155 salt bridge required for 5-HT2A binding");
       if (bbbPermeable(p)) r.push(`CNS-suitable: TPSA ${p.tpsa.toFixed(0)} Å², MW ${p.mw.toFixed(0)} Da`);
       if (ph.hasPiperidine || ph.hasPiperazine) r.push("Aliphatic amine ring consistent with serotonergic ligand scaffold");
       return r;
@@ -304,10 +318,12 @@ const CATALOGUE: TargetEntry[] = [
       let sc = 0;
       if (inRange(p.mw, 250, 450)) sc += 1;
       if (bbbPermeable(p)) sc += 1.5;
-      if (ph.basicAmineCount >= 1) sc += 2;
+      if (ph.basicAmineCount >= 1) sc += 2.5;
       if (ph.hasPiperidine) sc += 1.5;
       if (ph.hasEster) sc += 1.5;
       if (p.numAromaticRings >= 1 && p.numAromaticRings <= 2) sc += 0.5;
+      if (p.hbd > 3) sc -= 1.5;
+      if (ph.basicAmineCount === 0 && !ph.hasPiperidine) sc -= 2.5;
       return sc;
     },
     rationale(p, ph) {
@@ -326,10 +342,12 @@ const CATALOGUE: TargetEntry[] = [
       let sc = 0;
       if (inRange(p.mw, 250, 500)) sc += 1;
       if (bbbPermeable(p)) sc += 2;
-      if (ph.basicAmineCount >= 1) sc += 2;
-      if (ph.hasPiperidine) sc += 2;
+      if (ph.basicAmineCount >= 1) sc += 2.5;
+      if (ph.hasPiperidine) sc += 2.5;
       if (p.numRings >= 3 && p.logP > 1) sc += 1.5;
       if (p.numAliphaticRings >= 2) sc += 1;
+      if (p.hbd > 3) sc -= 1.5;
+      if (ph.basicAmineCount === 0 && !ph.hasPiperidine) sc -= 3;
       return sc;
     },
     rationale(p, ph) {
@@ -681,11 +699,12 @@ const CATALOGUE: TargetEntry[] = [
     score(p, ph) {
       let sc = 0;
       if (inRange(p.mw, 400, 600)) sc += 1;
-      if (ph.basicAmineCount >= 2) sc += 2;
+      if (ph.basicAmineCount >= 2) sc += 2.5;
       if (ph.hasPiperidine || ph.hasPiperazine) sc += 2;
       if (p.numAromaticRings >= 2) sc += 1;
       if (ph.hasTrifluoromethyl) sc += 1;
       if (ph.hasAmide) sc += 0.5;
+      if (ph.basicAmineCount === 0) sc -= 2;
       return sc;
     },
     rationale(p, ph) {
@@ -707,7 +726,8 @@ export function suggestTargets(
   if (!smiles || !props.isValid) return [];
 
   const ph: PharmacophoreProfile = pharmacophores ?? {
-    aromaticNCount: 0, basicAmineCount: 0, acidicGroupCount: 0,
+    aromaticNCount: 0, basicAmineCount: 0, aromaticAmineCount: 0,
+    acidicGroupCount: 0, amideCount: 0,
     hasCarboxylicAcid: false, hasSulfonamide: false, hasSulfone: false,
     hasPhenol: false, hasMichaelAcceptor: false, hasAmide: false,
     hasUrea: false, hasTrifluoromethyl: false, hasHalogen: false,
@@ -715,6 +735,7 @@ export function suggestTargets(
     hasPiperazine: false, hasIndole: false, hasQuinazoline: false,
     hasPyrimidine: false, hasBenzimidazole: false, hasEpoxide: false,
     hasPhosphate: false, hasNitro: false, hasEster: false, hasLactam: false,
+    hasAlkoxy: false, hasAniline: false,
   };
 
   const scored = CATALOGUE.map(t => {
