@@ -2338,7 +2338,7 @@ export function HakaseAI() {
                             />
                           </div>
                           <button
-                            onClick={handleProteinFetch}
+                            onClick={() => handleProteinFetch()}
                             disabled={!uniprotId.trim() || proteinLoading}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
                           >
