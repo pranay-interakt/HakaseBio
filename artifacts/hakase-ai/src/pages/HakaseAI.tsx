@@ -2260,11 +2260,23 @@ export function HakaseAI() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Target UniProt ID</span>
                             <span className="text-[9px] text-red-400">*</span>
-                            {uniprotAutoMode && targetSuggestions.length > 0 && (
-                              <span className={`px-1.5 py-0.5 rounded-full border text-[8px] font-medium ${targetSuggestions[0]?.source === "chembl" ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400" : "bg-violet-500/15 border-violet-500/25 text-violet-400"}`}>
-                                {targetSuggestions[0]?.source === "chembl" ? "ChEMBL Verified" : "Auto-matched"}
-                              </span>
-                            )}
+                            {uniprotAutoMode && targetSuggestions.length > 0 && (() => {
+                              const top = targetSuggestions[0];
+                              const isChembl = top?.source === "chembl";
+                              const confLabel = top?.confidenceLabel ?? "Low";
+                              const confBadge = isChembl
+                                ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
+                                : confLabel === "High"   ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
+                                : confLabel === "Medium" ? "bg-amber-500/15 border-amber-500/25 text-amber-400"
+                                :                          "bg-red-500/10 border-red-500/20 text-red-400";
+                              const confText = isChembl ? "ChEMBL Verified"
+                                : `Auto-matched · ${confLabel} confidence`;
+                              return (
+                                <span className={`px-1.5 py-0.5 rounded-full border text-[8px] font-medium ${confBadge}`}>
+                                  {confText}
+                                </span>
+                              );
+                            })()}
                             {chemblLookupLoading && (
                               <span className="px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-[8px] text-sky-400 font-medium animate-pulse">
                                 Querying ChEMBL…
@@ -2285,17 +2297,26 @@ export function HakaseAI() {
 
                         {/* Quick-select from molecule-matched suggestions */}
                         {targetSuggestions.length > 0 && (
-                          <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                            {targetSuggestions.slice(0, 4).map(sugg => (
-                              <button
-                                key={sugg.uniprotId}
-                                onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setProteinInfo(null); setProteinError(null); }}
-                                className={`text-[9px] transition-colors font-mono ${uniprotId === sugg.uniprotId ? (sugg.source === "chembl" ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
-                              >
-                                {sugg.uniprotId} <span className={`not-italic ${uniprotId === sugg.uniprotId ? (sugg.source === "chembl" ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
-                                {sugg.source === "chembl" && <span className="text-[7px] text-emerald-600 ml-0.5">●</span>}
-                              </button>
-                            ))}
+                          <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                            {targetSuggestions.slice(0, 4).map(sugg => {
+                              const isActive = uniprotId === sugg.uniprotId;
+                              const isChembl = sugg.source === "chembl";
+                              const confPct = Math.round(sugg.confidence * 100);
+                              const confColor = isChembl ? "text-emerald-500"
+                                : sugg.confidenceLabel === "High"   ? "text-emerald-500"
+                                : sugg.confidenceLabel === "Medium" ? "text-amber-500"
+                                :                                     "text-red-400";
+                              return (
+                                <button
+                                  key={sugg.uniprotId}
+                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setProteinInfo(null); setProteinError(null); }}
+                                  className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
+                                >
+                                  {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
+                                  <span className={`text-[7px] ml-0.5 ${confColor}`}>{confPct}%</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
 
@@ -2394,8 +2415,13 @@ export function HakaseAI() {
                                         </button>
                                       </div>
                                       <div className="flex items-center gap-2 text-[9px] text-slate-500">
-                                        <span className={`px-1 py-px rounded text-[7px] font-bold uppercase tracking-wider ${sugg.source === "chembl" ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-700/50 text-slate-500"}`}>
-                                          {sugg.source === "chembl" ? "Experimental" : "Predicted"}
+                                        <span className={`px-1 py-px rounded text-[7px] font-bold uppercase tracking-wider ${
+                                          sugg.confidenceLabel === "Experimental" ? "bg-emerald-500/15 text-emerald-400"
+                                          : sugg.confidenceLabel === "High"       ? "bg-emerald-500/10 text-emerald-500"
+                                          : sugg.confidenceLabel === "Medium"     ? "bg-amber-500/10 text-amber-400"
+                                          :                                         "bg-red-500/10 text-red-400"
+                                        }`}>
+                                          {sugg.confidenceLabel === "Experimental" ? "Experimental" : `${sugg.confidenceLabel} Conf.`}
                                         </span>
                                         <span className="text-slate-600">{sugg.targetClass}</span>
                                         <span className="text-slate-700">·</span>
@@ -2403,10 +2429,18 @@ export function HakaseAI() {
                                       </div>
                                       {/* Confidence bar */}
                                       <div className="flex items-center gap-1.5">
-                                        <div className="flex-1 h-0.5 rounded-full bg-white/8">
-                                          <div className={`h-full rounded-full ${barColor} opacity-70`} style={{ width: `${(sugg.confidence * 100).toFixed(0)}%` }} />
+                                        <div className="flex-1 h-1 rounded-full bg-white/8">
+                                          <div className={`h-full rounded-full opacity-80 ${
+                                            sugg.confidenceLabel === "Experimental" || sugg.confidenceLabel === "High" ? "bg-emerald-500"
+                                            : sugg.confidenceLabel === "Medium" ? "bg-amber-500"
+                                            : "bg-red-400"
+                                          }`} style={{ width: `${(sugg.confidence * 100).toFixed(0)}%` }} />
                                         </div>
-                                        <span className="text-[9px] text-slate-600 w-6 text-right">{(sugg.confidence * 100).toFixed(0)}%</span>
+                                        <span className={`text-[9px] w-8 text-right font-medium ${
+                                          sugg.confidenceLabel === "Experimental" || sugg.confidenceLabel === "High" ? "text-emerald-500"
+                                          : sugg.confidenceLabel === "Medium" ? "text-amber-400"
+                                          : "text-red-400"
+                                        }`}>{(sugg.confidence * 100).toFixed(0)}%</span>
                                       </div>
                                       {/* Rationale bullets */}
                                       <ul className="space-y-0.5">

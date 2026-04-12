@@ -7,6 +7,7 @@ export interface TargetSuggestion {
   fullName:    string;
   targetClass: string;
   confidence:  number;
+  confidenceLabel: "High" | "Medium" | "Low" | "Experimental";
   rationale:   string[];
   area:        string;
   color:       "violet" | "blue" | "emerald" | "amber" | "red" | "cyan";
@@ -746,19 +747,24 @@ export function suggestTargets(
 
   scored.sort((a, b) => b.rawScore - a.rawScore);
 
-  const maxScore = scored[0]?.rawScore ?? 1;
+  const ABSOLUTE_MAX = 12;
 
-  return scored.slice(0, topN).map(t => ({
-    uniprotId:   t.uniprotId,
-    geneName:    t.geneName,
-    fullName:    t.fullName,
-    targetClass: t.targetClass,
-    confidence:  Math.min(1, t.rawScore / Math.max(maxScore, 1)),
-    rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
-    area:        t.area,
-    color:       t.color,
-    source:      "heuristic" as const,
-  }));
+  return scored.slice(0, topN).map(t => {
+    const conf = Math.min(1, Math.max(0, t.rawScore / ABSOLUTE_MAX));
+    const label: TargetSuggestion["confidenceLabel"] = conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
+    return {
+      uniprotId:   t.uniprotId,
+      geneName:    t.geneName,
+      fullName:    t.fullName,
+      targetClass: t.targetClass,
+      confidence:  conf,
+      confidenceLabel: label,
+      rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
+      area:        t.area,
+      color:       t.color,
+      source:      "heuristic" as const,
+    };
+  });
 }
 
 function potencyColor(nM: number): TargetSuggestion["color"] {
@@ -799,6 +805,7 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
       fullName: h.targetName,
       targetClass: h.targetType === "SINGLE PROTEIN" ? "Protein" : h.targetType,
       confidence: conf,
+      confidenceLabel: "Experimental" as const,
       rationale,
       area: "ChEMBL",
       color: potencyColor(h.bestValue_nM),
