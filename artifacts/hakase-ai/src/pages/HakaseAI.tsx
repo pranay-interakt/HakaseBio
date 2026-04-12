@@ -197,6 +197,7 @@ export function HakaseAI() {
 
   // Layer 1 state
   const [smiles, setSmiles] = useState("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
+  const [activatedSmiles, setActivatedSmiles] = useState("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
   const [molName, setMolName] = useState("Ibuprofen-Analog-001");
   const [uniprotId, setUniprotId] = useState("P00533");
   const [pdbId, setPdbId] = useState("4HJO");
@@ -265,24 +266,38 @@ export function HakaseAI() {
   const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
   const molNameManual = useRef(false);
 
+  const activatedMolProps = useMemo(() => {
+    if (!rdkitReady || !activatedSmiles) return null;
+    return getMolecularProperties(activatedSmiles);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activatedSmiles, rdkitReady]);
+
   const pharmacophores = useMemo(
-    () => (molProps?.isValid && smiles ? detectPharmacophores(smiles) : null),
+    () => (activatedMolProps?.isValid && activatedSmiles ? detectPharmacophores(activatedSmiles) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [smiles, molProps?.isValid],
+    [activatedSmiles, activatedMolProps?.isValid],
   );
 
   const heuristicSuggestions = useMemo<TargetSuggestion[]>(
-    () => (molProps?.isValid ? suggestTargets(smiles, molProps, pharmacophores, 5) : []),
+    () => (activatedMolProps?.isValid ? suggestTargets(activatedSmiles, activatedMolProps, pharmacophores, 5) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [smiles, molProps?.isValid, pharmacophores],
+    [activatedSmiles, activatedMolProps?.isValid, pharmacophores],
   );
 
+  const smilesNeedsActivation = smiles.trim() !== activatedSmiles.trim() && molProps?.isValid === true;
+
+  const handleAnalyzeMolecule = useCallback(() => {
+    if (molProps?.isValid && smiles.trim()) {
+      setActivatedSmiles(smiles.trim());
+    }
+  }, [smiles, molProps?.isValid]);
+
   useEffect(() => {
-    if (!molProps?.isValid || !smiles) {
+    if (!activatedMolProps?.isValid || !activatedSmiles) {
       setChemblSuggestions([]);
       return;
     }
-    const currentSmiles = smiles;
+    const currentSmiles = activatedSmiles;
     chemblLookupRef.current = currentSmiles;
     molNameManual.current = false;
     setChemblSuggestions([]);
@@ -318,7 +333,7 @@ export function HakaseAI() {
         if (chemblLookupRef.current === currentSmiles) setChemblLookupLoading(false);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smiles, molProps?.isValid]);
+  }, [activatedSmiles, activatedMolProps?.isValid]);
 
   const targetSuggestions = useMemo<TargetSuggestion[]>(() => {
     if (chemblSuggestions.length > 0) {
@@ -831,6 +846,7 @@ export function HakaseAI() {
 
   const loadSavedProject = useCallback((proj: typeof savedProjects[number]) => {
     setSmiles(proj.smiles);
+    setActivatedSmiles(proj.smiles);
     setMolName(proj.molName);
     setUniprotId(proj.uniprotId);
     setIndication(proj.indicationCode);
@@ -1291,6 +1307,7 @@ export function HakaseAI() {
     setChemblCompoundId(null);
     // Reset molecule / compound
     setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
+    setActivatedSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
     setMolName("New-Compound-001");
     setUniprotId("P00533");
     setPdbId("4HJO");
@@ -1779,26 +1796,41 @@ export function HakaseAI() {
                     <SectionHeader icon={Atom} label="Primary In Vitro Input" />
                     <div className="space-y-3">
                       <FieldGroup label="SMILES String" required hint="RDKit validated · MW 100–1500 Da">
-                        <div id="demo-smiles-input" className="relative">
-                          <Input
-                            value={smiles}
-                            onChange={e => setSmiles(e.target.value)}
-                            placeholder="Enter SMILES notation..."
-                            className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-violet-500/60 focus:bg-white/8"
-                          />
-                          {smiles && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                              {!rdkitReady ? (
-                                <RefreshCw className="w-3.5 h-3.5 text-slate-500 animate-spin" />
-                              ) : molProps?.isValid ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                              ) : molProps ? (
-                                <XCircle className="w-3.5 h-3.5 text-red-400" />
-                              ) : (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                              )}
-                            </div>
-                          )}
+                        <div id="demo-smiles-input" className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              value={smiles}
+                              onChange={e => setSmiles(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter" && molProps?.isValid) handleAnalyzeMolecule(); }}
+                              placeholder="Enter SMILES notation..."
+                              className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-violet-500/60 focus:bg-white/8"
+                            />
+                            {smiles && (
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                {!rdkitReady ? (
+                                  <RefreshCw className="w-3.5 h-3.5 text-slate-500 animate-spin" />
+                                ) : molProps?.isValid ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                ) : molProps ? (
+                                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                ) : (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleAnalyzeMolecule}
+                            disabled={!molProps?.isValid || !smilesNeedsActivation}
+                            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                              smilesNeedsActivation && molProps?.isValid
+                                ? "bg-gradient-to-r from-violet-600 to-violet-500 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:from-violet-500 hover:to-violet-400 animate-pulse"
+                                : "bg-white/5 border border-white/10 text-slate-500 cursor-not-allowed"
+                            }`}
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            {smilesNeedsActivation ? "Run" : "Active"}
+                          </button>
                         </div>
                         {smiles && (
                           <div className={`mt-2 border rounded-lg overflow-hidden transition-colors ${
@@ -1898,8 +1930,8 @@ export function HakaseAI() {
                       </FieldGroup>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
-                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
+                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); }} />
+                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); }} />
                       </div>
 
                       {/* ── Diagen Integration ── */}
@@ -2032,6 +2064,7 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(diagenResult.smiles);
+                                      setActivatedSmiles(diagenResult.smiles);
                                       setMolName(diagenResult.name);
                                       setUniprotId(diagenResult.uniprotId);
                                       setDiagenOpen(false);
@@ -2044,6 +2077,7 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(diagenResult.smiles);
+                                      setActivatedSmiles(diagenResult.smiles);
                                       setMolName(diagenResult.name);
                                       setDiagenOpen(false);
                                       setDiagenResult(null);
@@ -2164,6 +2198,7 @@ export function HakaseAI() {
                                   <button
                                     onClick={() => {
                                       setSmiles(apiResult.smiles);
+                                      setActivatedSmiles(apiResult.smiles);
                                       setMolName(apiResult.name);
                                       setApiImportOpen(false);
                                       setApiResult(null);
@@ -4285,7 +4320,7 @@ export function HakaseAI() {
       {demoOpen && (
         <DemoRunner
           onClose={() => setDemoOpen(false)}
-          setSmiles={setSmiles}
+          setSmiles={(s: string) => { setSmiles(s); setActivatedSmiles(s); }}
           setMolName={setMolName}
           setUniprotId={setUniprotId}
           setActiveLayer={setActiveLayer}
