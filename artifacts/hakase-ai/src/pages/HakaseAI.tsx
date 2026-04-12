@@ -210,7 +210,7 @@ export function HakaseAI() {
   const proteinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
-  const [admetOn] = useState(true);
+  const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
   const [toxOn, setToxOn] = useState(true);
   const [fingerprintOn, setFingerprintOn] = useState(false);
