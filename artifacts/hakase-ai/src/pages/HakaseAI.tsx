@@ -288,6 +288,12 @@ export function HakaseAI() {
 
   const handleAnalyzeMolecule = useCallback(() => {
     if (molProps?.isValid && smiles.trim()) {
+      uniprotManual.current = false;
+      molNameManual.current = false;
+      setUniprotAutoMode(true);
+      setProteinInfo(null);
+      setProteinError(null);
+      setAlphafoldData(null);
       setActivatedSmiles(smiles.trim());
     }
   }, [smiles, molProps?.isValid]);
@@ -866,6 +872,12 @@ export function HakaseAI() {
     setMolName(proj.molName);
     setUniprotId(proj.uniprotId);
     setIndication(proj.indicationCode);
+    uniprotManual.current = false;
+    molNameManual.current = false;
+    setUniprotAutoMode(true);
+    setProteinInfo(null);
+    setProteinError(null);
+    setAlphafoldData(null);
     setSimResults(null);
     setInVitroResults(null);
     setAnimalResults(null);
@@ -1946,8 +1958,8 @@ export function HakaseAI() {
                       </FieldGroup>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); }} />
-                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); }} />
+                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }} />
+                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); setActivatedSmiles(sm); if (nm) setMolName(nm); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }} />
                       </div>
 
                       {/* ── Diagen Integration ── */}
@@ -2095,6 +2107,12 @@ export function HakaseAI() {
                                       setSmiles(diagenResult.smiles);
                                       setActivatedSmiles(diagenResult.smiles);
                                       setMolName(diagenResult.name);
+                                      uniprotManual.current = false;
+                                      molNameManual.current = false;
+                                      setUniprotAutoMode(true);
+                                      setProteinInfo(null);
+                                      setProteinError(null);
+                                      setAlphafoldData(null);
                                       setDiagenOpen(false);
                                       setDiagenResult(null);
                                     }}
@@ -2216,6 +2234,12 @@ export function HakaseAI() {
                                       setSmiles(apiResult.smiles);
                                       setActivatedSmiles(apiResult.smiles);
                                       setMolName(apiResult.name);
+                                      uniprotManual.current = false;
+                                      molNameManual.current = false;
+                                      setUniprotAutoMode(true);
+                                      setProteinInfo(null);
+                                      setProteinError(null);
+                                      setAlphafoldData(null);
                                       setApiImportOpen(false);
                                       setApiResult(null);
                                     }}
@@ -4336,7 +4360,7 @@ export function HakaseAI() {
       {demoOpen && (
         <DemoRunner
           onClose={() => setDemoOpen(false)}
-          setSmiles={(s: string) => { setSmiles(s); setActivatedSmiles(s); }}
+          setSmiles={(s: string) => { setSmiles(s); setActivatedSmiles(s); uniprotManual.current = false; molNameManual.current = false; setUniprotAutoMode(true); setProteinInfo(null); setProteinError(null); setAlphafoldData(null); }}
           setMolName={setMolName}
           setUniprotId={setUniprotId}
           setActiveLayer={setActiveLayer}
