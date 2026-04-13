@@ -42,6 +42,16 @@ All simulation engines are browser-side. Key engines include:
 -   **RDKit.js (MinimalLib)**: Used for molecular property calculations (`amw`, `CrippenClogP`, `lipinskiHBD`, `lipinskiHBA`, `tpsa`, `NumRotatableBonds`), pharmacophore detection, fingerprint generation, and similarity computation.
 -   **Target Suggestion**: Two-tier approach using ChEMBL experimental data and RDKit SMARTS pharmacophore-based fallback.
 
+### Python AI Service (`artifacts/ai-service/`)
+A FastAPI-based Python backend service running on port 8090, proxied through the Node.js API server at `/api/ai/*`. Provides:
+-   **ADMET Prediction** (`POST /api/ai/admet`): Full ADMET profiling — absorption (Caco-2, HIA, P-gp), distribution (BBB, PPB, Vd), metabolism (CYP inhibition, hepatic clearance), excretion (half-life), toxicity (LD50, hERG, Ames, DILI), and druglikeness (Lipinski, Veber, QED).
+-   **Molecular Properties** (`POST /api/ai/properties`): Solubility, bioavailability, ionization, complexity, synthetic accessibility, lead/fragment-likeness assessment.
+-   **Drug-Target Interaction** (`POST /api/ai/binding`): Pharmacophore matching + Tanimoto fingerprint similarity against 5 target profiles (EGFR, BRAF, BCL2, COX2, HDAC) with pIC50/IC50 estimates.
+-   **Protein Analysis** (`POST /api/ai/protein`): UniProt + AlphaFold integration, amino acid composition, secondary structure prediction, druggability assessment.
+-   **Full Pipeline** (`POST /api/ai/full-pipeline`): Runs all four modules in one call.
+-   Frontend client library: `artifacts/hakase-ai/src/lib/aiService.ts`
+-   Uses: Python 3.11, FastAPI, RDKit (full), scikit-learn, numpy, pandas
+
 ## External Dependencies
 
 -   **ChEMBL**: Used for compound identification, multi-target bioactivity fetching, target lookups, and PD parameter retrieval. Accessed via `@workspace/api-server/src/routes/chembl.ts` proxy.
