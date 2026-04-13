@@ -2263,7 +2263,6 @@ export function HakaseAI() {
                             {uniprotAutoMode && targetSuggestions.length > 0 && (() => {
                               const top = targetSuggestions[0];
                               const isChembl = top?.source === "chembl";
-                              const isSimilarity = top?.source === "similarity";
                               const confLabel = top?.confidenceLabel ?? "Low";
                               const confBadge = isChembl
                                 ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
@@ -2271,8 +2270,7 @@ export function HakaseAI() {
                                 : confLabel === "Medium" ? "bg-amber-500/15 border-amber-500/25 text-amber-400"
                                 :                          "bg-red-500/10 border-red-500/20 text-red-400";
                               const confText = isChembl ? "ChEMBL Verified"
-                                : isSimilarity ? `Ligand Similarity · ${confLabel} confidence`
-                                : `Pharmacophore · ${confLabel} confidence`;
+                                : `Auto-matched · ${confLabel} confidence`;
                               return (
                                 <span className={`px-1.5 py-0.5 rounded-full border text-[8px] font-medium ${confBadge}`}>
                                   {confText}
@@ -2303,7 +2301,6 @@ export function HakaseAI() {
                             {targetSuggestions.slice(0, 4).map(sugg => {
                               const isActive = uniprotId === sugg.uniprotId;
                               const isChembl = sugg.source === "chembl";
-                              const isSimilarity = sugg.source === "similarity";
                               const confPct = Math.round(sugg.confidence * 100);
                               const confColor = isChembl ? "text-emerald-500"
                                 : sugg.confidenceLabel === "High"   ? "text-emerald-500"
@@ -2313,11 +2310,10 @@ export function HakaseAI() {
                                 <button
                                   key={sugg.uniprotId}
                                   onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); handleProteinFetch(sugg.uniprotId); }}
-                                  className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : isSimilarity ? "text-sky-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
+                                  className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
                                 >
-                                  {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : isSimilarity ? "text-sky-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
+                                  {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
                                   <span className={`text-[7px] ml-0.5 ${confColor}`}>{confPct}%</span>
-                                  {isSimilarity && <span className="text-[6px] text-sky-600 ml-0.5">Tc</span>}
                                 </button>
                               );
                             })}
@@ -2429,13 +2425,6 @@ export function HakaseAI() {
                                           :                                         "bg-red-500/10 text-red-400"
                                         }`}>
                                           {sugg.confidenceLabel === "Experimental" ? "Experimental" : `${sugg.confidenceLabel} Conf.`}
-                                        </span>
-                                        <span className={`px-1 py-px rounded text-[7px] font-medium uppercase tracking-wider ${
-                                          sugg.source === "similarity" ? "bg-sky-500/10 text-sky-400"
-                                          : sugg.source === "chembl"   ? "bg-emerald-500/10 text-emerald-400"
-                                          :                              "bg-slate-700/50 text-slate-500"
-                                        }`}>
-                                          {sugg.source === "similarity" ? "Tanimoto" : sugg.source === "chembl" ? "ChEMBL" : "Pharmacophore"}
                                         </span>
                                         <span className="text-slate-600">{sugg.targetClass}</span>
                                         <span className="text-slate-700">·</span>

@@ -1,6 +1,5 @@
 import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import type { ChEMBLTargetHit } from "./chemblTargetLookup";
-import { ligandSimilaritySearch, aggregateSimilarityByTarget } from "./ligandSimilarity";
 
 export interface TargetSuggestion {
   uniprotId:   string;
@@ -12,7 +11,7 @@ export interface TargetSuggestion {
   rationale:   string[];
   area:        string;
   color:       "violet" | "blue" | "emerald" | "amber" | "red" | "cyan";
-  source:      "chembl" | "heuristic" | "similarity";
+  source:      "chembl" | "heuristic";
 }
 
 function inRange(v: number, lo: number, hi: number): boolean { return v >= lo && v <= hi; }
@@ -740,52 +739,17 @@ export function suggestTargets(
     hasAlkoxy: false, hasAniline: false,
   };
 
-  const simHits = ligandSimilaritySearch(smiles, 20, 0.15);
-  const simTargets = aggregateSimilarityByTarget(simHits);
-
-  const similaritySuggestions: TargetSuggestion[] = simTargets
-    .filter(st => st.bestSimilarity >= 0.2)
-    .map(st => {
-      const conf = Math.min(1, st.bestSimilarity);
-      const label: TargetSuggestion["confidenceLabel"] =
-        conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
-
-      const rationale: string[] = [];
-      const topHits = st.hits.slice(0, 3);
-      for (const h of topHits) {
-        const simPct = (h.tanimoto * 100).toFixed(0);
-        const actStr = h.activityNM != null
-          ? (h.activityNM < 1000 ? ` (IC₅₀ ${h.activityNM.toFixed(0)} nM)` : ` (IC₅₀ ${(h.activityNM / 1000).toFixed(1)} µM)`)
-          : "";
-        rationale.push(`Tanimoto ${simPct}% to ${h.name}${actStr} — known ${st.geneName} ligand`);
-      }
-      if (st.hits.length > 1) {
-        rationale.push(`${st.hits.length} reference ligands matched in similarity search`);
-      }
-
-      return {
-        uniprotId: st.uniprotId,
-        geneName: st.geneName,
-        fullName: st.fullName,
-        targetClass: st.targetClass,
-        confidence: conf,
-        confidenceLabel: label,
-        rationale,
-        area: st.area,
-        color: st.color,
-        source: "similarity" as const,
-      };
-    });
-
-  const ABSOLUTE_MAX = 12;
-  const heuristicScored = CATALOGUE.map(t => {
+  const scored = CATALOGUE.map(t => {
     const rawScore = t.score(props, ph);
     const reasons  = t.rationale(props, ph);
     return { ...t, rawScore, reasons };
   });
-  heuristicScored.sort((a, b) => b.rawScore - a.rawScore);
 
-  const heuristicSuggestions: TargetSuggestion[] = heuristicScored.slice(0, topN).map(t => {
+  scored.sort((a, b) => b.rawScore - a.rawScore);
+
+  const ABSOLUTE_MAX = 12;
+
+  return scored.slice(0, topN).map(t => {
     const conf = Math.min(1, Math.max(0, t.rawScore / ABSOLUTE_MAX));
     const label: TargetSuggestion["confidenceLabel"] = conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
     return {
@@ -801,30 +765,6 @@ export function suggestTargets(
       source:      "heuristic" as const,
     };
   });
-
-  if (similaritySuggestions.length > 0) {
-    const simIds = new Set(similaritySuggestions.map(s => s.uniprotId));
-
-    const merged: TargetSuggestion[] = similaritySuggestions.map(sim => {
-      const heur = heuristicSuggestions.find(h => h.uniprotId === sim.uniprotId);
-      if (heur && heur.rationale.length > 0) {
-        const combined = [...sim.rationale];
-        for (const r of heur.rationale) {
-          if (!combined.includes(r)) combined.push(r);
-        }
-        return { ...sim, rationale: combined };
-      }
-      return sim;
-    });
-
-    const fallbacks = heuristicSuggestions
-      .filter(h => !simIds.has(h.uniprotId))
-      .slice(0, Math.max(0, topN - merged.length));
-
-    return [...merged, ...fallbacks].slice(0, topN);
-  }
-
-  return heuristicSuggestions;
 }
 
 function potencyColor(nM: number): TargetSuggestion["color"] {
