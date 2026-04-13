@@ -19,7 +19,6 @@ import { runCohortSimulation, type CohortResults, type L2PkOverrides } from "@/l
 import { fetchFAERSSignals } from "@/lib/faersApi";
 import { fetchPDParameters } from "@/lib/pdModel";
 import { runTrialSimulation, runProcovaAnalysis, lookupVarianceReduction, type TrialResults, type ProcovaResults, type ProcovaConfig } from "@/lib/trialSim";
-import { fetchClinicalTrialSites, runMonteCarloSiteRanking, type RankedSite, type MonteCarloConfig } from "@/lib/siteRanking";
 import {
   runAnimalCohortSimulation, type AnimalCohortResults,
   SPECIES_LIST, STUDY_TYPE_LIST, type SpeciesId, type StudyType,
@@ -2339,7 +2338,7 @@ export function HakaseAI() {
                             />
                           </div>
                           <button
-                            onClick={() => handleProteinFetch()}
+                            onClick={handleProteinFetch}
                             disabled={!uniprotId.trim() || proteinLoading}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
                           >
@@ -4356,7 +4355,7 @@ export function HakaseAI() {
                       <OverrideBanner overrides={safetyOverrides} />
                     )}
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL4?.databaseQueries ?? []).some(q => q.database === w.database))} />
-                    <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} trialPhase={trialPhase} numSites={parseInt(numSites) || 20} dropoutRate={Number(dropoutRate) || 0.15} targetSampleSize={parseInt(targetSampleSize) || 240} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />
+                    <Layer3Results trialResults={trialResults} cohortResults={cohortResults} indication={indication} simResults={simResults} aiReport={l3AiReport} aiLoading={l3AiLoading} aiError={l3AiError} aiStream={l3AiStream} onRunAi={runL3AiAnalysis} />
                     {procovaResults && <ProcovaResultsPanel pr={procovaResults} powerTarget={Number(powerTarget) || 0.80} />}
                     {provenanceL4 && <ProvenanceFooter provenance={provenanceL4} layer={4} />}
                     <div className="px-6 pb-6">
@@ -8083,14 +8082,10 @@ function ProcovaRegulatory() {
 }
 
 // ── Layer 3 Results ───────────────────────────────────────────────────
-function Layer3Results({ trialResults: tr, cohortResults: cr, indication, trialPhase, numSites: numSitesDesired, dropoutRate, targetSampleSize, simResults: sr, aiReport: l3Rep, aiLoading: l3Load, aiError: l3Err, aiStream: l3Strm, onRunAi: runL3 }: {
+function Layer3Results({ trialResults: tr, cohortResults: cr, indication, simResults: sr, aiReport: l3Rep, aiLoading: l3Load, aiError: l3Err, aiStream: l3Strm, onRunAi: runL3 }: {
   trialResults: TrialResults | null;
   cohortResults: CohortResults | null;
   indication: string;
-  trialPhase: string;
-  numSites: number;
-  dropoutRate: number;
-  targetSampleSize: number;
   simResults: SimResults | null;
   aiReport: Record<string, unknown> | null;
   aiLoading: boolean;
@@ -8166,7 +8161,7 @@ function Layer3Results({ trialResults: tr, cohortResults: cr, indication, trialP
       {activeTab === "enrollment"  && <EnrollmentChart     tr={tr} />}
       {activeTab === "power"       && <PowerCurve          tr={tr} />}
       {activeTab === "balance"     && <BalanceReport       cr={cr} />}
-      {activeTab === "sites"       && <SiteRanking         tr={tr} indication={indication} trialPhase={trialPhase} numSites={numSitesDesired} dropoutRate={dropoutRate} targetSampleSize={targetSampleSize} />}
+      {activeTab === "sites"       && <SiteRanking         tr={tr} />}
       {activeTab === "cost"        && <CostSummary         tr={tr} />}
 
       <div className="flex gap-2 justify-end">
@@ -8393,172 +8388,53 @@ function BalanceReport({ cr }: { cr: CohortResults | null }) {
   );
 }
 
-function SiteRanking({ tr, indication, trialPhase, numSites, dropoutRate, targetSampleSize }: {
-  tr: TrialResults | null;
-  indication: string;
-  trialPhase: string;
-  numSites: number;
-  dropoutRate: number;
-  targetSampleSize: number;
-}) {
-  const [rankedSites, setRankedSites] = useState<RankedSite[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [apiSource, setApiSource] = useState<string>("");
-  const [studyCount, setStudyCount] = useState(0);
-  const [showTop, setShowTop] = useState(10);
-  const fetchedKeyRef = useRef("");
-
-  useEffect(() => {
-    const key = `${indication}||${trialPhase}||${numSites}||${dropoutRate}||${targetSampleSize}`;
-    if (key === fetchedKeyRef.current) return;
-    fetchedKeyRef.current = key;
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    (async () => {
-      try {
-        const sites = await fetchClinicalTrialSites(indication, trialPhase, 80);
-        if (cancelled) return;
-
-        if (sites.length === 0) {
-          setError("No sites found for this indication/phase on ClinicalTrials.gov. Try a broader indication.");
-          setRankedSites([]);
-          setLoading(false);
-          return;
-        }
-
-        setStudyCount(sites.length);
-        setApiSource("ClinicalTrials.gov (v2 API)");
-
-        const config: MonteCarloConfig = {
-          iterations: 2000,
-          targetSampleSize,
-          numSitesDesired: numSites,
-          trialDurationMonths: tr?.estimatedDuration ?? 24,
-          dropoutRate,
-          phase: trialPhase,
-        };
-
-        const ranked = runMonteCarloSiteRanking(sites, config, 42);
-        if (cancelled) return;
-        setRankedSites(ranked);
-      } catch (err) {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to fetch site data");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [indication, trialPhase, numSites, dropoutRate, targetSampleSize, tr?.estimatedDuration]);
-
-  const displaySites = rankedSites.slice(0, showTop);
-  const regionCounts = rankedSites.reduce<Record<string, number>>((acc, s) => {
-    acc[s.region] = (acc[s.region] ?? 0) + 1;
-    return acc;
-  }, {});
-  const topRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+function SiteRanking({ tr }: { tr: TrialResults | null }) {
+  const sites = tr
+    ? tr.siteRecommendations.slice(0, 5).map((s, i) => ({
+        rank: i + 1, site: s.site, region: s.region,
+        enrollment: parseFloat(s.enrollPerMonth.toFixed(1)),
+        quality: parseFloat(s.quality.toFixed(1)),
+        composite: Math.round(s.composite * 100),
+      }))
+    : [
+        { rank: 1, site: "Johns Hopkins, Baltimore", region: "North America", enrollment: 4.2, quality: 9.2, composite: 91 },
+        { rank: 2, site: "Royal Marsden, London",    region: "Europe",        enrollment: 3.8, quality: 9.4, composite: 88 },
+        { rank: 3, site: "MD Anderson, Houston",     region: "North America", enrollment: 3.9, quality: 8.9, composite: 86 },
+        { rank: 4, site: "Memorial Sloan Kettering", region: "North America", enrollment: 3.5, quality: 9.1, composite: 84 },
+        { rank: 5, site: "Tokyo Medical Univ.",      region: "Asia-Pacific",  enrollment: 3.3, quality: 8.7, composite: 79 },
+      ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-[12px] font-semibold text-slate-300">Dynamic Site Ranking</h3>
-          <p className="text-[9px] text-slate-600 mt-0.5">Monte Carlo simulation (2,000 iterations) on live ClinicalTrials.gov data</p>
-        </div>
-        {apiSource && !loading && (
-          <div className="flex items-center gap-2">
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] text-emerald-400 font-medium">LIVE API</span>
-            <span className="text-[9px] text-slate-600">{studyCount} facilities · {rankedSites.length} unique sites</span>
-          </div>
-        )}
-      </div>
-
-      {loading && (
-        <div className="flex items-center justify-center py-8 gap-2">
-          <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-          <span className="text-[11px] text-slate-500">Querying ClinicalTrials.gov & running Monte Carlo…</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-500/5 border border-red-500/15 rounded-lg p-3">
-          <p className="text-[10px] text-red-400">{error}</p>
-        </div>
-      )}
-
-      {!loading && !error && displaySites.length > 0 && (
-        <>
-          <div className="flex gap-2 flex-wrap">
-            {topRegions.map(([region, count]) => (
-              <span key={region} className="px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-[9px] text-slate-400">
-                {region} <span className="text-slate-600">({count})</span>
-              </span>
+    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+      <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Site Ranking Table</h3>
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="border-b border-white/8">
+            {["#","Site","Region","Enrollment/mo","Quality Score","Composite"].map(h => (
+              <th key={h} className="text-left py-2 pr-4 text-slate-500 font-medium">{h}</th>
             ))}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="border-b border-white/8">
-                  {["#","Facility","Location","Region","Trials","Enroll/mo","Quality","Experience","Composite"].map(h => (
-                    <th key={h} className="text-left py-2 pr-3 text-slate-500 font-medium whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displaySites.map(s => {
-                  const compositeColor = s.composite >= 80 ? "text-emerald-300"
-                    : s.composite >= 60 ? "text-amber-300"
-                    : "text-red-300";
-                  const barColor = s.composite >= 80 ? "bg-emerald-500"
-                    : s.composite >= 60 ? "bg-amber-500"
-                    : "bg-red-400";
-                  return (
-                    <tr key={`${s.site}-${s.city}-${s.rank}`} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                      <td className="py-2 pr-3 font-bold text-slate-500">{s.rank}</td>
-                      <td className="py-2 pr-3 text-slate-300 max-w-[200px] truncate" title={s.site}>{s.site}</td>
-                      <td className="py-2 pr-3 text-slate-500 text-[10px]">{s.city}{s.country ? `, ${s.country}` : ""}</td>
-                      <td className="py-2 pr-3"><Badge className="text-[8px] bg-white/5 text-slate-500">{s.region}</Badge></td>
-                      <td className="py-2 pr-3 text-violet-400 font-medium">{s.trialCount}</td>
-                      <td className="py-2 pr-3 text-blue-400 font-medium">{s.enrollPerMonth}</td>
-                      <td className="py-2 pr-3 text-emerald-400 font-medium">{s.quality}/10</td>
-                      <td className="py-2 pr-3 text-amber-400 font-medium">{s.experience}/10</td>
-                      <td className="py-2 pr-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-14 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                            <div className={`h-full ${barColor} rounded-full`} style={{ width: `${s.composite}%` }} />
-                          </div>
-                          <span className={`font-semibold ${compositeColor}`}>{s.composite}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {rankedSites.length > showTop && (
-            <button
-              onClick={() => setShowTop(prev => Math.min(prev + 10, rankedSites.length))}
-              className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
-            >
-              Show more ({rankedSites.length - showTop} remaining)
-            </button>
-          )}
-
-          <div className="flex items-center gap-4 pt-2 border-t border-white/5 text-[9px] text-slate-600">
-            <span>Source: {apiSource}</span>
-            <span>MC iterations: 2,000</span>
-            <span>Weights: Enrollment 35% · Quality 30% · Experience 25% · Retention 10%</span>
-          </div>
-        </>
-      )}
+          </tr>
+        </thead>
+        <tbody>
+          {sites.map(s => (
+            <tr key={s.rank} className="border-b border-white/5 hover:bg-white/3 cursor-pointer">
+              <td className="py-2 pr-4 font-bold text-slate-500">{s.rank}</td>
+              <td className="py-2 pr-4 text-slate-300">{s.site}</td>
+              <td className="py-2 pr-4"><Badge className="text-[9px] bg-white/5 text-slate-500">{s.region}</Badge></td>
+              <td className="py-2 pr-4 text-blue-400 font-medium">{s.enrollment}</td>
+              <td className="py-2 pr-4 text-emerald-400 font-medium">{s.quality}/10</td>
+              <td className="py-2 pr-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${s.composite}%` }} />
+                  </div>
+                  <span className="text-emerald-300 font-semibold">{s.composite}</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
