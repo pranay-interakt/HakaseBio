@@ -518,14 +518,9 @@ export function runTrialSimulation(
   //           data management + biostatistics (8%) → ×1.33 total
   const estimatedCostRaw = baseCost * 1.33;
 
-  // Site recommendations
   const siteRecommendations = [
-    { site: "Johns Hopkins, Baltimore",    region: "North America", enrollPerMonth: parseFloat(jitter(4.2, 0.5, seed + 40).toFixed(1)), quality: parseFloat(jitter(9.2, 0.4, seed + 41).toFixed(1)), composite: Math.round(jitter(91, 5, seed + 42)) },
-    { site: "Royal Marsden, London",       region: "Europe",        enrollPerMonth: parseFloat(jitter(3.8, 0.5, seed + 43).toFixed(1)), quality: parseFloat(jitter(9.4, 0.3, seed + 44).toFixed(1)), composite: Math.round(jitter(88, 4, seed + 45)) },
-    { site: "MD Anderson, Houston",        region: "North America", enrollPerMonth: parseFloat(jitter(3.9, 0.5, seed + 46).toFixed(1)), quality: parseFloat(jitter(8.9, 0.4, seed + 47).toFixed(1)), composite: Math.round(jitter(86, 5, seed + 48)) },
-    { site: "Memorial Sloan Kettering",   region: "North America", enrollPerMonth: parseFloat(jitter(3.5, 0.4, seed + 49).toFixed(1)), quality: parseFloat(jitter(9.1, 0.3, seed + 50).toFixed(1)), composite: Math.round(jitter(84, 4, seed + 51)) },
-    { site: "Tokyo Medical Univ.",        region: "Asia-Pacific",  enrollPerMonth: parseFloat(jitter(3.3, 0.4, seed + 52).toFixed(1)), quality: parseFloat(jitter(8.7, 0.5, seed + 53).toFixed(1)), composite: Math.round(jitter(79, 5, seed + 54)) },
-  ].sort((a, b) => b.composite - a.composite);
+    { site: "Pending dynamic ranking…", region: "—", enrollPerMonth: 0, quality: 0, composite: 0 },
+  ];
 
   // Trial Go/No-Go
   let trialGoNogo: "GO" | "CONDITIONAL GO" | "NO-GO";
