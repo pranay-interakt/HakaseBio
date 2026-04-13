@@ -40,7 +40,7 @@ All simulation engines are browser-side. Key engines include:
 -   **Database**: PostgreSQL with Drizzle ORM for schema definition and interaction.
 -   **API Design**: Express server with Zod for robust request/response validation.
 -   **RDKit.js (MinimalLib)**: Used for molecular property calculations (`amw`, `CrippenClogP`, `lipinskiHBD`, `lipinskiHBA`, `tpsa`, `NumRotatableBonds`), pharmacophore detection, fingerprint generation, and similarity computation.
--   **Target Suggestion**: Two-tier approach using ChEMBL experimental data and RDKit SMARTS pharmacophore-based fallback.
+-   **Target Suggestion**: Three-tier approach: (1) ChEMBL experimental bioactivity data (highest priority), (2) Morgan fingerprint Tanimoto similarity search against a ~50-compound reference library of known drug-target pairs (`ligandSimilarity.ts`), (3) RDKit SMARTS pharmacophore-based heuristic fallback. Similarity results are primary when ChEMBL data is unavailable; pharmacophore rationale is merged as secondary evidence.
 
 ## External Dependencies
 
