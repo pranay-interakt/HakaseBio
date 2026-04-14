@@ -390,8 +390,8 @@ export function HakaseAI() {
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
-  const handleProteinFetch = useCallback(async (overrideId?: string) => {
-    const id = (overrideId ?? uniprotId).trim();
+  const handleProteinFetch = useCallback(async (overrideId?: string | unknown) => {
+    const id = (typeof overrideId === "string" ? overrideId : uniprotId).trim();
     if (!id) return;
     setProteinLoading(true);
     setProteinError(null);
