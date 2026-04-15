@@ -36,3 +36,9 @@ id = "agkBKLz0xJErgcfEieCIb"
 uri = "file://HakaseAI_Glossary.md"
 type = "text"
 title = "HakaseAI — Complete Product Glossary (44 Sections)"
+
+[[outputs]]
+id = "sGUG5q8sptGz_vgFFS-4U"
+uri = "file://artifacts/hakase-ai/docs/target-protein-config.md"
+type = "text"
+title = "Target Protein Configuration & Molecule-Based Target Suggestions"
