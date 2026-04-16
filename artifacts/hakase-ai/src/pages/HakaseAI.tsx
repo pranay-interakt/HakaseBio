@@ -2913,6 +2913,55 @@ export function HakaseAI() {
                 </div>
 
                 <div className="flex-1 p-5 space-y-6">
+                  {/* L2 Recommendations — dynamic, at top */}
+                  {(() => {
+                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
+                    if (!simResults) {
+                      recs.push({ text: "Run Layer 1 (In Vitro) first to unlock animal PK simulation.", level: "info" });
+                    } else {
+                      const toxPct = (simResults.admet.toxicity * 100).toFixed(0);
+                      const absPct = (simResults.admet.absorption * 100).toFixed(0);
+                      const logP = simResults.lipinski.logP;
+                      const mw = simResults.lipinski.mw;
+                      if (simResults.admet.toxicity > 0.6) recs.push({ text: `L1 toxicity is ${toxPct}% (threshold 60%) — choose a species with higher metabolic tolerance (e.g. beagle dog) and use a conservative starting dose (1/20 NOAEL instead of 1/10).`, level: "warn" });
+                      if (logP > 5)    recs.push({ text: `LogP = ${logP.toFixed(2)} exceeds Lipinski limit (>5). Aqueous solubility will be poor — consider lipid-based nano-emulsion or amorphous solid dispersion formulations for this study.`, level: "warn" });
+                      if (logP < 0)    recs.push({ text: `LogP = ${logP.toFixed(2)} (very hydrophilic) — tissue penetration may be limited. IV dosing will give cleaner PK data than oral gavage.`, level: "info" });
+                      if (simResults.admet.absorption < 0.45)  recs.push({ text: `Predicted absorption is only ${absPct}% — oral bioavailability will be low. Consider IV or IP route, or formulation enhancement to improve exposure.`, level: "warn" });
+                      if (mw > 500) recs.push({ text: `MW = ${mw.toFixed(0)} Da exceeds 500 Da — membrane permeability may limit oral absorption. BCS Class II/IV formulations recommended.`, level: "warn" });
+                      if (simResults.goNogo === "NO-GO")   recs.push({ text: `L1 returned NO-GO (toxicity ${toxPct}%, absorption ${absPct}%). Animal study data may support re-assessment only if liabilities are formulation-addressable.`, level: "warn" });
+                      if (simResults.goNogo === "GO" && simResults.admet.toxicity <= 0.6) recs.push({ text: `L1 returned GO with clean profile (toxicity ${toxPct}%, absorption ${absPct}%). Standard allometric scaling and 1/10 HED starting dose apply.`, level: "ok" });
+                      if (simResults.goNogo === "WATCH") recs.push({ text: `L1 returned WATCH (toxicity ${toxPct}%, absorption ${absPct}%). Proceed with enhanced monitoring — plan additional satellite groups for TK sampling.`, level: "info" });
+                    }
+                    if (animalResults) {
+                      const halfLife = animalResults.humanHalfLife;
+                      const formF = animalResults.formulationResult.formulatedF;
+                      const noael = animalResults.noael;
+                      const fih = animalResults.fihDoseMgKg;
+                      const margin = noael / Math.max(fih, 0.001);
+                      if (halfLife < 2)   recs.push({ text: `Projected human t½ = ${halfLife.toFixed(1)} h (very short) — multiple daily doses or modified-release formulation will be required in clinical development.`, level: "warn" });
+                      if (halfLife > 24)  recs.push({ text: `Projected human t½ = ${halfLife.toFixed(1)} h — QD dosing is feasible. Monitor for accumulation in renally-impaired populations in L3.`, level: "ok" });
+                      if (formF < 0.4) recs.push({ text: `Formulated bioavailability = ${(formF * 100).toFixed(0)}% (below 40% threshold) — explore nanocrystal, solid dispersion, or SEDDS formulation strategies.`, level: "warn" });
+                      if (margin < 3) recs.push({ text: `Narrow NOAEL safety margin: ${margin.toFixed(1)}× (NOAEL ${noael.toFixed(1)} mg/kg vs FIH ${fih.toFixed(3)} mg/kg). Threshold is 3×. Consider a more conservative starting dose in L3.`, level: "warn" });
+                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: `Animal PK complete — all parameters within acceptable ranges. Results are cascading to L3 Patient Cohort with allometric scaling applied.`, level: "ok" });
+                    }
+                    if (recs.length === 0) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <AlertTriangle className="w-3 h-3" />
+                          Recommendations
+                        </p>
+                        {recs.map((r, i) => (
+                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
+                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
+                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
+                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
+                          }`}>{r.text}</div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   {/* Species Selection */}
                   <section>
                     <div className="flex items-center gap-2 mb-3">
@@ -3058,38 +3107,6 @@ export function HakaseAI() {
                     </div>
                   </div>
 
-                  {/* L2 Recommendations */}
-                  {(() => {
-                    const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
-                    if (!simResults) {
-                      recs.push({ text: "Run Layer 1 (In Vitro) first to unlock animal PK simulation.", level: "info" });
-                    } else {
-                      if (simResults.admet.toxicity > 0.6) recs.push({ text: "High L1 toxicity — choose a species with higher metabolic tolerance (e.g. beagle dog) and use a conservative starting dose.", level: "warn" });
-                      if (simResults.lipinski.logP > 5)    recs.push({ text: "High LogP compounds often show poor aqueous solubility. Consider lipid-based or nanoparticle formulations in L2.", level: "warn" });
-                      if (simResults.lipinski.logP < 0)    recs.push({ text: "Very low LogP may limit tissue distribution. IV dosing in the animal study will give cleaner PK data.", level: "info" });
-                      if (simResults.goNogo === "NO-GO")   recs.push({ text: "L1 returned NO-GO. Animal study data may support re-assessment if structural liabilities are formulation-addressable.", level: "warn" });
-                    }
-                    if (animalResults) {
-                      if (animalResults.humanHalfLife < 2)   recs.push({ text: "Very short projected human t½ < 2 h — multiple daily doses or modified-release formulation likely required.", level: "warn" });
-                      if (animalResults.humanHalfLife > 24)  recs.push({ text: "Long projected t½ > 24 h — QD dosing feasible; monitor accumulation in renally-impaired patients in L3.", level: "ok" });
-                      if (animalResults.formulationResult.formulatedF < 0.4) recs.push({ text: "Low formulated bioavailability — explore nanocrystal, solid dispersion, or self-emulsifying strategies.", level: "warn" });
-                      if (animalResults.noael < 3 * animalResults.fihDoseMgKg) recs.push({ text: "Narrow NOAEL safety margin (< 3× FIH dose) — consider a more conservative starting dose in L3.", level: "warn" });
-                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Animal PK complete — parameters are cascading to L3 Patient Cohort with allometric scaling applied.", level: "ok" });
-                    }
-                    if (recs.length === 0) return null;
-                    return (
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Recommendations</p>
-                        {recs.map((r, i) => (
-                          <div key={i} className={`rounded-lg px-3 py-2 text-[10px] leading-relaxed border ${
-                            r.level === "warn" ? "bg-amber-500/8 border-amber-500/20 text-amber-300" :
-                            r.level === "ok"   ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-300" :
-                                                 "bg-blue-500/8 border-blue-500/20 text-blue-300"
-                          }`}>{r.text}</div>
-                        ))}
-                      </div>
-                    );
-                  })()}
                 </div>
 
                 <div id="demo-run-l2" className="p-5 border-t border-white/8 mt-auto">
