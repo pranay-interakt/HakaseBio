@@ -364,11 +364,6 @@ export function HakaseAI() {
     if (uniprotManual.current) return;
     const top = targetSuggestions[0];
     if (!top) return;
-    if (top.uniprotId === uniprotId) return;
-    setUniprotId(top.uniprotId);
-    setProteinInfo(null);
-    setProteinError(null);
-    setAlphafoldData(null);
     const areaMap: Record<string, string> = {
       "Oncology": "Oncology", "Oncology (CML)": "Oncology", "Oncology (Prostate) / Endocrinology": "Oncology",
       "Oncology (Breast) / Endocrinology": "Oncology", "Oncology / Angiogenesis": "Oncology",
@@ -385,6 +380,18 @@ export function HakaseAI() {
     };
     const mapped = areaMap[top.area];
     if (mapped) setTherapeuticArea(mapped);
+    else {
+      const fallback = top.area.split(/\s*[\/·]\s*/)[0].trim();
+      const validAreas = ["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"];
+      const match = validAreas.find(v => fallback.toLowerCase().startsWith(v.toLowerCase()));
+      if (match) setTherapeuticArea(match);
+    }
+    if (top.uniprotId !== uniprotId) {
+      setUniprotId(top.uniprotId);
+      setProteinInfo(null);
+      setProteinError(null);
+      setAlphafoldData(null);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions]);
   // ─────────────────────────────────────────────────────────────────────

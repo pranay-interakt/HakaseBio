@@ -42,3 +42,9 @@ id = "sGUG5q8sptGz_vgFFS-4U"
 uri = "file://artifacts/hakase-ai/docs/target-protein-config.md"
 type = "text"
 title = "Target Protein Configuration & Molecule-Based Target Suggestions"
+
+[[outputs]]
+id = "IfES0Yn0LGzqjii0QFSBj"
+uri = "file://artifacts/hakase-ai/docs/layer-1-in-vitro.md"
+type = "text"
+title = "Layer 1 — In Vitro Digital Twin (Complete Documentation)"
