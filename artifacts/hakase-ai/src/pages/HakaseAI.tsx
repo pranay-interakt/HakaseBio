@@ -496,6 +496,8 @@ export function HakaseAI() {
   const [animalRoute, setAnimalRoute] = useState("Oral");
   const [animalFormulation, setAnimalFormulation] = useState<FormulationType>("plain");
   const [animalResults, setAnimalResults] = useState<AnimalCohortResults | null>(null);
+  const [l2AutoConfigured, setL2AutoConfigured] = useState(false);
+  const l2ManualOverride = useRef({ species: false, study: false, route: false, formulation: false });
 
   // ── External DB enrichment state ──────────────────────────────────────────
   const [extBindingDB, setExtBindingDB]   = useState<BindingDBResult | null>(null);
@@ -609,6 +611,42 @@ export function HakaseAI() {
   const [inVitroResults, setInVitroResults] = useState<InVitroResults | null>(null);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
+
+  useEffect(() => {
+    if (!simResults) return;
+    const tox = simResults.admet.toxicity;
+    const abs = simResults.admet.absorption;
+    const logP = simResults.lipinski.logP;
+    const mw = simResults.lipinski.mw;
+    const goNogo = simResults.goNogo;
+
+    if (!l2ManualOverride.current.species) {
+      if (tox > 0.6) setAnimalSpecies("dog_beagle");
+      else if (therapeuticArea === "CNS") setAnimalSpecies("monkey_cyno");
+      else setAnimalSpecies("rat_sd");
+    }
+    if (!l2ManualOverride.current.study) {
+      if (goNogo === "NO-GO") setAnimalStudyType("single_dose");
+      else if (goNogo === "WATCH") setAnimalStudyType("sub_acute_14d");
+      else if (tox > 0.5) setAnimalStudyType("sub_acute_14d");
+      else setAnimalStudyType("sub_chronic_28d");
+    }
+    if (!l2ManualOverride.current.route) {
+      if (abs < 0.35 || logP < 0) setAnimalRoute("IV");
+      else if (abs < 0.45) setAnimalRoute("SC");
+      else setAnimalRoute("Oral");
+    }
+    if (!l2ManualOverride.current.formulation) {
+      if (logP > 5) setAnimalFormulation("lipid");
+      else if (mw > 500 && logP > 3) setAnimalFormulation("amorphous");
+      else if (mw > 400 && logP > 2 && abs < 0.6) setAnimalFormulation("nanoparticle");
+      else if (logP > 3 && abs < 0.55) setAnimalFormulation("cyclodextrin");
+      else setAnimalFormulation("plain");
+    }
+    l2ManualOverride.current = { species: false, study: false, route: false, formulation: false };
+    setL2AutoConfigured(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simResults]);
 
   const [haIOpsCtx, setHAIOpsCtx] = useState<HAIOpsContext>(createHAIOpsContext());
   const safetyFlags = haIOpsCtx.flags;
@@ -2931,6 +2969,25 @@ export function HakaseAI() {
                       if (simResults.goNogo === "NO-GO")   recs.push({ text: `L1 returned NO-GO (toxicity ${toxPct}%, absorption ${absPct}%). Animal study data may support re-assessment only if liabilities are formulation-addressable.`, level: "warn" });
                       if (simResults.goNogo === "GO" && simResults.admet.toxicity <= 0.6) recs.push({ text: `L1 returned GO with clean profile (toxicity ${toxPct}%, absorption ${absPct}%). Standard allometric scaling and 1/10 HED starting dose apply.`, level: "ok" });
                       if (simResults.goNogo === "WATCH") recs.push({ text: `L1 returned WATCH (toxicity ${toxPct}%, absorption ${absPct}%). Proceed with enhanced monitoring — plan additional satellite groups for TK sampling.`, level: "info" });
+                      if (l2AutoConfigured) {
+                        const configParts: string[] = [];
+                        if (!l2ManualOverride.current.species) {
+                          const spName = SPECIES_LIST.find(s => s.id === animalSpecies)?.displayName ?? animalSpecies;
+                          configParts.push(`Species → ${spName}`);
+                        }
+                        if (!l2ManualOverride.current.study) {
+                          const stName = STUDY_TYPE_LIST.find(s => s.id === animalStudyType)?.label ?? animalStudyType;
+                          configParts.push(`Study → ${stName}`);
+                        }
+                        if (!l2ManualOverride.current.route) configParts.push(`Route → ${animalRoute}`);
+                        if (!l2ManualOverride.current.formulation && animalRoute === "Oral") {
+                          const fName = FORMULATION_LIST.find(f => f.id === animalFormulation)?.label ?? animalFormulation;
+                          configParts.push(`Formulation → ${fName}`);
+                        }
+                        if (configParts.length > 0) {
+                          recs.push({ text: `Auto-configured from L1 data: ${configParts.join(" · ")}. Click any option to override.`, level: "info" });
+                        }
+                      }
                     }
                     if (animalResults) {
                       const halfLife = animalResults.humanHalfLife;
@@ -2967,12 +3024,15 @@ export function HakaseAI() {
                     <div className="flex items-center gap-2 mb-3">
                       <TestTube2 className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Species Selection</span>
+                      {l2AutoConfigured && !l2ManualOverride.current.species && (
+                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       {SPECIES_LIST.map(sp => (
                         <button
                           key={sp.id}
-                          onClick={() => setAnimalSpecies(sp.id)}
+                          onClick={() => { l2ManualOverride.current.species = true; setAnimalSpecies(sp.id); }}
                           className={`p-3 rounded-lg border text-left transition-all ${
                             animalSpecies === sp.id
                               ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
@@ -2998,12 +3058,15 @@ export function HakaseAI() {
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Study Design</span>
+                      {l2AutoConfigured && !l2ManualOverride.current.study && (
+                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {STUDY_TYPE_LIST.map(st => (
                         <button
                           key={st.id}
-                          onClick={() => setAnimalStudyType(st.id)}
+                          onClick={() => { l2ManualOverride.current.study = true; setAnimalStudyType(st.id); }}
                           className={`w-full p-3 rounded-lg border text-left transition-all ${
                             animalStudyType === st.id
                               ? "bg-amber-500/10 border-amber-500/40"
@@ -3027,12 +3090,15 @@ export function HakaseAI() {
                     <div className="flex items-center gap-2 mb-3">
                       <Activity className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Route of Administration</span>
+                      {l2AutoConfigured && !l2ManualOverride.current.route && (
+                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {["Oral", "IV", "SC", "IM", "Topical", "Inhalation"].map(r => (
                         <button
                           key={r}
-                          onClick={() => setAnimalRoute(r)}
+                          onClick={() => { l2ManualOverride.current.route = true; setAnimalRoute(r); }}
                           className={`py-2 px-3 rounded-lg border text-[11px] font-medium transition-all ${
                             animalRoute === r
                               ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
@@ -3052,12 +3118,15 @@ export function HakaseAI() {
                         <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
                         <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Formulation / Drug Delivery</span>
                         <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-semibold">FDA IIG</span>
+                        {l2AutoConfigured && !l2ManualOverride.current.formulation && (
+                          <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                        )}
                       </div>
                       <div className="space-y-2">
                         {FORMULATION_LIST.map(f => (
                           <button
                             key={f.id}
-                            onClick={() => setAnimalFormulation(f.id)}
+                            onClick={() => { l2ManualOverride.current.formulation = true; setAnimalFormulation(f.id); }}
                             className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
                               animalFormulation === f.id
                                 ? "bg-amber-500/10 border-amber-500/35 text-amber-200"
