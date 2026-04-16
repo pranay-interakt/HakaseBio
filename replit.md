@@ -25,6 +25,12 @@ The project is a pnpm monorepo using TypeScript (v5.9) and Node.js (v24). The ba
 #### HAIOps Framework
 The HAIOps framework (`Healthcare AI Operations`) integrates safety and governance. It includes a Safety Flag Cascade engine (cardiac, hepatotoxicity, DDI, narrow-margin, high-grade-ae, subgroup-disparity) that propagates across all simulation layers. Overrides are logged, and provenance metadata (engine version, timestamp) is displayed.
 
+#### Enhanced AI Analysis Panel (`LayerAiPanel`)
+Each layer (L1/L2/L3) has an AI Analysis panel with:
+- **Pre-analysis data summaries**: L1 shows ADMET radar chart + target auto-match explanation + key metrics (IC50, Caco-2, hERG). L2 shows PK curve preview + clinical PK bars (Cmax, t½, responder %). L3 shows success probability gauge + trial metrics (power, p-value).
+- **Safety Flag Gate**: Expandable `AiSafetyGate` component showing all safety flags (critical/major/warning severity) with ICH references and review acknowledgment button. Shows "clear to proceed" when no flags exist.
+- **AI Report**: Claude-powered deep interpretation streamed via `/api/bio-analysis` endpoint with structured sections (overview, safety, target engagement, competitive context, etc.).
+
 #### Simulation Architecture
 All simulation engines are browser-side. Key engines include:
 -   `admet.ts`: Rule-based ADMET scoring, organ risk, toxicity alerts.
