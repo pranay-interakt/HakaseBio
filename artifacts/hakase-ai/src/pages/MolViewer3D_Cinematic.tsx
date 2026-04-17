@@ -194,17 +194,18 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, at
 }
 
 function CinematicInteractiveStage({
-  rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart, children,
+  rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart, onInteractEnd, children,
 }: {
   rx: number; ry: number; zoom: number;
   setRx: (v: number) => void; setRy: (v: number) => void;
   setZoom: (v: number | ((p: number) => number)) => void;
   ryRef: { current: number };
   onInteractStart: () => void;
+  onInteractEnd: () => void;
   children: ReactNode;
 }) {
   const { bind, isDragging } = use3DOrbitControls({
-    rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart,
+    rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart, onInteractEnd,
   });
   return (
     <div
@@ -411,6 +412,7 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
             setRx={setRx} setRy={setRy} setZoom={setZoom}
             ryRef={ryRef}
             onInteractStart={() => setIsAnimating(false)}
+            onInteractEnd={() => setIsAnimating(true)}
           >
             <MoleculeViewer
               rx={rx} ry={ry} zoom={zoom} renderMode={renderMode}

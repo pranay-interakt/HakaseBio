@@ -8,6 +8,7 @@ export interface OrbitControlOpts {
   setRy: (v: number) => void;
   setZoom: (v: number | ((prev: number) => number)) => void;
   onInteractStart?: () => void;
+  onInteractEnd?: () => void;
   rotateSpeed?: number;
   zoomMin?: number;
   zoomMax?: number;
@@ -19,6 +20,7 @@ export function use3DOrbitControls(opts: OrbitControlOpts) {
   const {
     rx, ry, setRx, setRy, setZoom,
     onInteractStart,
+    onInteractEnd,
     rotateSpeed = 0.01,
     zoomMin = 0.3,
     zoomMax = 2.5,
@@ -48,10 +50,12 @@ export function use3DOrbitControls(opts: OrbitControlOpts) {
   }, [rotateSpeed, setRx, setRy, ryRef]);
 
   const onPointerUp = useCallback((e: RPointerEvent<HTMLDivElement>) => {
+    const wasDragging = dragRef.current !== null;
     dragRef.current = null;
     setDragging(false);
     try { (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId); } catch {}
-  }, []);
+    if (wasDragging) onInteractEnd?.();
+  }, [onInteractEnd]);
 
   const onWheel = useCallback((e: RWheelEvent<HTMLDivElement>) => {
     onInteractStart?.();

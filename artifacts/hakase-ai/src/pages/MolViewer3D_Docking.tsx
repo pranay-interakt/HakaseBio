@@ -51,9 +51,35 @@ function buildLigandSDF(smiles: string): string | null {
 let _3DmolLoadPromise: Promise<any> | null = null;
 function load3Dmol(): Promise<any> {
   if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if (window.$3Dmol) return Promise.resolve(window.$3Dmol);
+  if (window.$3Dmol?.createViewer) return Promise.resolve(window.$3Dmol);
   if (_3DmolLoadPromise) return _3DmolLoadPromise;
-  _3DmolLoadPromise = import("3dmol").then((mod: any) => {
+
+  // Prefer the standalone CDN build — it's the officially recommended
+  // distribution and avoids issues with module-bundled WebGL helpers.
+  const loadFromCdn = () => new Promise<any>((resolve, reject) => {
+    const existing = document.querySelector('script[data-3dmol-loader="1"]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.$3Dmol));
+      existing.addEventListener("error", reject);
+      if (window.$3Dmol?.createViewer) resolve(window.$3Dmol);
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = "https://3dmol.org/build/3Dmol-min.js";
+    s.async = true;
+    s.dataset.threedmolLoader = "1";
+    s.setAttribute("data-3dmol-loader", "1");
+    s.onload = () => {
+      if (window.$3Dmol?.createViewer) resolve(window.$3Dmol);
+      else reject(new Error("3Dmol loaded but createViewer not found"));
+    };
+    s.onerror = () => reject(new Error("Failed to load 3Dmol from CDN"));
+    document.head.appendChild(s);
+  });
+
+  _3DmolLoadPromise = loadFromCdn().catch(async () => {
+    // Fallback to the npm bundle if CDN is blocked
+    const mod: any = await import("3dmol");
     const lib = mod?.default ?? mod;
     if (lib && !window.$3Dmol) window.$3Dmol = lib;
     return window.$3Dmol ?? lib;
@@ -120,27 +146,80 @@ export function MolViewer3D_Docking({
     setStatus("loading");
     setErrorMsg(null);
 
-    load3Dmol().then(($3Dmol: any) => {
+    load3Dmol().then(async ($3Dmol: any) => {
       if (cancelled || !containerRef.current || !$3Dmol) return;
+
+      // Wait for the container to actually have non-zero dimensions
+      // (the Docking tab may be hidden until the user clicks it, so its
+      // <canvas> would otherwise be created with 0×0 — which makes 3Dmol's
+      // WebGL context init fail with "Cannot read properties of null (reading 'clearDepth')")
+      const waitForSize = () => new Promise<void>((resolve, reject) => {
+        let frames = 0;
+        const tick = () => {
+          if (cancelled) return reject(new Error("cancelled"));
+          const el = containerRef.current;
+          if (el && el.clientWidth > 0 && el.clientHeight > 0) return resolve();
+          if (++frames > 120) return reject(new Error("Docking viewport never received layout dimensions"));
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+      try {
+        await waitForSize();
+      } catch (e: any) {
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMsg(e?.message || "Viewport not ready");
+        }
+        return;
+      }
+      if (cancelled || !containerRef.current) return;
 
       // Tear down any prior viewer
       try { viewerRef.current?.removeAllModels?.(); } catch {}
       try { viewerRef.current?.removeAllSurfaces?.(); } catch {}
       containerRef.current.innerHTML = "";
 
-      const v = $3Dmol.createViewer(containerRef.current, {
-        backgroundColor: bgDark ? "#04050a" : "#f8fafc",
-        antialias: true,
-      });
+      let v: any;
+      try {
+        v = $3Dmol.createViewer(containerRef.current, {
+          backgroundColor: bgDark ? "#04050a" : "#f8fafc",
+          antialias: true,
+        });
+      } catch (e: any) {
+        setStatus("error");
+        setErrorMsg(`3Dmol viewer init failed: ${e?.message || e}. Try reopening the Docking tab.`);
+        return;
+      }
+      if (!v) {
+        setStatus("error");
+        setErrorMsg("3Dmol viewer could not be created (WebGL unavailable in this browser/context).");
+        return;
+      }
       viewerRef.current = v;
 
-      // Fetch PDB
-      const url = `https://files.rcsb.org/download/${pdbId}.pdb`;
-      fetch(url)
-        .then(r => {
-          if (!r.ok) throw new Error(`PDB ${pdbId} fetch failed (${r.status})`);
-          return r.text();
-        })
+      // Fetch PDB — try multiple mirrors for resilience
+      const sources = [
+        `https://files.rcsb.org/download/${pdbId}.pdb`,
+        `https://files.rcsb.org/view/${pdbId}.pdb`,
+        `https://www.ebi.ac.uk/pdbe/entry-files/download/pdb${pdbId.toLowerCase()}.ent`,
+      ];
+      const tryFetch = async (): Promise<string> => {
+        let lastErr: any = null;
+        for (const src of sources) {
+          try {
+            const r = await fetch(src, { cache: "force-cache" });
+            if (!r.ok) { lastErr = new Error(`${src} → ${r.status}`); continue; }
+            const text = await r.text();
+            if (text && text.length > 200 && /^(HEADER|ATOM|HETATM|TITLE|REMARK|CRYST1)/m.test(text)) return text;
+            lastErr = new Error(`${src} returned non-PDB content`);
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        throw lastErr ?? new Error(`All PDB sources failed for ${pdbId}`);
+      };
+      tryFetch()
         .then(pdbText => {
           if (cancelled) return;
           v.addModel(pdbText, "pdb");
