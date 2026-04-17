@@ -54,6 +54,7 @@ import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
+import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { DemoRunner } from "@/components/DemoRunner";
 import { Badge } from "@/components/ui/badge";
@@ -116,7 +117,7 @@ export function HakaseAI() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [lightMode, setLightMode] = useState(false);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
-  const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
+  const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer" | "docking">("cinematic");
   const [diagenOpen, setDiagenOpen] = useState(false);
   const [diagenJobId, setDiagenJobId] = useState("");
   const [diagenMode, setDiagenMode] = useState<"sync" | "batch" | "cascade">("sync");
@@ -4510,6 +4511,7 @@ export function HakaseAI() {
                 { id: "cinematic", label: "🎬 Cinematic", desc: "Immersive" },
                 { id: "scientific", label: "🔬 Scientific", desc: "Split Panel" },
                 { id: "explorer", label: "🧬 Explorer", desc: "Multi-Molecule" },
+                { id: "docking", label: "🎯 Docking", desc: "Protein + Ligand" },
               ] as const).map(({ id, label, desc }) => (
                 <button
                   key={id}
@@ -4545,6 +4547,15 @@ export function HakaseAI() {
             {viewer3DMode === "cinematic" && <MolViewer3D_Cinematic smiles={smiles} molName={molName || "Molecule"} />}
             {viewer3DMode === "scientific" && <MolViewer3D_Scientific smiles={smiles} molName={molName || "Molecule"} />}
             {viewer3DMode === "explorer" && <MolViewer3D_Explorer smiles={smiles} molName={molName || "Molecule"} />}
+            {viewer3DMode === "docking" && (
+              <MolViewer3D_Docking
+                smiles={smiles}
+                molName={molName || "Molecule"}
+                pdbId={pdbId}
+                uniprotId={uniprotId}
+                targetName={targetSuggestions[0] ? `${targetSuggestions[0].geneName ?? ""} (${targetSuggestions[0].uniprotId})`.trim() : (uniprotId || "Auto-matched target")}
+              />
+            )}
           </div>
         </div>,
         document.body

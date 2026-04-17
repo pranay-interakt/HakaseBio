@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -11,6 +11,7 @@ import {
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
 import { getMolecularProperties } from "@/lib/chemistry";
 import { useRDKitReady } from "@/lib/useRDKitReady";
+import { use3DOrbitControls } from "@/lib/use3DOrbitControls";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#94a3b8", N: "#60a5fa", O: "#f87171",
@@ -189,6 +190,30 @@ function MoleculeViewer({ rx, ry, zoom, renderMode, showHydrogen, showLabels, at
         );
       })}
     </svg>
+  );
+}
+
+function CinematicInteractiveStage({
+  rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart, children,
+}: {
+  rx: number; ry: number; zoom: number;
+  setRx: (v: number) => void; setRy: (v: number) => void;
+  setZoom: (v: number | ((p: number) => number)) => void;
+  ryRef: { current: number };
+  onInteractStart: () => void;
+  children: ReactNode;
+}) {
+  const { bind, isDragging } = use3DOrbitControls({
+    rx, ry, zoom, setRx, setRy, setZoom, ryRef, onInteractStart,
+  });
+  return (
+    <div
+      {...bind}
+      style={{ ...bind.style, transform: "scale(1.4)", cursor: isDragging ? "grabbing" : "grab" }}
+      className="select-none"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -381,7 +406,12 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
           }} />
 
           {/* Molecule */}
-          <div style={{ transform: "scale(1.4)", cursor: "grab" }}>
+          <CinematicInteractiveStage
+            rx={rx} ry={ry} zoom={zoom}
+            setRx={setRx} setRy={setRy} setZoom={setZoom}
+            ryRef={ryRef}
+            onInteractStart={() => setIsAnimating(false)}
+          >
             <MoleculeViewer
               rx={rx} ry={ry} zoom={zoom} renderMode={renderMode}
               showHydrogen={showHydrogen} showLabels={showLabels}
@@ -389,7 +419,7 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
               onAtomClick={setSelectedAtom}
               selectedAtomId={selectedAtom?.id ?? null}
             />
-          </div>
+          </CinematicInteractiveStage>
 
           {/* Formula overlay */}
           <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md border border-white/8 rounded-xl px-4 py-3">

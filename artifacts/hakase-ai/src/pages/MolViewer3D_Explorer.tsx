@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { use3DOrbitControls } from "@/lib/use3DOrbitControls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,6 +162,26 @@ function BigMol({ rx, ry, zoom, color, dynAtoms, dynBonds }: { rx: number; ry: n
       {/* Accent glow */}
       <circle cx={cx} cy={cy} r="120" fill={`${color}08`} />
     </svg>
+  );
+}
+
+function ExplorerInteractiveStage({
+  rx, ry, zoom, setRx, setRy, setZoom, children,
+}: {
+  rx: number; ry: number; zoom: number;
+  setRx: (v: number) => void; setRy: (v: number) => void;
+  setZoom: (v: number | ((p: number) => number)) => void;
+  children: ReactNode;
+}) {
+  const { bind, isDragging } = use3DOrbitControls({ rx, ry, zoom, setRx, setRy, setZoom });
+  return (
+    <div
+      {...bind}
+      style={{ ...bind.style, transform: `scale(${zoom})`, cursor: isDragging ? "grabbing" : "grab" }}
+      className="select-none"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -452,9 +473,12 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
 
           {/* Molecule render */}
           <div className="flex-1 flex items-center justify-center relative z-10">
-            <div style={{ transform: `scale(${zoom})`, cursor: "grab" }}>
+            <ExplorerInteractiveStage
+              rx={rx} ry={ry} zoom={zoom}
+              setRx={setRx} setRy={setRy} setZoom={setZoom}
+            >
               <BigMol rx={rx} ry={ry} zoom={1} color={mol3d ? "#10b981" : primaryMol.accentColor} dynAtoms={dynAtoms} dynBonds={dynBonds} />
-            </div>
+            </ExplorerInteractiveStage>
           </div>
 
           {/* Controls overlay */}

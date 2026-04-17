@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import {
 import { smilesTo3D, type Atom3D, type Bond3D } from "@/lib/smilesTo3D";
 import { getMolecularProperties } from "@/lib/chemistry";
 import { useRDKitReady } from "@/lib/useRDKitReady";
+import { use3DOrbitControls } from "@/lib/use3DOrbitControls";
 
 const ATOM_COLORS: Record<string, string> = {
   C: "#b0b8c8", N: "#60a5fa", O: "#f87171",
@@ -142,6 +143,32 @@ function MolView({ rx, ry, zoom, mode, color, atoms, bonds }: { rx: number; ry: 
         );
       })}
     </svg>
+  );
+}
+
+function ScientificInteractiveStage({
+  rx, ry, zoom, setRx, setRy, setZoom, locked, children,
+}: {
+  rx: number; ry: number; zoom: number;
+  setRx: (v: number) => void; setRy: (v: number) => void;
+  setZoom: (v: number | ((p: number) => number)) => void;
+  locked: boolean;
+  children: ReactNode;
+}) {
+  const { bind, isDragging } = use3DOrbitControls({ rx, ry, zoom, setRx, setRy, setZoom });
+  if (locked) {
+    return (
+      <div style={{ transform: `scale(${zoom * 1.2})`, cursor: "not-allowed" }}>{children}</div>
+    );
+  }
+  return (
+    <div
+      {...bind}
+      style={{ ...bind.style, transform: `scale(${zoom * 1.2})`, cursor: isDragging ? "grabbing" : "grab" }}
+      className="select-none"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -356,9 +383,13 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
               backgroundSize: "30px 30px",
             }} />
 
-            <div style={{ transform: `scale(${zoom * 1.2})`, cursor: locked ? "not-allowed" : "grab" }}>
+            <ScientificInteractiveStage
+              rx={rx} ry={ry} zoom={zoom}
+              setRx={setRx} setRy={setRy} setZoom={setZoom}
+              locked={locked}
+            >
               <MolView rx={rx} ry={ry} zoom={1} mode={mode} color={colorScheme} atoms={dynAtoms} bonds={dynBonds} />
-            </div>
+            </ScientificInteractiveStage>
           </div>
 
           {/* Bottom controls */}
