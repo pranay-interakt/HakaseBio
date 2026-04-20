@@ -4,6 +4,7 @@ import bioAnalysisRouter from "./bio-analysis/index";
 import bioChatRouter from "./bio-chat/index";
 import bindingdbRouter from "./bindingdb";
 import chemblRouter from "./chembl";
+import ccteRouter from "./ccte";
 import aiServiceRouter from "./ai-service";
 
 const router: IRouter = Router();
@@ -13,6 +14,7 @@ router.use(bioAnalysisRouter);
 router.use(bioChatRouter);
 router.use(bindingdbRouter);
 router.use(chemblRouter);
+router.use(ccteRouter);
 router.use(aiServiceRouter);
 
 export default router;
