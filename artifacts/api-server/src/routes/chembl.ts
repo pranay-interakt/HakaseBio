@@ -71,6 +71,49 @@ router.get("/chembl/target", async (req, res) => {
   }
 });
 
+// Animal-PK: filter ADME assays by animal organism, then fetch activities.
+// Two-step pattern (more reliable than activity?target_organism__in=…).
+router.get("/chembl/animal-pk", async (req, res) => {
+  const chemblId = req.query.chembl_id as string | undefined;
+  if (!chemblId) { res.status(400).json({ error: "Provide ?chembl_id=<CHEMBLXXXXX>" }); return; }
+  const SPECIES = ["Rattus norvegicus", "Canis lupus familiaris", "Macaca fascicularis", "Mus musculus"];
+  try {
+    const perSpecies = await Promise.all(SPECIES.map(async (organism) => {
+      const assayUrl = `${CHEMBL_BASE}/assay.json?assay_organism=${encodeURIComponent(organism)}&assay_type=A&limit=50`;
+      const aRes = await fetch(assayUrl, { headers: HEADERS, signal: AbortSignal.timeout(8000) });
+      if (!aRes.ok) return { organism, records: [] as any[] };
+      const aData = (await aRes.json()) as { assays?: any[] };
+      const assayIds: string[] = (aData?.assays ?? []).map((a: any) => a.assay_chembl_id).filter(Boolean);
+      if (!assayIds.length) return { organism, records: [] as any[] };
+      // Fetch activities for this molecule across these assays
+      const ids = assayIds.slice(0, 30).join(",");
+      const actUrl = `${CHEMBL_BASE}/activity.json?molecule_chembl_id=${encodeURIComponent(chemblId)}&assay_chembl_id__in=${encodeURIComponent(ids)}&limit=100`;
+      const actRes = await fetch(actUrl, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+      if (!actRes.ok) return { organism, records: [] as any[] };
+      const actData = (await actRes.json()) as { activities?: any[] };
+      const records = (actData?.activities ?? [])
+        .filter((act: any) => {
+          if (act.standard_value == null) return false;
+          const n = parseFloat(String(act.standard_value));
+          return !isNaN(n) && n > 0;
+        })
+        .map((act: any) => ({
+          assayId: act.assay_chembl_id,
+          species: organism,
+          standardType: act.standard_type ?? "",
+          standardValue: parseFloat(String(act.standard_value)),
+          standardUnits: act.standard_units ?? "",
+          relation: act.standard_relation ?? "=",
+        }));
+      return { organism, records };
+    }));
+    const all = perSpecies.flatMap(s => s.records);
+    res.json({ chemblId, totalRecords: all.length, records: all });
+  } catch (err: any) {
+    res.status(502).json({ error: err?.message ?? "ChEMBL animal-pk proxy error" });
+  }
+});
+
 router.get("/chembl/target-search", async (req, res) => {
   const smiles = req.query.smiles as string | undefined;
   if (!smiles) {

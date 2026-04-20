@@ -1,7 +1,8 @@
 import { ExternalLink, Dna, Link2, GitBranch, Activity, Globe, Beaker, Leaf, FileText, Pill, Users, ChevronRight, Target } from "lucide-react";
 import type { BindingDBResult, BindingDBLigand } from "@/lib/bindingDB";
-import type { ChEMBLMultiTargetResult, ChEMBLTargetActivity } from "@/lib/chemblActivity";
+import type { ChEMBLMultiTargetResult, ChEMBLTargetActivity, ChEMBLAnimalPkResult } from "@/lib/chemblActivity";
 import type { ToxCastResult }         from "@/lib/toxcast";
+import type { ToxRefResult }          from "@/lib/toxRef";
 import type { CTGSearchResult, CTGTrial } from "@/lib/clinicalTrials";
 import type { OTTargetResult }        from "@/lib/openTargets";
 import type { StringResult, StringInteraction } from "@/lib/stringApi";
@@ -23,6 +24,9 @@ interface Props {
   extOpenTargets?: OTTargetResult    | null;
   extToxCast?:     ToxCastResult     | null;
   extEcotox?:      ECOTOXResult      | null;
+  extToxRef?:      ToxRefResult      | null;
+  extAnimalPk?:    ChEMBLAnimalPkResult | null;
+  layer2Confidence?: { overall: number; noaelFold: number | null; aucFold: number | null; species: string | null } | null;
   extClinTrials?:  CTGSearchResult   | null;
   extPharmGKB?:    PharmGKBResult    | null;
   extDisGeNET?:    DisGeNETGeneResult| null;
@@ -58,7 +62,7 @@ export function ExternalDbPanel(props: Props) {
   const hasAnyData = layer === 1
     ? (props.extBindingDB ?? props.extChEMBL ?? props.extString ?? props.extKEGG ?? props.extReactome ?? props.extOpenTargets)
     : layer === 2
-      ? (props.extToxCast ?? props.extEcotox)
+      ? (props.extToxCast ?? props.extEcotox ?? props.extToxRef ?? props.extAnimalPk)
       : (props.extClinTrials ?? props.extPharmGKB ?? props.extDisGeNET ?? props.extGnomAD);
 
   if (!hasAnyData && !loading) return null;
@@ -240,6 +244,109 @@ export function ExternalDbPanel(props: Props) {
       {/* ─── LAYER 2 ─────────────────────────────────────── */}
       {layer === 2 && (
         <>
+          {/* Layer 2 Confidence — derived from validation against measured data */}
+          {props.layer2Confidence && (props.layer2Confidence.noaelFold != null || props.layer2Confidence.aucFold != null) && (
+            <div className="p-4 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.03]">
+              <SectionHead icon={Activity} label="Layer 2 Confidence — Validation vs Measured Data" color="text-emerald-400" />
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className={`text-3xl font-bold ${props.layer2Confidence.overall >= 0.7 ? "text-emerald-300" : props.layer2Confidence.overall >= 0.4 ? "text-amber-300" : "text-rose-400"}`}>
+                    {(props.layer2Confidence.overall * 100).toFixed(0)}%
+                  </div>
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">Overall</div>
+                </div>
+                <div className="flex-1 space-y-1.5 text-[11px]">
+                  {props.layer2Confidence.noaelFold != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Predicted NOAEL vs ToxRefDB measured</span>
+                      <Tag cls={props.layer2Confidence.noaelFold <= 2 ? "bg-emerald-500/15 text-emerald-400" : props.layer2Confidence.noaelFold <= 5 ? "bg-amber-500/15 text-amber-400" : "bg-rose-500/15 text-rose-400"}>
+                        {props.layer2Confidence.noaelFold.toFixed(1)}× fold-error
+                      </Tag>
+                    </div>
+                  )}
+                  {props.layer2Confidence.aucFold != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Predicted AUC vs ChEMBL {props.layer2Confidence.species ?? "animal"}</span>
+                      <Tag cls={props.layer2Confidence.aucFold <= 2 ? "bg-emerald-500/15 text-emerald-400" : props.layer2Confidence.aucFold <= 5 ? "bg-amber-500/15 text-amber-400" : "bg-rose-500/15 text-rose-400"}>
+                        {props.layer2Confidence.aucFold.toFixed(1)}× fold-error
+                      </Tag>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ToxRefDB — measured animal NOAEL/LOAEL */}
+          {props.extToxRef && props.extToxRef.records.length > 0 && (
+            <div className="p-4 rounded-xl border border-orange-500/15 bg-orange-500/[0.03]">
+              <SectionHead icon={Beaker} label={`ToxRefDB — Measured Animal Hazards (${props.extToxRef.records.length})`} color="text-orange-400" />
+              {props.extToxRef.preferredName && (
+                <div className="text-[10px] text-slate-500 mb-2">
+                  Resolved: <span className="text-orange-300 font-semibold">{props.extToxRef.preferredName}</span>
+                  {props.extToxRef.dtxsid && <span className="text-slate-600 ml-1.5">({props.extToxRef.dtxsid})</span>}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                {props.extToxRef.records.slice(0, 6).map((r, i) => (
+                  <div key={i} className="flex items-start justify-between text-[11px] py-1 border-b border-white/5 last:border-0">
+                    <div className="flex flex-col max-w-[60%]">
+                      <span className="text-slate-300 font-medium capitalize">{r.species} — {r.studyType}</span>
+                      <span className="text-[9px] text-slate-600 truncate">{r.criticalEffect}</span>
+                    </div>
+                    <Tag cls={r.toxValType === "NOAEL" ? "bg-emerald-500/15 text-emerald-400" : r.toxValType === "LOAEL" ? "bg-amber-500/15 text-amber-400" : "bg-rose-500/15 text-rose-400"}>
+                      {r.toxValType} {r.value_mgKgDay.toFixed(1)} mg/kg/day
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+              {props.extToxRef.noaelMin != null && (
+                <div className="mt-2 text-[10px] text-slate-500">
+                  Most-conservative NOAEL: <span className="text-emerald-400 font-semibold">{props.extToxRef.noaelMin.toFixed(2)} mg/kg/day</span>
+                  <span className="text-slate-600 ml-2">across {props.extToxRef.speciesCovered.join(", ")}</span>
+                </div>
+              )}
+              <a href={`https://comptox.epa.gov/dashboard/chemical/details/${props.extToxRef.dtxsid}`} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1 text-[9px] text-slate-600 hover:text-slate-400 mt-2 transition-colors">
+                <ExternalLink className="w-3 h-3" /> EPA CCTE Hazard
+              </a>
+            </div>
+          )}
+          {props.extToxRef && props.extToxRef.records.length === 0 && props.extToxRef.status !== "live" && (
+            <div className="p-3 rounded-xl border border-slate-700/30 bg-slate-800/20 text-[10px] text-slate-500">
+              ToxRefDB: {props.extToxRef.status === "no-data" ? "no animal hazard records for this compound" : props.extToxRef.status === "unresolved" ? "compound not found in EPA registry" : "lookup unavailable"}
+            </div>
+          )}
+
+          {/* ChEMBL Animal-PK — measured rat/dog/monkey PK */}
+          {props.extAnimalPk && props.extAnimalPk.records.length > 0 && (
+            <div className="p-4 rounded-xl border border-amber-500/15 bg-amber-500/[0.03]">
+              <SectionHead icon={Target} label={`ChEMBL — Measured Animal PK (${props.extAnimalPk.totalRecords})`} color="text-amber-400" />
+              <div className="space-y-1.5">
+                {props.extAnimalPk.records.slice(0, 8).map((r, i) => (
+                  <div key={i} className="flex items-start justify-between text-[11px] py-1 border-b border-white/5 last:border-0">
+                    <div className="flex flex-col max-w-[55%]">
+                      <span className="text-slate-300 italic">{r.species}</span>
+                      <span className="text-[9px] text-slate-600">{r.standardType}</span>
+                    </div>
+                    <Tag cls="bg-amber-500/15 text-amber-400">
+                      {r.relation !== "=" ? `${r.relation} ` : ""}{r.standardValue.toFixed(2)} {r.standardUnits}
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[10px] text-slate-500">
+                Species covered: <span className="text-amber-300 font-semibold">{props.extAnimalPk.speciesCovered.length}</span>
+              </div>
+              {props.extAnimalPk.chemblId && (
+                <a href={`https://www.ebi.ac.uk/chembl/compound_report_card/${props.extAnimalPk.chemblId}/`} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-[9px] text-slate-600 hover:text-slate-400 mt-2 transition-colors">
+                  <ExternalLink className="w-3 h-3" /> ChEMBL Compound Report
+                </a>
+              )}
+            </div>
+          )}
+
           {/* CompTox / ToxCast */}
           {props.extToxCast && (
             <div className="p-4 rounded-xl border border-amber-500/15 bg-amber-500/[0.03]">

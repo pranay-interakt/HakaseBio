@@ -26,8 +26,9 @@ import {
 } from "@/lib/animalSim";
 import { FORMULATION_LIST } from "@/lib/formulationDB";
 import { fetchBindingDB, type BindingDBResult } from "@/lib/bindingDB";
-import { fetchChEMBLMultiTarget, type ChEMBLMultiTargetResult } from "@/lib/chemblActivity";
+import { fetchChEMBLMultiTarget, fetchChemblAnimalPk, validateAucPrediction, type ChEMBLMultiTargetResult, type ChEMBLAnimalPkResult } from "@/lib/chemblActivity";
 import { fetchCompTox, type ToxCastResult } from "@/lib/toxcast";
+import { fetchToxRef, validateNoaelPrediction, type ToxRefResult } from "@/lib/toxRef";
 import { searchClinicalTrials, type CTGSearchResult } from "@/lib/clinicalTrials";
 import { fetchOpenTargets, type OTTargetResult } from "@/lib/openTargets";
 import { fetchStringInteractions, type StringResult } from "@/lib/stringApi";
@@ -520,6 +521,9 @@ export function HakaseAI() {
   const [extDisGeNET, setExtDisGeNET]     = useState<DisGeNETGeneResult | null>(null);
   const [extGnomAD, setExtGnomAD]         = useState<GnomADResult | null>(null);
   const [extEcotox, setExtEcotox]         = useState<ECOTOXResult | null>(null);
+  const [extToxRef, setExtToxRef]         = useState<ToxRefResult | null>(null);
+  const [extAnimalPk, setExtAnimalPk]     = useState<ChEMBLAnimalPkResult | null>(null);
+  const [layer2Confidence, setLayer2Confidence] = useState<{ overall: number; noaelFold: number | null; aucFold: number | null; species: string | null } | null>(null);
   const [extDbLoading, setExtDbLoading]   = useState(false);
 
   // Layer 3 state
@@ -966,11 +970,14 @@ export function HakaseAI() {
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
           const l2Flags = computeLayer2Flags({ safetyMargin: results.safetyMarginNoael, noael: results.noael, hedConservative: results.hedBsa });
+          // Provenance is initialised as pending; the enrichment block below
+          // overwrites each entry with the real fetch outcome before merging.
           const prov2 = createProvenance("animalSim.ts", "browser", smiles);
           prov2.databaseQueries = [
-            { database: "CompTox", status: "success" },
-            { database: "ECOTOX", status: "success" },
-            { database: "ToxRefDB", status: "success" },
+            { database: "CompTox", status: "skipped" },
+            { database: "ECOTOX", status: "skipped" },
+            { database: "ToxRefDB", status: "skipped" },
+            { database: "ChEMBL animal-PK", status: "skipped" },
           ];
           setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 2, l2Flags), 2, prov2));
 
@@ -1013,14 +1020,45 @@ export function HakaseAI() {
 
           setSimProgress(100);
           setSimStatus(prev => ({ ...prev, 2: "complete" }));
-          // ── Layer 2 external DB enrichment ──────────────────────────────
+          // ── Layer 2 external DB enrichment + validation ─────────────────
           setExtDbLoading(true);
+          setExtToxRef(null); setExtAnimalPk(null); setLayer2Confidence(null);
           Promise.allSettled([
             fetchCompTox(smiles),
             fetchEcotox("", layer1.molName),
-          ]).then(([toxSettled, ecotoxSettled]) => {
-            if (toxSettled.status === "fulfilled") setExtToxCast(toxSettled.value);
-            if (ecotoxSettled.status === "fulfilled") setExtEcotox(ecotoxSettled.value);
+            fetchToxRef({ name: layer1.molName, inchiKey: undefined }),
+            fetchChemblAnimalPk(smiles),
+          ]).then(([toxSettled, ecotoxSettled, toxRefSettled, animalPkSettled]) => {
+            const tox = toxSettled.status === "fulfilled" ? toxSettled.value : null;
+            const eco = ecotoxSettled.status === "fulfilled" ? ecotoxSettled.value : null;
+            const tref = toxRefSettled.status === "fulfilled" ? toxRefSettled.value : null;
+            const apk = animalPkSettled.status === "fulfilled" ? animalPkSettled.value : null;
+            if (tox) setExtToxCast(tox);
+            if (eco) setExtEcotox(eco);
+            if (tref) setExtToxRef(tref);
+            if (apk) setExtAnimalPk(apk);
+
+            // Real provenance — reflect actual fetch outcomes
+            const provReal = createProvenance("animalSim.ts", "browser", smiles);
+            provReal.databaseQueries = [
+              { database: "CompTox", status: tox?.status === "live" ? "success" : "failed" },
+              { database: "ECOTOX", status: eco && eco.studies.length > 0 ? "success" : "failed" },
+              { database: "ToxRefDB", status: tref?.status === "live" ? "success" : tref?.status === "no-data" ? "failed" : "failed" },
+              { database: "ChEMBL animal-PK", status: apk?.status === "live" ? "success" : "failed" },
+            ];
+            setHAIOpsCtx(prev => mergeLayerProvenance(prev, 2, provReal));
+
+            // Per-layer confidence from validation against measured ground truth
+            const noaelV = tref ? validateNoaelPrediction(results.noael, tref) : { confidence: 0, foldError: null, measuredNoael: null };
+            const aucV = apk ? validateAucPrediction(results.humanAuc, apk) : { confidence: 0, foldError: null, measuredAuc: null, species: null };
+            const validators = [noaelV.confidence, aucV.confidence].filter(c => c > 0);
+            const overall = validators.length > 0 ? validators.reduce((a, b) => a + b, 0) / validators.length : 0;
+            setLayer2Confidence({
+              overall,
+              noaelFold: noaelV.foldError,
+              aucFold: aucV.foldError,
+              species: aucV.species,
+            });
             setExtDbLoading(false);
           });
         }
@@ -3766,6 +3804,9 @@ export function HakaseAI() {
                         loading={extDbLoading}
                         extToxCast={extToxCast}
                         extEcotox={extEcotox}
+                        extToxRef={extToxRef}
+                        extAnimalPk={extAnimalPk}
+                        layer2Confidence={layer2Confidence}
                       />
                     </div>
                   </>
