@@ -528,7 +528,8 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
                   <div key={prop}>
                     <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">{prop}</div>
                     {selected.map(sid => {
-                      const mol = MOLECULES.find(m => m.id === sid)!;
+                      const mol = MOLECULES.find(m => m.id === sid);
+                      if (!mol) return null;
                       const vals: Record<string, number> = {
                         "QED Score": mol.qed,
                         "Binding Affinity": 1 - parseFloat(mol.binding) / 50,
@@ -565,11 +566,12 @@ export function MolViewer3D_Explorer({ smiles, molName: propMolName }: { smiles?
                           return { x: cx + dist * Math.cos(rad), y: cy + dist * Math.sin(rad) };
                         };
                         const outerPts = axes.map((_, i) => toPoint(-90 + i * 72, r));
-                        const paths = selected.slice(0, 3).map(sid => {
-                          const mol = MOLECULES.find(m => m.id === sid)!;
+                        const paths = selected.slice(0, 3).flatMap(sid => {
+                          const mol = MOLECULES.find(m => m.id === sid);
+                          if (!mol) return [];
                           const vals = [mol.qed, 1 - parseFloat(mol.binding) / 50, mol.tox === "Low" ? 0.9 : 0.4, mol.mw / 500, 1 - mol.sa / 6];
                           const pts = vals.map((v, i) => toPoint(-90 + i * 72, r * v));
-                          return { mol, pts };
+                          return [{ mol, pts }];
                         });
 
                         return (
