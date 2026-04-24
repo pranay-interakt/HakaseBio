@@ -2347,14 +2347,20 @@ export function HakaseAI() {
                             {uniprotAutoMode && targetSuggestions.length > 0 && (() => {
                               const top = targetSuggestions[0];
                               const isChembl = top?.source === "chembl";
+                              const isSimilar = top?.source === "chembl-similar";
+                              const isMeasured = isChembl || isSimilar;
                               const confLabel = top?.confidenceLabel ?? "Low";
                               const confBadge = isChembl
                                 ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
+                                : isSimilar
+                                ? "bg-amber-500/15 border-amber-500/25 text-amber-300"
                                 : confLabel === "High"   ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
                                 : confLabel === "Medium" ? "bg-amber-500/15 border-amber-500/25 text-amber-400"
                                 :                          "bg-red-500/10 border-red-500/20 text-red-400";
                               const confText = isChembl ? "ChEMBL Verified"
+                                : isSimilar ? `ChEMBL · ${top?.similarityPct ? Math.round(top.similarityPct) + "% sim" : "similarity"}`
                                 : `Auto-matched · ${confLabel} confidence`;
+                              void isMeasured;
                               return (
                                 <span className={`px-1.5 py-0.5 rounded-full border text-[8px] font-medium ${confBadge}`}>
                                   {confText}
@@ -2384,7 +2390,7 @@ export function HakaseAI() {
                           <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-1">
                             {targetSuggestions.slice(0, 4).map(sugg => {
                               const isActive = uniprotId === sugg.uniprotId;
-                              const isChembl = sugg.source === "chembl";
+                              const isChembl = sugg.source === "chembl" || sugg.source === "chembl-similar";
                               const confPct = Math.round(sugg.confidence * 100);
                               const confColor = isChembl ? "text-emerald-500"
                                 : sugg.confidenceLabel === "High"   ? "text-emerald-500"
@@ -2538,6 +2544,47 @@ export function HakaseAI() {
                                           </li>
                                         ))}
                                       </ul>
+                                      {/* PDB structure chips + similarity provenance */}
+                                      {((sugg.pdbIds?.length ?? 0) > 0 || sugg.source === "chembl-similar") && (
+                                        <div className="pt-1 border-t border-white/5 space-y-1">
+                                          {(sugg.pdbIds?.length ?? 0) > 0 && (
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                              <span className="text-[8px] uppercase tracking-wider text-slate-600 font-semibold">PDB</span>
+                                              <span className="text-[8px] text-slate-700 font-mono">{sugg.pdbCount}×</span>
+                                              {sugg.pdbIds!.slice(0, 6).map(pid => (
+                                                <button
+                                                  key={pid}
+                                                  onClick={() => {
+                                                    uniprotManual.current = true;
+                                                    setUniprotAutoMode(false);
+                                                    setUniprotId(sugg.uniprotId);
+                                                    setPdbId(pid);
+                                                    handleProteinFetch(sugg.uniprotId);
+                                                  }}
+                                                  className="px-1 py-px rounded bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/40 text-[8px] font-mono transition-colors"
+                                                  title={`Load PDB ${pid}`}
+                                                >
+                                                  {pid}
+                                                </button>
+                                              ))}
+                                              {sugg.pdbCount! > 6 && (
+                                                <span className="text-[8px] text-slate-600">+{sugg.pdbCount! - 6}</span>
+                                              )}
+                                            </div>
+                                          )}
+                                          {sugg.source === "chembl-similar" && sugg.similarityPct != null && (
+                                            <div className="flex items-center gap-1 text-[8px]">
+                                              <span className="px-1 py-px rounded bg-amber-500/10 border border-amber-500/25 text-amber-300 font-semibold uppercase tracking-wider">
+                                                Inferred
+                                              </span>
+                                              <span className="text-slate-600">via {Math.round(sugg.similarityPct)}% similar molecule</span>
+                                              {sugg.similarSourceChemblId && (
+                                                <span className="text-slate-700 font-mono">({sugg.similarSourceChemblId})</span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

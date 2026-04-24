@@ -11,7 +11,15 @@ export interface TargetSuggestion {
   rationale:   string[];
   area:        string;
   color:       "violet" | "blue" | "emerald" | "amber" | "red" | "cyan";
-  source:      "chembl" | "heuristic";
+  source:      "chembl" | "chembl-similar" | "heuristic";
+  /** PDB structure IDs available for this target (≤ 10 surfaced). */
+  pdbIds?:     string[];
+  /** Total PDB structures (may exceed pdbIds.length). */
+  pdbCount?:   number;
+  /** When source === "chembl-similar": ChEMBL ID of the similar molecule that produced the strongest hit. */
+  similarSourceChemblId?: string;
+  similarSourceName?: string;
+  similarityPct?: number;
 }
 
 function inRange(v: number, lo: number, hi: number): boolean { return v >= lo && v <= hi; }
@@ -787,17 +795,30 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
   const bestNm = best.bestValue_nM;
 
   return withUniprot.slice(0, 5).map((h) => {
-    const conf = Math.min(1, Math.max(0.1, bestNm / Math.max(h.bestValue_nM, 0.01)));
+    const isSimilarity = h.fromSimilarity === true;
+    // Confidence: scale by relative potency, then dampen 30% if from similarity inference
+    let conf = Math.min(1, Math.max(0.1, bestNm / Math.max(h.bestValue_nM, 0.01)));
+    if (isSimilarity) conf = conf * 0.7;
+
     const rationale: string[] = [];
-    rationale.push(`Experimental ${h.bestActivityType}: ${formatNm(h.bestValue_nM)} (ChEMBL measured)`);
+    if (isSimilarity) {
+      const simPct = h.bestSimilarity != null ? Math.round(h.bestSimilarity) : null;
+      const src = h.bestSourceName ?? h.bestSourceChemblId ?? "similar molecule";
+      rationale.push(`Inferred from ${simPct ? `${simPct}% similar ` : ""}${src}: ${h.bestActivityType} ${formatNm(h.bestValue_nM)} (ChEMBL measured)`);
+    } else {
+      rationale.push(`Experimental ${h.bestActivityType}: ${formatNm(h.bestValue_nM)} (ChEMBL measured)`);
+    }
     if (h.pChembl != null && !isNaN(h.pChembl)) {
       rationale.push(`pChEMBL ${h.pChembl.toFixed(1)} — ${h.pChembl >= 7 ? "highly potent" : h.pChembl >= 5 ? "moderately potent" : "weak"} activity`);
     }
-    if (compoundName && compoundName !== h.targetChemblId) {
+    if (h.pdbCount && h.pdbCount > 0) {
+      rationale.push(`${h.pdbCount} PDB structure${h.pdbCount === 1 ? "" : "s"} available${h.pdbIds && h.pdbIds.length > 0 ? ` (e.g. ${h.pdbIds.slice(0, 3).join(", ")})` : ""}`);
+    }
+    if (!isSimilarity && compoundName && compoundName !== h.targetChemblId) {
       rationale.push(`Compound: ${compoundName}`);
     }
 
-    const geneName = extractGeneName(h.targetName);
+    const geneName = h.geneName ?? extractGeneName(h.targetName);
 
     return {
       uniprotId: h.uniprotId!,
@@ -807,9 +828,14 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
       confidence: conf,
       confidenceLabel: "Experimental" as const,
       rationale,
-      area: "ChEMBL",
+      area: isSimilarity ? "ChEMBL (similarity)" : "ChEMBL",
       color: potencyColor(h.bestValue_nM),
-      source: "chembl" as const,
+      source: isSimilarity ? ("chembl-similar" as const) : ("chembl" as const),
+      pdbIds: h.pdbIds ?? [],
+      pdbCount: h.pdbCount ?? 0,
+      similarSourceChemblId: h.bestSourceChemblId,
+      similarSourceName: h.bestSourceName ?? undefined,
+      similarityPct: h.bestSimilarity,
     };
   });
 }
