@@ -1,6 +1,7 @@
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Crippen, Lipinski, rdMolDescriptors
+from rdkit.Chem.QED import qed
 from utils.descriptors import smiles_to_mol, compute_descriptors
 
 
@@ -79,7 +80,7 @@ def predict_admet(smiles: str) -> dict:
             "lipinski_violations": lipinski_violations,
             "lipinski_pass": lipinski_violations <= 1,
             "veber_pass": veber_pass,
-            "qed_estimate": round(_qed_estimate(mw, logp, tpsa, hbd, hba, rot, arom_rings), 3),
+            "qed_estimate": round(qed(mol), 3),
         },
         "model_info": {
             "engine": "HakaseAI RDKit-QSPR v1.0",
@@ -175,25 +176,6 @@ def _predict_ames(arom_rings, mw, logp):
 def _predict_dili(mw, logp, tpsa, hba):
     score = 0.002 * mw + 0.3 * logp - 0.005 * tpsa - 0.1 * hba
     return "High" if score > 1.5 else "Moderate" if score > 0.8 else "Low"
-
-
-def _qed_estimate(mw, logp, tpsa, hbd, hba, rot, arom):
-    penalties = 0
-    if mw > 500:
-        penalties += 0.15
-    if logp > 5 or logp < -1:
-        penalties += 0.15
-    if tpsa > 140:
-        penalties += 0.1
-    if hbd > 5:
-        penalties += 0.1
-    if hba > 10:
-        penalties += 0.1
-    if rot > 10:
-        penalties += 0.1
-    if arom > 4:
-        penalties += 0.1
-    return max(0.1, 0.9 - penalties)
 
 
 def _mrdd(mw, ld50):
