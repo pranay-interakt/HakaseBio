@@ -1,5 +1,6 @@
 import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import type { ChEMBLTargetHit } from "./chemblTargetLookup";
+import { makeQuality, type SourceQuality } from "./sourceQuality";
 
 export interface TargetSuggestion {
   uniprotId:   string;
@@ -20,6 +21,8 @@ export interface TargetSuggestion {
   similarSourceChemblId?: string;
   similarSourceName?: string;
   similarityPct?: number;
+  /** Source-quality scoring: tier + score + measurement payload (when v2 ChEMBL succeeded). */
+  quality?:    SourceQuality;
 }
 
 function inRange(v: number, lo: number, hi: number): boolean { return v >= lo && v <= hi; }
@@ -771,6 +774,9 @@ export function suggestTargets(
       area:        t.area,
       color:       t.color,
       source:      "heuristic" as const,
+      quality:     makeQuality("heuristic", "RDKit pharmacophore catalogue", {
+        note: "Pattern match against curated 29-target catalogue — no measured binding data",
+      }),
     };
   });
 }
@@ -820,6 +826,18 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
 
     const geneName = h.geneName ?? extractGeneName(h.targetName);
 
+    // Quality: prefer the v2 measurement payload from the hit if present;
+    // otherwise synthesize a tier from source + similarity provenance.
+    const quality: SourceQuality = h.quality ?? makeQuality(
+      isSimilarity ? "enriched" : "experimental",
+      isSimilarity ? "ChEMBL similarity" : "ChEMBL exact-match",
+      {
+        note: isSimilarity
+          ? "Inferred from structurally similar molecule — no measured data on this exact compound"
+          : "Direct measured binding data for this compound",
+      },
+    );
+
     return {
       uniprotId: h.uniprotId!,
       geneName,
@@ -836,6 +854,7 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
       similarSourceChemblId: h.bestSourceChemblId,
       similarSourceName: h.bestSourceName ?? undefined,
       similarityPct: h.bestSimilarity,
+      quality,
     };
   });
 }

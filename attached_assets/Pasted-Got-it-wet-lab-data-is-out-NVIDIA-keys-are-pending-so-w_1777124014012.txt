@@ -1,0 +1,223 @@
+Got it — wet lab data is out, NVIDIA keys are pending, so we'll skip BioNeMo (items 5–6) and ship the context-independent foundation now: source-quality scoring, cascade gate, ChEMBL v2 with quality payload, and L1 wiring to the new payload. I'll respect the user preferences in replit.md (no edits to HAIOps.tsx or safetyFlags.ts) — cascade gate logic will live in a new helper, not in the safety flag engine.
+
+Good. Here's the precise build spec.
+
+---
+
+## Files to Create / Modify
+
+**New files:**
+- `src/lib/sourceQuality.ts` — scoring definitions, tier logic, quality aggregation
+- `src/lib/cascadeGate.ts` — gate rules, decision engine, no touch to `safetyFlags.ts`
+- `src/lib/chemblV2.ts` — ChEMBL v2 API client with quality payload
+- `src/types/quality.ts` — shared interfaces for quality scores across all modules
+
+**Modified files:**
+- `src/lib/admet.ts` — attach `sourceQuality` to every computed value
+- `src/lib/inVitroSim.ts` — attach `sourceQuality` to dose-response, permeability, metabolic stability outputs
+- `src/lib/bioactivationEngine.ts` — attach `sourceQuality` to alerts
+- `src/lib/targetSuggestion.ts` — attach `sourceQuality` to target scores, distinguish ChEMBL vs heuristic
+- `src/lib/chemblTargetLookup.ts` — add v2 route call alongside existing v1
+- `src/pages/HakaseAI.tsx` — wire L1 binding card to ChEMBL v2, render quality indicators, suppress low-confidence values
+
+**Untouched per your constraint:**
+- `HAIOps.tsx`
+- `safetyFlags.ts`
+
+---
+
+## Data Structures
+
+```typescript
+// src/types/quality.ts
+
+export type QualityTier = 'experimental' | 'enriched' | 'heuristic' | 'inferred';
+
+export interface SourceQuality {
+  score: number;        // 1.0, 0.7, 0.3, 0.1
+  tier: QualityTier;
+  source: string;       // "ChEMBL", "RDKit heuristic", "BioNeMo", etc.
+  provenance?: string;  // URL, assay ID, or file reference
+  timestamp: string;    // ISO 8601
+}
+
+export interface QualityScoredValue<T> {
+  value: T;
+  quality: SourceQuality;
+}
+
+export interface ChEMBLQualityPayload {
+  nMeasurements: number;
+  range_nM: [number, number];
+  geometricMean_nM: number;
+  species: string[];
+  assayTypes: Record<string, number>;
+  assayFormats: Record<string, number>;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface EnrichedChEMBLTarget {
+  uniprotId: string;
+  targetName: string;
+  bestValue_nM: number;
+  quality: SourceQuality & { payload: ChEMBLQualityPayload };
+}
+```
+
+---
+
+## Cascade Gate Rules (cascadeGate.ts)
+
+```typescript
+export interface CascadeDecision {
+  canAutoAdvance: boolean;
+  reason: string;
+  blockedBy: string[];  // which outputs failed the gate
+  requiresOverride: boolean;
+}
+
+export function evaluateCascadeGate(
+  outputs: Record<string, QualityScoredValue<any>>,
+  goNoGoDecision: 'GO' | 'WATCH' | 'NO-GO'
+): CascadeDecision {
+  
+  const SAFETY_CRITICAL_KEYS = [
+    'hERG_IC50', 'hepatotoxicityRisk', 'genotoxicityAlert', 'cypInhibition'
+  ];
+  
+  if (goNoGoDecision === 'NO-GO') {
+    return {
+      canAutoAdvance: false,
+      reason: 'NO-GO compounds require manual review regardless of data quality',
+      blockedBy: ['goNoGo'],
+      requiresOverride: true
+    };
+  }
+  
+  const blockedBy: string[] = [];
+  
+  for (const key of SAFETY_CRITICAL_KEYS) {
+    const output = outputs[key];
+    if (!output || output.quality.score < 0.6) {
+      blockedBy.push(key);
+    }
+  }
+  
+  const nonSafetyKeys = Object.keys(outputs).filter(k => !SAFETY_CRITICAL_KEYS.includes(k));
+  const nonSafetyScores = nonSafetyKeys.map(k => outputs[k]?.quality.score ?? 0);
+  const avgNonSafety = nonSafetyScores.length > 0 
+    ? nonSafetyScores.reduce((a, b) => a + b, 0) / nonSafetyScores.length 
+    : 0;
+  
+  if (avgNonSafety < 0.6) {
+    blockedBy.push('average_non_safety_quality');
+  }
+  
+  return {
+    canAutoAdvance: blockedBy.length === 0,
+    reason: blockedBy.length === 0 
+      ? 'All quality thresholds met' 
+      : `Blocked by: ${blockedBy.join(', ')}`,
+    blockedBy,
+    requiresOverride: blockedBy.length > 0
+  };
+}
+```
+
+---
+
+## ChEMBL v2 API Contract
+
+**Route:** `POST /api/chembl/similar-targets/v2`
+
+**Request:**
+```json
+{
+  "smiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+  "similarityThreshold": 0.7,
+  "maxResults": 5
+}
+```
+
+**Response:**
+```json
+{
+  "querySmiles": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+  "targets": [
+    {
+      "uniprotId": "P00533",
+      "targetName": "EGFR",
+      "bestValue_nM": 1.2,
+      "bestActivityType": "IC50",
+      "bestPChembl": 8.92,
+      "bestSimilarity": 0.87,
+      "quality": {
+        "score": 1.0,
+        "tier": "experimental",
+        "source": "ChEMBL",
+        "provenance": "https://www.ebi.ac.uk/chembl/target/UNIPROT_P00533",
+        "timestamp": "2026-04-25T17:32:00Z",
+        "payload": {
+          "nMeasurements": 8,
+          "range_nM": [0.4, 18.0],
+          "geometricMean_nM": 3.4,
+          "species": ["human", "human", "mouse"],
+          "assayTypes": {"IC50": 5, "Ki": 2, "Kd": 1},
+          "assayFormats": {"biochemical": 6, "cell-based": 2},
+          "confidence": "medium"
+        }
+      }
+    }
+  ],
+  "fallbackToV1": false
+}
+```
+
+**UI rendering rule:**
+- `confidence === "high"` AND `species` all human AND one dominant `assayType`: render point estimate normally
+- `confidence === "medium"`: render range as primary, point estimate secondary
+- `confidence === "low"` OR `nMeasurements < 3`: render **"Insufficient data"** with link to raw ChEMBL records, suppress point estimate in cascade calculations
+
+---
+
+## L1 Wiring: What Changes in Each File
+
+| File | Change |
+|---|---|
+| `admet.ts` | Every return value wrapped in `QualityScoredValue`. Absorption/distribution/metabolism/excretion/toxicity scores get `tier: 'heuristic'`, `score: 0.3`. If ChEMBL v2 data available for a target, binding estimates get `tier: 'experimental'`, `score: 1.0`. |
+| `inVitroSim.ts` | Dose-response parameters (IC50, Hill, Emax) get `tier: 'heuristic'`, `score: 0.3`. Permeability (Caco-2, PAMPA) and metabolic stability get `tier: 'heuristic'`, `score: 0.3`. |
+| `bioactivationEngine.ts` | Each alert gets `tier: 'heuristic'`, `score: 0.3`. |
+| `targetSuggestion.ts` | ChEMBL-derived targets get `tier: 'experimental'`, `score: 1.0`. Heuristic targets get `tier: 'heuristic'`, `score: 0.3`. |
+| `chemblTargetLookup.ts` | Add `fetchChEMBLV2()` function. Keep existing v1 call unchanged. |
+| `HakaseAI.tsx` | Import `SourceQuality` type. Render quality badges next to values. Wire binding card to v2 API. Call `evaluateCascadeGate()` before enabling L2 button. |
+
+---
+
+## UI Badge Spec
+
+```typescript
+const QualityBadge = ({ quality }: { quality: SourceQuality }) => {
+  const colors = {
+    experimental: 'bg-green-100 text-green-800',
+    enriched: 'bg-blue-100 text-blue-800',
+    heuristic: 'bg-yellow-100 text-yellow-800',
+    inferred: 'bg-red-100 text-red-800'
+  };
+  
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[quality.tier]}`}>
+      {quality.tier} · {quality.source}
+    </span>
+  );
+};
+```
+
+Hover tooltip shows full provenance: score, timestamp, nMeasurements if applicable.
+
+---
+
+## One Open Question Before Commit
+
+ChEMBL v2 API: do you want me to build the backend route (Python/Flask/FastAPI) or just the TypeScript client that calls it? If the backend doesn't exist yet, I need to know your stack to spec the route properly.
+
+Answer that and I start writing code.

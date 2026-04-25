@@ -1,3 +1,5 @@
+import type { SourceQuality } from "./sourceQuality";
+
 export interface ChEMBLTargetHit {
   targetChemblId: string;
   targetName: string;
@@ -17,6 +19,8 @@ export interface ChEMBLTargetHit {
   bestSimilarity?: number;
   /** True when this row came from similarity inference, not exact-match measured data. */
   fromSimilarity?: boolean;
+  /** Source-quality metadata. Present when v2 endpoint succeeded. */
+  quality?: SourceQuality;
 }
 
 export interface ChEMBLTargetSearchResult {
@@ -79,30 +83,56 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
     }
   } catch { /* fall through to similarity */ }
 
-  // Pass 2: similarity search (PDB enrichment built into the route)
+  // Pass 2: similarity search — v2 (full quality payload) with v1 fallback.
+  const mapV2Target = (t: any): ChEMBLTargetHit => ({
+    targetChemblId: t.targetChemblId ?? "",
+    targetName: t.targetName ?? "",
+    targetType: t.targetType ?? "",
+    uniprotId: t.uniprotId ?? null,
+    geneName: t.geneName ?? null,
+    organism: t.organism ?? null,
+    bestActivityType: t.bestActivityType ?? "",
+    bestValue_nM: t.bestValue_nM ?? 0,
+    pChembl: t.bestPChembl ?? null,
+    pdbIds: t.pdbIds ?? [],
+    pdbCount: t.pdbCount ?? 0,
+    bestSourceChemblId: t.bestSourceChemblId ?? null,
+    bestSourceName: t.bestSourceName ?? null,
+    bestSimilarity: t.bestSimilarity ?? null,
+    fromSimilarity: true,
+    quality: t.quality ?? undefined,
+  });
+
+  // Try v2 first
+  try {
+    const res = await fetch(`/api/chembl/similar-targets/v2?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
+      signal: AbortSignal.timeout(60000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const targets = ((data.targets ?? []) as any[]).map(mapV2Target);
+      if (targets.length > 0 || (data.status ?? "") === "no_targets" || (data.status ?? "") === "no_similar") {
+        return {
+          compoundChemblId: "",
+          compoundName: "",
+          targets,
+          status: targets.length > 0 ? "found" : "no_targets",
+          method: "similarity",
+          similarCount: data.similarCount ?? 0,
+          similarityThreshold: data.threshold ?? 70,
+        };
+      }
+    }
+  } catch { /* fall through to v1 */ }
+
+  // Fallback: v1 (no quality payload)
   try {
     const res = await fetch(`/api/chembl/similar-targets?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
       signal: AbortSignal.timeout(45000),
     });
     if (!res.ok) return { ...empty, status: "error", method: "none" };
     const data = await res.json();
-    const targets = ((data.targets ?? []) as any[]).map(t => ({
-      targetChemblId: t.targetChemblId ?? "",
-      targetName: t.targetName ?? "",
-      targetType: t.targetType ?? "",
-      uniprotId: t.uniprotId ?? null,
-      geneName: t.geneName ?? null,
-      organism: t.organism ?? null,
-      bestActivityType: t.bestActivityType ?? "",
-      bestValue_nM: t.bestValue_nM ?? 0,
-      pChembl: t.bestPChembl ?? null,
-      pdbIds: t.pdbIds ?? [],
-      pdbCount: t.pdbCount ?? 0,
-      bestSourceChemblId: t.bestSourceChemblId ?? null,
-      bestSourceName: t.bestSourceName ?? null,
-      bestSimilarity: t.bestSimilarity ?? null,
-      fromSimilarity: true,
-    } as ChEMBLTargetHit));
+    const targets = ((data.targets ?? []) as any[]).map(mapV2Target);
     return {
       compoundChemblId: "",
       compoundName: "",

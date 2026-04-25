@@ -41,6 +41,8 @@ import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
 import { suggestTargets, convertChEMBLHitsToSuggestions, type TargetSuggestion } from "@/lib/targetSuggestion";
 import { detectPharmacophores } from "@/lib/chemistry";
 import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
+import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
+import { evaluateCascadeGate, recordCascadeOverride, type CascadeOverrideRecord } from "@/lib/cascadeGate";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
 import {
   computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
@@ -623,6 +625,20 @@ export function HakaseAI() {
   const [inVitroResults, setInVitroResults] = useState<InVitroResults | null>(null);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
+
+  // ── Cascade gate (L1 → L2) ───────────────────────────────────────────────
+  // Auto-cascade is permitted only when:
+  //   (a) compound is not NO-GO,
+  //   (b) every safety-critical output meets minimum quality ≥ 0.6, and
+  //   (c) average non-safety quality ≥ 0.6.
+  // Otherwise the user sees a stage-gate banner and must explicitly override.
+  const cascadeGate = useMemo(
+    () => evaluateCascadeGate(simResults, targetSuggestions),
+    [simResults, targetSuggestions],
+  );
+  const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
+  // Reset override whenever the molecule or target evidence changes.
+  useEffect(() => { setCascadeOverride(null); }, [smiles, targetSuggestions.length]);
 
   useEffect(() => {
     if (!simResults) return;
@@ -2544,6 +2560,88 @@ export function HakaseAI() {
                                           </li>
                                         ))}
                                       </ul>
+                                      {/* Source-quality block: tier chip + measurement payload (when available) */}
+                                      {sugg.quality && (() => {
+                                        const q = sugg.quality;
+                                        const p = q.payload;
+                                        const suppress = shouldSuppressEstimate(q);
+                                        const dominantAssay = p ? Object.entries(p.assayTypes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null : null;
+                                        const humanShare = p && p.nMeasurements > 0 ? ((p.speciesCount["Homo sapiens"] ?? 0) / p.nMeasurements) : 0;
+                                        return (
+                                          <div className={`pt-1 border-t border-white/5 space-y-1 ${suppress ? "opacity-60" : ""}`}>
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                              <span className={`px-1.5 py-px rounded border text-[8px] font-bold uppercase tracking-wider ${tierChipClasses(q.tier)}`}>
+                                                {tierLabel(q.tier)}
+                                              </span>
+                                              <span className="text-[8px] text-slate-500">{q.source}</span>
+                                              {q.note && <span className="text-[8px] text-slate-600 italic" title={q.note}>· {q.note.length > 60 ? q.note.slice(0, 60) + "…" : q.note}</span>}
+                                            </div>
+                                            {p && (
+                                              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px]">
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-slate-600">n</span>
+                                                  <span className={`font-mono font-semibold ${p.nMeasurements >= 5 ? "text-emerald-400" : p.nMeasurements >= 3 ? "text-amber-400" : "text-rose-400"}`}>
+                                                    {p.nMeasurements}
+                                                  </span>
+                                                  <span className="text-slate-700">({p.distinctCompounds} cmpd{p.distinctCompounds === 1 ? "" : "s"})</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-slate-600">geom</span>
+                                                  <span className="font-mono text-slate-300">{p.geometricMean_nM < 1000 ? `${p.geometricMean_nM.toFixed(1)} nM` : `${(p.geometricMean_nM / 1000).toFixed(2)} µM`}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 col-span-2">
+                                                  <span className="text-slate-600">range</span>
+                                                  <span className="font-mono text-slate-400">
+                                                    {p.range_nM[0] < 1000 ? `${p.range_nM[0].toFixed(1)}` : `${(p.range_nM[0] / 1000).toFixed(2)}k`}
+                                                    –
+                                                    {p.range_nM[1] < 1000 ? `${p.range_nM[1].toFixed(1)} nM` : `${(p.range_nM[1] / 1000).toFixed(2)} µM`}
+                                                  </span>
+                                                  {dominantAssay && (
+                                                    <span className="px-1 py-px rounded bg-violet-500/10 border border-violet-500/25 text-violet-300 font-mono text-[8px]">
+                                                      {dominantAssay}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="flex items-center gap-1 col-span-2 flex-wrap">
+                                                  <span className="text-slate-600">species</span>
+                                                  {p.species.length === 0 ? (
+                                                    <span className="text-slate-700 italic">unspecified</span>
+                                                  ) : (
+                                                    <>
+                                                      {p.species.slice(0, 3).map(s => (
+                                                        <span key={s} className={`px-1 py-px rounded text-[8px] font-mono ${s === "Homo sapiens" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25" : "bg-white/5 text-slate-500 border border-white/10"}`}>
+                                                          {s === "Homo sapiens" ? "human" : s.split(" ")[0].toLowerCase()}
+                                                        </span>
+                                                      ))}
+                                                      {humanShare >= 0.5 && p.species.length > 1 && (
+                                                        <span className="text-[8px] text-emerald-500/70">{(humanShare * 100).toFixed(0)}% human</span>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                                <div className="flex items-center gap-1 col-span-2">
+                                                  <span className="text-slate-600">confidence</span>
+                                                  <span className={`px-1 py-px rounded text-[8px] font-bold uppercase tracking-wider ${
+                                                    p.confidence === "high"   ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" :
+                                                    p.confidence === "medium" ? "bg-amber-500/15 text-amber-300 border border-amber-500/30" :
+                                                                                "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                                                  }`}>
+                                                    {p.confidence}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            )}
+                                            {suppress && (
+                                              <div className="flex items-start gap-1 px-1.5 py-1 rounded bg-rose-500/8 border border-rose-500/20">
+                                                <Info className="w-3 h-3 text-rose-400 shrink-0 mt-px" />
+                                                <span className="text-[9px] text-rose-300 leading-tight">
+                                                  Insufficient experimental data — treat as exploratory. Point estimate suppressed in cascade calculations.
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                       {/* PDB structure chips + similarity provenance */}
                                       {((sugg.pdbIds?.length ?? 0) > 0 || sugg.source === "chembl-similar") && (
                                         <div className="pt-1 border-t border-white/5 space-y-1">
@@ -2841,6 +2939,90 @@ export function HakaseAI() {
 
                 {/* L1 → L2 Cascade Preview + Recommendations */}
                 <div className="px-5 pb-3 space-y-3">
+                  {/* Stage-Gate Cascade Decision (always visible — surfaces the gate verdict) */}
+                  {(() => {
+                    const g = cascadeGate;
+                    const passed = g.canAutoCascade;
+                    const overridden = !!cascadeOverride;
+                    const headColor = passed ? "emerald" : overridden ? "amber" : "rose";
+                    const headBg = passed ? "bg-emerald-500/8 border-emerald-500/25" :
+                                   overridden ? "bg-amber-500/8 border-amber-500/25" :
+                                                 "bg-rose-500/8 border-rose-500/25";
+                    const headText = passed ? "text-emerald-300" : overridden ? "text-amber-300" : "text-rose-300";
+                    return (
+                      <div className={`rounded-xl border p-3 space-y-2 ${headBg}`}>
+                        <div className="flex items-center gap-2">
+                          {passed ? <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 text-${headColor}-400`} />
+                                  : <Info             className={`w-3.5 h-3.5 shrink-0 text-${headColor}-400`} />}
+                          <span className={`text-[11px] font-semibold ${headText}`}>
+                            {passed ? "Stage-Gate: Auto-Cascade Permitted"
+                                    : overridden ? "Stage-Gate: Manual Override Active"
+                                                  : "Stage-Gate Review Required"}
+                          </span>
+                          <span className="ml-auto text-[9px] font-mono text-slate-500">
+                            safetyMin {g.safetyMinScore.toFixed(2)} · avgNonSafety {g.avgNonSafetyScore.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className={`text-[10px] leading-relaxed ${passed ? "text-emerald-300/80" : overridden ? "text-amber-300/80" : "text-rose-300/85"}`}>
+                          {g.reason}
+                        </p>
+                        {!passed && g.blockedBy.length > 0 && (
+                          <div className="flex items-start gap-1 flex-wrap">
+                            <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Blocked by:</span>
+                            {g.blockedBy.map(k => (
+                              <span key={k} className={`px-1.5 py-px rounded text-[9px] font-mono ${tierChipClasses("heuristic")}`}>{k}</span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Per-output quality detail (collapsed; one line per output) */}
+                        <details className="text-[9px]">
+                          <summary className="cursor-pointer text-slate-500 hover:text-slate-300">Per-output quality detail</summary>
+                          <div className="mt-1.5 space-y-0.5 pl-2 border-l border-white/5">
+                            {Object.entries(g.detail).map(([k, v]) => (
+                              <div key={k} className="flex items-center gap-2">
+                                <span className={`px-1 py-px rounded border text-[8px] font-bold uppercase ${tierChipClasses(v.tier)}`}>{tierLabel(v.tier)}</span>
+                                <span className="font-mono text-slate-400">{k}</span>
+                                <span className="text-slate-600 italic">— {v.note}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                        {!passed && !overridden && simResults && (
+                          <button
+                            onClick={() => {
+                              const justification = window.prompt(
+                                "Override the stage-gate? Enter justification (logged to provenance):",
+                                "Reviewed manually; advancing to L2 with awareness of heuristic-only safety signals.",
+                              );
+                              if (!justification || !justification.trim()) return;
+                              const reviewer = (typeof window !== "undefined" && window.localStorage?.getItem("hakase.reviewer")) || "anonymous";
+                              const rec = recordCascadeOverride(g, reviewer, justification.trim());
+                              setCascadeOverride(rec);
+                              const prov = createProvenance("cascadeGate.ts", "browser", smiles);
+                              prov.databaseQueries = [{ database: "Cascade gate override", status: "skipped" }];
+                              // Conform to SafetyOverride: { fromLayer, toLayer, verdict, timestamp, reason? }
+                              setHAIOpsCtx(prev => mergeLayerProvenance(addOverride(prev, {
+                                fromLayer: 1,
+                                toLayer: 2,
+                                verdict: "OVERRIDE_CASCADE_GATE",
+                                timestamp: rec.timestamp,
+                                reason: `${rec.reviewer}: ${rec.justification} — blockedBy=[${rec.blockedBy.join(", ")}] safetyMin=${rec.safetyMinScore.toFixed(2)} avgNonSafety=${rec.avgNonSafetyScore.toFixed(2)}`,
+                              }), 1, prov));
+                            }}
+                            data-testid="cascade-override-button"
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 hover:bg-rose-500/25 text-[10px] font-semibold transition-colors"
+                          >
+                            Override & advance to L2
+                          </button>
+                        )}
+                        {overridden && cascadeOverride && (
+                          <div className="text-[9px] text-amber-400/80 font-mono">
+                            Override logged at {new Date(cascadeOverride.timestamp).toLocaleTimeString()} by {cascadeOverride.reviewer} — “{cascadeOverride.justification}”
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
@@ -3277,9 +3459,18 @@ export function HakaseAI() {
                 </div>
 
                 <div id="demo-run-l2" className="p-5 border-t border-white/8 mt-auto">
+                  {/* Cascade-gate enforcement: block L2 advance unless gate passes or user has overridden */}
+                  {simResults && !cascadeGate.canAutoCascade && !cascadeOverride && (
+                    <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 flex items-start gap-1.5">
+                      <Info className="w-3 h-3 text-rose-400 shrink-0 mt-0.5" />
+                      <span className="text-[9px] text-rose-300 leading-tight">
+                        Stage-gate review required before advancing to L2. Return to Layer 1 and acknowledge the gate banner.
+                      </span>
+                    </div>
+                  )}
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[2] === "running" || !simResults}
+                    disabled={simStatus[2] === "running" || !simResults || (!cascadeGate.canAutoCascade && !cascadeOverride)}
                     className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
                     {simStatus[2] === "running" ? (
@@ -3290,6 +3481,9 @@ export function HakaseAI() {
                   </Button>
                   {!simResults && (
                     <p className="text-[10px] text-amber-700 text-center mt-2">Complete Layer 1 (In Vitro) first</p>
+                  )}
+                  {simResults && cascadeOverride && (
+                    <p className="text-[10px] text-amber-500 text-center mt-2">Cascade-gate override active — advance permitted with logged justification</p>
                   )}
                   <p className="text-[10px] text-slate-600 text-center mt-1">PBPK · Allometric scaling · NOAEL/MTD · FIH dose</p>
                 </div>
