@@ -1,0 +1,130 @@
+This is an exceptionally productive exchange — you've turned a hostile review into a precise diagnostic. Let me give you the direct answers you need, then a concrete action plan.
+
+---
+
+## The Two Questions, Answered
+
+**1. Timeline and Resource Constraint**
+
+You have three possible contexts. Pick one honestly:
+
+| Context | What Matters | What to Ship |
+|---|---|---|
+| **Investor demo (next 30–60 days)** | Perception of depth, regulatory sophistication, pipeline completeness | Items 1, 6, labeling fixes + "Stage-Gate Review" framing. Validation is future work. |
+| **Internal tool for your own chemistry team** | Decision quality, liability protection, time saved | Validation fork (hERG/Caco-2/logP must hit R² > 0.6 or you stop calling it prediction). ChEMBL API enrichment with n/range/species/assay-type breakdown. |
+| **External sale / platform play** | Differentiation from free tools, defensible moat, liability shield | Strategic pivot to **orchestration-first** (Option C). Compete on workflow integration + governance, not prediction accuracy. |
+
+You haven't told me which context you're in. **This is the decision that makes all other decisions.** If you're building for investors, the critic's science objections are irrelevant — fix the labeling and ship the cascade story. If you're building for practicing chemists, the science objections are fatal — validate or pivot.
+
+**2. Dropping "Digital Twin"**
+
+Yes. Do it. The term is liability-bearing and undefended.
+
+But be precise about what you replace it with:
+
+- **"Discovery Intelligence Platform"** — signals data integration, not prediction. Accurate but vague.
+- **"Translational Triage Engine"** — signals decision-support, not simulation. Better.
+- **"Preclinical Workbench"** — signals tool suite, not oracle. Honest, but may underwhelm investors.
+
+My recommendation: **"Preclinical Intelligence Platform"** externally, **"Layer 1 In Vitro Characterization"** internally. The first signals workflow value without claiming fidelity. The second is technically accurate to what the code actually does.
+
+---
+
+## The ChEMBL API Fix — What You Actually Need to Build
+
+You identified the precondition correctly. Here's the specific contract:
+
+**Current API returns:**
+```
+bestValue_nM: 1.2
+bestActivityType: "IC50"
+bestPChembl: 8.92
+bestSimilarity: 0.87
+```
+
+**Required API returns:**
+```
+bestValue_nM: 1.2
+geometricMean_nM: 3.4
+range_nM: [0.4, 18.0]
+nMeasurements: 8
+species: ["human", "human", "mouse"]  // or humanOnly: false
+assayTypes: {"IC50": 5, "Ki": 2, "Kd": 1}
+assayFormats: {"biochemical": 6, "cell-based": 2}
+confidence: "high" | "medium" | "low"  // derived from n + spread + species consistency
+```
+
+**UI rendering rule:**
+- If `confidence === "high"` AND `species === ["human"]` AND `assayTypes` has one dominant type: show point estimate with small print.
+- If `confidence === "medium"`: show range as primary, point estimate as secondary.
+- If `confidence === "low"` OR `nMeasurements < 3`: show "insufficient data — estimate suppressed" with link to raw ChEMBL records.
+
+This is not a prediction problem. This is a **data quality signaling** problem. The fix is in the API aggregation logic and the UI rendering layer, not in a new ML model.
+
+---
+
+## The Liability Owner — The Question You Raised
+
+You're right that this is the actual product gap. Here's a concrete fix:
+
+**Add a `LiabilityAttribution` field to every L1 output card:**
+
+```typescript
+interface LiabilityAttribution {
+  recommendationType: "triage" | "hypothesis" | "prediction";
+  validatedAgainst: "experimental" | "literature" | "heuristic" | null;
+  reviewerRequired: boolean;
+  regulatoryClaim: "none" | "ICH-referenced flag" | "not for submission";
+}
+```
+
+**Render in UI:**
+> **"This output is a hypothesis-generation signal based on [heuristic scoring / ChEMBL experimental data / mixed sources]. It is not validated for assay design or regulatory submission. Review required before advancing to L2."**
+
+This is one line of code in the provenance layer and one UI component. It closes the liability gap the critic gestured at without changing any simulation logic.
+
+---
+
+## Concrete Priority List, Revised
+
+Assuming **external sale / platform play** (the hardest context, and the one where your current position is weakest):
+
+| Priority | Task | Effort | Impact |
+|---|---|---|---|
+| 1 | Drop "Digital Twin" from all customer-facing materials | 1 day | High (liability) |
+| 2 | Add `LiabilityAttribution` to all output cards | 2 days | High (legal) |
+| 3 | Re-label heuristic outputs in UI ("estimated potency band," "not for assay design") | 3 days | High (trust) |
+| 4 | Rewrite ChEMBL API to return n/range/species/assay-type + confidence tier | 5 days | High (honesty) |
+| 5 | Implement cascade gating as "Stage-Gate Review" with data-quality thresholds | 3 days | High (safety) |
+| 6 | Run 50-compound validation fork (hERG/Caco-2/logP/IC50) | 4–6 weeks | Critical (strategic direction) |
+| 7 | If R² < 0.6 on hERG/logP: remove prediction claims entirely, pivot to orchestration-only | 2 days | Critical (if validation fails) |
+| 8 | Expand off-target panel using ChEMBL similar-targets (already fetched, not surfaced) | 3 days | Medium (competitive) |
+
+If you're in **investor demo** mode, do 1–3 and 5 only. Skip validation entirely — it's future work, not demo work.
+
+If you're in **internal tool** mode, do 2–6 in order. Validation is the gate; everything else is prep.
+
+---
+
+## The One Strategic Risk You Haven't Addressed
+
+Your Option C (orchestration-first, compete on workflow) is defensible, but it has a competitor problem:
+
+**Schrödinger LiveDesign and Certara D360 already exist.** They have decades of pharma relationships, validated models, and regulatory credibility. Your moat — L1→L4 cascade + HAIOps governance — is real but only matters if the predictions in L1 are good enough that users want to cascade them. If L1 is "honest but weak," the cascade is a weak signal pushed through more layers.
+
+The honest positioning for Option C is: **"We don't predict better than Schrödinger. We predict more honestly, with full provenance, and we connect the prediction to the rest of your pipeline automatically."** That's a viable niche, but it's a smaller market than "AI digital twin replaces wet lab."
+
+Are you building for that niche, or are you hoping to outgrow it?
+
+---
+
+## What I Need From You
+
+Before touching any code:
+
+1. **Which context?** Investor demo / internal tool / external sale.
+2. **"Digital Twin" — yes or no on dropping it?** (I recommend yes.)
+3. **Validation budget:** Do you have 4–6 weeks and wet lab data access for the 50-compound fork? Or is this theoretical?
+4. **Competitive target:** Are you trying to replace Schrödinger/Certara, complement them, or serve a different user (e.g., biotech without computational chemistry teams)?
+
+These four answers determine whether I should help you build an honest calculator, a demo-ready platform, or a validated prediction engine. The code paths diverge significantly after this decision.
