@@ -1,0 +1,104 @@
+No wet lab data. Build the safety architecture around that constraint.
+
+---
+
+## What to Build Now
+
+**1. Source-Quality Scoring on Every L1 Output**
+
+Add a `sourceQuality` field to every computed value in L1:
+
+| Tier | Score | Source | Example |
+|---|---|---|---|
+| Experimental | 1.0 | ChEMBL measured, BindingDB assay | `IC50 = 12 nM (ChEMBL, n=8)` |
+| Enriched | 0.7 | Database-derived but not direct assay | `Target tractability from Open Targets` |
+| Heuristic | 0.3 | Rules, patterns, interpolation | `ADMET absorption from TPSA bracket` |
+| Inferred | 0.1 | Model prediction without validation | `Binding affinity from pharmacophore jitter` |
+
+Implementation: attach this to every number in the L1 response. Not one score per compound — one score per data point.
+
+**2. Cascade Gate: Minimum Quality on Safety-Critical Outputs**
+
+Your own correction to my average-scoring idea was right. Use **minimum quality**, not average:
+
+- **Safety-critical outputs** (hERG, hepatotoxicity, genotoxicity, CYP DDI): minimum quality ≥ 0.6 to auto-cascade
+- **All other outputs**: average quality ≥ 0.6 to auto-cascade
+- **NO-GO compounds**: never auto-cascade, regardless of quality
+
+If any safety-critical output is heuristic-only (0.3), the cascade stops. User sees: **"Safety data insufficient for automatic advancement. Manual review required."**
+
+**3. ChEMBL API v2: Enrichment Without Breaking v1**
+
+Keep `/api/chembl/similar-targets` exactly as-is. Add new route:
+
+```
+GET /api/chembl/similar-targets/v2?smiles=...&threshold=...
+```
+
+Returns:
+```json
+{
+  "targets": [
+    {
+      "uniprotId": "P00533",
+      "targetName": "EGFR",
+      "bestValue_nM": 1.2,
+      "quality": {
+        "score": 1.0,
+        "tier": "experimental",
+        "nMeasurements": 8,
+        "range_nM": [0.4, 18.0],
+        "geometricMean_nM": 3.4,
+        "species": ["human", "human", "mouse"],
+        "assayTypes": {"IC50": 5, "Ki": 2, "Kd": 1},
+        "assayFormats": {"biochemical": 6, "cell-based": 2},
+        "confidence": "medium"
+      }
+    }
+  ]
+}
+```
+
+UI rule for v2: if `confidence === "low"` or `nMeasurements < 3`, render value grayed out with tooltip: **"Insufficient experimental data — treat as exploratory."**
+
+**4. BioNeMo Integration: Partial Functional Signature**
+
+You have molecular embeddings, not full perturbation. Use what you have:
+
+- Embed input SMILES via BioNeMo
+- Compare against embedded reference drugs (your 29-target catalog, pre-embedded)
+- Return: **"Nearest functional neighbor: [drug name] (similarity: 0.87)"**
+- Flag: **"Functional anchor available"** vs **"No close functional analog"**
+
+This is not prediction. This is **similarity signaling**. It tells users "this compound lives near known X inhibitors in embedding space" — useful for triage, not for dosing.
+
+Add `functionalQuality` score:
+- ≥0.8 similarity to reference: 0.7 (enriched tier)
+- <0.8 or no match: 0.0 (no functional data)
+
+Use in cascade gating: if `functionalQuality >= 0.7` AND structural quality is heuristic-only, user can opt to advance with functional anchor noted.
+
+---
+
+## Build Order
+
+| Priority | Task | Files to Touch | Effort |
+|---|---|---|---|
+| 1 | Add `sourceQuality` to all L1 computed values | `admet.ts`, `inVitroSim.ts`, `bioactivationEngine.ts`, `targetSuggestion.ts` | 2 days |
+| 2 | Implement cascade gate with min-quality rules | `safetyFlags.ts`, cascade logic in `HakaseAI.tsx` | 2 days |
+| 3 | Build ChEMBL v2 API with quality payload | New route `chemblTargetLookup.ts` or `drug_target.py` | 3 days |
+| 4 | Wire L1 binding card to ChEMBL v2, suppress low-confidence | `HakaseAI.tsx` UI components | 2 days |
+| 5 | Add BioNeMo functional similarity module | New file `functionalSignature.ts`, BioNeMo client | 4 days |
+| 6 | Surface functional anchor in L1 output + cascade logic | `HakaseAI.tsx`, cascade gate | 1 day |
+
+---
+
+## The One Decision You Still Need to Make
+
+BioNeMo integration is 4 days of work. Before I start:
+
+- Do you have API keys and rate limits sorted with NVIDIA?
+- Is the embedding model fixed (e.g., `nvidia/molmim-2b`), or are you still choosing?
+- Do you have your 29-target reference drugs pre-embedded, or do we need to batch that first?
+
+These are blockers, not strategy questions. Answer them and the build starts.
