@@ -61,6 +61,15 @@ A FastAPI-based Python backend service running on port 8090, proxied through the
 -   Frontend client library: `artifacts/hakase-ai/src/lib/aiService.ts`
 -   Uses: Python 3.11, FastAPI, RDKit (full), scikit-learn, numpy, pandas
 
+#### ML-Enhanced Predictions (Pre-Trained Models)
+First wave of pre-trained ML models from the `HakaseAI Pre-Trained Model Integration Roadmap`. These run alongside the existing QSPR/heuristic engines and follow the graceful-degradation principle: if the ML model fails to load, the heuristic remains the primary signal.
+-   **ADMET-AI** (`POST /api/ai/admet-ml`): Open-source Chemprop-RDKit GNN ensemble (MIT license, github.com/swansonk14/admet_ai) trained on the TDC ADMET benchmark. Returns 100+ endpoints (41 ADMET + ~60 physchem) including Caco2_Wang, HIA_Hou, Pgp_Broccatelli, BBB_Martins, PPBR_AZ, VDss_Lombardo, all 5 major CYP inhibitions (1A2/2C9/2C19/2D6/3A4), Clearance_Hepatocyte_AZ, Half_Life_Obach, hERG, AMES, DILI, LD50_Zhu, Carcinogens_Lagunin, ClinTox, Skin_Reaction. Response includes a flat `endpoints` map plus a curated `structured` view grouped into absorption/distribution/metabolism/excretion/toxicity buckets.
+-   **Lazy loading**: Model weights load on first request (~30s cold start, ~200ms warm inference). Service starts instantly; the load is amortized across the session.
+-   **Status & warmup endpoints**: `GET /api/ai/models/status` reports which ML models are loaded; `POST /api/ai/models/warmup` force-loads them (use after deploy).
+-   **Frontend integration**: `predictAdmetMl(smiles)`, `getModelStatus()`, `warmupModels()`, and `mlBadgeFromSource()` helpers in `aiService.ts`. The result envelope includes `source: "ml" | "fallback"` so UI can show an "ML-Enhanced" vs "Heuristic Only" badge.
+-   **Implementation**: `artifacts/ai-service/models/admet_ml.py` (singleton, thread-safe), surfaced through `main.py` and proxied through `api-server/routes/ai-service.ts`.
+-   **Deferred for follow-up tasks**: CardioTox (P1, dedicated hERG model), DeepDTA (P1, structure-aware binding affinity using UniProt sequences), PIDGINv4 (P1, expand target prediction from 29 → 2,700+), ChemBERTa-2 (P0 foundation embeddings), RAscore (P3, retrosynthesis accessibility).
+
 ## External Dependencies
 
 -   **ChEMBL**: Used for compound identification, multi-target bioactivity fetching, target lookups, and PD parameter retrieval. Accessed via `@workspace/api-server/src/routes/chembl.ts` proxy.

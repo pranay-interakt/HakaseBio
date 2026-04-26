@@ -177,3 +177,75 @@ export async function checkAiHealth(): Promise<{ status: string; service: string
   const res = await fetch(`${API_BASE}/health`);
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// ML-Enhanced predictions (ADMET-AI, etc.)
+// ---------------------------------------------------------------------------
+
+export interface MlEndpointValue {
+  value: number | string | null;
+  label: string;
+}
+
+export interface MlAdmetStructured {
+  absorption: Record<string, MlEndpointValue>;
+  distribution: Record<string, MlEndpointValue>;
+  metabolism: Record<string, MlEndpointValue>;
+  excretion: Record<string, MlEndpointValue>;
+  toxicity: Record<string, MlEndpointValue>;
+}
+
+export interface MlAdmetResult {
+  smiles: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  endpoints: Record<string, number | string | null>;
+  structured: MlAdmetStructured;
+  model_info: {
+    engine: string;
+    method: string;
+    endpoint_count?: number;
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
+}
+
+export interface ModelLoadStatus {
+  loaded: boolean;
+  load_time_s: number | null;
+  error: string | null;
+  engine: string;
+}
+
+export interface ModelStatusResponse {
+  admet_ml: ModelLoadStatus;
+}
+
+export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
+  return post<MlAdmetResult>("/admet-ml", { smiles });
+}
+
+export async function getModelStatus(): Promise<ModelStatusResponse> {
+  const res = await fetch(`${API_BASE}/models/status`);
+  if (!res.ok) throw new Error("Failed to fetch model status");
+  return res.json();
+}
+
+export async function warmupModels(): Promise<ModelStatusResponse> {
+  const res = await fetch(`${API_BASE}/models/warmup`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to warm up models");
+  return res.json();
+}
+
+/** UI helper: returns the badge state for a given source value. */
+export function mlBadgeFromSource(source: "ml" | "fallback" | string): {
+  label: string;
+  tone: "ml" | "heuristic" | "browser";
+} {
+  if (source === "ml") return { label: "ML-Enhanced", tone: "ml" };
+  if (source === "fallback") return { label: "Heuristic Only", tone: "heuristic" };
+  return { label: "Browser-Only", tone: "browser" };
+}

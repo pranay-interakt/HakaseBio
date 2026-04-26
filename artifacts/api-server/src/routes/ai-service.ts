@@ -83,4 +83,40 @@ router.get("/ai/health", async (_req, res) => {
   }
 });
 
+router.post("/ai/admet-ml", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/admet-ml`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.get("/ai/models/status", async (_req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/models/status`);
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.post("/ai/models/warmup", async (_req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/models/warmup`, {
+      method: "POST",
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 export default router;
