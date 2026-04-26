@@ -220,12 +220,54 @@ export interface ModelLoadStatus {
   engine: string;
 }
 
+export interface CardiotoxResult {
+  smiles: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  prediction: {
+    blocker_probability: number | null;
+    risk_class: "Low" | "Moderate" | "High" | null;
+    ic50_band: string | null;
+  };
+  model_info: {
+    engine: string;
+    method: string;
+    training?: {
+      dataset: string;
+      n_train: number;
+      n_positives: number;
+      n_negatives: number;
+      label_threshold: string;
+    };
+    performance?: {
+      cv_roc_auc_mean: number | null;
+      cv_roc_auc_std: number | null;
+      cv_folds: number;
+    };
+    features?: {
+      morgan_nbits: number;
+      morgan_radius: number;
+      rdkit_descriptors: string[];
+    };
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
+}
+
 export interface ModelStatusResponse {
   admet_ml: ModelLoadStatus;
+  cardiotox: ModelLoadStatus;
 }
 
 export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
   return post<MlAdmetResult>("/admet-ml", { smiles });
+}
+
+export async function predictCardiotox(smiles: string): Promise<CardiotoxResult> {
+  return post<CardiotoxResult>("/cardiotox", { smiles });
 }
 
 export async function getModelStatus(): Promise<ModelStatusResponse> {

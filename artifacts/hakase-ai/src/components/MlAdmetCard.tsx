@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   predictAdmetMl,
+  predictCardiotox,
   mlBadgeFromSource,
   type MlAdmetResult,
   type MlEndpointValue,
+  type CardiotoxResult,
 } from "@/lib/aiService";
 import type { AdmetScores } from "@/lib/admet";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +16,7 @@ import {
   RefreshCw,
   CheckCircle2,
   Info,
+  Heart,
 } from "lucide-react";
 
 type BucketKey = "absorption" | "distribution" | "metabolism" | "excretion" | "toxicity";
@@ -128,6 +131,13 @@ function mlAxisScore(bucket: BucketKey, structured: MlAdmetResult["structured"])
   return null;
 }
 
+/** Map a 0–1 hERG blocker probability to qualitative class — same thresholds CardioTox uses. */
+function hergProbToClass(p: number): "Low" | "Moderate" | "High" {
+  if (p < 0.3) return "Low";
+  if (p < 0.6) return "Moderate";
+  return "High";
+}
+
 interface MlAdmetCardProps {
   smiles: string | null | undefined;
   heuristicAdmet: AdmetScores | null | undefined;
@@ -135,6 +145,8 @@ interface MlAdmetCardProps {
 
 export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
   const [result, setResult] = useState<MlAdmetResult | null>(null);
+  const [cardiotox, setCardiotox] = useState<CardiotoxResult | null>(null);
+  const [cardiotoxError, setCardiotoxError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -148,17 +160,25 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
   useEffect(() => {
     if (!trimmed) {
       setResult(null);
+      setCardiotox(null);
       setError(null);
+      setCardiotoxError(null);
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setCardiotoxError(null);
+    // Fire both in parallel so the slower one (CardioTox cold-train ≈ 22s) doesn't
+    // gate the ADMET-AI render. Each result lands independently.
     predictAdmetMl(trimmed)
       .then(r => { if (!cancelled) setResult(r); })
       .catch(e => { if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setResult(null); } })
       .finally(() => { if (!cancelled) setLoading(false); });
+    predictCardiotox(trimmed)
+      .then(r => { if (!cancelled) setCardiotox(r); })
+      .catch(e => { if (!cancelled) { setCardiotoxError(e instanceof Error ? e.message : String(e)); setCardiotox(null); } });
     return () => { cancelled = true; };
   }, [trimmed, refreshKey]);
 
@@ -329,8 +349,171 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Critical Safety Endpoints (ML probabilities)
           </div>
+          {/* Paired hERG card: ADMET-AI + CardioTox consensus view */}
+          {(() => {
+            const hergV = result.structured.toxicity["hERG"];
+            const admetHergProb =
+              hergV && typeof hergV.value === "number" && !Number.isNaN(hergV.value)
+                ? hergV.value
+                : null;
+            const cardioProb =
+              cardiotox && cardiotox.source === "ml"
+                ? cardiotox.prediction.blocker_probability
+                : null;
+            const admetClass = admetHergProb !== null ? hergProbToClass(admetHergProb) : null;
+            const cardioClass = cardiotox?.prediction.risk_class ?? null;
+
+            // Consensus logic: identical class → Consensus; one step apart → Aligned; two apart → Divergent
+            const orderMap = { Low: 0, Moderate: 1, High: 2 } as const;
+            let consensus:
+              | { label: string; bg: string; border: string; text: string }
+              | null = null;
+            if (admetClass && cardioClass) {
+              const diff = Math.abs(orderMap[admetClass] - orderMap[cardioClass]);
+              if (diff === 0) {
+                consensus = {
+                  label: "Consensus",
+                  bg: "bg-emerald-500/15",
+                  border: "border-emerald-500/40",
+                  text: "text-emerald-300",
+                };
+              } else if (diff === 1) {
+                consensus = {
+                  label: "Aligned",
+                  bg: "bg-yellow-500/15",
+                  border: "border-yellow-500/40",
+                  text: "text-yellow-300",
+                };
+              } else {
+                consensus = {
+                  label: "Divergent",
+                  bg: "bg-orange-500/15",
+                  border: "border-orange-500/40",
+                  text: "text-orange-300",
+                };
+              }
+            }
+
+            const admetTone = admetHergProb !== null ? probTone(admetHergProb, "high") : null;
+            const cardioTone = cardioProb !== null ? probTone(cardioProb, "high") : null;
+
+            return (
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-2">
+                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-3.5 h-3.5 text-red-400" />
+                    <span className="text-[11px] font-semibold text-slate-200">
+                      hERG cardiotoxicity — paired prediction
+                    </span>
+                  </div>
+                  {consensus && (
+                    <Badge
+                      className={`text-[9px] ${consensus.bg} ${consensus.text} ${consensus.border}`}
+                    >
+                      {consensus.label}
+                    </Badge>
+                  )}
+                  {!consensus && cardiotoxError && (
+                    <Badge className="text-[9px] bg-slate-500/15 text-slate-400 border-slate-500/30">
+                      CardioTox unavailable
+                    </Badge>
+                  )}
+                  {!consensus && !cardiotoxError && !cardiotox && (
+                    <Badge className="text-[9px] bg-slate-500/15 text-slate-400 border-slate-500/30">
+                      Loading CardioTox…
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {/* ADMET-AI hERG */}
+                  <div
+                    className={`rounded-lg px-2.5 py-2 border ${
+                      admetTone?.bg ?? "bg-white/5"
+                    } ${admetTone?.border ?? "border-white/10"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider">
+                        ADMET-AI (hERG_Karim, GNN)
+                      </span>
+                      {admetTone && (
+                        <Badge className={`text-[8px] ${admetTone.bg} ${admetTone.text} ${admetTone.border}`}>
+                          {admetTone.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className={`text-[16px] font-bold mt-1 ${admetTone?.text ?? "text-slate-200"}`}>
+                      {admetHergProb !== null ? admetHergProb.toFixed(3) : "—"}
+                      {admetHergProb !== null && (
+                        <span className="text-[9px] text-slate-500 ml-1">blocker prob</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CardioTox */}
+                  <div
+                    className={`rounded-lg px-2.5 py-2 border ${
+                      cardioTone?.bg ?? "bg-white/5"
+                    } ${cardioTone?.border ?? "border-white/10"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider">
+                        CardioTox (hERG-Wang, RF + Morgan FP)
+                      </span>
+                      {cardioTone && cardioClass && (
+                        <Badge className={`text-[8px] ${cardioTone.bg} ${cardioTone.text} ${cardioTone.border}`}>
+                          {cardioClass}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className={`text-[16px] font-bold mt-1 ${cardioTone?.text ?? "text-slate-200"}`}>
+                      {cardioProb !== null ? cardioProb.toFixed(3) : "—"}
+                      {cardioProb !== null && (
+                        <span className="text-[9px] text-slate-500 ml-1">blocker prob</span>
+                      )}
+                    </div>
+                    {cardiotox?.source === "ml" && cardiotox.prediction.ic50_band && (
+                      <div className="text-[9px] text-slate-500 mt-1">
+                        IC₅₀ band: <span className="text-slate-300">{cardiotox.prediction.ic50_band}</span>
+                      </div>
+                    )}
+                    {cardiotox?.source === "fallback" && (
+                      <div className="text-[9px] text-amber-400 mt-1">
+                        {cardiotox.error ?? "CardioTox inference unavailable"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-[9px] text-slate-500 mt-2 leading-relaxed">
+                  Two methodologically independent models — different training sets, different
+                  algorithms, different feature representations — for a more robust safety call.
+                  {cardiotox?.source === "ml" &&
+                    cardiotox.model_info.performance?.cv_roc_auc_mean != null && (
+                      <>
+                        {" "}CardioTox 5-fold CV ROC-AUC ={" "}
+                        <span className="text-slate-300">
+                          {cardiotox.model_info.performance.cv_roc_auc_mean.toFixed(3)}
+                        </span>
+                        {cardiotox.model_info.performance.cv_roc_auc_std != null && (
+                          <>
+                            {" "}±{" "}
+                            <span className="text-slate-300">
+                              {cardiotox.model_info.performance.cv_roc_auc_std.toFixed(3)}
+                            </span>
+                          </>
+                        )}
+                        .
+                      </>
+                    )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Other critical safety endpoints (excluding hERG, shown above) */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {CRITICAL_SAFETY_KEYS.map(({ key, label, bad }) => {
+            {CRITICAL_SAFETY_KEYS.filter(c => c.key !== "hERG").map(({ key, label, bad }) => {
               const v = result.structured.toxicity[key];
               if (!v) return null;
               const f = formatValue(v);
@@ -403,15 +586,30 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
 
       {/* Footer attribution */}
       {result && result.source === "ml" && result.model_info?.reference && (
-        <div className="text-[9px] text-slate-600 pt-2 border-t border-white/5 flex items-start gap-1">
-          <CheckCircle2 className="w-3 h-3 text-emerald-500/60 shrink-0 mt-0.5" />
-          <span>
-            Predictions from <span className="text-slate-400">{result.model_info.engine}</span>
-            {result.model_info.method && ` (${result.model_info.method})`}
-            {result.model_info.endpoint_count != null && ` · ${result.model_info.endpoint_count} endpoints`}
-            {result.model_info.license && ` · ${result.model_info.license}`}
-            {result.model_info.reference && ` · ${result.model_info.reference}`}
-          </span>
+        <div className="text-[9px] text-slate-600 pt-2 border-t border-white/5 space-y-1">
+          <div className="flex items-start gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-500/60 shrink-0 mt-0.5" />
+            <span>
+              Predictions from <span className="text-slate-400">{result.model_info.engine}</span>
+              {result.model_info.method && ` (${result.model_info.method})`}
+              {result.model_info.endpoint_count != null && ` · ${result.model_info.endpoint_count} endpoints`}
+              {result.model_info.license && ` · ${result.model_info.license}`}
+              {result.model_info.reference && ` · ${result.model_info.reference}`}
+            </span>
+          </div>
+          {cardiotox?.source === "ml" && cardiotox.model_info?.reference && (
+            <div className="flex items-start gap-1">
+              <Heart className="w-3 h-3 text-red-500/60 shrink-0 mt-0.5" />
+              <span>
+                hERG second-opinion from{" "}
+                <span className="text-slate-400">{cardiotox.model_info.engine}</span>
+                {cardiotox.model_info.training?.dataset &&
+                  ` · trained on ${cardiotox.model_info.training.dataset} (n=${cardiotox.model_info.training.n_train})`}
+                {cardiotox.model_info.license && ` · ${cardiotox.model_info.license}`}
+                {cardiotox.model_info.reference && ` · ${cardiotox.model_info.reference}`}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
