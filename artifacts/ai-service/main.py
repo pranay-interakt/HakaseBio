@@ -15,6 +15,11 @@ from models.admet_ml import (
     is_ready as admet_ml_status,
     warmup as admet_ml_warmup,
 )
+from models.cardiotox import (
+    predict_cardiotox,
+    is_ready as cardiotox_status,
+    warmup as cardiotox_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -58,6 +63,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _prewarm_cardiotox_in_background() -> None:
+    """Background-prewarm CardioTox so the first user doesn't pay the 22s cold-train.
+
+    Loading from the pickled cache is ~1s; a fresh first-time train is ~22s.
+    Either way, doing it on a background thread means /health responds instantly
+    and ADMET requests aren't blocked. ADMET-AI is intentionally not prewarmed
+    here — it's much heavier (~30s) and the existing UI already handles cold-load
+    gracefully with a loading state.
+    """
+    import threading
+    threading.Thread(target=cardiotox_warmup, name="cardiotox-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -105,11 +124,23 @@ def api_predict_admet_ml(req: SmilesRequest):
         raise HTTPException(status_code=500, detail=f"ADMET-ML prediction failed: {str(e)}")
 
 
+@app.post("/predict/cardiotox")
+def api_predict_cardiotox(req: SmilesRequest):
+    """Dedicated hERG cardiotoxicity prediction (independent second opinion)."""
+    try:
+        return sanitize(predict_cardiotox(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CardioTox prediction failed: {str(e)}")
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
     return {
         "admet_ml": admet_ml_status(),
+        "cardiotox": cardiotox_status(),
     }
 
 
@@ -118,6 +149,7 @@ def api_models_warmup():
     """Force-load ML models (use after deploy or first session)."""
     return {
         "admet_ml": admet_ml_warmup(),
+        "cardiotox": cardiotox_warmup(),
     }
 
 
