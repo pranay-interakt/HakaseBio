@@ -1,0 +1,419 @@
+import { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  predictAdmetMl,
+  mlBadgeFromSource,
+  type MlAdmetResult,
+  type MlEndpointValue,
+} from "@/lib/aiService";
+import type { AdmetScores } from "@/lib/admet";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sparkles,
+  Brain,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
+
+type BucketKey = "absorption" | "distribution" | "metabolism" | "excretion" | "toxicity";
+
+const BUCKET_LABELS: Record<BucketKey, string> = {
+  absorption: "Absorption",
+  distribution: "Distribution",
+  metabolism: "Metabolism",
+  excretion: "Excretion",
+  toxicity: "Toxicity",
+};
+
+const CRITICAL_SAFETY_KEYS: Array<{ key: string; label: string; bad: "high" | "low" }> = [
+  { key: "hERG", label: "hERG (cardiotoxicity)", bad: "high" },
+  { key: "AMES", label: "AMES (mutagenicity)", bad: "high" },
+  { key: "DILI", label: "DILI (liver injury)", bad: "high" },
+  { key: "ClinTox", label: "ClinTox (clinical failure)", bad: "high" },
+  { key: "Carcinogens_Lagunin", label: "Carcinogenicity", bad: "high" },
+  { key: "Skin_Reaction", label: "Skin sensitization", bad: "high" },
+];
+
+/** ML probability endpoint keys. Single source of truth for axis-mapping + risk-tone display. */
+const CYP_INHIBITION_KEY_RE = /^CYP\d+[A-Za-z]?\d*_(Veith|Inhibition)/i;
+
+function isCypInhibitionKey(key: string): boolean {
+  return CYP_INHIBITION_KEY_RE.test(key);
+}
+
+function isProbabilityKey(key: string): boolean {
+  if (CRITICAL_SAFETY_KEYS.some(c => c.key === key)) return true;
+  if (isCypInhibitionKey(key)) return true;
+  if (key === "BBB_Martins" || key === "HIA_Hou" || key === "Pgp_Broccatelli") return true;
+  if (key === "Bioavailability_Ma") return true;
+  return false;
+}
+
+function formatValue(v: MlEndpointValue): { display: string; numeric: number | null } {
+  if (v.value === null || v.value === undefined) return { display: "—", numeric: null };
+  if (typeof v.value === "string") return { display: v.value, numeric: null };
+  const n = v.value;
+  if (Number.isNaN(n)) return { display: "—", numeric: null };
+  if (Math.abs(n) >= 1000) return { display: n.toExponential(2), numeric: n };
+  if (Math.abs(n) >= 10) return { display: n.toFixed(1), numeric: n };
+  if (Math.abs(n) >= 1) return { display: n.toFixed(2), numeric: n };
+  return { display: n.toFixed(3), numeric: n };
+}
+
+/** Risk tone for a probability-style endpoint where higher = worse. */
+function probTone(p: number, badDirection: "high" | "low" = "high"): {
+  text: string;
+  bg: string;
+  border: string;
+  label: "Low" | "Moderate" | "High";
+} {
+  const r = badDirection === "high" ? p : 1 - p;
+  if (r < 0.3) return { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30", label: "Low" };
+  if (r < 0.6) return { text: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30", label: "Moderate" };
+  return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", label: "High" };
+}
+
+/** Map ML toxicity probability set to a 0–1 axis (lower prob = safer = higher score). */
+function mlAxisScore(bucket: BucketKey, structured: MlAdmetResult["structured"]): number | null {
+  const entries = Object.entries(structured[bucket] || {});
+  if (entries.length === 0) return null;
+
+  if (bucket === "toxicity") {
+    // Average critical risk probabilities, invert so 1.0 = safest
+    const risks: number[] = [];
+    for (const c of CRITICAL_SAFETY_KEYS) {
+      const v = structured.toxicity[c.key];
+      if (v && typeof v.value === "number" && !Number.isNaN(v.value)) risks.push(v.value);
+    }
+    if (risks.length === 0) return null;
+    const avg = risks.reduce((s, x) => s + x, 0) / risks.length;
+    return Math.max(0, Math.min(1, 1 - avg));
+  }
+
+  if (bucket === "absorption") {
+    const v = structured.absorption["HIA_Hou"] ?? structured.absorption["Bioavailability_Ma"];
+    if (v && typeof v.value === "number") return Math.max(0, Math.min(1, v.value));
+    return null;
+  }
+
+  if (bucket === "distribution") {
+    const bbb = structured.distribution["BBB_Martins"];
+    if (bbb && typeof bbb.value === "number") return Math.max(0, Math.min(1, bbb.value));
+    return null;
+  }
+
+  if (bucket === "metabolism") {
+    // Lower CYP inhibition = better. Average CYP inhibition probabilities and invert.
+    const inhibs: number[] = [];
+    for (const [k, v] of entries) {
+      if (isCypInhibitionKey(k) && typeof v.value === "number" && !Number.isNaN(v.value)) {
+        inhibs.push(v.value);
+      }
+    }
+    if (inhibs.length === 0) return null;
+    const avg = inhibs.reduce((s, x) => s + x, 0) / inhibs.length;
+    return Math.max(0, Math.min(1, 1 - avg));
+  }
+
+  if (bucket === "excretion") {
+    const cl = structured.excretion["Clearance_Hepatocyte_AZ"];
+    if (cl && typeof cl.value === "number") {
+      // Clearance ~1–50 mL/min/kg typical; normalize to a 0–1 scale (higher = better excretion).
+      return Math.max(0, Math.min(1, cl.value / 30));
+    }
+    return null;
+  }
+
+  return null;
+}
+
+interface MlAdmetCardProps {
+  smiles: string | null | undefined;
+  heuristicAdmet: AdmetScores | null | undefined;
+}
+
+export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
+  const [result, setResult] = useState<MlAdmetResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const trimmed = (smiles ?? "").trim();
+
+  const fetchMl = useCallback(() => {
+    setRefreshKey(k => k + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!trimmed) {
+      setResult(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    predictAdmetMl(trimmed)
+      .then(r => { if (!cancelled) setResult(r); })
+      .catch(e => { if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setResult(null); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [trimmed, refreshKey]);
+
+  const badge = useMemo(() => {
+    if (!result) return null;
+    return mlBadgeFromSource(result.source);
+  }, [result]);
+
+  const axes: BucketKey[] = ["absorption", "distribution", "metabolism", "excretion", "toxicity"];
+  const heuristicAxes = useMemo(() => {
+    if (!heuristicAdmet) return null;
+    return {
+      absorption: heuristicAdmet.absorption,
+      distribution: heuristicAdmet.distribution,
+      metabolism: heuristicAdmet.metabolism,
+      excretion: heuristicAdmet.excretion,
+      toxicity: heuristicAdmet.toxicity,
+    };
+  }, [heuristicAdmet]);
+
+  return (
+    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-violet-400" />
+          <h3 className="text-[13px] font-semibold text-slate-200">ML-Enhanced ADMET</h3>
+          {badge && (
+            <Badge
+              className={`text-[9px] ${
+                badge.tone === "ml"
+                  ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                  : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+              }`}
+            >
+              <Sparkles className="w-2.5 h-2.5 mr-1 inline" />
+              {badge.label}
+            </Badge>
+          )}
+          {result?.model_info?.engine && (
+            <span className="text-[9px] text-slate-500">
+              {result.model_info.engine}
+              {typeof result.model_info.inference_time_ms === "number" &&
+                ` · ${result.model_info.inference_time_ms.toFixed(0)} ms`}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={fetchMl}
+          disabled={loading || !trimmed}
+          className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 disabled:opacity-40 px-2 py-1 rounded border border-white/10 hover:bg-white/5"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          {loading ? "Predicting…" : "Re-run"}
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {!trimmed && (
+        <div className="text-[11px] text-slate-500 italic">Enter a SMILES to run ML predictions.</div>
+      )}
+
+      {/* Loading state */}
+      {loading && !result && (
+        <div className="bg-violet-500/5 border border-violet-500/20 rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+          <div className="text-[11px] text-slate-300">
+            Running Chemprop ensemble inference…
+            <span className="text-slate-500 ml-1">(first call ≈ 9s, warm ≈ 200ms)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error state (transport-level) */}
+      {error && (
+        <div className="bg-red-500/8 border border-red-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+          <div className="text-[10px] text-red-300 leading-relaxed">
+            <span className="font-semibold">ML service unavailable.</span> {error}
+            <div className="text-slate-500 mt-0.5">
+              Heuristic ADMET (left of comparison view) is still valid for this molecule.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback envelope (model returned but inference failed) */}
+      {result && result.source === "fallback" && (
+        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-[10px] text-amber-300 leading-relaxed">
+            <span className="font-semibold">ML inference unavailable for this molecule.</span>{" "}
+            <span className="text-slate-400">
+              {result.error ?? "The model returned no predictions."} Heuristic ADMET below remains the source of truth.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 5-axis side-by-side comparison */}
+      {result && result.source === "ml" && (
+        <div>
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            ML vs Heuristic — 5-axis ADMET
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {axes.map(axis => {
+              const ml = mlAxisScore(axis, result.structured);
+              const heur = heuristicAxes ? heuristicAxes[axis] : null;
+              const mlPct = ml !== null ? Math.round(ml * 100) : null;
+              const heurPct = heur !== null && heur !== undefined ? Math.round(heur * 100) : null;
+              const delta =
+                mlPct !== null && heurPct !== null ? mlPct - heurPct : null;
+              return (
+                <div key={axis} className="bg-white/5 rounded-lg p-2.5 space-y-1.5">
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">{BUCKET_LABELS[axis]}</div>
+                  {/* ML bar */}
+                  <div>
+                    <div className="flex items-center justify-between text-[9px]">
+                      <span className="text-violet-300 font-semibold">ML</span>
+                      <span className="text-violet-300">{mlPct !== null ? `${mlPct}%` : "—"}</span>
+                    </div>
+                    <div className="w-full bg-white/5 rounded h-1.5 mt-0.5">
+                      <div
+                        className="h-1.5 rounded bg-violet-500"
+                        style={{ width: `${mlPct ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Heuristic bar */}
+                  <div>
+                    <div className="flex items-center justify-between text-[9px]">
+                      <span className="text-slate-400">Heur</span>
+                      <span className="text-slate-400">{heurPct !== null ? `${heurPct}%` : "—"}</span>
+                    </div>
+                    <div className="w-full bg-white/5 rounded h-1.5 mt-0.5">
+                      <div
+                        className="h-1.5 rounded bg-slate-500"
+                        style={{ width: `${heurPct ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Delta */}
+                  {delta !== null && (
+                    <div
+                      className={`text-[9px] text-center ${
+                        Math.abs(delta) < 10
+                          ? "text-slate-500"
+                          : delta > 0
+                          ? "text-emerald-400"
+                          : "text-amber-400"
+                      }`}
+                    >
+                      Δ {delta > 0 ? "+" : ""}
+                      {delta} pts
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Critical safety endpoints */}
+      {result && result.source === "ml" && (
+        <div>
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            Critical Safety Endpoints (ML probabilities)
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {CRITICAL_SAFETY_KEYS.map(({ key, label, bad }) => {
+              const v = result.structured.toxicity[key];
+              if (!v) return null;
+              const f = formatValue(v);
+              const tone = f.numeric !== null ? probTone(f.numeric, bad) : null;
+              return (
+                <div
+                  key={key}
+                  className={`rounded-lg px-2.5 py-2 border ${tone?.bg ?? "bg-white/5"} ${tone?.border ?? "border-white/10"}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-300 font-medium leading-tight">{label}</span>
+                    {tone && (
+                      <Badge className={`text-[8px] ${tone.bg} ${tone.text} ${tone.border}`}>
+                        {tone.label}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className={`text-[14px] font-bold mt-1 ${tone?.text ?? "text-slate-200"}`}>
+                    {f.display}
+                    {f.numeric !== null && <span className="text-[9px] text-slate-500 ml-1">prob</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bucket details */}
+      {result && result.source === "ml" && (
+        <div className="space-y-3">
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            All ML Endpoints by Bucket
+          </div>
+          {axes.map(bucket => {
+            const entries = Object.entries(result.structured[bucket] || {});
+            if (entries.length === 0) return null;
+            return (
+              <div key={bucket} className="bg-white/5 rounded-lg p-3">
+                <div className="text-[10px] font-semibold text-slate-300 mb-2">{BUCKET_LABELS[bucket]}</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1.5">
+                  {entries.map(([k, v]) => {
+                    const f = formatValue(v);
+                    const isProb = isProbabilityKey(k) && f.numeric !== null;
+                    const tone = isProb && f.numeric !== null ? probTone(f.numeric, "high") : null;
+                    return (
+                      <div key={k} className="flex items-center justify-between gap-2 min-w-0">
+                        <span
+                          className="text-[10px] text-slate-400 truncate"
+                          title={v.label || k}
+                        >
+                          {k}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold tabular-nums ${
+                            tone ? tone.text : "text-slate-200"
+                          }`}
+                        >
+                          {f.display}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer attribution */}
+      {result && result.source === "ml" && result.model_info?.reference && (
+        <div className="text-[9px] text-slate-600 pt-2 border-t border-white/5 flex items-start gap-1">
+          <CheckCircle2 className="w-3 h-3 text-emerald-500/60 shrink-0 mt-0.5" />
+          <span>
+            Predictions from <span className="text-slate-400">{result.model_info.engine}</span>
+            {result.model_info.method && ` (${result.model_info.method})`}
+            {result.model_info.endpoint_count != null && ` · ${result.model_info.endpoint_count} endpoints`}
+            {result.model_info.license && ` · ${result.model_info.license}`}
+            {result.model_info.reference && ` · ${result.model_info.reference}`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

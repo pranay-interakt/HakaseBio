@@ -60,6 +60,7 @@ import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { DemoRunner } from "@/components/DemoRunner";
+import { MlAdmetCard } from "@/components/MlAdmetCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -3167,6 +3168,7 @@ export function HakaseAI() {
                       })}
                     </div>
                     <Layer1Results
+                      smiles={smiles}
                       molProps={molProps}
                       simResults={simResults}
                       inVitroResults={inVitroResults}
@@ -7121,6 +7123,7 @@ function ProvenanceFooter({ provenance, layer }: { provenance: ProvenanceRecord;
 }
 
 function Layer1Results({
+  smiles,
   molProps, simResults, inVitroResults, indication,
   l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
@@ -7128,6 +7131,7 @@ function Layer1Results({
   safetyFlags, flagsAcknowledged, onAcknowledgeFlags,
   topTarget, therapeuticArea,
 }: {
+  smiles: string;
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
   inVitroResults: InVitroResults | null;
@@ -7150,7 +7154,7 @@ function Layer1Results({
   topTarget?: TargetSuggestion | null;
   therapeuticArea?: string;
 }) {
-  const [activeTab, setActiveTab] = useState("dose-response");
+  const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
 
   const iv = inVitroResults;
@@ -7228,6 +7232,7 @@ function Layer1Results({
       {/* In Vitro Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-lg flex-wrap">
         {[
+          { id: "ml-admet",      label: "ML-Enhanced",   icon: Brain },
           { id: "dose-response", label: "Dose-Response", icon: TrendingUp },
           { id: "permeability",  label: "Permeability",  icon: Layers },
           { id: "clearance",     label: "Clearance",     icon: Activity },
@@ -7247,6 +7252,11 @@ function Layer1Results({
           </button>
         ))}
       </div>
+
+      {/* ML-Enhanced ADMET Tab */}
+      {activeTab === "ml-admet" && (
+        <MlAdmetCard smiles={smiles} heuristicAdmet={simResults?.admet ?? null} />
+      )}
 
       {/* Dose-Response Tab */}
       {activeTab === "dose-response" && iv && (
