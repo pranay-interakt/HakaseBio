@@ -10,6 +10,11 @@ from models.admet import predict_admet
 from models.molecular_properties import predict_properties
 from models.drug_target import predict_binding
 from models.protein import predict_protein
+from models.admet_ml import (
+    predict_admet_ml,
+    is_ready as admet_ml_status,
+    warmup as admet_ml_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -87,6 +92,33 @@ def api_predict_admet(req: SmilesRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ADMET prediction failed: {str(e)}")
+
+
+@app.post("/predict/admet-ml")
+def api_predict_admet_ml(req: SmilesRequest):
+    """ML-enhanced ADMET prediction via ADMET-AI (Chemprop GNN ensemble)."""
+    try:
+        return sanitize(predict_admet_ml(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ADMET-ML prediction failed: {str(e)}")
+
+
+@app.get("/models/status")
+def api_models_status():
+    """Report which ML models are loaded and ready."""
+    return {
+        "admet_ml": admet_ml_status(),
+    }
+
+
+@app.post("/models/warmup")
+def api_models_warmup():
+    """Force-load ML models (use after deploy or first session)."""
+    return {
+        "admet_ml": admet_ml_warmup(),
+    }
 
 
 @app.post("/predict/properties")
