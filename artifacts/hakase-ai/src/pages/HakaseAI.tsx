@@ -305,7 +305,7 @@ export function HakaseAI() {
   );
 
   const heuristicSuggestions = useMemo<TargetSuggestion[]>(
-    () => (activatedMolProps?.isValid ? suggestTargets(activatedSmiles, activatedMolProps, pharmacophores, 5) : []),
+    () => (activatedMolProps?.isValid ? suggestTargets(activatedSmiles, activatedMolProps, pharmacophores, 8) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activatedSmiles, activatedMolProps?.isValid, pharmacophores],
   );
@@ -376,8 +376,8 @@ export function HakaseAI() {
       const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
       const fallbacks = heuristicSuggestions
         .filter(h => !chemblIds.has(h.uniprotId))
-        .slice(0, Math.max(0, 5 - chemblSuggestions.length));
-      return [...chemblSuggestions, ...fallbacks].slice(0, 5);
+        .slice(0, Math.max(0, 8 - chemblSuggestions.length));
+      return [...chemblSuggestions, ...fallbacks].slice(0, 8);
     }
     return heuristicSuggestions;
   }, [chemblSuggestions, heuristicSuggestions]);
