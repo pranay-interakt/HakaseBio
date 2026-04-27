@@ -38,7 +38,7 @@ import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
 import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
-import { suggestTargets, convertChEMBLHitsToSuggestions, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { suggestTargets, convertChEMBLHitsToSuggestions, isValidUniprotAccession, type TargetSuggestion } from "@/lib/targetSuggestion";
 import { detectPharmacophores } from "@/lib/chemistry";
 import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
@@ -418,7 +418,7 @@ export function HakaseAI() {
       const match = validAreas.find(v => fallback.toLowerCase().startsWith(v.toLowerCase()));
       if (match) setTherapeuticArea(match);
     }
-    if (top.uniprotId !== uniprotId) {
+    if (top.uniprotId !== uniprotId && isValidUniprotAccession(top.uniprotId)) {
       setUniprotId(top.uniprotId);
       setProteinInfo(null);
       setProteinError(null);
@@ -430,8 +430,19 @@ export function HakaseAI() {
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
   const handleProteinFetch = useCallback(async (overrideId?: string | unknown) => {
-    const id = (typeof overrideId === "string" ? overrideId : uniprotId).trim();
+    const id = (typeof overrideId === "string" ? overrideId : uniprotId).trim().toUpperCase();
     if (!id) return;
+    if (!isValidUniprotAccession(id)) {
+      setProteinError(`Invalid UniProt accession "${id}". Expected format e.g. P00533 or A0A024R161.`);
+      setProteinInfo(null);
+      setAlphafoldData(null);
+      setProteinRule(null);
+      setProteinMl(null);
+      setProteinLoading(false);
+      setProteinRuleLoading(false);
+      setProteinMlLoading(false);
+      return;
+    }
     // Bump sequence and capture our token. Any setState below is gated on the
     // ref still matching — protects against stale UniProt or AlphaFold (incl.
     // PDB-download tail) responses overwriting the user's newer selection.
@@ -2481,43 +2492,69 @@ export function HakaseAI() {
                           </div>
                         )}
 
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                            <Input
-                              value={uniprotId}
-                              onChange={e => {
-                                uniprotManual.current = true;
-                                setUniprotAutoMode(false);
-                                setUniprotId(e.target.value.toUpperCase());
-                                setProteinInfo(null);
-                                setProteinError(null);
-                              }}
-                              onKeyDown={e => e.key === "Enter" && handleProteinFetch()}
-                              className="bg-white/5 border-white/10 text-white text-[12px] pl-8 font-mono focus:border-violet-500/60 uppercase"
-                              placeholder="UniProt accession e.g. P00533"
-                            />
-                          </div>
-                          <button
-                            onClick={handleProteinFetch}
-                            disabled={!uniprotId.trim() || proteinLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
-                          >
-                            {proteinLoading
-                              ? <><RefreshCw className="w-3 h-3 animate-spin" /> Fetching…</>
-                              : <><Download className="w-3 h-3" /> Fetch</>
-                            }
-                          </button>
-                        </div>
+                        {(() => {
+                          const trimmedUniprot = uniprotId.trim();
+                          const uniprotIdInvalid = trimmedUniprot.length > 0 && !isValidUniprotAccession(trimmedUniprot);
+                          return (
+                            <>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${uniprotIdInvalid ? "text-red-400" : "text-slate-500"}`} />
+                                  <Input
+                                    value={uniprotId}
+                                    onChange={e => {
+                                      uniprotManual.current = true;
+                                      setUniprotAutoMode(false);
+                                      setUniprotId(e.target.value.toUpperCase());
+                                      setProteinInfo(null);
+                                      setProteinError(null);
+                                    }}
+                                    onKeyDown={e => e.key === "Enter" && !uniprotIdInvalid && handleProteinFetch()}
+                                    aria-invalid={uniprotIdInvalid}
+                                    aria-describedby="uniprot-id-hint"
+                                    className={`bg-white/5 text-white text-[12px] pl-8 font-mono uppercase ${uniprotIdInvalid ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-violet-500/60"}`}
+                                    placeholder="UniProt accession e.g. P00533"
+                                  />
+                                </div>
+                                <button
+                                  onClick={handleProteinFetch}
+                                  disabled={!trimmedUniprot || uniprotIdInvalid || proteinLoading}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
+                                >
+                                  {proteinLoading
+                                    ? <><RefreshCw className="w-3 h-3 animate-spin" /> Fetching…</>
+                                    : <><Download className="w-3 h-3" /> Fetch</>
+                                  }
+                                </button>
+                              </div>
 
-                        {/* What is a UniProt ID */}
-                        <div className="mt-1.5 flex items-start gap-1">
-                          <Info className="w-3 h-3 text-slate-600 shrink-0 mt-0.5" />
-                          <span className="text-[9px] text-slate-600">
-                            UniProt accessions are 6–10 character protein identifiers. Find yours at{" "}
-                            <span className="text-violet-500">uniprot.org</span> by searching the protein or gene name.
-                          </span>
-                        </div>
+                              {/* Inline format hint / validation message */}
+                              <div
+                                id="uniprot-id-hint"
+                                role={uniprotIdInvalid ? "alert" : undefined}
+                                aria-live={uniprotIdInvalid ? "polite" : undefined}
+                                className="mt-1.5 flex items-start gap-1"
+                              >
+                                {uniprotIdInvalid ? (
+                                  <>
+                                    <AlertTriangle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
+                                    <span className="text-[9px] text-red-400">
+                                      Invalid UniProt accession format. Expected e.g. <span className="font-mono">P00533</span> or <span className="font-mono">A0A024R161</span>.
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Info className="w-3 h-3 text-slate-600 shrink-0 mt-0.5" />
+                                    <span className="text-[9px] text-slate-600">
+                                      UniProt accessions are 6–10 character protein identifiers. Find yours at{" "}
+                                      <span className="text-violet-500">uniprot.org</span> by searching the protein or gene name.
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
 
                         {/* Molecule-aware target suggestions */}
                         {targetSuggestions.length > 0 && (

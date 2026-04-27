@@ -831,8 +831,15 @@ function formatNm(nM: number): string {
  * data is real evidence and should surface to the user. The combiner upstream
  * is responsible for any final dedup / display ordering.
  */
+export const UNIPROT_ACCESSION_RE = /^([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})$/;
+
+export function isValidUniprotAccession(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return UNIPROT_ACCESSION_RE.test(id.trim().toUpperCase());
+}
+
 export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compoundName: string): TargetSuggestion[] {
-  const withUniprot = hits.filter(h => h.uniprotId != null);
+  const withUniprot = hits.filter(h => isValidUniprotAccession(h.uniprotId));
   if (withUniprot.length === 0) return [];
 
   const best = withUniprot[0];
