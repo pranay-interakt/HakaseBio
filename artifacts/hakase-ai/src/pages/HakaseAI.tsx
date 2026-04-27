@@ -304,8 +304,12 @@ export function HakaseAI() {
     [activatedSmiles, activatedMolProps?.isValid],
   );
 
+  // Heuristic suggestions are now dynamic: no hard top-N cap. The generator
+  // filters by minimum confidence (Medium ≥ 0.35) and applies a safety floor
+  // of 3 so the user always sees something even for weakly-overlapping
+  // molecules. See `suggestTargets` doc-block for the full filtering rules.
   const heuristicSuggestions = useMemo<TargetSuggestion[]>(
-    () => (activatedMolProps?.isValid ? suggestTargets(activatedSmiles, activatedMolProps, pharmacophores, 8) : []),
+    () => (activatedMolProps?.isValid ? suggestTargets(activatedSmiles, activatedMolProps, pharmacophores) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activatedSmiles, activatedMolProps?.isValid, pharmacophores],
   );
@@ -371,15 +375,17 @@ export function HakaseAI() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activatedSmiles, activatedMolProps?.isValid]);
 
+  // Combined suggestion list — fully dynamic, no hard cap.
+  // Order: every ChEMBL hit first (real measured / similarity binding evidence
+  // for THIS molecule), then heuristic catalogue matches that aren't already
+  // surfaced by ChEMBL (deduped by UniProt ID). The heuristic side is already
+  // confidence-filtered upstream by `suggestTargets`, so the combined length
+  // naturally tracks how informative the molecule actually is.
   const targetSuggestions = useMemo<TargetSuggestion[]>(() => {
-    if (chemblSuggestions.length > 0) {
-      const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
-      const fallbacks = heuristicSuggestions
-        .filter(h => !chemblIds.has(h.uniprotId))
-        .slice(0, Math.max(0, 8 - chemblSuggestions.length));
-      return [...chemblSuggestions, ...fallbacks].slice(0, 8);
-    }
-    return heuristicSuggestions;
+    if (chemblSuggestions.length === 0) return heuristicSuggestions;
+    const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
+    const fallbacks = heuristicSuggestions.filter(h => !chemblIds.has(h.uniprotId));
+    return [...chemblSuggestions, ...fallbacks];
   }, [chemblSuggestions, heuristicSuggestions]);
 
   // ── Auto-sync top target suggestion → UniProt field ───────────────────────

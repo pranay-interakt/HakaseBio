@@ -729,13 +729,32 @@ const CATALOGUE: TargetEntry[] = [
   },
 ];
 
+/**
+ * Suggest catalogue targets ranked by physicochemical / pharmacophore match.
+ *
+ * The number of returned suggestions is **dynamic** — driven by the molecule's
+ * actual catalogue overlap rather than a hard top-N cap:
+ *   1. Score every catalogue target.
+ *   2. Drop targets below `opts.minConfidence` (default 0.35 = Medium label
+ *      threshold). A weakly-overlapping molecule may legitimately have ZERO
+ *      strong matches.
+ *   3. Safety floor: if fewer than `opts.floor` (default 3) survive the filter,
+ *      keep the top `floor` regardless so the user always sees something.
+ *   4. Hard ceiling: clamp at `opts.maxN` (default 25 — well above the typical
+ *      ~12 catalogue targets that score >0.35) just to prevent pathological
+ *      cases from flooding the UI.
+ */
 export function suggestTargets(
   smiles: string,
   props: MolecularProperties,
   pharmacophores: PharmacophoreProfile | null,
-  topN = 5,
+  opts: { minConfidence?: number; floor?: number; maxN?: number } = {},
 ): TargetSuggestion[] {
   if (!smiles || !props.isValid) return [];
+
+  const minConfidence = opts.minConfidence ?? 0.35;
+  const floor = opts.floor ?? 3;
+  const maxN = opts.maxN ?? 25;
 
   const ph: PharmacophoreProfile = pharmacophores ?? {
     aromaticNCount: 0, basicAmineCount: 0, aromaticAmineCount: 0,
@@ -760,8 +779,17 @@ export function suggestTargets(
 
   const ABSOLUTE_MAX = 12;
 
-  return scored.slice(0, topN).map(t => {
-    const conf = Math.min(1, Math.max(0, t.rawScore / ABSOLUTE_MAX));
+  // Compute confidence for every target, then apply the dynamic filter.
+  const scoredWithConf = scored.map(t => ({
+    t,
+    conf: Math.min(1, Math.max(0, t.rawScore / ABSOLUTE_MAX)),
+  }));
+
+  const aboveThreshold = scoredWithConf.filter(x => x.conf >= minConfidence);
+  // Apply the safety floor — keep at least `floor` even if all are weak.
+  const kept = aboveThreshold.length >= floor ? aboveThreshold : scoredWithConf.slice(0, floor);
+
+  return kept.slice(0, maxN).map(({ t, conf }) => {
     const label: TargetSuggestion["confidenceLabel"] = conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
     return {
       uniprotId:   t.uniprotId,
@@ -793,6 +821,12 @@ function formatNm(nM: number): string {
   return `${(nM / 1000).toFixed(1)} µM`;
 }
 
+/**
+ * Convert all ChEMBL target hits with a UniProt ID into suggestions. There is
+ * NO hard cap here — every hit with measured (or similarity-inferred) binding
+ * data is real evidence and should surface to the user. The combiner upstream
+ * is responsible for any final dedup / display ordering.
+ */
 export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compoundName: string): TargetSuggestion[] {
   const withUniprot = hits.filter(h => h.uniprotId != null);
   if (withUniprot.length === 0) return [];
@@ -800,7 +834,7 @@ export function convertChEMBLHitsToSuggestions(hits: ChEMBLTargetHit[], compound
   const best = withUniprot[0];
   const bestNm = best.bestValue_nM;
 
-  return withUniprot.slice(0, 5).map((h) => {
+  return withUniprot.map((h) => {
     const isSimilarity = h.fromSimilarity === true;
     // Confidence: scale by relative potency, then dampen 30% if from similarity inference
     let conf = Math.min(1, Math.max(0.1, bestNm / Math.max(h.bestValue_nM, 0.01)));
