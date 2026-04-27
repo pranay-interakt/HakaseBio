@@ -1,5 +1,18 @@
 import os
 import numpy as np
+# Eagerly import sklearn submodules on the main thread BEFORE any prewarm
+# background thread can race on them. sklearn's submodules import each other
+# lazily and concurrent first-imports from worker threads can deadlock with
+# `ImportError: cannot import name 'clone' from partially initialized module
+# 'sklearn.base'`. We have two ML prewarm threads (cardiotox + protein_ml) that
+# both touch sklearn — pre-import here is the safe fix.
+import sklearn  # noqa: F401
+import sklearn.base  # noqa: F401
+import sklearn.ensemble  # noqa: F401
+import sklearn.linear_model  # noqa: F401
+import sklearn.model_selection  # noqa: F401
+import sklearn.pipeline  # noqa: F401
+import sklearn.preprocessing  # noqa: F401
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +32,11 @@ from models.cardiotox import (
     predict_cardiotox,
     is_ready as cardiotox_status,
     warmup as cardiotox_warmup,
+)
+from models.protein_ml import (
+    predict_protein_ml,
+    is_ready as protein_ml_status,
+    warmup as protein_ml_warmup,
 )
 
 
@@ -66,17 +84,21 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-def _prewarm_cardiotox_in_background() -> None:
-    """Background-prewarm CardioTox so the first user doesn't pay the 22s cold-train.
+def _prewarm_in_background() -> None:
+    """Background-prewarm small ML models so the first user doesn't pay cold-load.
 
-    Loading from the pickled cache is ~1s; a fresh first-time train is ~22s.
-    Either way, doing it on a background thread means /health responds instantly
-    and ADMET requests aren't blocked. ADMET-AI is intentionally not prewarmed
-    here — it's much heavier (~30s) and the existing UI already handles cold-load
-    gracefully with a loading state.
+    - CardioTox: ~22s fresh train, ~1s from cache.
+    - ProteinML: heavy on first cold start (downloads ~140 MB ESM-2 weights and
+      embeds ~160 training proteins, can take 5-15 min on CPU). Subsequent
+      starts read everything from cache and are seconds. Either way, running on
+      a background thread means /health and other endpoints stay responsive.
+
+    ADMET-AI is intentionally not prewarmed (~30s + heavy memory; existing UI
+    handles cold-load gracefully).
     """
     import threading
     threading.Thread(target=cardiotox_warmup, name="cardiotox-prewarm", daemon=True).start()
+    threading.Thread(target=protein_ml_warmup, name="protein-ml-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -135,12 +157,24 @@ def api_predict_cardiotox(req: SmilesRequest):
         raise HTTPException(status_code=500, detail=f"CardioTox prediction failed: {str(e)}")
 
 
+@app.post("/predict/protein-ml")
+def api_predict_protein_ml(req: ProteinRequest):
+    """Dedicated ESM-2 druggability prediction (independent second opinion)."""
+    try:
+        return sanitize(predict_protein_ml(req.uniprot_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ProteinML prediction failed: {str(e)}")
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
     return {
         "admet_ml": admet_ml_status(),
         "cardiotox": cardiotox_status(),
+        "protein_ml": protein_ml_status(),
     }
 
 
@@ -150,6 +184,7 @@ def api_models_warmup():
     return {
         "admet_ml": admet_ml_warmup(),
         "cardiotox": cardiotox_warmup(),
+        "protein_ml": protein_ml_warmup(),
     }
 
 
