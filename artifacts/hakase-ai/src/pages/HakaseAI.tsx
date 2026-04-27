@@ -12,7 +12,7 @@ import {
 import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
 import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
 import {
-  fetchUniProt, fetchPdbStructure, fetchAlphaFold,
+  fetchUniProt, fetchPdbStructure, fetchAlphaFoldFull,
   type ProteinInfo, type PdbStructure, type AlphafoldPrediction,
 } from "@/lib/proteinApi";
 import { runCohortSimulation, type CohortResults, type L2PkOverrides } from "@/lib/cohortSim";
@@ -214,6 +214,12 @@ export function HakaseAI() {
   const [alphafoldData, setAlphafoldData] = useState<AlphafoldPrediction | null>(null);
   const proteinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sequence counter for protein-fetch requests. Each call to handleProteinFetch
+  // captures the current value; async UniProt + AlphaFold callbacks compare
+  // against this ref before applying setState so a slow response from a stale
+  // request can't overwrite the result of a newer one when the user changes
+  // UniProt IDs rapidly. Plain ID equality wouldn't catch repeat-of-same-ID.
+  const proteinFetchSeqRef = useRef(0);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
@@ -405,19 +411,30 @@ export function HakaseAI() {
   const handleProteinFetch = useCallback(async (overrideId?: string | unknown) => {
     const id = (typeof overrideId === "string" ? overrideId : uniprotId).trim();
     if (!id) return;
+    // Bump sequence and capture our token. Any setState below is gated on the
+    // ref still matching — protects against stale UniProt or AlphaFold (incl.
+    // PDB-download tail) responses overwriting the user's newer selection.
+    const seq = ++proteinFetchSeqRef.current;
+    const isCurrent = () => proteinFetchSeqRef.current === seq;
+
     setProteinLoading(true);
     setProteinError(null);
     setProteinInfo(null);
     setAlphafoldData(null);
     try {
       const info = await fetchUniProt(id);
+      if (!isCurrent()) return;
       setProteinInfo(info);
       if (info.pdbIds.length && !pdbId) setPdbId(info.pdbIds[0]);
-      fetchAlphaFold(id).then(af => setAlphafoldData(af ?? null)).catch(() => null);
+      fetchAlphaFoldFull(id)
+        .then(af => { if (isCurrent()) setAlphafoldData(af ?? null); })
+        .catch(() => null);
     } catch (err: unknown) {
-      setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
+      if (isCurrent()) {
+        setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
+      }
     } finally {
-      setProteinLoading(false);
+      if (isCurrent()) setProteinLoading(false);
     }
   }, [uniprotId, pdbId]);
 
@@ -2706,7 +2723,9 @@ export function HakaseAI() {
                                 { k: "Active sites",  v: String(proteinInfo.activeSites) },
                                 { k: "Binding sites", v: String(proteinInfo.bindingSites) },
                                 { k: "PDB entries",   v: proteinInfo.pdbIds.length ? `${proteinInfo.pdbIds.length} structures` : "None" },
-                                { k: "AlphaFold",     v: alphafoldData ? `pLDDT ${alphafoldData.meanPlddt.toFixed(0)}` : proteinInfo.alphafoldId ? "Available" : "N/A" },
+                                { k: "AlphaFold",     v: alphafoldData
+                                    ? `pLDDT ${alphafoldData.meanPlddt.toFixed(0)}${alphafoldData.analysis ? ` · ${alphafoldData.analysis.qualityClass}` : ""}`
+                                    : proteinInfo.alphafoldId ? "Available" : "N/A" },
                               ].map(({ k, v }) => (
                                 <div key={k} className="flex justify-between">
                                   <span className="text-[9px] text-slate-600">{k}</span>
@@ -2714,6 +2733,58 @@ export function HakaseAI() {
                                 </div>
                               ))}
                             </div>
+                            {/* Per-residue pLDDT analysis (disorder map + druggable folded core).
+                                Only renders when `fetchAlphaFoldFull` succeeded in fetching+parsing
+                                the AlphaFold PDB file. Critical for huge multi-domain targets where
+                                the druggable core is buried inside an otherwise-disordered chain. */}
+                            {alphafoldData?.analysis && (() => {
+                              const a = alphafoldData.analysis!;
+                              const qualityColor: Record<typeof a.qualityClass, string> = {
+                                Excellent: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+                                Good:      "bg-cyan-500/15 border-cyan-500/30 text-cyan-300",
+                                Fair:      "bg-amber-500/15 border-amber-500/30 text-amber-300",
+                                Poor:      "bg-red-500/15 border-red-500/30 text-red-300",
+                              };
+                              const isHuge = proteinInfo.sequenceLength > 800;
+                              const core = a.largestFoldedDomain;
+                              return (
+                                <div className="border-t border-white/5 pt-2 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-600 uppercase tracking-wider">Structural quality</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${qualityColor[a.qualityClass]}`}>
+                                      {a.qualityClass}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                    <div className="flex justify-between">
+                                      <span className="text-[9px] text-slate-600">Confident (≥70)</span>
+                                      <span className="text-[9px] text-emerald-300 font-medium">{(a.confidentFraction * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-[9px] text-slate-600">Disordered (&lt;50)</span>
+                                      <span className="text-[9px] text-amber-300 font-medium">{(a.disorderedFraction * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-[9px] text-slate-600">Folded domains</span>
+                                      <span className="text-[9px] text-slate-400 font-medium">{a.foldedDomains.length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-[9px] text-slate-600">Disorder regions</span>
+                                      <span className="text-[9px] text-slate-400 font-medium">{a.disorderRegions.length}</span>
+                                    </div>
+                                  </div>
+                                  {isHuge && core && (
+                                    <div className="bg-violet-500/10 border border-violet-500/25 rounded px-2 py-1.5">
+                                      <div className="text-[9px] text-violet-300 font-semibold mb-0.5">Druggable core domain</div>
+                                      <div className="text-[10px] text-slate-300 font-mono">
+                                        residues {core.start}–{core.end}
+                                        <span className="text-slate-500"> · {core.length} aa · μpLDDT {core.meanPlddt}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {proteinInfo.pdbIds.length > 0 && (
                               <div>
                                 <div className="text-[9px] text-slate-600 mb-1">
