@@ -61,6 +61,12 @@ import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { DemoRunner } from "@/components/DemoRunner";
 import { MlAdmetCard } from "@/components/MlAdmetCard";
+import {
+  predictProtein,
+  predictProteinMl,
+  type AiProteinResult,
+  type ProteinMlResult,
+} from "@/lib/aiService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -212,6 +218,15 @@ export function HakaseAI() {
   const [pdbStructure, setPdbStructure] = useState<PdbStructure | null>(null);
   const [pdbLoading, setPdbLoading] = useState(false);
   const [alphafoldData, setAlphafoldData] = useState<AlphafoldPrediction | null>(null);
+  // ── Druggability assessment (paired view: rule-based + ESM-2 ML) ──────────
+  // Both fire in parallel from handleProteinFetch after UniProt succeeds.
+  // Each side degrades gracefully if its endpoint fails so the rest of the
+  // protein card still renders. The "loading" flags drive a small spinner per
+  // side; the ML side may take many seconds while the model is cold-loading.
+  const [proteinRule, setProteinRule] = useState<AiProteinResult | null>(null);
+  const [proteinRuleLoading, setProteinRuleLoading] = useState(false);
+  const [proteinMl, setProteinMl] = useState<ProteinMlResult | null>(null);
+  const [proteinMlLoading, setProteinMlLoading] = useState(false);
   const proteinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Sequence counter for protein-fetch requests. Each call to handleProteinFetch
@@ -421,6 +436,10 @@ export function HakaseAI() {
     setProteinError(null);
     setProteinInfo(null);
     setAlphafoldData(null);
+    setProteinRule(null);
+    setProteinMl(null);
+    setProteinRuleLoading(true);
+    setProteinMlLoading(true);
     try {
       const info = await fetchUniProt(id);
       if (!isCurrent()) return;
@@ -429,6 +448,18 @@ export function HakaseAI() {
       fetchAlphaFoldFull(id)
         .then(af => { if (isCurrent()) setAlphafoldData(af ?? null); })
         .catch(() => null);
+      // Druggability — fire rule-based and ESM-2 ML in parallel, each
+      // applying setState only if this fetch is still the current one.
+      // Either may fail independently (network, cold-loading model, etc.)
+      // and the UI degrades gracefully on a per-side basis.
+      predictProtein(id)
+        .then(r => { if (isCurrent()) setProteinRule(r); })
+        .catch(() => { if (isCurrent()) setProteinRule(null); })
+        .finally(() => { if (isCurrent()) setProteinRuleLoading(false); });
+      predictProteinMl(id)
+        .then(r => { if (isCurrent()) setProteinMl(r); })
+        .catch(() => { if (isCurrent()) setProteinMl(null); })
+        .finally(() => { if (isCurrent()) setProteinMlLoading(false); });
     } catch (err: unknown) {
       if (isCurrent()) {
         setProteinError(err instanceof Error ? err.message : "UniProt lookup failed");
@@ -2780,6 +2811,130 @@ export function HakaseAI() {
                                         residues {core.start}–{core.end}
                                         <span className="text-slate-500"> · {core.length} aa · μpLDDT {core.meanPlddt}</span>
                                       </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {/* Paired druggability assessment.
+                                LEFT  — rule-based score from /api/ai/protein
+                                        (heuristic over binding-site count, active-site
+                                        count, sequence length).
+                                RIGHT — ESM-2 35M mean-pooled embedding → logistic
+                                        regression head trained on ~80 well-drugged
+                                        targets vs ~80 essential housekeeping proteins.
+                                Methodologically independent — agreement / divergence
+                                between the two acts as a confidence indicator.
+                                Renders only when at least one side has data or is
+                                in flight; both-failed silently hides this block. */}
+                            {(proteinRule || proteinMl || proteinRuleLoading || proteinMlLoading) && (() => {
+                              const ruleProb = proteinRule?.druggability?.druggability_score ?? null;
+                              const ruleClass = proteinRule?.druggability?.druggability_class ?? null;
+                              const mlProb = proteinMl?.prediction?.druggability_probability ?? null;
+                              const mlClass = proteinMl?.prediction?.druggability_class ?? null;
+                              const mlAvail = proteinMl?.ml_available !== false;
+
+                              const classToTone = (cls: string | null): { color: string; tone: "good" | "mid" | "bad" | "none" } => {
+                                if (!cls) return { color: "bg-slate-500/15 border-slate-500/30 text-slate-400", tone: "none" };
+                                const lc = cls.toLowerCase();
+                                if (lc.includes("high") || lc === "druggable") return { color: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", tone: "good" };
+                                if (lc.includes("moderate") || lc.includes("borderline")) return { color: "bg-amber-500/15 border-amber-500/30 text-amber-300", tone: "mid" };
+                                if (lc.includes("low") || lc.includes("undruggable") || lc.includes("non-druggable")) return { color: "bg-red-500/15 border-red-500/30 text-red-300", tone: "bad" };
+                                return { color: "bg-slate-500/15 border-slate-500/30 text-slate-400", tone: "none" };
+                              };
+
+                              const ruleStyle = classToTone(ruleClass);
+                              const mlStyle = classToTone(mlClass);
+
+                              // Agreement: only meaningful when both sides have produced a class.
+                              let agreement: { label: string; color: string } | null = null;
+                              if (ruleStyle.tone !== "none" && mlStyle.tone !== "none") {
+                                if (ruleStyle.tone === mlStyle.tone) {
+                                  agreement = { label: "Aligned", color: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" };
+                                } else {
+                                  // Adjacent buckets (good/mid or mid/bad) → "Partial"; opposite (good/bad) → "Divergent".
+                                  const tones = [ruleStyle.tone, mlStyle.tone].sort();
+                                  const opposite = tones[0] === "bad" && tones[1] === "good";
+                                  agreement = opposite
+                                    ? { label: "Divergent", color: "bg-red-500/15 border-red-500/30 text-red-300" }
+                                    : { label: "Partial", color: "bg-amber-500/15 border-amber-500/30 text-amber-300" };
+                                }
+                              }
+
+                              const Side = ({ title, subtitle, prob, cls, style, loading, fallback, meta }: {
+                                title: string;
+                                subtitle: string;
+                                prob: number | null;
+                                cls: string | null;
+                                style: { color: string };
+                                loading: boolean;
+                                fallback: boolean;
+                                meta: string;
+                              }) => (
+                                <div className="bg-white/3 border border-white/10 rounded p-2 space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-500 uppercase tracking-wider">{title}</span>
+                                    {cls && !fallback ? (
+                                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${style.color}`}>{cls}</span>
+                                    ) : loading ? (
+                                      <RefreshCw className="w-2.5 h-2.5 text-slate-500 animate-spin" />
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] border bg-slate-500/15 border-slate-500/30 text-slate-500">N/A</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[9px] text-slate-600 leading-tight">{subtitle}</div>
+                                  {prob != null && !fallback ? (
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-[16px] font-mono font-semibold text-slate-200">{prob.toFixed(2)}</span>
+                                      <span className="text-[9px] text-slate-600">probability</span>
+                                    </div>
+                                  ) : (
+                                    <div className="text-[10px] text-slate-600 italic">
+                                      {loading ? "Loading…" : fallback ? "Model unavailable" : "Awaiting"}
+                                    </div>
+                                  )}
+                                  <div className="text-[8px] text-slate-700 font-mono leading-tight">{meta}</div>
+                                </div>
+                              );
+
+                              return (
+                                <div className="border-t border-white/5 pt-2 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-600 uppercase tracking-wider">Druggability assessment</span>
+                                    {agreement && (
+                                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${agreement.color}`}>
+                                        {agreement.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <Side
+                                      title="Rule-based"
+                                      subtitle="Heuristic on binding/active sites"
+                                      prob={ruleProb}
+                                      cls={ruleClass}
+                                      style={ruleStyle}
+                                      loading={proteinRuleLoading && !proteinRule}
+                                      fallback={false}
+                                      meta="UniProt features → score"
+                                    />
+                                    <Side
+                                      title="ML (ESM-2)"
+                                      subtitle="35M-param protein LM + LR head"
+                                      prob={mlProb}
+                                      cls={mlClass}
+                                      style={mlStyle}
+                                      loading={proteinMlLoading && !proteinMl}
+                                      fallback={!mlAvail}
+                                      meta={proteinMl?.model_info?.performance?.cv_roc_auc_mean != null
+                                        ? `CV ROC-AUC ${proteinMl.model_info.performance.cv_roc_auc_mean.toFixed(2)}`
+                                        : "Sequence embedding → LR"}
+                                    />
+                                  </div>
+                                  {proteinMl && !mlAvail && proteinMl.error && (
+                                    <div className="text-[9px] text-amber-400/80 flex items-center gap-1">
+                                      <Info className="w-3 h-3 shrink-0" />
+                                      <span className="leading-tight">ML model: {proteinMl.error}</span>
                                     </div>
                                   )}
                                 </div>

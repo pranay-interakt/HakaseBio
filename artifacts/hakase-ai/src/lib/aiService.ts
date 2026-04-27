@@ -257,9 +257,53 @@ export interface CardiotoxResult {
   };
 }
 
+export interface ProteinMlResult {
+  uniprot_id: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  sequence_length?: number;
+  prediction: {
+    druggability_probability: number | null;
+    druggability_class: "Druggable" | "Borderline" | "Likely undruggable" | null;
+  };
+  model_info: {
+    engine: string;
+    method: string;
+    training?: {
+      n_train: number;
+      n_positives: number;
+      n_negatives: number;
+      label_definition: string;
+    };
+    performance?: {
+      cv_roc_auc_mean: number | null;
+      cv_roc_auc_std: number | null;
+      cv_folds: number;
+    };
+    features?: {
+      esm_model: string;
+      embed_dim: number;
+      pooling: string;
+      max_chunk_residues: number;
+      chunk_stride: number;
+      chunks_used: number;
+    };
+    thresholds?: {
+      druggable: number;
+      borderline: number;
+    };
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
+}
+
 export interface ModelStatusResponse {
   admet_ml: ModelLoadStatus;
   cardiotox: ModelLoadStatus;
+  protein_ml?: ModelLoadStatus;
 }
 
 export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
@@ -268,6 +312,10 @@ export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
 
 export async function predictCardiotox(smiles: string): Promise<CardiotoxResult> {
   return post<CardiotoxResult>("/cardiotox", { smiles });
+}
+
+export async function predictProteinMl(uniprotId: string): Promise<ProteinMlResult> {
+  return post<ProteinMlResult>("/protein-ml", { uniprot_id: uniprotId });
 }
 
 export async function getModelStatus(): Promise<ModelStatusResponse> {
