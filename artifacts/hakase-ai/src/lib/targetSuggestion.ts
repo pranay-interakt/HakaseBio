@@ -67,6 +67,10 @@ const CATALOGUE: TargetEntry[] = [
       if (ph.hasAmide) sc += 0.5;
       if (ph.hasMichaelAcceptor) sc += 1.5;
       if (ph.hasHalogen) sc += 0.5;
+      const hasEgfrSpecificFeature = ph.hasQuinazoline || ph.hasPyrimidine || ph.hasMichaelAcceptor;
+      if (!hasEgfrSpecificFeature) {
+        sc = Math.min(sc, 7.5);
+      }
       return sc;
     },
     rationale(p, ph) {
