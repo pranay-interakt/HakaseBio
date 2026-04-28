@@ -64,8 +64,12 @@ import { MlAdmetCard } from "@/components/MlAdmetCard";
 import {
   predictProtein,
   predictProteinMl,
+  predictProperties,
+  predictSolubilityMl,
   type AiProteinResult,
   type ProteinMlResult,
+  type AiPropertiesResult,
+  type SolubilityMlResult,
 } from "@/lib/aiService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -235,6 +239,17 @@ export function HakaseAI() {
   // request can't overwrite the result of a newer one when the user changes
   // UniProt IDs rapidly. Plain ID equality wouldn't catch repeat-of-same-ID.
   const proteinFetchSeqRef = useRef(0);
+  // ── Molecule ML Predictions (paired view: rule-based + ML, per axis) ──────
+  // Solubility is the first model. Both sides fire from a single SMILES-change
+  // effect (debounced) so the user sees instant per-row updates as they edit.
+  // Stale-request guard via solSeqRef matches the protein-ml pattern: rapid
+  // edits don't paint stale results from a slow earlier request.
+  const [solRule, setSolRule] = useState<AiPropertiesResult | null>(null);
+  const [solRuleLoading, setSolRuleLoading] = useState(false);
+  const [solMl, setSolMl] = useState<SolubilityMlResult | null>(null);
+  const [solMlLoading, setSolMlLoading] = useState(false);
+  const solSeqRef = useRef(0);
+  const solDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
@@ -263,6 +278,47 @@ export function HakaseAI() {
     }, 250);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [smiles, rdkitReady]);
+
+  // ── Molecule ML: paired predictions on SMILES change ──────────────────────
+  // First valid SMILES fires immediately (instant feedback on mount / paste).
+  // Subsequent edits are debounced 400 ms so keystrokes don't spam the AI
+  // service. We gate on RDKit-validated SMILES (molProps?.isValid) so we never
+  // send obviously malformed strings. Each side's promise is guarded by
+  // solSeqRef so stale responses can never overwrite the result of a newer
+  // query.
+  useEffect(() => {
+    if (solDebounceRef.current) clearTimeout(solDebounceRef.current);
+    const sm = smiles.trim();
+    if (!sm) {
+      setSolRule(null); setSolMl(null);
+      setSolRuleLoading(false); setSolMlLoading(false);
+      return;
+    }
+    if (rdkitReady && molProps && !molProps.isValid) {
+      setSolRule(null); setSolMl(null);
+      setSolRuleLoading(false); setSolMlLoading(false);
+      return;
+    }
+    const seq = ++solSeqRef.current;
+    const fire = () => {
+      setSolRuleLoading(true);
+      setSolMlLoading(true);
+      predictProperties(sm)
+        .then(r => { if (solSeqRef.current === seq) { setSolRule(r); setSolRuleLoading(false); } })
+        .catch(() => { if (solSeqRef.current === seq) { setSolRule(null); setSolRuleLoading(false); } });
+      predictSolubilityMl(sm)
+        .then(r => { if (solSeqRef.current === seq) { setSolMl(r); setSolMlLoading(false); } })
+        .catch(() => { if (solSeqRef.current === seq) { setSolMl(null); setSolMlLoading(false); } });
+    };
+    // First prediction or no prior result → fire immediately. Otherwise debounce.
+    if (!solRule && !solMl) {
+      fire();
+    } else {
+      solDebounceRef.current = setTimeout(fire, 400);
+    }
+    return () => { if (solDebounceRef.current) clearTimeout(solDebounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smiles, rdkitReady, molProps?.isValid]);
 
   const mol2dSvg = useMemo(() => {
     if (!rdkitReady || !molProps?.isValid || !smiles) return null;
@@ -3086,6 +3142,165 @@ export function HakaseAI() {
                         </Select>
                       </FieldGroup>
                     </div>
+                  </section>
+
+                  <Separator className="bg-white/8" />
+
+                  {/* 2.X Molecule ML Predictions — paired view, ADMET-grouped.
+                      Solubility is the first row; future molecule-side models
+                      (CYP, Caco-2, PPB, CL_int, BBB, Ames) drop into their
+                      respective ADMET sub-headers without changing the card
+                      structure. The card surfaces methodology independence by
+                      always showing the rule-based and ML scores side by side
+                      with a Δ-based consensus badge. */}
+                  <section id="demo-molecule-ml">
+                    <SectionHeader icon={Beaker} label="Molecule ML Predictions" />
+                    <div className="text-[10px] text-slate-500 -mt-1 mb-2.5 leading-snug">
+                      Independent ML second opinions paired with rule-based predictions.
+                      Updates automatically as you edit the SMILES above.
+                    </div>
+
+                    {/* Solubility & Permeability ─────────────────────────── */}
+                    {(() => {
+                      const ruleLogS = solRule?.solubility?.logS_predicted ?? null;
+                      const ruleClass = solRule?.solubility?.solubility_class ?? null;
+                      const mlLogS = solMl?.prediction?.logS_predicted ?? null;
+                      const mlClass = solMl?.prediction?.solubility_class ?? null;
+                      const mlAvail = solMl?.ml_available !== false;
+
+                      // Tone from logS (works for both rule + ML regardless of
+                      // their slightly different class label strings).
+                      const tone = (logs: number | null): "good" | "mid" | "bad" | "none" => {
+                        if (logs == null) return "none";
+                        if (logs > -2) return "good";
+                        if (logs > -5) return "mid";
+                        return "bad";
+                      };
+                      const toneStyle = (t: "good" | "mid" | "bad" | "none") =>
+                        t === "good" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                        : t === "mid" ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                        : t === "bad" ? "bg-red-500/15 border-red-500/30 text-red-300"
+                        : "bg-slate-500/15 border-slate-500/30 text-slate-400";
+
+                      // Δ-logS-based consensus — more honest than label match
+                      // since rule and ML use slightly different bucket schemes.
+                      let consensus: { label: string; color: string; detail: string } | null = null;
+                      if (ruleLogS != null && mlLogS != null) {
+                        const d = Math.abs(ruleLogS - mlLogS);
+                        if (d < 0.5) {
+                          consensus = { label: "Aligned", color: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", detail: `Δ ${d.toFixed(2)} logS` };
+                        } else if (d < 1.5) {
+                          consensus = { label: "Partial", color: "bg-amber-500/15 border-amber-500/30 text-amber-300", detail: `Δ ${d.toFixed(2)} logS` };
+                        } else {
+                          consensus = { label: "Divergent", color: "bg-red-500/15 border-red-500/30 text-red-300", detail: `Δ ${d.toFixed(2)} logS` };
+                        }
+                      }
+
+                      const SolSide = ({ title, subtitle, logS, cls, t, loading, fallback, meta }: {
+                        title: string; subtitle: string; logS: number | null; cls: string | null;
+                        t: "good" | "mid" | "bad" | "none"; loading: boolean; fallback: boolean; meta: string;
+                      }) => (
+                        <div className="bg-white/3 border border-white/10 rounded p-2 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-slate-500 uppercase tracking-wider">{title}</span>
+                            {cls && !fallback ? (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${toneStyle(t)}`}>{cls}</span>
+                            ) : loading ? (
+                              <RefreshCw className="w-2.5 h-2.5 text-slate-500 animate-spin" />
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] border bg-slate-500/15 border-slate-500/30 text-slate-500">N/A</span>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-slate-600 leading-tight">{subtitle}</div>
+                          {logS != null && !fallback ? (
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-[16px] font-mono font-semibold text-slate-200">{logS >= 0 ? "+" : ""}{logS.toFixed(2)}</span>
+                              <span className="text-[9px] text-slate-600">logS (mol/L)</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-600 italic">
+                              {loading ? "Loading…" : fallback ? "Model unavailable" : "Awaiting SMILES"}
+                            </div>
+                          )}
+                          <div className="text-[8px] text-slate-700 font-mono leading-tight">{meta}</div>
+                        </div>
+                      );
+
+                      return (
+                        <div className="space-y-2.5">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Solubility &amp; Permeability</span>
+                                <span className="text-[9px] text-slate-600">aqueous logS</span>
+                              </div>
+                              {consensus && (
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${consensus.color}`}
+                                  title={consensus.detail}>
+                                  {consensus.label}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <SolSide
+                                title="Rule-based"
+                                subtitle="Closed-form ESOL formula (Delaney 2004)"
+                                logS={ruleLogS}
+                                cls={ruleClass}
+                                t={tone(ruleLogS)}
+                                loading={solRuleLoading && !solRule}
+                                fallback={false}
+                                meta="logP/MW/RB/AP linear regression"
+                              />
+                              <SolSide
+                                title="ML (Random Forest)"
+                                subtitle="Morgan FP + 9 RDKit descriptors → RF regressor"
+                                logS={mlLogS}
+                                cls={mlClass}
+                                t={tone(mlLogS)}
+                                loading={solMlLoading && !solMl}
+                                fallback={!mlAvail}
+                                meta={solMl?.model_info?.performance?.cv_r2_mean != null
+                                  ? `CV R² ${solMl.model_info.performance.cv_r2_mean.toFixed(2)} · RMSE ${solMl.model_info.performance.cv_rmse_mean?.toFixed(2) ?? "—"}`
+                                  : "Trained on 136 curated compounds"}
+                              />
+                            </div>
+                            {solMl && !mlAvail && solMl.error && (
+                              <div className="mt-1 text-[9px] text-amber-400/80 flex items-center gap-1">
+                                <Info className="w-3 h-3 shrink-0" />
+                                <span className="leading-tight">ML model: {solMl.error}</span>
+                              </div>
+                            )}
+                            {!smiles.trim() && (
+                              <div className="mt-1 text-[9px] text-slate-600 italic">Enter a SMILES above to see paired predictions.</div>
+                            )}
+                            {smiles.trim() && rdkitReady && molProps && !molProps.isValid && (
+                              <div className="mt-1 text-[9px] text-amber-400/80 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                <span className="leading-tight">SMILES invalid — predictions skipped.</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Placeholder ADMET sections — model scaffolding made
+                              visible so the user knows where future models will
+                              land. Kept intentionally minimal (no fake data). */}
+                          {[
+                            { name: "Distribution", note: "PPB, V_d, BBB" },
+                            { name: "Metabolism", note: "CYP3A4 / 2D6 / 2C9 inhibition, CL_int" },
+                            { name: "Toxicity", note: "Ames mutagenicity, hepatotoxicity (cardiotox already wired)" },
+                          ].map(({ name, note }) => (
+                            <div key={name} className="flex items-center justify-between border-t border-white/5 pt-2 opacity-50">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider">{name}</span>
+                                <span className="text-[9px] text-slate-600">{note}</span>
+                              </div>
+                              <span className="text-[9px] text-slate-600 italic">More models coming</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </section>
 
                   <Separator className="bg-white/8" />

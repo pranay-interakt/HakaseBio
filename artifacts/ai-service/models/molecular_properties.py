@@ -17,7 +17,15 @@ def predict_properties(smiles: str) -> dict:
     rot = desc["RotBonds"]
     fsp3 = desc["FractionCSP3"]
 
-    solubility = _predict_solubility(logp, mw, tpsa, rot)
+    # Delaney ESOL aromatic proportion: #aromatic heavy atoms / #heavy atoms.
+    # Computed here (not in _predict_solubility) so the function signature
+    # stays small and the helper remains a pure formula.
+    heavy_n = mol.GetNumHeavyAtoms()
+    aromatic_proportion = (
+        sum(1 for a in mol.GetAtoms() if a.GetIsAromatic()) / heavy_n
+        if heavy_n > 0 else 0.0
+    )
+    solubility = _predict_solubility(logp, mw, rot, aromatic_proportion)
     bioavailability = _predict_bioavailability(mw, logp, tpsa, hbd, hba, rot)
     pka = _estimate_pka(mol)
     charge_state = _charge_at_ph(pka, 7.4)
@@ -76,9 +84,20 @@ def predict_properties(smiles: str) -> dict:
     }
 
 
-def _predict_solubility(logp, mw, tpsa, rot):
-    logs = 0.5 - 0.01 * mw - 0.7 * logp + 0.003 * tpsa - 0.05 * rot
-    return np.clip(logs, -10, 2)
+def _predict_solubility(logp, mw, rot, aromatic_proportion):
+    """Delaney 2004 ESOL closed-form aqueous solubility (logS, mol/L).
+
+    Reference: Delaney, J. S. (2004). "ESOL: Estimating Aqueous Solubility
+    Directly from Molecular Structure." J. Chem. Inf. Comput. Sci., 44(3),
+    1000-1005. https://doi.org/10.1021/ci034243x
+
+    Closed-form linear regression — no learning, no fingerprints. This is
+    intentionally methodologically distinct from the ML solubility second
+    opinion (RandomForest on Morgan FP + RDKit descriptors) so the paired
+    UI view in HakaseAI shows two genuinely independent estimates.
+    """
+    logs = 0.16 - 0.63 * logp - 0.0062 * mw + 0.066 * rot - 0.74 * aromatic_proportion
+    return float(np.clip(logs, -10, 2))
 
 
 def _sol_class(logs):

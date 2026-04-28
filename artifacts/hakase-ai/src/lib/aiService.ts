@@ -300,10 +300,60 @@ export interface ProteinMlResult {
   };
 }
 
+export interface SolubilityMlResult {
+  smiles: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  prediction: {
+    logS_predicted: number | null;
+    solubility_class:
+      | "Highly soluble"
+      | "Soluble"
+      | "Slightly soluble"
+      | "Insoluble"
+      | null;
+    solubility_mg_mL: number | null;
+  };
+  model_info: {
+    engine: string;
+    method: string;
+    training?: {
+      dataset: string;
+      n_train: number;
+      logS_min: number;
+      logS_max: number;
+      logS_mean: number;
+    };
+    performance?: {
+      cv_r2_mean: number | null;
+      cv_r2_std: number | null;
+      cv_rmse_mean: number | null;
+      cv_rmse_std: number | null;
+      cv_folds: number;
+    };
+    features?: {
+      morgan_nbits: number;
+      morgan_radius: number;
+      rdkit_descriptors: string[];
+    };
+    thresholds?: {
+      highly_soluble: number;
+      soluble: number;
+      slightly_soluble: number;
+    };
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
+}
+
 export interface ModelStatusResponse {
   admet_ml: ModelLoadStatus;
   cardiotox: ModelLoadStatus;
   protein_ml?: ModelLoadStatus;
+  solubility_ml?: ModelLoadStatus;
 }
 
 export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
@@ -316,6 +366,10 @@ export async function predictCardiotox(smiles: string): Promise<CardiotoxResult>
 
 export async function predictProteinMl(uniprotId: string): Promise<ProteinMlResult> {
   return post<ProteinMlResult>("/protein-ml", { uniprot_id: uniprotId });
+}
+
+export async function predictSolubilityMl(smiles: string): Promise<SolubilityMlResult> {
+  return post<SolubilityMlResult>("/solubility-ml", { smiles });
 }
 
 export async function getModelStatus(): Promise<ModelStatusResponse> {
