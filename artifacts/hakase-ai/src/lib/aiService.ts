@@ -95,7 +95,16 @@ export interface AiBindingPrediction {
 export interface AiBindingResult {
   smiles: string;
   predictions: AiBindingPrediction[];
-  model_info: { engine: string; method: string; targets_screened: number };
+  // status differentiates "ChEMBL has no neighbors" (biological signal) from
+  // "ChEMBL service unreachable" (infrastructure failure) — UI must NOT
+  // conflate these two cases (architect review).
+  // Possible values: "found" | "no_targets" | "requested_target_not_found" | "service_unreachable"
+  model_info: {
+    engine: string;
+    method: string;
+    targets_screened: number;
+    status?: string;
+  };
 }
 
 export interface AiProteinResult {
@@ -349,11 +358,69 @@ export interface SolubilityMlResult {
   };
 }
 
+export interface BindingMlResult {
+  smiles: string;
+  uniprot_id: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  prediction: {
+    pKd_predicted: number | null;
+    Kd_nM: number | null;
+    affinity_class:
+      | "High affinity"
+      | "Moderate affinity"
+      | "Weak affinity"
+      | "Negligible"
+      | null;
+  };
+  model_info: {
+    engine: string;
+    method: string;
+    training?: {
+      dataset: string;
+      n_train: number;
+      n_unique_targets: number;
+      n_unique_drugs: number;
+      pkd_min: number;
+      pkd_max: number;
+      pkd_mean: number;
+    };
+    performance?: {
+      cv_r2_mean: number | null;
+      cv_r2_std: number | null;
+      cv_rmse_mean: number | null;
+      cv_rmse_std: number | null;
+      cv_pearson_mean: number | null;
+      cv_pearson_std: number | null;
+      cv_folds: number;
+    };
+    features?: {
+      morgan_nbits: number;
+      morgan_radius: number;
+      rdkit_descriptors: string[];
+      esm_model: string;
+      protein_feature_dim: number;
+      feature_dim_total: number;
+    };
+    thresholds?: {
+      high_affinity_pkd: number;
+      moderate_pkd: number;
+      weak_pkd: number;
+    };
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
+}
+
 export interface ModelStatusResponse {
   admet_ml: ModelLoadStatus;
   cardiotox: ModelLoadStatus;
   protein_ml?: ModelLoadStatus;
   solubility_ml?: ModelLoadStatus;
+  binding_ml?: ModelLoadStatus;
 }
 
 export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
@@ -370,6 +437,16 @@ export async function predictProteinMl(uniprotId: string): Promise<ProteinMlResu
 
 export async function predictSolubilityMl(smiles: string): Promise<SolubilityMlResult> {
   return post<SolubilityMlResult>("/solubility-ml", { smiles });
+}
+
+export async function predictBindingMl(
+  smiles: string,
+  uniprotId: string,
+): Promise<BindingMlResult> {
+  return post<BindingMlResult>("/binding-ml", {
+    smiles,
+    uniprot_id: uniprotId,
+  });
 }
 
 export async function getModelStatus(): Promise<ModelStatusResponse> {

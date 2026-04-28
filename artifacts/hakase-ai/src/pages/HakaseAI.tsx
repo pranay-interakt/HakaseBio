@@ -66,10 +66,14 @@ import {
   predictProteinMl,
   predictProperties,
   predictSolubilityMl,
+  predictBinding,
+  predictBindingMl,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
   type SolubilityMlResult,
+  type AiBindingResult,
+  type BindingMlResult,
 } from "@/lib/aiService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -233,6 +237,17 @@ export function HakaseAI() {
   const [solMlLoading, setSolMlLoading] = useState(false);
   const solSeqRef = useRef(0);
   const solDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Binding affinity (paired view: ChEMBL similarity + DeepDTA-style ML) ──
+  // Fires from a (smiles, uniprotId) effect. ChEMBL path returns measured
+  // pIC50 from ≥70% Tanimoto neighbors when present; ML path returns a
+  // learned pKd from ESM-2 ⊕ Morgan features and works even when ChEMBL
+  // has zero neighbors. Stale-request guard via bindingSeqRef.
+  const [bindingChembl, setBindingChembl] = useState<AiBindingResult | null>(null);
+  const [bindingChemblLoading, setBindingChemblLoading] = useState(false);
+  const [bindingMl, setBindingMl] = useState<BindingMlResult | null>(null);
+  const [bindingMlLoading, setBindingMlLoading] = useState(false);
+  const bindingSeqRef = useRef(0);
+  const bindingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
@@ -302,6 +317,46 @@ export function HakaseAI() {
     return () => { if (solDebounceRef.current) clearTimeout(solDebounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smiles, rdkitReady, molProps?.isValid]);
+
+  // ── Binding affinity: paired predictions on (SMILES, UniProt) change ──────
+  // Runs only when BOTH inputs are non-empty AND the SMILES is RDKit-valid.
+  // ChEMBL side filters strictly to the requested UniProt (returns empty
+  // predictions with a clear "no neighbors" status when it has no data) so
+  // we never silently show a different target. ML side always returns a
+  // value envelope (or a fallback envelope on parse/embed/inference failure).
+  useEffect(() => {
+    if (bindingDebounceRef.current) clearTimeout(bindingDebounceRef.current);
+    const sm = smiles.trim();
+    const uid = uniprotId.trim().toUpperCase();
+    if (!sm || !uid) {
+      setBindingChembl(null); setBindingMl(null);
+      setBindingChemblLoading(false); setBindingMlLoading(false);
+      return;
+    }
+    if (rdkitReady && molProps && !molProps.isValid) {
+      setBindingChembl(null); setBindingMl(null);
+      setBindingChemblLoading(false); setBindingMlLoading(false);
+      return;
+    }
+    const seq = ++bindingSeqRef.current;
+    const fire = () => {
+      setBindingChemblLoading(true);
+      setBindingMlLoading(true);
+      predictBinding(sm, uid)
+        .then(r => { if (bindingSeqRef.current === seq) { setBindingChembl(r); setBindingChemblLoading(false); } })
+        .catch(() => { if (bindingSeqRef.current === seq) { setBindingChembl(null); setBindingChemblLoading(false); } });
+      predictBindingMl(sm, uid)
+        .then(r => { if (bindingSeqRef.current === seq) { setBindingMl(r); setBindingMlLoading(false); } })
+        .catch(() => { if (bindingSeqRef.current === seq) { setBindingMl(null); setBindingMlLoading(false); } });
+    };
+    if (!bindingChembl && !bindingMl) {
+      fire();
+    } else {
+      bindingDebounceRef.current = setTimeout(fire, 400);
+    }
+    return () => { if (bindingDebounceRef.current) clearTimeout(bindingDebounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smiles, uniprotId, rdkitReady, molProps?.isValid]);
 
   const mol2dSvg = useMemo(() => {
     if (!rdkitReady || !molProps?.isValid || !smiles) return null;
@@ -2988,6 +3043,158 @@ export function HakaseAI() {
                                     <div className="text-[9px] text-amber-400/80 flex items-center gap-1">
                                       <Info className="w-3 h-3 shrink-0" />
                                       <span className="leading-tight">ML model: {proteinMl.error}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {/* ── Binding affinity (paired view: ChEMBL similarity vs DeepDTA-style ML) ── */}
+                            {smiles.trim() && uniprotId.trim() && (() => {
+                              // ChEMBL side: filter the predictions array down to the
+                              // currently selected UniProt — predictBinding(targetId)
+                              // already strict-filters server-side, so we just take [0].
+                              const chemblPred = bindingChembl?.predictions?.[0] ?? null;
+                              // Branch on the explicit status returned by drug_target.predict_binding
+                              // so we DON'T conflate biological "no near-neighbors" with
+                              // infrastructure "ChEMBL service unreachable" (architect fix).
+                              const chemblStatus: string | undefined = bindingChembl?.model_info?.status;
+                              const chemblServiceDown = chemblStatus === "service_unreachable";
+                              const chemblNoNeighbors =
+                                !!bindingChembl &&
+                                !chemblPred &&
+                                (chemblStatus === "no_targets" ||
+                                 chemblStatus === "requested_target_not_found");
+                              const chemblUnknownEmpty =
+                                !!bindingChembl &&
+                                !chemblPred &&
+                                !chemblServiceDown &&
+                                !chemblNoNeighbors;
+
+                              const chemblPic50: number | null = chemblPred?.estimated_pIC50 ?? null;
+                              const chemblIc50nM: number | null = chemblPred?.estimated_IC50_nM ?? null;
+
+                              const mlPkd: number | null = bindingMl?.prediction?.pKd_predicted ?? null;
+                              const mlKdNM: number | null = bindingMl?.prediction?.Kd_nM ?? null;
+                              const mlClass: string | null = bindingMl?.prediction?.affinity_class ?? null;
+                              const mlAvailable = !!bindingMl?.ml_available;
+
+                              // Δ-based agreement badge — only when BOTH sides give a number.
+                              // Compares the ChEMBL pIC50 to the ML pKd (treated as comparable
+                              // log-affinity scales for the consensus heuristic).
+                              const delta =
+                                chemblPic50 != null && mlPkd != null
+                                  ? Math.abs(chemblPic50 - mlPkd)
+                                  : null;
+                              const agreement =
+                                delta == null
+                                  ? null
+                                  : delta < 0.5
+                                    ? { label: "Aligned",  color: "border-emerald-400/40 text-emerald-300 bg-emerald-400/10" }
+                                    : delta < 1.5
+                                      ? { label: "Partial", color: "border-amber-400/40 text-amber-300 bg-amber-400/10" }
+                                      : { label: "Divergent", color: "border-rose-400/40 text-rose-300 bg-rose-400/10" };
+
+                              const classColor = (cls: string | null) => {
+                                if (cls === "High affinity") return "text-emerald-300";
+                                if (cls === "Moderate affinity") return "text-cyan-300";
+                                if (cls === "Weak affinity") return "text-amber-300";
+                                if (cls === "Negligible") return "text-slate-400";
+                                return "text-slate-300";
+                              };
+                              const fmtKd = (kd: number | null): string => {
+                                if (kd == null) return "—";
+                                if (kd < 1) return `${kd.toFixed(2)} nM`;
+                                if (kd < 1000) return `${kd.toFixed(1)} nM`;
+                                if (kd < 1_000_000) return `${(kd / 1000).toFixed(2)} µM`;
+                                return `${(kd / 1_000_000).toFixed(2)} mM`;
+                              };
+
+                              return (
+                                <div className="border-t border-white/5 pt-2 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-600 uppercase tracking-wider">Binding affinity</span>
+                                    {agreement && (
+                                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${agreement.color}`}>
+                                        {agreement.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {/* Left cell — ChEMBL similarity */}
+                                    <div className="rounded border border-white/5 bg-white/[0.02] p-1.5 space-y-0.5">
+                                      <div className="text-[10px] text-slate-300 font-semibold leading-tight">ChEMBL similarity</div>
+                                      <div className="text-[8px] text-slate-500 leading-tight">≥70% Tanimoto neighbors</div>
+                                      {bindingChemblLoading && !bindingChembl ? (
+                                        <div className="text-[10px] text-slate-500 italic">Loading…</div>
+                                      ) : chemblPred ? (
+                                        <>
+                                          <div className="text-[14px] text-slate-100 font-mono tabular-nums leading-none mt-0.5">
+                                            pIC50 {chemblPic50!.toFixed(2)}
+                                          </div>
+                                          <div className="text-[9px] text-slate-400 font-mono">IC50 ≈ {fmtKd(chemblIc50nM)}</div>
+                                          <div className="text-[8px] text-slate-500">{chemblPred.confidence} confidence</div>
+                                        </>
+                                      ) : chemblServiceDown ? (
+                                        <div className="text-[10px] text-amber-400/80 italic leading-tight">ChEMBL service unreachable — try again later</div>
+                                      ) : chemblNoNeighbors ? (
+                                        <div className="text-[10px] text-slate-500 italic leading-tight">No ChEMBL neighbors above 70% — ML side only</div>
+                                      ) : chemblUnknownEmpty ? (
+                                        <div className="text-[10px] text-slate-500 italic leading-tight">No ChEMBL data returned</div>
+                                      ) : (
+                                        <div className="text-[10px] text-slate-600 italic">Awaiting</div>
+                                      )}
+                                      <div className="text-[8px] text-slate-700 font-mono leading-tight">measured pIC50 aggregate</div>
+                                    </div>
+                                    {/* Right cell — DeepDTA-style ML */}
+                                    <div className="rounded border border-white/5 bg-white/[0.02] p-1.5 space-y-0.5">
+                                      <div className="text-[10px] text-slate-300 font-semibold leading-tight">ML (ESM-2 + Morgan)</div>
+                                      <div className="text-[8px] text-slate-500 leading-tight">DeepDTA-style GBM regressor</div>
+                                      {bindingMlLoading && !bindingMl ? (
+                                        <div className="text-[10px] text-slate-500 italic">Loading…</div>
+                                      ) : mlAvailable && mlPkd != null ? (
+                                        <>
+                                          <div className={`text-[14px] font-mono tabular-nums leading-none mt-0.5 ${classColor(mlClass)}`}>
+                                            pKd {mlPkd.toFixed(2)}
+                                          </div>
+                                          <div className="text-[9px] text-slate-400 font-mono">Kd ≈ {fmtKd(mlKdNM)}</div>
+                                          <div className={`text-[8px] ${classColor(mlClass)}`}>{mlClass}</div>
+                                        </>
+                                      ) : (
+                                        <div className="text-[10px] text-slate-600 italic">Model unavailable</div>
+                                      )}
+                                      <div className="text-[8px] text-slate-700 font-mono leading-tight">
+                                        {(() => {
+                                          const perf = bindingMl?.model_info?.performance as
+                                            | {
+                                                cv_r2_mean?: number | null;
+                                                cv_r2_std?: number | null;
+                                                cv_grp_r2_mean?: number | null;
+                                                cv_grp_r2_std?: number | null;
+                                              }
+                                            | undefined;
+                                          if (!perf || perf.cv_r2_mean == null) return "1512-dim feature vector";
+                                          // Show BOTH random KFold (optimistic, in-distribution) and
+                                          // GroupKFold-by-UniProt (realistic, novel-target) with ±std,
+                                          // so the user sees the small-N uncertainty honestly.
+                                          const std = perf.cv_r2_std != null
+                                            ? `±${perf.cv_r2_std.toFixed(2)}`
+                                            : "";
+                                          const grpStr = perf.cv_grp_r2_mean != null
+                                            ? ` · grp R² ${perf.cv_grp_r2_mean.toFixed(2)}${
+                                                perf.cv_grp_r2_std != null
+                                                  ? `±${perf.cv_grp_r2_std.toFixed(2)}`
+                                                  : ""
+                                              }`
+                                            : "";
+                                          return `CV R² ${perf.cv_r2_mean.toFixed(2)}${std}${grpStr}`;
+                                        })()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {bindingMl && !mlAvailable && bindingMl.error && (
+                                    <div className="text-[9px] text-amber-400/80 flex items-center gap-1">
+                                      <Info className="w-3 h-3 shrink-0" />
+                                      <span className="leading-tight">ML model: {bindingMl.error}</span>
                                     </div>
                                   )}
                                 </div>

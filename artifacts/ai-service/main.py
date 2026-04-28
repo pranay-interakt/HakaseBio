@@ -43,6 +43,11 @@ from models.solubility_ml import (
     is_ready as solubility_ml_status,
     warmup as solubility_ml_warmup,
 )
+from models.binding_ml import (
+    predict_binding_ml,
+    is_ready as binding_ml_status,
+    warmup as binding_ml_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -105,6 +110,7 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=cardiotox_warmup, name="cardiotox-prewarm", daemon=True).start()
     threading.Thread(target=protein_ml_warmup, name="protein-ml-prewarm", daemon=True).start()
     threading.Thread(target=solubility_ml_warmup, name="solubility-ml-prewarm", daemon=True).start()
+    threading.Thread(target=binding_ml_warmup, name="binding-ml-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -185,6 +191,29 @@ def api_predict_solubility_ml(req: SmilesRequest):
         raise HTTPException(status_code=500, detail=f"SolubilityML prediction failed: {str(e)}")
 
 
+class BindingMlRequest(BaseModel):
+    smiles: str
+    uniprot_id: str
+
+
+@app.post("/predict/binding-ml")
+def api_predict_binding_ml(req: BindingMlRequest):
+    """Dedicated DeepDTA-style binding-affinity prediction (independent second opinion).
+
+    Pairs the existing ChEMBL-similarity binding path: that path looks up
+    measured pIC50 from ≥70%-Tanimoto neighbors in ChEMBL (no learning,
+    coverage gap when no neighbors exist). This path is a learned regressor
+    on (Morgan FP + RDKit descriptors) ⊕ ESM-2 mean-pool embedding so it
+    generalizes to unseen drug-target pairs.
+    """
+    try:
+        return sanitize(predict_binding_ml(req.smiles, req.uniprot_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BindingML prediction failed: {str(e)}")
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -193,6 +222,7 @@ def api_models_status():
         "cardiotox": cardiotox_status(),
         "protein_ml": protein_ml_status(),
         "solubility_ml": solubility_ml_status(),
+        "binding_ml": binding_ml_status(),
     }
 
 
@@ -204,6 +234,7 @@ def api_models_warmup():
         "cardiotox": cardiotox_warmup(),
         "protein_ml": protein_ml_warmup(),
         "solubility_ml": solubility_ml_warmup(),
+        "binding_ml": binding_ml_warmup(),
     }
 
 
