@@ -156,6 +156,10 @@ export function HakaseAI() {
     enrollment?: number | null; nctId?: string | null;
     abstract?: string;
   } | null>(null);
+  // Starter templates that pre-populate the Layer 1 form. They are *not*
+  // saved runs — clicking one only loads SMILES / target / indication and
+  // resets all simulation results, so we must not display fabricated
+  // QED / binding / responder / success / Go-No-Go numbers here.
   const [savedProjects, setSavedProjects] = useState([
     {
       name: "CDK4/6 Inhibitor Screen",
@@ -164,13 +168,6 @@ export function HakaseAI() {
       molName: "HAK-CDK4-231",
       smiles: "C1CN(C(=O)c2cc3cc(NC(=O)c4ccc(F)cn4)ccc3[nH]2)CCC1N",
       uniprotId: "P11802",
-      layers: 3,
-      goNogo: "GO" as const,
-      qed: 0.74,
-      binding: "14.2 nM",
-      responderRate: 0.61,
-      successProb: 0.78,
-      lastRun: "2h ago",
     },
     {
       name: "EGFR-T790M Mutant",
@@ -179,13 +176,6 @@ export function HakaseAI() {
       molName: "HAK-EGFR-047",
       smiles: "CN(C)CCNc1nc(Nc2cccc(c2)C(F)(F)F)c3cc(OC)c(NC(=O)/C=C/CN(C)C)cc3n1",
       uniprotId: "P00533",
-      layers: 2,
-      goNogo: "GO" as const,
-      qed: 0.69,
-      binding: "8.1 nM",
-      responderRate: 0.58,
-      successProb: null,
-      lastRun: "Yesterday",
     },
     {
       name: "KRAS G12C Series",
@@ -194,13 +184,6 @@ export function HakaseAI() {
       molName: "HAK-KRAS-112",
       smiles: "CC1(C)CCC(=C1)c1cc(NC(=O)c2ccc(F)cc2)c2ncc(-c3ccncc3)cc2n1",
       uniprotId: "P01116",
-      layers: 1,
-      goNogo: "WATCH" as const,
-      qed: 0.52,
-      binding: "42.7 nM",
-      responderRate: null,
-      successProb: null,
-      lastRun: "3d ago",
     },
   ]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -1828,65 +1811,36 @@ export function HakaseAI() {
                 </div>
               </div>
 
-              {/* Saved Projects */}
+              {/* Starter Templates */}
               <div className="p-3 flex-1 overflow-y-auto">
-                <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Saved Projects</div>
-                {savedProjects.map((proj) => {
-                  const goColor = proj.goNogo === "GO" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                    : proj.goNogo === "WATCH" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
-                    : "text-red-400 bg-red-500/10 border-red-500/20";
-                  const barColors = ["bg-violet-500", "bg-blue-500", "bg-emerald-500"];
-                  return (
-                    <div key={proj.name} onClick={() => loadSavedProject(proj)} className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1.5 group border border-transparent hover:border-white/8 transition-all">
-                      {/* Header row */}
-                      <div className="flex items-start justify-between gap-1 mb-0.5">
-                        <div className="text-[11px] font-semibold text-slate-300 truncate group-hover:text-white leading-tight">{proj.name}</div>
-                        <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded border ${goColor}`}>{proj.goNogo}</span>
-                      </div>
-
-                      {/* Molecule + indication */}
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="text-[9px] text-slate-600 font-mono">{proj.molName}</span>
-                        <span className="text-slate-700">·</span>
-                        <span className="text-[9px] text-slate-600">{proj.indication}</span>
-                      </div>
-
-                      {/* Key metrics */}
-                      <div className="flex gap-2 mb-1.5">
-                        <div>
-                          <div className="text-[8px] text-slate-700 uppercase tracking-wider">QED</div>
-                          <div className="text-[10px] font-semibold text-slate-400">{proj.qed.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[8px] text-slate-700 uppercase tracking-wider">Binding</div>
-                          <div className="text-[10px] font-semibold text-slate-400">{proj.binding}</div>
-                        </div>
-                        {proj.responderRate != null && (
-                          <div>
-                            <div className="text-[8px] text-slate-700 uppercase tracking-wider">Resp.</div>
-                            <div className="text-[10px] font-semibold text-blue-400">{(proj.responderRate * 100).toFixed(0)}%</div>
-                          </div>
-                        )}
-                        {proj.successProb != null && (
-                          <div>
-                            <div className="text-[8px] text-slate-700 uppercase tracking-wider">P(success)</div>
-                            <div className="text-[10px] font-semibold text-emerald-400">{(proj.successProb * 100).toFixed(0)}%</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Layer progress bars + last run */}
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex gap-0.5 flex-1">
-                          {[0, 1, 2].map(l => (
-                            <div key={l} className={`h-0.5 flex-1 rounded-full ${l < proj.layers ? barColors[l] : "bg-white/10"}`} />
-                          ))}
-                        </div>
-                        <span className="text-[8px] text-slate-700 shrink-0">{proj.lastRun}</span>
-                      </div>
+                <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Starter Templates</div>
+                {savedProjects.map((proj) => (
+                  <div
+                    key={proj.name}
+                    onClick={() => loadSavedProject(proj)}
+                    className="p-2.5 rounded-lg hover:bg-white/5 cursor-pointer mb-1.5 group border border-transparent hover:border-white/8 transition-all"
+                  >
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-1 mb-0.5">
+                      <div className="text-[11px] font-semibold text-slate-300 truncate group-hover:text-white leading-tight">{proj.name}</div>
+                      <span className="shrink-0 text-[8px] font-bold px-1 py-0.5 rounded border text-slate-400 bg-white/5 border-white/10 uppercase tracking-wider">Template</span>
                     </div>
-                  );
-                })}
+
+                    {/* Molecule + indication */}
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[9px] text-slate-600 font-mono">{proj.molName}</span>
+                      <span className="text-slate-700">·</span>
+                      <span className="text-[9px] text-slate-600">{proj.indication}</span>
+                    </div>
+
+                    {/* Target */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[8px] text-slate-700 uppercase tracking-wider">Target</span>
+                      <span className="text-[9px] font-mono text-slate-500">{proj.uniprotId}</span>
+                      <span className="ml-auto text-[8px] text-slate-700 italic">Click to load</span>
+                    </div>
+                  </div>
+                ))}
 
                 <button
                   onClick={handleNewProject}
@@ -8221,12 +8175,23 @@ function Layer1Results({
 }
 
 function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molProps: MolecularProperties | null }) {
+  if (!admet) {
+    return (
+      <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+        <h3 className="text-[12px] font-semibold text-slate-300 mb-4">ADMET Radar Chart</h3>
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
+          <Activity className="w-8 h-8" />
+          <p className="text-[11px]">Run the simulation to populate the ADMET radar</p>
+        </div>
+      </div>
+    );
+  }
   const axes = [
-    { label: "Absorption",   val: admet?.absorption   ?? 0.82, angle: -90 },
-    { label: "Distribution", val: admet?.distribution ?? 0.68, angle: -18 },
-    { label: "Metabolism",   val: admet?.metabolism   ?? 0.74, angle:  54 },
-    { label: "Excretion",    val: admet?.excretion    ?? 0.71, angle: 126 },
-    { label: "Toxicity",     val: admet?.toxicity     ?? 0.88, angle: 198 },
+    { label: "Absorption",   val: admet.absorption,   angle: -90 },
+    { label: "Distribution", val: admet.distribution, angle: -18 },
+    { label: "Metabolism",   val: admet.metabolism,   angle:  54 },
+    { label: "Excretion",    val: admet.excretion,    angle: 126 },
+    { label: "Toxicity",     val: admet.toxicity,     angle: 198 },
   ];
 
   const cx = 150, cy = 140, r = 100;
