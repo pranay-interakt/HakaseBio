@@ -38,6 +38,11 @@ from models.protein_ml import (
     is_ready as protein_ml_status,
     warmup as protein_ml_warmup,
 )
+from models.solubility_ml import (
+    predict_solubility_ml,
+    is_ready as solubility_ml_status,
+    warmup as solubility_ml_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -99,6 +104,7 @@ def _prewarm_in_background() -> None:
     import threading
     threading.Thread(target=cardiotox_warmup, name="cardiotox-prewarm", daemon=True).start()
     threading.Thread(target=protein_ml_warmup, name="protein-ml-prewarm", daemon=True).start()
+    threading.Thread(target=solubility_ml_warmup, name="solubility-ml-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -168,6 +174,17 @@ def api_predict_protein_ml(req: ProteinRequest):
         raise HTTPException(status_code=500, detail=f"ProteinML prediction failed: {str(e)}")
 
 
+@app.post("/predict/solubility-ml")
+def api_predict_solubility_ml(req: SmilesRequest):
+    """Dedicated aqueous-solubility (logS) prediction (independent second opinion)."""
+    try:
+        return sanitize(predict_solubility_ml(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SolubilityML prediction failed: {str(e)}")
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -175,6 +192,7 @@ def api_models_status():
         "admet_ml": admet_ml_status(),
         "cardiotox": cardiotox_status(),
         "protein_ml": protein_ml_status(),
+        "solubility_ml": solubility_ml_status(),
     }
 
 
@@ -185,6 +203,7 @@ def api_models_warmup():
         "admet_ml": admet_ml_warmup(),
         "cardiotox": cardiotox_warmup(),
         "protein_ml": protein_ml_warmup(),
+        "solubility_ml": solubility_ml_warmup(),
     }
 
 
