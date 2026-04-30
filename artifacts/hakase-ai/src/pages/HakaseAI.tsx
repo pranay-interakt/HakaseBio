@@ -4136,12 +4136,12 @@ export function HakaseAI() {
                     </section>
                   )}
 
-                  {/* L1 → L2 Cascade Applied */}
+                  {/* L1 → L4 Cascade Applied (L2 / L3 are scaffolds — animal sim consumes L1 directly) */}
                   <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
                       <span className="text-[11px] font-semibold text-violet-300">
-                        {simResults ? "Layer 1 → Layer 2 Cascade Applied" : "Layer 1 → Layer 2 Cascade Pending"}
+                        {simResults ? "Layer 1 → Layer 4 Cascade Applied" : "Layer 1 → Layer 4 Cascade Pending"}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -4174,7 +4174,7 @@ export function HakaseAI() {
                     <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 flex items-start gap-1.5">
                       <Info className="w-3 h-3 text-rose-400 shrink-0 mt-0.5" />
                       <span className="text-[9px] text-rose-300 leading-tight">
-                        Stage-gate review required before advancing to L2. Return to Layer 1 and acknowledge the gate banner.
+                        Stage-gate review required before running L4 Animal Cohort. Return to Layer 1 and acknowledge the gate banner.
                       </span>
                     </div>
                   )}
