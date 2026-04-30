@@ -1,145 +1,140 @@
-import { useState } from "react";
-import { Microscope, ArrowRight, Database, Construction, Beaker, Rabbit, Layers, Users2, FlaskConical, Activity, AlertCircle, Sparkles } from "lucide-react";
+import { Microscope, ArrowRight, Database, Shield, Sparkles, AlertCircle, AlertTriangle, CircleDot, FileText } from "lucide-react";
+import type { SimResults } from "@/lib/admet";
 
 interface Layer3ExVivoScaffoldProps {
   layer2Ready: boolean;
+  simResults: SimResults | null;
   onContinue: () => void;
 }
 
-function ScaffoldSectionHeader({ icon: Icon, label }: { icon: any; label: string }) {
+function ScaffoldSectionHeader({ icon: Icon, label, badge }: { icon: any; label: string; badge?: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <Icon className="w-3.5 h-3.5 text-slate-500" />
       <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{label}</span>
-      <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-400/80">
-        Scaffold
-      </span>
+      {badge && (
+        <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-400/80">
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
 
-function OptionCard({
-  title,
-  subtitle,
-  badge,
-  selected,
-  onClick,
-}: {
-  title: string;
-  subtitle: string;
-  badge?: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
+/**
+ * L3 modality reference list — content taken from §5 of
+ * `attached_assets/HakaseBio_4Layer_Architecture_Research_*.docx`
+ * (paraphrased; cited numbers and the Ewart-2022 sensitivity figure
+ * are preserved as-stated by the doc).
+ *
+ * No L3 wet vendor or computational engine is wired in this product.
+ * Every modality below is a *reference candidate* with the doc's own
+ * provenance / licence note attached, NOT a user choice.
+ *
+ * Cost figures are intentionally not asserted because the doc only
+ * cites a single concrete number (ATCC organoid lines $2–6k / line)
+ * — fabricating the rest would violate the no-assumptions policy.
+ */
+const L3_MODALITIES = [
+  {
+    name: "Precision-cut tissue slices (PCLS)",
+    summary: "Lung, liver, kidney, brain — preserves architecture + multi-cell-type context.",
+    sources: [
+      { name: "EU-ToxRisk / ONTOX", note: "Horizon Europe NAM datasets through 2027" },
+      { name: "Tox21 / NCATS",     note: "qHTS pre-screen — ~10K cmpds × ~70 assays" },
+    ],
+  },
+  {
+    name: "Isolated perfused organs",
+    summary: "Langendorff heart, isolated perfused liver / kidney — full-organ pharmacology.",
+    sources: [
+      { name: "Internal / academic protocols", note: "no public packaged dataset of meaningful size" },
+    ],
+  },
+  {
+    name: "Patient-derived organoids",
+    summary: "Tumour + non-tumour 3D cultures with patient genomics + clinical metadata.",
+    sources: [
+      { name: "HCMI (NCI / ATCC)",          note: "~700 next-gen cancer models with paired matched-normal genomics" },
+      { name: "Hubrecht HUB Organoid Biobank", note: "largest non-cancer + cancer biobank globally; HUB Foundation MTA, commercial sublicensing required" },
+      { name: "hPSCreg",                     note: "~7,500 hiPSC/hESC lines with provenance, ethics, QC" },
+      { name: "ATCC organoid lines",         note: "Commercial MTA (~$2–6k / line — only concrete cost asserted by the doc)" },
+      { name: "Cellosaurus (organoid records)", note: "~5K entries, CC-BY 4.0 — every L3 row should carry a CVCL accession" },
+    ],
+  },
+  {
+    name: "Microphysiological systems / organ-on-chip",
+    summary: "Multi-tissue chips with media flow + mechanical cues. All vendor data is walled-garden — public footprint is qualification papers.",
+    sources: [
+      { name: "Emulate (Liver-/Brain-/Intestine-/Lung-Chip S1)", note: "Liver-Chip qualification, Ewart 2022: 87% sensitivity vs Tox21 — best published hepatotox MPS to date" },
+      { name: "CN Bio (PhysioMimix OOC, Liver-Chip)",            note: "strong on liver clearance + first-pass metabolism" },
+      { name: "Mimetas (OrganoPlate 3-lane / Graft)",            note: "higher throughput (96-well), tubule + BBB models" },
+      { name: "TissUse (HUMIMIC Chip2 / Chip4 / ChipX)",         note: "multi-organ co-culture, ADME-T focused" },
+      { name: "InSphero (Akura Flow / 96-well 3D)",              note: "scaffold-free spheroids, high-throughput hepatotox" },
+      { name: "MPS-Database (FDA / U. Pittsburgh DILI consortium)", note: "only public MPS dataset of meaningful size, primarily liver + kidney chips" },
+      { name: "IQ-MPS (IQ Consortium MPS Affiliate)",            note: "pharma-curated qualification datasets — partnership target" },
+    ],
+  },
+] as const;
+
+const L3_COMPUTE = [
+  { name: "httk (R, EPA CompTox)",          license: "GPL-3", note: "Default open IVIVE engine — Caco-2 / PPB / Clint → human plasma C_ss, AUC, equivalent doses" },
+  { name: "Tabula Sapiens v2 (CZ Biohub)",  license: "CC-BY 4.0", note: "Deconvolution reference for organoid / PCLS samples; tissue-selectivity scoring" },
+  { name: "Human Cell Atlas / CELLxGENE",   license: "open API", note: "Identifies which cell types are actually present in a given organoid system — most lack immune / vascular compartments" },
+  { name: "GTEx v10",                       license: "open metadata · dbGaP genotypes", note: "IVIVE scaling and target-tissue expression priors" },
+] as const;
+
+function ModalityCard({ modality }: { modality: (typeof L3_MODALITIES)[number] }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-lg border p-3 transition-colors cursor-pointer ${
-        selected
-          ? "border-amber-500/50 bg-amber-500/8 ring-1 ring-amber-500/30"
-          : "border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="text-[12px] font-semibold text-white">{title}</div>
-        {badge && (
-          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 shrink-0">
-            {badge}
-          </span>
-        )}
+    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+      <div className="flex items-start gap-2 mb-1.5">
+        <Microscope className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="text-[12px] font-semibold text-white">{modality.name}</div>
+            <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/8 text-rose-300">No vendor wired</span>
+          </div>
+          <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{modality.summary}</div>
+        </div>
       </div>
-      <div className="text-[10px] text-slate-500 leading-relaxed">{subtitle}</div>
-    </button>
+      <div className="pl-5 space-y-1 mt-2">
+        {modality.sources.map(s => (
+          <div key={s.name} className="flex items-baseline gap-2 text-[10px]">
+            <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
+            <span className="text-slate-300 font-medium">{s.name}</span>
+            <span className="text-slate-500">— {s.note}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function PillCard({
-  label,
-  detail,
-  selected,
-  onClick,
-}: {
-  label: string;
-  detail: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
+function L1OutputRow({ label, value, source }: { label: string; value: string; source?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-left rounded-lg border p-2.5 transition-colors cursor-pointer ${
-        selected
-          ? "border-amber-500/50 bg-amber-500/8 ring-1 ring-amber-500/30"
-          : "border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
-      }`}
-    >
-      <div className="text-[11px] font-semibold text-white">{label}</div>
-      <div className="text-[9px] text-slate-500 leading-relaxed mt-0.5">{detail}</div>
-    </button>
+    <div className="flex items-center justify-between gap-3 border-b border-white/5 py-1.5">
+      <div className="flex flex-col">
+        <span className="text-[11px] text-slate-300">{label}</span>
+        {source && <span className="text-[9px] text-slate-600 uppercase tracking-wider">{source}</span>}
+      </div>
+      <span className={value === "—" ? "text-slate-600 text-[11px] font-mono" : "text-amber-300 text-[11px] font-mono"}>{value}</span>
+    </div>
   );
 }
-
-const TIERS = [
-  { id: "pcls",     title: "Precision-cut tissue slices (PCLS)", subtitle: "Liver, kidney, lung slices. Native architecture preserved 24–96h. Cheapest L3 tier and the calibration anchor for IVIVE.",          badge: "$15k / cmpd" },
-  { id: "organoid", title: "Patient-derived organoids",          subtitle: "HCMI + HUB Organoids consortium. 3D self-organising mini-organs from patient tissue. Required across ≥3 donor lines.",                  badge: "$30–80k" },
-  { id: "mps",      title: "Microphysiological systems / organ-on-chip", subtitle: "Emulate, CN Bio, Mimetas, TissUse, InSphero. Vendor-locked data is the largest open problem in the L3 stack.",            badge: "$60–180k" },
-  { id: "perfused", title: "Isolated perfused organs",           subtitle: "IPL (liver), IPK (kidney). Highest tier. Used selectively for compounds with edge-case clearance / transporter liabilities.",         badge: "$120–250k" },
-] as const;
-
-const ORGANS = [
-  { id: "liver",  name: "Liver",   detail: "CYP, transporters, hepatotox" },
-  { id: "kidney", name: "Kidney",  detail: "OAT/OCT, tubular tox" },
-  { id: "lung",   name: "Lung",    detail: "Inhaled / pulmonary safety" },
-  { id: "heart",  name: "Heart",   detail: "Contractility, hERG context" },
-  { id: "cns",    name: "CNS",     detail: "BBB penetration (K_p,uu)" },
-  { id: "gut",    name: "Gut",     detail: "Absorption, gut-on-chip" },
-] as const;
-
-const VENDORS = [
-  { id: "emulate",  title: "Emulate",  subtitle: "Liver-Chip, Intestine-Chip, Kidney-Chip. Most published validation." },
-  { id: "cnbio",    title: "CN Bio",   subtitle: "PhysioMimix multi-organ. Strongest hepatotox dataset." },
-  { id: "mimetas",  title: "Mimetas",  subtitle: "OrganoPlate 3-lane kidney + gut. Highest throughput." },
-  { id: "tissuse",  title: "TissUse",  subtitle: "HUMIMIC multi-organ chip. Strongest cross-organ PK." },
-  { id: "insphero", title: "InSphero", subtitle: "3D InSight liver microtissues. Long-term (28d+) repeat dosing." },
-] as const;
-
-const READOUTS = [
-  { id: "scrna",     name: "scRNA-seq",     detail: "Cell-type-resolved response" },
-  { id: "lcms",      name: "LC-MS",         detail: "Compound + metabolite quant" },
-  { id: "imaging",   name: "Imaging",       detail: "High-content confocal" },
-  { id: "function",  name: "Functional",    detail: "Albumin, urea, TEER, contraction" },
-  { id: "cytokine",  name: "Cytokines",     detail: "Multiplex Luminex panel" },
-  { id: "tox",       name: "Tox markers",   detail: "ALT/AST, LDH, mito stress" },
-] as const;
 
 /**
  * L3 Ex-Vivo — scaffold panel introduced by the April 2026 4-layer redesign.
- * Renders with the same two-pane layout as L1 / L4: a left input-parameters
- * sidebar where modality / organ / vendor / readout choices are interactively
- * selectable (state is local — modality workflows aren't wired yet), plus a
- * right output pane that documents the L2→L3 input contract and the L3→L4
- * graduation dossier from the Architecture Research doc (§2.2).
- *
- * Real tissue without a live animal: precision-cut tissue slices, isolated
- * perfused organs, patient-derived organoids, microphysiological systems.
+ * Same two-pane layout as L1 / L2 / L4. Honest status panel: no L3 wet vendor
+ * is wired and L2 isn't either, so the upstream values shown are L1 outputs
+ * (which is what L4 also currently consumes via direct cascade).
  */
-export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoScaffoldProps) {
-  const [tier,     setTier]     = useState<string>("pcls");
-  const [organs,   setOrgans]   = useState<Set<string>>(new Set(["liver"]));
-  const [vendor,   setVendor]   = useState<string>("emulate");
-  const [readouts, setReadouts] = useState<Set<string>>(new Set(["scrna", "lcms"]));
-
-  const toggleOrgan   = (id: string) => setOrgans(prev   => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleReadout = (id: string) => setReadouts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  const showVendorSection = tier === "mps";
+export function Layer3ExVivoScaffold({ layer2Ready, simResults, onContinue }: Layer3ExVivoScaffoldProps) {
+  const hasL1 = !!simResults;
 
   return (
     <div className="flex-1 flex overflow-hidden">
 
-      {/* ── LEFT INPUT-PARAMETERS SIDEBAR ──────────────────────────────────── */}
+      {/* ── LEFT STATUS / INPUTS PANEL ─────────────────────────────────────── */}
       <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
         <div className="p-5 border-b border-white/8">
           <div className="flex items-center gap-2 mb-1">
@@ -149,12 +144,25 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
               Scaffold
             </span>
           </div>
-          <p className="text-[12px] text-slate-500">Real tissue without live animal — PCLS · organoids · MPS · perfused organs</p>
+          <p className="text-[12px] text-slate-500">PCLS · perfused organs · organoids · MPS / organ-on-chip — modality reference; no wet vendor wired</p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
 
-          {/* Status / readiness banner */}
+          {/* Honest banner */}
+          <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-3 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="text-[11px] font-semibold text-rose-300">No L3 wet vendor or compute engine is wired in this build</div>
+              <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
+                L2 is not wired either, so the upstream record shown below is what L1 actually produced —
+                this is the same record L4 currently consumes via direct cascade. Modalities and reference
+                resources below are sourced verbatim from §5 of the architecture doc.
+              </p>
+            </div>
+          </div>
+
+          {/* L2 readiness */}
           <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${
             layer2Ready
               ? "border-emerald-500/25 bg-emerald-500/5"
@@ -167,124 +175,93 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             )}
             <div className="flex-1">
               <div className={`text-[11px] font-semibold ${layer2Ready ? "text-emerald-300" : "text-amber-300"}`}>
-                {layer2Ready ? "L2 ready · contract satisfied" : "Awaiting L2 In Silico completion"}
+                {layer2Ready ? "L2 contract acknowledged" : "L2 contract not yet reviewed"}
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                {layer2Ready
-                  ? "L2 has produced a 20–50 compound shortlist with predicted dose ranges, validated docking poses, and uncertainty estimates. The L3 modalities below would consume that shortlist."
-                  : "L2 In Silico is currently a scaffold — its triage shortlist is not yet generated. Until then, L3 modality configuration remains illustrative."}
+                L2 produces no record today. Upstream evidence below is the live L1 output.
               </p>
             </div>
           </div>
 
-          {/* TISSUE TIER — single-select */}
+          {/* LIVE UPSTREAM (L1) INPUTS */}
           <section>
-            <ScaffoldSectionHeader icon={Layers} label="Tissue Tier" />
-            <div className="grid grid-cols-1 gap-2">
-              {TIERS.map(t => (
-                <OptionCard
-                  key={t.id}
-                  title={t.title}
-                  subtitle={t.subtitle}
-                  badge={t.badge}
-                  selected={tier === t.id}
-                  onClick={() => setTier(t.id)}
-                />
+            <ScaffoldSectionHeader icon={Database} label="Upstream evidence (live from L1)" badge={hasL1 ? "Live" : "Pending"} />
+            <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+              <L1OutputRow
+                label="Compound"
+                source="L1 / chemistry.ts"
+                value={simResults ? simResults.molName : "—"}
+              />
+              <L1OutputRow
+                label="UniProt target"
+                source="L1 / UniProt KB"
+                value={simResults ? simResults.uniprotId : "—"}
+              />
+              <L1OutputRow
+                label="Predicted pKd"
+                source="ai-service / DeepDTA-style"
+                value={simResults ? `${simResults.binding.primaryKd.toFixed(1)} nM` : "—"}
+              />
+              <L1OutputRow
+                label="Hepato-tox alerts"
+                source="bioactivationEngine SMARTS"
+                value={simResults ? `${simResults.toxAlerts.filter(t => t.category === "Hepatotox" || t.category === "DILI").length}` : "—"}
+              />
+              <L1OutputRow
+                label="hERG / cardiac alerts"
+                source="cardiotox RF + heuristic"
+                value={simResults ? `${simResults.toxAlerts.filter(t => t.category === "hERG").length}` : "—"}
+              />
+              <L1OutputRow
+                label="Organ-risk fingerprint"
+                source="L1 / admet.ts"
+                value={simResults ? `${simResults.organs.length} organs scored` : "—"}
+              />
+              <L1OutputRow
+                label="Go / No-Go"
+                source="L1 cascade gate"
+                value={simResults ? simResults.goNogo : "—"}
+              />
+            </div>
+            {!hasL1 && (
+              <p className="text-[10px] text-slate-500 leading-relaxed mt-2">Run L1 to populate upstream evidence.</p>
+            )}
+          </section>
+
+          {/* MODALITIES */}
+          <section>
+            <ScaffoldSectionHeader icon={Microscope} label="L3 Modalities (architecture doc §5.1)" badge="Reference" />
+            <div className="space-y-2">
+              {L3_MODALITIES.map(m => <ModalityCard key={m.name} modality={m} />)}
+            </div>
+          </section>
+
+          {/* COMPUTE FRAMEWORKS */}
+          <section>
+            <ScaffoldSectionHeader icon={FileText} label="L3 Compute Frameworks (§5.2)" badge="Not wired" />
+            <div className="space-y-1.5">
+              {L3_COMPUTE.map(c => (
+                <div key={c.name} className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[11px] font-semibold text-white">{c.name}</span>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-500">{c.license}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 leading-relaxed mt-0.5">{c.note}</div>
+                </div>
               ))}
             </div>
           </section>
 
-          {/* ORGAN SELECTION — multi-select */}
-          <section>
-            <ScaffoldSectionHeader icon={Activity} label="Organ Selection" />
-            <div className="grid grid-cols-2 gap-2">
-              {ORGANS.map(o => (
-                <PillCard
-                  key={o.id}
-                  label={o.name}
-                  detail={o.detail}
-                  selected={organs.has(o.id)}
-                  onClick={() => toggleOrgan(o.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {/* DONOR LINES — display only */}
-          <section>
-            <ScaffoldSectionHeader icon={Users2} label="Donor Diversity" />
-            <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Patient-derived donor lines</span>
-                <span className="text-amber-300 font-mono">≥ 3 (minimum)</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Replicates per condition</span>
-                <span className="text-amber-300 font-mono">3 technical · 3 biological</span>
-              </div>
-              <div className="text-[10px] text-slate-500 leading-relaxed pt-1 border-t border-white/5">
-                HCMI / HUB Organoids consortia provide validated patient-derived lines with full clinical metadata.
-              </div>
-            </div>
-          </section>
-
-          {/* VENDOR — only relevant for MPS tier — single-select */}
-          {showVendorSection ? (
-            <section>
-              <ScaffoldSectionHeader icon={FlaskConical} label="MPS Vendor" />
-              <div className="grid grid-cols-1 gap-2">
-                {VENDORS.map(v => (
-                  <OptionCard
-                    key={v.id}
-                    title={v.title}
-                    subtitle={v.subtitle}
-                    selected={vendor === v.id}
-                    onClick={() => setVendor(v.id)}
-                  />
-                ))}
-              </div>
-              <div className="mt-2 text-[10px] text-amber-400/80 leading-relaxed">
-                Vendor partnerships are the largest open problem in the L3 stack — data formats are largely vendor-locked.
-              </div>
-            </section>
-          ) : (
-            <section>
-              <ScaffoldSectionHeader icon={FlaskConical} label="MPS Vendor" />
-              <div className="rounded-lg border border-white/8 bg-white/[0.01] p-3 text-[10px] text-slate-500 leading-relaxed">
-                Vendor selection only applies to the <span className="text-slate-400 font-medium">Microphysiological systems / organ-on-chip</span> tier. Switch tiers above to configure a vendor.
-              </div>
-            </section>
-          )}
-
-          {/* READOUTS — multi-select */}
-          <section>
-            <ScaffoldSectionHeader icon={Database} label="Readouts" />
-            <div className="grid grid-cols-2 gap-2">
-              {READOUTS.map(r => (
-                <PillCard
-                  key={r.id}
-                  label={r.name}
-                  detail={r.detail}
-                  selected={readouts.has(r.id)}
-                  onClick={() => toggleReadout(r.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          {/* RUN BUTTON (disabled — vendor wiring pending) */}
+          {/* RUN BUTTON — disabled */}
           <button
             type="button"
             disabled
-            title="Modality workflows require vendor partnerships and ship in a follow-on phase"
-            className="w-full bg-amber-600/20 border border-amber-500/30 text-amber-400/60 font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center cursor-not-allowed"
+            title="No L3 wet vendor or compute engine integration ships in this build"
+            className="w-full bg-rose-600/15 border border-rose-500/25 text-rose-400/70 font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center cursor-not-allowed"
           >
             <Microscope className="w-4 h-4" />
-            Run Ex Vivo Study (vendor wiring pending)
+            Run L3 Ex-Vivo Study — no vendor wired
           </button>
-          <p className="text-[10px] text-slate-500 text-center -mt-3">
-            Selections above are saved locally — modality workflows ship in a follow-on phase.
-          </p>
 
         </div>
       </div>
@@ -301,60 +278,31 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             <div className="flex-1">
               <h2 className="text-[18px] font-semibold text-white">L3 — Ex Vivo Contract</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
-                Most expensive and most predictive pre-clinical step ($15k–$250k / cmpd). Sits closest to L4.
-                Source: Architecture Research §2.2 + Story of the Redesign Chapter 4.
+                Real human / animal tissue, no live animals. Most predictive and most data-poor pre-clinical layer.
+                Source: Architecture Research §5 · No vendor or engine is wired in this build.
               </p>
             </div>
           </div>
 
-          {/* L3 modalities */}
+          {/* L2 → L3 input contract — sourced from the doc */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Construction className="w-4 h-4 text-amber-400" />
-              <h3 className="text-[13px] font-semibold text-white">L3 Modalities — Tissue Roadmap</h3>
+              <ArrowRight className="w-4 h-4 text-violet-400" />
+              <h3 className="text-[13px] font-semibold text-white">L2 → L3 Input Contract</h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              Four ex-vivo modalities, increasing in physiological realism and cost:
-            </p>
-            <div className="space-y-2">
-              {[
-                { n: 1, name: "Precision-cut tissue slices (PCLS)", detail: "Liver, kidney, lung slices preserving native architecture for 24–96h. Cheapest L3 tier (~$15k / cmpd) and the calibration anchor for IVIVE." },
-                { n: 2, name: "Patient-derived organoids",          detail: "HCMI + HUB Organoids consortium. 3D self-organising mini-organs. Tier: ~$30k–$80k / cmpd across ≥3 donor lines." },
-                { n: 3, name: "Microphysiological systems (MPS) / organ-on-chip", detail: "Emulate, CN Bio, Mimetas, TissUse, InSphero. Vendor-locked data is the largest open problem in the L3 stack — partnership required. Tier: ~$60k–$180k / cmpd." },
-                { n: 4, name: "Isolated perfused organs",           detail: "IPL (isolated perfused liver), IPK (kidney). Highest tier (~$120k–$250k / cmpd). Used selectively for edge-case clearance / transporter liabilities." },
-              ].map(stage => (
-                <div key={stage.n} className="flex items-start gap-3 p-2.5 rounded-lg bg-black/20 border border-white/5">
-                  <div className="w-6 h-6 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center justify-center shrink-0 mt-0.5">
-                    {stage.n}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-medium text-white">{stage.name}</div>
-                    <div className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{stage.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* L3 → L4 graduation dossier */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ArrowRight className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-[13px] font-semibold text-white">L3 → L4 Graduation Dossier</h3>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              Per surviving compound, L3 hands L4 a graduation dossier:
+              When L2 is wired, each shortlisted compound would arrive with the bundle described in the doc:
             </p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
               {[
-                "Tissue-selectivity matrix (54 GTEx tissues × predicted margin)",
-                "ADME card (F_oral, V_d, t½, primary clearance route, transporter liabilities)",
-                "K_p,uu where CNS-relevant",
-                "Tox flag list ranked by mechanism (mito, BSEP, hERG, OAT/OCT, neurite)",
-                "Organoid efficacy panel across ≥3 patient-derived lines",
-                "Cell-type-resolved scRNA response",
-                "Confidence scorecard + IVIVE calibration evidence",
-                "Recommended animal study design (species, route, dose range)",
+                "Predicted human dose range",
+                "Predicted unbound Cmax + AUC at each candidate dose",
+                "PoseBusters-cleared docking poses",
+                "Off-target liability flags",
+                "Predicted IVIVE-derived clearance",
+                "Confidence + uncertainty per prediction",
+                "Selection rationale",
+                "L1 wet-assay provenance carried forward",
               ].map(field => (
                 <div key={field} className="flex items-center gap-2 border-b border-white/5 py-1">
                   <Database className="w-3 h-3 text-slate-600 shrink-0" />
@@ -364,15 +312,40 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             </div>
           </div>
 
-          {/* Implementation footnote */}
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-start gap-3">
-            <Beaker className="w-5 h-5 text-amber-400/60 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="text-[12px] font-semibold text-amber-200">Until L3 engines are wired</div>
-              <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                L4 Animal Cohort consumes L1 outputs directly via allometric projection — the L3 dossier path is reserved for future graduation logic.
-              </p>
+          {/* L3 → L4 graduation dossier */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowRight className="w-4 h-4 text-amber-400" />
+              <h3 className="text-[13px] font-semibold text-white">L3 → L4 Graduation Dossier</h3>
             </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+              When wired, L3 would hand L4 a per-compound dossier with the items listed in the doc — no sample counts, costs, or pass-thresholds are asserted by this product:
+            </p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
+              {[
+                "Tissue-source provenance + Cellosaurus CVCL accession",
+                "Donor / patient demographic strata",
+                "Concentration–response in matched human + rodent tissue",
+                "Tissue-selectivity index (efficacious vs background)",
+                "Mechanistic biomarkers (transcriptomic / proteomic where run)",
+                "Predicted human-equivalent dose (IVIVE-scaled)",
+                "Confidence + replicate metadata",
+                "Tox / clearance flags carried into L4 dose-finding",
+              ].map(field => (
+                <div key={field} className="flex items-center gap-2 border-b border-white/5 py-1">
+                  <Shield className="w-3 h-3 text-slate-600 shrink-0" />
+                  <span className="text-slate-300">{field}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Honest bottom-line note */}
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              <span className="font-semibold text-amber-300">Bottom line on vendor data (doc §5.1.4):</span> all L3 wet vendors run walled-garden datasets — public footprint is qualification papers. No live vendor integration ships in this build.
+            </p>
           </div>
 
           {/* Continue */}
@@ -380,11 +353,10 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             <button
               type="button"
               onClick={onContinue}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[12px] font-semibold transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[12px] font-semibold transition-colors"
             >
-              <Rabbit className="w-4 h-4" />
-              Reviewed L3 contract — continue to L4 Animal Cohort
               <ArrowRight className="w-4 h-4" />
+              Reviewed L3 contract — continue to L4 Animal Cohort
             </button>
           </div>
 

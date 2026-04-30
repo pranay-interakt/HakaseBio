@@ -3902,25 +3902,27 @@ export function HakaseAI() {
           )}
 
           {/* Layer 2 — In Silico (NEW · Apr-2026 redesign · scaffold)
-              Cheap computational triage (~$0.10–$10 / cmpd / model) sitting
-              between L1 In Vitro and L3 Ex Vivo. Documents the L1→L2 input
-              contract and L2→L3 output contract. Wet sim engines land here in
-              a follow-on phase. */}
+              Computational triage layer between L1 In Vitro and L3 Ex Vivo.
+              Currently a status-only scaffold — no L2 engine (docking, PBPK,
+              ML triage) is wired in this build. Surfaces the L1→L2 input
+              contract and the pipeline shape from architecture doc §4. */}
           {activeLayer === 2 && (
             <Layer2InSilicoScaffold
               layer1Ready={simStatus[1] === "complete"}
+              simResults={simResults}
               onContinue={() => setActiveLayer(3)}
             />
           )}
 
           {/* Layer 3 — Ex Vivo (NEW · Apr-2026 redesign · scaffold)
               Real tissue without live animal — PCLS, perfused organs, organoids,
-              MPS / organ-on-chip. Most expensive and most predictive pre-clinical
-              step ($15k–$250k / cmpd). Documents the L2→L3 contract and the
-              graduation dossier handed to L4. */}
+              MPS / organ-on-chip. Most predictive and most data-poor pre-clinical
+              layer per architecture doc §5. Currently a status-only scaffold —
+              no wet vendor or compute framework is wired in this build. */}
           {activeLayer === 3 && (
             <Layer3ExVivoScaffold
               layer2Ready={simStatus[2] === "complete"}
+              simResults={simResults}
               onContinue={() => setActiveLayer(4)}
             />
           )}
