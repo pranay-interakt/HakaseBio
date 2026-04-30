@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Microscope, ArrowRight, Database, Construction, Beaker, Rabbit, Layers, Users2, FlaskConical, Activity, AlertCircle, Sparkles } from "lucide-react";
 
 interface Layer3ExVivoScaffoldProps {
@@ -17,13 +18,27 @@ function ScaffoldSectionHeader({ icon: Icon, label }: { icon: any; label: string
   );
 }
 
-function OptionCard({ title, subtitle, badge, selected }: { title: string; subtitle: string; badge?: string; selected?: boolean }) {
+function OptionCard({
+  title,
+  subtitle,
+  badge,
+  selected,
+  onClick,
+}: {
+  title: string;
+  subtitle: string;
+  badge?: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div
-      className={`rounded-lg border p-3 cursor-not-allowed opacity-70 ${
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left rounded-lg border p-3 transition-colors cursor-pointer ${
         selected
-          ? "border-amber-500/40 bg-amber-500/5"
-          : "border-white/8 bg-white/[0.02]"
+          ? "border-amber-500/50 bg-amber-500/8 ring-1 ring-amber-500/30"
+          : "border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
@@ -35,23 +50,92 @@ function OptionCard({ title, subtitle, badge, selected }: { title: string; subti
         )}
       </div>
       <div className="text-[10px] text-slate-500 leading-relaxed">{subtitle}</div>
-    </div>
+    </button>
   );
 }
+
+function PillCard({
+  label,
+  detail,
+  selected,
+  onClick,
+}: {
+  label: string;
+  detail: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left rounded-lg border p-2.5 transition-colors cursor-pointer ${
+        selected
+          ? "border-amber-500/50 bg-amber-500/8 ring-1 ring-amber-500/30"
+          : "border-white/8 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+      }`}
+    >
+      <div className="text-[11px] font-semibold text-white">{label}</div>
+      <div className="text-[9px] text-slate-500 leading-relaxed mt-0.5">{detail}</div>
+    </button>
+  );
+}
+
+const TIERS = [
+  { id: "pcls",     title: "Precision-cut tissue slices (PCLS)", subtitle: "Liver, kidney, lung slices. Native architecture preserved 24–96h. Cheapest L3 tier and the calibration anchor for IVIVE.",          badge: "$15k / cmpd" },
+  { id: "organoid", title: "Patient-derived organoids",          subtitle: "HCMI + HUB Organoids consortium. 3D self-organising mini-organs from patient tissue. Required across ≥3 donor lines.",                  badge: "$30–80k" },
+  { id: "mps",      title: "Microphysiological systems / organ-on-chip", subtitle: "Emulate, CN Bio, Mimetas, TissUse, InSphero. Vendor-locked data is the largest open problem in the L3 stack.",            badge: "$60–180k" },
+  { id: "perfused", title: "Isolated perfused organs",           subtitle: "IPL (liver), IPK (kidney). Highest tier. Used selectively for compounds with edge-case clearance / transporter liabilities.",         badge: "$120–250k" },
+] as const;
+
+const ORGANS = [
+  { id: "liver",  name: "Liver",   detail: "CYP, transporters, hepatotox" },
+  { id: "kidney", name: "Kidney",  detail: "OAT/OCT, tubular tox" },
+  { id: "lung",   name: "Lung",    detail: "Inhaled / pulmonary safety" },
+  { id: "heart",  name: "Heart",   detail: "Contractility, hERG context" },
+  { id: "cns",    name: "CNS",     detail: "BBB penetration (K_p,uu)" },
+  { id: "gut",    name: "Gut",     detail: "Absorption, gut-on-chip" },
+] as const;
+
+const VENDORS = [
+  { id: "emulate",  title: "Emulate",  subtitle: "Liver-Chip, Intestine-Chip, Kidney-Chip. Most published validation." },
+  { id: "cnbio",    title: "CN Bio",   subtitle: "PhysioMimix multi-organ. Strongest hepatotox dataset." },
+  { id: "mimetas",  title: "Mimetas",  subtitle: "OrganoPlate 3-lane kidney + gut. Highest throughput." },
+  { id: "tissuse",  title: "TissUse",  subtitle: "HUMIMIC multi-organ chip. Strongest cross-organ PK." },
+  { id: "insphero", title: "InSphero", subtitle: "3D InSight liver microtissues. Long-term (28d+) repeat dosing." },
+] as const;
+
+const READOUTS = [
+  { id: "scrna",     name: "scRNA-seq",     detail: "Cell-type-resolved response" },
+  { id: "lcms",      name: "LC-MS",         detail: "Compound + metabolite quant" },
+  { id: "imaging",   name: "Imaging",       detail: "High-content confocal" },
+  { id: "function",  name: "Functional",    detail: "Albumin, urea, TEER, contraction" },
+  { id: "cytokine",  name: "Cytokines",     detail: "Multiplex Luminex panel" },
+  { id: "tox",       name: "Tox markers",   detail: "ALT/AST, LDH, mito stress" },
+] as const;
 
 /**
  * L3 Ex-Vivo — scaffold panel introduced by the April 2026 4-layer redesign.
  * Renders with the same two-pane layout as L1 / L4: a left input-parameters
- * sidebar showing what *would* be configurable here (tissue tier, organ
- * selection, donor lines, vendor, readouts — all visually disabled and
- * tagged "Scaffold"), plus a right output pane that documents the L2→L3
- * input contract and the L3→L4 graduation dossier from the Architecture
- * Research doc (§2.2).
+ * sidebar where modality / organ / vendor / readout choices are interactively
+ * selectable (state is local — modality workflows aren't wired yet), plus a
+ * right output pane that documents the L2→L3 input contract and the L3→L4
+ * graduation dossier from the Architecture Research doc (§2.2).
  *
  * Real tissue without a live animal: precision-cut tissue slices, isolated
  * perfused organs, patient-derived organoids, microphysiological systems.
  */
 export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoScaffoldProps) {
+  const [tier,     setTier]     = useState<string>("pcls");
+  const [organs,   setOrgans]   = useState<Set<string>>(new Set(["liver"]));
+  const [vendor,   setVendor]   = useState<string>("emulate");
+  const [readouts, setReadouts] = useState<Set<string>>(new Set(["scrna", "lcms"]));
+
+  const toggleOrgan   = (id: string) => setOrgans(prev   => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleReadout = (id: string) => setReadouts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const showVendorSection = tier === "mps";
+
   return (
     <div className="flex-1 flex overflow-hidden">
 
@@ -93,62 +177,40 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             </div>
           </div>
 
-          {/* TISSUE TIER */}
+          {/* TISSUE TIER — single-select */}
           <section>
             <ScaffoldSectionHeader icon={Layers} label="Tissue Tier" />
             <div className="grid grid-cols-1 gap-2">
-              <OptionCard
-                title="Precision-cut tissue slices (PCLS)"
-                subtitle="Liver, kidney, lung slices. Native architecture preserved 24–96h. Cheapest L3 tier and the calibration anchor for IVIVE."
-                badge="$15k / cmpd"
-                selected
-              />
-              <OptionCard
-                title="Patient-derived organoids"
-                subtitle="HCMI + HUB Organoids consortium. 3D self-organising mini-organs from patient tissue. Required across ≥3 donor lines."
-                badge="$30–80k"
-              />
-              <OptionCard
-                title="Microphysiological systems / organ-on-chip"
-                subtitle="Emulate, CN Bio, Mimetas, TissUse, InSphero. Vendor-locked data is the largest open problem in the L3 stack."
-                badge="$60–180k"
-              />
-              <OptionCard
-                title="Isolated perfused organs"
-                subtitle="IPL (liver), IPK (kidney). Highest tier. Used selectively for compounds with edge-case clearance / transporter liabilities."
-                badge="$120–250k"
-              />
-            </div>
-          </section>
-
-          {/* ORGAN SELECTION */}
-          <section>
-            <ScaffoldSectionHeader icon={Activity} label="Organ Selection" />
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Liver",   detail: "CYP, transporters, hepatotox", selected: true },
-                { name: "Kidney",  detail: "OAT/OCT, tubular tox" },
-                { name: "Lung",    detail: "Inhaled / pulmonary safety" },
-                { name: "Heart",   detail: "Contractility, hERG context" },
-                { name: "CNS",     detail: "BBB penetration (K_p,uu)" },
-                { name: "Gut",     detail: "Absorption, gut-on-chip" },
-              ].map(o => (
-                <div
-                  key={o.name}
-                  className={`rounded-lg border p-2.5 cursor-not-allowed opacity-70 ${
-                    o.selected
-                      ? "border-amber-500/40 bg-amber-500/5"
-                      : "border-white/8 bg-white/[0.02]"
-                  }`}
-                >
-                  <div className="text-[11px] font-semibold text-white">{o.name}</div>
-                  <div className="text-[9px] text-slate-500 leading-relaxed mt-0.5">{o.detail}</div>
-                </div>
+              {TIERS.map(t => (
+                <OptionCard
+                  key={t.id}
+                  title={t.title}
+                  subtitle={t.subtitle}
+                  badge={t.badge}
+                  selected={tier === t.id}
+                  onClick={() => setTier(t.id)}
+                />
               ))}
             </div>
           </section>
 
-          {/* DONOR LINES */}
+          {/* ORGAN SELECTION — multi-select */}
+          <section>
+            <ScaffoldSectionHeader icon={Activity} label="Organ Selection" />
+            <div className="grid grid-cols-2 gap-2">
+              {ORGANS.map(o => (
+                <PillCard
+                  key={o.id}
+                  label={o.name}
+                  detail={o.detail}
+                  selected={organs.has(o.id)}
+                  onClick={() => toggleOrgan(o.id)}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* DONOR LINES — display only */}
           <section>
             <ScaffoldSectionHeader icon={Users2} label="Donor Diversity" />
             <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2">
@@ -166,66 +228,62 @@ export function Layer3ExVivoScaffold({ layer2Ready, onContinue }: Layer3ExVivoSc
             </div>
           </section>
 
-          {/* VENDOR (MPS only) */}
-          <section>
-            <ScaffoldSectionHeader icon={FlaskConical} label="MPS Vendor (if MPS tier)" />
-            <div className="grid grid-cols-1 gap-2">
-              {[
-                { name: "Emulate",   detail: "Liver-Chip, Intestine-Chip, Kidney-Chip. Most published validation." },
-                { name: "CN Bio",    detail: "PhysioMimix multi-organ. Strongest hepatotox dataset." },
-                { name: "Mimetas",   detail: "OrganoPlate 3-lane kidney + gut. Highest throughput." },
-                { name: "TissUse",   detail: "HUMIMIC multi-organ chip. Strongest cross-organ PK." },
-                { name: "InSphero",  detail: "3D InSight liver microtissues. Long-term (28d+) repeat dosing." },
-              ].map(v => (
-                <div key={v.name} className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 cursor-not-allowed opacity-70">
-                  <div className="text-[11px] font-semibold text-white">{v.name}</div>
-                  <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{v.detail}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 text-[10px] text-amber-400/80 leading-relaxed">
-              Vendor partnerships are the largest open problem in the L3 stack — data formats are largely vendor-locked.
-            </div>
-          </section>
+          {/* VENDOR — only relevant for MPS tier — single-select */}
+          {showVendorSection ? (
+            <section>
+              <ScaffoldSectionHeader icon={FlaskConical} label="MPS Vendor" />
+              <div className="grid grid-cols-1 gap-2">
+                {VENDORS.map(v => (
+                  <OptionCard
+                    key={v.id}
+                    title={v.title}
+                    subtitle={v.subtitle}
+                    selected={vendor === v.id}
+                    onClick={() => setVendor(v.id)}
+                  />
+                ))}
+              </div>
+              <div className="mt-2 text-[10px] text-amber-400/80 leading-relaxed">
+                Vendor partnerships are the largest open problem in the L3 stack — data formats are largely vendor-locked.
+              </div>
+            </section>
+          ) : (
+            <section>
+              <ScaffoldSectionHeader icon={FlaskConical} label="MPS Vendor" />
+              <div className="rounded-lg border border-white/8 bg-white/[0.01] p-3 text-[10px] text-slate-500 leading-relaxed">
+                Vendor selection only applies to the <span className="text-slate-400 font-medium">Microphysiological systems / organ-on-chip</span> tier. Switch tiers above to configure a vendor.
+              </div>
+            </section>
+          )}
 
-          {/* READOUTS */}
+          {/* READOUTS — multi-select */}
           <section>
             <ScaffoldSectionHeader icon={Database} label="Readouts" />
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "scRNA-seq",      detail: "Cell-type-resolved response", selected: true },
-                { name: "LC-MS",          detail: "Compound + metabolite quant", selected: true },
-                { name: "Imaging",        detail: "High-content confocal" },
-                { name: "Functional",     detail: "Albumin, urea, TEER, contraction" },
-                { name: "Cytokines",      detail: "Multiplex Luminex panel" },
-                { name: "Tox markers",    detail: "ALT/AST, LDH, mito stress" },
-              ].map(r => (
-                <div
-                  key={r.name}
-                  className={`rounded-lg border p-2.5 cursor-not-allowed opacity-70 ${
-                    r.selected
-                      ? "border-amber-500/40 bg-amber-500/5"
-                      : "border-white/8 bg-white/[0.02]"
-                  }`}
-                >
-                  <div className="text-[11px] font-semibold text-white">{r.name}</div>
-                  <div className="text-[9px] text-slate-500 leading-relaxed mt-0.5">{r.detail}</div>
-                </div>
+              {READOUTS.map(r => (
+                <PillCard
+                  key={r.id}
+                  label={r.name}
+                  detail={r.detail}
+                  selected={readouts.has(r.id)}
+                  onClick={() => toggleReadout(r.id)}
+                />
               ))}
             </div>
           </section>
 
-          {/* RUN BUTTON (disabled) */}
+          {/* RUN BUTTON (disabled — vendor wiring pending) */}
           <button
             type="button"
             disabled
+            title="Modality workflows require vendor partnerships and ship in a follow-on phase"
             className="w-full bg-amber-600/20 border border-amber-500/30 text-amber-400/60 font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center cursor-not-allowed"
           >
             <Microscope className="w-4 h-4" />
             Run Ex Vivo Study (vendor wiring pending)
           </button>
           <p className="text-[10px] text-slate-500 text-center -mt-3">
-            Modality workflows require vendor partnerships and will be wired in a follow-on phase.
+            Selections above are saved locally — modality workflows ship in a follow-on phase.
           </p>
 
         </div>
