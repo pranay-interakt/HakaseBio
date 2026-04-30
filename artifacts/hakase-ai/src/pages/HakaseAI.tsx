@@ -95,8 +95,15 @@ import {
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard,
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
   TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
+  Cpu,
   Sun, Moon
 } from "lucide-react";
+// 4-Layer Pre-Clinical Architecture (April 2026 redesign).
+// L1 In Vitro → L2 In Silico → L3 Ex Vivo → L4 Animal Cohort.
+// Patient Cohort + Trial code is preserved but gated unreachable.
+import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
+import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
+import { Layer3ExVivoScaffold } from "@/components/Layer3ExVivoScaffold";
 
 type Layer = 1 | 2 | 3 | 4;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
@@ -661,7 +668,9 @@ export function HakaseAI() {
     { code: "K50",   label: "Crohn's Disease" },
   ];
 
-  // Layer 2 — Animal Cohort state
+  // Layer 4 — Animal Cohort state (formerly internal slot 2 — relocated by
+  // the April 2026 4-layer redesign. Variable names retain the historic
+  // "animal" prefix; the slot index is what changed, not the data shape.)
   const [animalSpecies, setAnimalSpecies] = useState<SpeciesId>("rat_sd");
   const [animalStudyType, setAnimalStudyType] = useState<StudyType>("sub_chronic_28d");
   const [animalRoute, setAnimalRoute] = useState("Oral");
@@ -1129,11 +1138,16 @@ export function HakaseAI() {
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
-    const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 2 ? 16 : activeLayer === 3 ? 22 : 28;
+    // Tick budgets per layer — L2 In Silico and L3 Ex Vivo are scaffolds in
+    // this build (no Run handler), so 0 ticks. L4 Animal Cohort uses the same
+    // 16-tick budget the relocated runner inherited from former internal slot 2.
+    const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 4 ? 16 : 0;
     let tick = 0;
 
-    // ── Layer 2: Animal Cohort ────────────────────────────────────────────────
-    if (activeLayer === 2) {
+    // ── Layer 4: Animal Cohort ────────────────────────────────────────────────
+    // Relocated from former internal slot 2 per April 2026 4-layer redesign.
+    // The simulation logic is unchanged; only the slot index moved.
+    if (activeLayer === 4) {
       const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
@@ -1145,17 +1159,21 @@ export function HakaseAI() {
           clearInterval(interval2);
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
-          const l2Flags = computeLayer2Flags({ safetyMargin: results.safetyMarginNoael, noael: results.noael, hedConservative: results.hedBsa });
+          // computeLayer2Flags is named for the legacy slot index; under the
+          // 4-layer redesign, animal flags now live at L4. We remap each flag's
+          // originLayer from 2 → 4 client-side so safetyFlags.ts stays untouched.
+          const l4FlagsRaw = computeLayer2Flags({ safetyMargin: results.safetyMarginNoael, noael: results.noael, hedConservative: results.hedBsa });
+          const l4Flags = l4FlagsRaw.map(f => ({ ...f, originLayer: 4 }));
           // Provenance is initialised as pending; the enrichment block below
           // overwrites each entry with the real fetch outcome before merging.
-          const prov2 = createProvenance("animalSim.ts", "browser", smiles);
-          prov2.databaseQueries = [
+          const prov4 = createProvenance("animalSim.ts", "browser", smiles);
+          prov4.databaseQueries = [
             { database: "CompTox", status: "skipped" },
             { database: "ECOTOX", status: "skipped" },
             { database: "ToxRefDB", status: "skipped" },
             { database: "ChEMBL animal-PK", status: "skipped" },
           ];
-          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 2, l2Flags), 2, prov2));
+          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 4, l4Flags), 4, prov4));
 
           // ── Full L2 → L3 cascade ──────────────────────────────────────
           // Starting dose: FIH mg/kg (conservative 1/10 HED)
@@ -1195,8 +1213,8 @@ export function HakaseAI() {
           // ─────────────────────────────────────────────────────────────
 
           setSimProgress(100);
-          setSimStatus(prev => ({ ...prev, 2: "complete" }));
-          // ── Layer 2 external DB enrichment + validation ─────────────────
+          setSimStatus(prev => ({ ...prev, 4: "complete" }));
+          // ── Layer 4 external DB enrichment + validation ─────────────────
           setExtDbLoading(true);
           setExtToxRef(null); setExtAnimalPk(null); setLayer2Confidence(null);
           Promise.allSettled([
@@ -1222,13 +1240,16 @@ export function HakaseAI() {
               { database: "ToxRefDB", status: tref?.status === "live" ? "success" : tref?.status === "no-data" ? "failed" : "failed" },
               { database: "ChEMBL animal-PK", status: apk?.status === "live" ? "success" : "failed" },
             ];
-            setHAIOpsCtx(prev => mergeLayerProvenance(prev, 2, provReal));
+            // Animal sim provenance lives at L4 under the redesigned 4-layer architecture.
+            setHAIOpsCtx(prev => mergeLayerProvenance(prev, 4, provReal));
 
             // Per-layer confidence from validation against measured ground truth
             const noaelV = tref ? validateNoaelPrediction(results.noael, tref) : { confidence: 0, foldError: null, measuredNoael: null };
             const aucV = apk ? validateAucPrediction(results.humanAuc, apk) : { confidence: 0, foldError: null, measuredAuc: null, species: null };
             const validators = [noaelV.confidence, aucV.confidence].filter(c => c > 0);
             const overall = validators.length > 0 ? validators.reduce((a, b) => a + b, 0) / validators.length : 0;
+            // setLayer2Confidence retains its legacy name; it now stores L4
+            // (Animal Cohort) confidence under the redesigned 4-layer architecture.
             setLayer2Confidence({
               overall,
               noaelFold: noaelV.foldError,
@@ -1243,7 +1264,12 @@ export function HakaseAI() {
     }
 
     // ── Layer 3: Patient Cohort (async — real FAERS + PD fetch) ───────────────
-    if (activeLayer === 3) {
+    // PRESERVED AS DEAD CODE per April 2026 4-layer redesign. Patient Cohort
+    // is no longer in the pre-clinical scope; it belongs to Hakase Clinical
+    // and will be reached via the L4→Clinical API contract. The runner stays
+    // here as living documentation but is gated unreachable. The new L3 slot
+    // is Ex Vivo (a scaffold panel — see render dispatch below).
+    if (!HIDE_PATIENT_TRIAL_LAYERS && activeLayer === 3) {
       const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
@@ -1373,8 +1399,11 @@ export function HakaseAI() {
               setExtDbLoading(false);
             });
           }
-        } else {
-          // Layer 4: Trial
+        } else if (!HIDE_PATIENT_TRIAL_LAYERS) {
+          // Layer 4: Trial — PRESERVED AS DEAD CODE per April 2026 4-layer
+          // redesign. Trial design moved out of pre-clinical scope into
+          // Hakase Clinical. The new L4 slot is Animal Cohort (handled by
+          // the relocated runner above at `if (activeLayer === 4)`).
           const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
           const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
             bioavailF:       animalResults.formulationResult.formulatedF,
@@ -1669,9 +1698,14 @@ export function HakaseAI() {
     return "disabled";
   };
 
-  const layerIcons = [TestTube2, Rabbit, Users, Beaker] as const;
-  const layerLabels = ["In Vitro", "Animal Cohort", "Patient Cohort", "Trial"] as const;
-  const layerColors = ["violet", "amber", "blue", "emerald"] as const;
+  // 4-Layer Pre-Clinical Architecture (April 2026 redesign):
+  // L1 In Vitro → L2 In Silico → L3 Ex Vivo → L4 Animal Cohort.
+  // Patient Cohort + Trial were former internal slots 3/4 — moved out of
+  // pre-clinical scope (now handed to Hakase Clinical via API per Section 8
+  // of the architecture doc) and gated unreachable via HIDE_PATIENT_TRIAL_LAYERS.
+  const layerIcons = [TestTube2, Cpu, Microscope, Rabbit] as const;
+  const layerLabels = ["In Vitro", "In Silico", "Ex Vivo", "Animal Cohort"] as const;
+  const layerColors = ["violet", "cyan", "amber", "emerald"] as const;
 
   return (
     <div className={`h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']${lightMode ? " hk-light" : ""}`} style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -1691,13 +1725,15 @@ export function HakaseAI() {
             const Icon = layerIcons[i];
             const status = getLayerStatus(layer);
             const isActive = activeLayer === layer;
+            // Layer color mapping aligns with `layerColors` const above:
+            // L1=violet (InVitro), L2=cyan (InSilico), L3=amber (ExVivo), L4=emerald (Animal Cohort).
             const activeColor = layer === 1 ? "bg-violet-600/20 border-violet-500/50 text-violet-300"
-              : layer === 2 ? "bg-amber-600/20 border-amber-500/50 text-amber-300"
-              : layer === 3 ? "bg-blue-600/20 border-blue-500/50 text-blue-300"
+              : layer === 2 ? "bg-cyan-600/20 border-cyan-500/50 text-cyan-300"
+              : layer === 3 ? "bg-amber-600/20 border-amber-500/50 text-amber-300"
               : "bg-emerald-600/20 border-emerald-500/50 text-emerald-300";
             const badgeColor = layer === 1 ? "border-violet-400 text-violet-400 bg-violet-400/10"
-              : layer === 2 ? "border-amber-400 text-amber-400 bg-amber-400/10"
-              : layer === 3 ? "border-blue-400 text-blue-400 bg-blue-400/10"
+              : layer === 2 ? "border-cyan-400 text-cyan-400 bg-cyan-400/10"
+              : layer === 3 ? "border-amber-400 text-amber-400 bg-amber-400/10"
               : "border-emerald-400 text-emerald-400 bg-emerald-400/10";
             return (
               <div key={layer} className="flex items-center">
@@ -3699,12 +3735,12 @@ export function HakaseAI() {
                     else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
                     if (simResults) {
                       if (simResults.admet.toxicity > 0.6)    recs.push({ text: "High toxicity signal — consider structural optimization to reduce hERG/CYP3A4 liability before animal studies.", level: "warn" });
-                      if (simResults.lipinski.logP > 5)        recs.push({ text: "LogP > 5 exceeds Lipinski limit — oral bioavailability may be low. Plan formulation strategies in L2.", level: "warn" });
+                      if (simResults.lipinski.logP > 5)        recs.push({ text: "LogP > 5 exceeds Lipinski limit — oral bioavailability may be low. Plan formulation strategies for L4 Animal Cohort.", level: "warn" });
                       if (simResults.lipinski.mw > 500)        recs.push({ text: "MW > 500 Da — consider lead optimization to improve membrane permeability.", level: "warn" });
                       if (simResults.admet.absorption < 0.45)  recs.push({ text: "Low predicted absorption — review TPSA and HBD count. Bioisostere substitutions may improve F%.", level: "warn" });
-                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Clean physicochemical profile — well-positioned for in vivo translation to L2.", level: "ok" });
-                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 Animal Cohort to project FIH dose and system exposure.", level: "ok" });
-                      else if (simResults.goNogo === "WATCH") recs.push({ text: "WATCH decision — proceed with caution and monitor flagged liabilities in L2.", level: "info" });
+                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Clean physicochemical profile — well-positioned to advance into L2 In Silico triage.", level: "ok" });
+                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 In Silico to triage candidates before committing to L4 Animal Cohort spend.", level: "ok" });
+                      else if (simResults.goNogo === "WATCH") recs.push({ text: "WATCH decision — proceed with caution into L2 In Silico and monitor flagged liabilities through to L4.", level: "info" });
                     }
                     if (recs.length === 0) return null;
                     return (
@@ -3865,16 +3901,43 @@ export function HakaseAI() {
             </div>
           )}
 
-          {/* Layer 2 — Animal Cohort */}
+          {/* Layer 2 — In Silico (NEW · Apr-2026 redesign · scaffold)
+              Cheap computational triage (~$0.10–$10 / cmpd / model) sitting
+              between L1 In Vitro and L3 Ex Vivo. Documents the L1→L2 input
+              contract and L2→L3 output contract. Wet sim engines land here in
+              a follow-on phase. */}
           {activeLayer === 2 && (
+            <Layer2InSilicoScaffold
+              layer1Ready={simStatus[1] === "complete"}
+              onContinue={() => setActiveLayer(3)}
+            />
+          )}
+
+          {/* Layer 3 — Ex Vivo (NEW · Apr-2026 redesign · scaffold)
+              Real tissue without live animal — PCLS, perfused organs, organoids,
+              MPS / organ-on-chip. Most expensive and most predictive pre-clinical
+              step ($15k–$250k / cmpd). Documents the L2→L3 contract and the
+              graduation dossier handed to L4. */}
+          {activeLayer === 3 && (
+            <Layer3ExVivoScaffold
+              layer2Ready={simStatus[2] === "complete"}
+              onContinue={() => setActiveLayer(4)}
+            />
+          )}
+
+          {/* Layer 4 — Animal Cohort (relocated from former internal slot 2)
+              Same simulation logic — only the slot index moved per April 2026
+              4-layer redesign. ICH M3(R2) battery, GLP-grade, hands off to
+              Hakase Clinical via API (architecture doc §8). */}
+          {activeLayer === 4 && (
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
-                    <Rabbit className="w-4 h-4 text-amber-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 2 — Animal Cohort</h2>
+                    <Rabbit className="w-4 h-4 text-emerald-400" />
+                    <h2 className="text-[15px] font-semibold text-white">Layer 4 — Animal Cohort</h2>
                   </div>
-                  <p className="text-[12px] text-slate-500">In-silico pre-clinical simulation · PBPK allometric scaling · FIH dose projection</p>
+                  <p className="text-[12px] text-slate-500">ICH M3(R2) rodent + non-rodent battery · PBPK allometric scaling · FIH dose projection</p>
                 </div>
 
                 <div className="flex-1 p-5 space-y-6">
@@ -3926,7 +3989,7 @@ export function HakaseAI() {
                       if (halfLife > 24)  recs.push({ text: `Projected human t½ = ${halfLife.toFixed(1)} h — QD dosing is feasible. Monitor for accumulation in renally-impaired populations in L3.`, level: "ok" });
                       if (formF < 0.4) recs.push({ text: `Formulated bioavailability = ${(formF * 100).toFixed(0)}% (below 40% threshold) — explore nanocrystal, solid dispersion, or SEDDS formulation strategies.`, level: "warn" });
                       if (margin < 3) recs.push({ text: `Narrow NOAEL safety margin: ${margin.toFixed(1)}× (NOAEL ${noael.toFixed(1)} mg/kg vs FIH ${fih.toFixed(3)} mg/kg). Threshold is 3×. Consider a more conservative starting dose in L3.`, level: "warn" });
-                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: `Animal PK complete — all parameters within acceptable ranges. Results are cascading to L3 Patient Cohort with allometric scaling applied.`, level: "ok" });
+                      if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: `Animal PK complete — all parameters within acceptable ranges. Pre-clinical package ready for handoff to Hakase Clinical (Phase 1 design) with full allometric scaling and tissue-selectivity dossier attached.`, level: "ok" });
                     }
                     if (recs.length === 0) return null;
                     return (
@@ -4117,10 +4180,10 @@ export function HakaseAI() {
                   )}
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[2] === "running" || !simResults || (!cascadeGate.canAutoCascade && !cascadeOverride)}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    disabled={simStatus[4] === "running" || !simResults || (!cascadeGate.canAutoCascade && !cascadeOverride)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
-                    {simStatus[2] === "running" ? (
+                    {simStatus[4] === "running" ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating Animal Cohort…</>
                     ) : (
                       <><Rabbit className="w-4 h-4" /> Run Animal Cohort Simulation</>
@@ -4136,44 +4199,49 @@ export function HakaseAI() {
                 </div>
               </div>
 
-              {/* L2 Animal Output */}
+              {/* L4 Animal Cohort Output (relocated — formerly slot 2 under
+                   the legacy 4-layer ordering). All `simStatus[2]` and
+                   `provenanceL2` references in this block have been remapped
+                   to slot 4 to match the new architecture. */}
               <div className="flex-1 overflow-y-auto p-5">
-                {simStatus[2] === "idle" && (
+                {simStatus[4] === "idle" && (
                   <EmptyState
                     icon={Rabbit}
                     title="No animal cohort results yet"
                     description="Select a species, study design, and route of administration, then run the simulation to see PBPK outputs, NOAEL/MTD predictions, study group design, and the Human Translation Panel with FIH dose."
                   />
                 )}
-                {simStatus[2] === "running" && (
+                {simStatus[4] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-                      <Rabbit className="w-8 h-8 text-amber-400 animate-pulse" />
+                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                      <Rabbit className="w-8 h-8 text-emerald-400 animate-pulse" />
                     </div>
                     <div className="text-[14px] font-medium text-white">Running Animal Cohort Simulation</div>
                     <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
                     <p className="text-[11px] text-slate-500">PBPK modeling · Allometric scaling · Tox prediction</p>
                   </div>
                 )}
-                {simStatus[2] === "complete" && animalResults && (
+                {simStatus[4] === "complete" && animalResults && (
                   <>
-                    {getFlagsForLayer(safetyFlags, 2).length > 0 && (
-                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 2)} layerLabel="Upstream" upstream />
+                    {getFlagsForLayer(safetyFlags, 4).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 4)} layerLabel="Upstream" upstream />
                     )}
-                    {safetyOverrides.some(o => o.toLayer <= 2) && (
-                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 2)} />
+                    {safetyOverrides.some(o => o.toLayer <= 4) && (
+                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 4)} />
                     )}
-                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL2?.databaseQueries ?? []).some(q => q.database === w.database))} />
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL4?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
-                    {provenanceL2 && <ProvenanceFooter provenance={provenanceL2} layer={2} />}
+                    {provenanceL4 && <ProvenanceFooter provenance={provenanceL4} layer={4} />}
                   </>
                 )}
               </div>
             </div>
           )}
 
-          {/* Layer 3 — Patient Cohort Twin */}
-          {activeLayer === 3 && (
+          {/* LEGACY Layer 3 — Patient Cohort Twin (PRESERVED AS DEAD CODE)
+              Patient Cohort moved out of pre-clinical scope per April 2026
+              4-layer redesign. The new L3 slot is Ex Vivo (scaffold above). */}
+          {!HIDE_PATIENT_TRIAL_LAYERS && activeLayer === 3 && (
 
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[440px] border-r border-white/8 overflow-y-auto flex flex-col">
@@ -4703,8 +4771,12 @@ export function HakaseAI() {
             </div>
           )}
 
-          {/* Layer 4 — Trial Digital Twin */}
-          {activeLayer === 4 && (
+          {/* LEGACY Layer 4 — Trial Digital Twin (PRESERVED AS DEAD CODE)
+              Trial design moved out of pre-clinical scope into Hakase Clinical
+              per April 2026 4-layer redesign (architecture doc §1.3 module
+              boundaries). The new L4 slot renders the relocated Animal Cohort
+              panel (see "Layer 4 — Animal Cohort" block below). */}
+          {!HIDE_PATIENT_TRIAL_LAYERS && activeLayer === 4 && (
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
