@@ -3903,14 +3903,16 @@ export function HakaseAI() {
 
           {/* Layer 2 — In Silico (NEW · Apr-2026 redesign · scaffold)
               Computational triage layer between L1 In Vitro and L3 Ex Vivo.
-              Currently a status-only scaffold — no L2 engine (docking, PBPK,
-              ML triage) is wired in this build. Surfaces the L1→L2 input
-              contract and the pipeline shape from architecture doc §4. */}
+              Stage 8 (therapeutic-index ranking) is wired via lib/l2DoseProjection.ts;
+              other stages (docking, PBPK, ML triage) remain reference-only. Surfaces
+              the L1→L2 input contract and the pipeline shape from architecture doc §4. */}
           {activeLayer === 2 && (
             <Layer2InSilicoScaffold
               layer1Ready={simStatus[1] === "complete"}
               simResults={simResults}
+              inVitroResults={inVitroResults}
               onContinue={() => setActiveLayer(3)}
+              onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
             />
           )}
 

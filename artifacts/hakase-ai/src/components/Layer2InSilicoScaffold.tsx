@@ -1,10 +1,15 @@
-import { Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle, CircleDot } from "lucide-react";
+import { useState } from "react";
+import { Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle, CircleDot, Play, Activity, Shield, Beaker, CheckCircle2 } from "lucide-react";
 import type { SimResults } from "@/lib/admet";
+import type { InVitroResults } from "@/lib/inVitroSim";
+import { computeL2DoseProjection, type L2DoseProjection, type MarginTier } from "@/lib/l2DoseProjection";
 
 interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
   simResults: SimResults | null;
+  inVitroResults: InVitroResults | null;
   onContinue: () => void;
+  onComplete?: () => void;
 }
 
 function ScaffoldSectionHeader({ icon: Icon, label, badge }: { icon: any; label: string; badge?: string }) {
@@ -122,10 +127,11 @@ const L2_STAGES = [
   {
     n: 8,
     name: "Therapeutic-index ranking",
-    detail: "Efficacy margin = predicted Cmax,unbound / Ki; safety margin = hERG IC50 / Cmax,unbound (and CYP, off-target). MRSD computed from L1 NOAEL via FDA workflow. Composite score with confidence intervals from PBPK population simulation (n = 500 virtual subjects, per doc).",
+    wired: true,
+    detail: "Efficacy margin = predicted Cmax,unbound / Ki; safety margin = hERG IC50 / Cmax,unbound (and CYP, off-target). Wired in this build via lib/l2DoseProjection.ts — runs on live L1 outputs. Click 'Run' below.",
     engines: [
-      { name: "PKNCA / ospsuite-r", note: "GPL — allometric scaling helpers for the NOAEL→HED chain" },
-      { name: "(internal scoring utility)", note: "no widely-adopted standalone OSS package — doc recommends a thin in-house implementation" },
+      { name: "lib/l2DoseProjection.ts", note: "in-house — receptor occupancy + well-stirred liver model + Caco-2 → F bins + logP-binned Vd proxy" },
+      { name: "PKNCA / ospsuite-r", note: "GPL — allometric scaling helpers (referenced; not used by current in-house implementation)" },
     ],
   },
   {
@@ -148,7 +154,11 @@ function StageCard({ stage }: { stage: (typeof L2_STAGES)[number] }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
-            <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/8 text-rose-300">Not wired</span>
+            {(stage as any).wired ? (
+              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">Wired</span>
+            ) : (
+              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/8 text-rose-300">Not wired</span>
+            )}
           </div>
           <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{stage.detail}</div>
         </div>
@@ -162,6 +172,59 @@ function StageCard({ stage }: { stage: (typeof L2_STAGES)[number] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function fmt(n: number, digits: number, suffix = ""): string {
+  if (!isFinite(n)) return "—";
+  return `${n.toFixed(digits)}${suffix}`;
+}
+
+function tierColor(t: MarginTier): string {
+  if (t === "SAFE")    return "border-emerald-500/35 bg-emerald-500/8 text-emerald-300";
+  if (t === "CAUTION") return "border-amber-500/35 bg-amber-500/8 text-amber-300";
+  if (t === "RISK")    return "border-rose-500/35 bg-rose-500/8 text-rose-300";
+  return "border-slate-500/30 bg-slate-500/8 text-slate-400";
+}
+
+function verdictColor(v: "GO" | "WATCH" | "NO-GO"): string {
+  if (v === "GO")    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+  if (v === "WATCH") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+  return "border-rose-500/40 bg-rose-500/10 text-rose-300";
+}
+
+function MarginBar({ row }: { row: { label: string; ratio: number | null; tier: MarginTier; numerator: string; denominator: string; assumption: string } }) {
+  const display = row.ratio === null || !isFinite(row.ratio)
+    ? "—"
+    : row.ratio >= 1000 ? `${(row.ratio / 1000).toFixed(1)}k×`
+    : row.ratio >= 100  ? `${row.ratio.toFixed(0)}×`
+    : `${row.ratio.toFixed(1)}×`;
+  // Bar fill: log-scaled, capped at margin=1000.
+  const fillPct = row.ratio === null || !isFinite(row.ratio)
+    ? 0
+    : Math.min(100, Math.max(2, (Math.log10(Math.max(1, row.ratio)) / 3) * 100));
+  const fillClass =
+    row.tier === "SAFE"    ? "bg-emerald-500/60"
+    : row.tier === "CAUTION" ? "bg-amber-500/60"
+    : row.tier === "RISK"  ? "bg-rose-500/60"
+    : "bg-slate-500/40";
+  return (
+    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[12px] font-semibold text-white">{row.label}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-mono text-cyan-300">{display}</span>
+          <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${tierColor(row.tier)}`}>{row.tier}</span>
+        </div>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div className={`h-full ${fillClass}`} style={{ width: `${fillPct}%` }} />
+      </div>
+      <div className="text-[10px] text-slate-500 leading-relaxed">
+        <span className="text-slate-400">{row.numerator}</span> ÷ <span className="text-slate-400">{row.denominator}</span>
+      </div>
+      <div className="text-[9px] text-slate-600 leading-relaxed italic">{row.assumption}</div>
     </div>
   );
 }
@@ -189,8 +252,22 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
  * No fabricated numbers (no costs, no wall-clock estimates, no composite
  * weights) — only what's either in `simResults` (live) or in the doc (cited).
  */
-export function Layer2InSilicoScaffold({ layer1Ready, simResults, onContinue }: Layer2InSilicoScaffoldProps) {
-  const hasL1 = !!simResults;
+export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, onContinue, onComplete }: Layer2InSilicoScaffoldProps) {
+  const hasL1 = !!simResults && !!inVitroResults;
+  const [projection, setProjection] = useState<L2DoseProjection | null>(null);
+  const [running, setRunning]       = useState(false);
+
+  const handleRun = () => {
+    if (!simResults || !inVitroResults) return;
+    setRunning(true);
+    // Synchronous; small delay just so the spinner is visible.
+    setTimeout(() => {
+      const p = computeL2DoseProjection(simResults, inVitroResults);
+      setProjection(p);
+      setRunning(false);
+      onComplete?.();
+    }, 250);
+  };
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -202,23 +279,25 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, onContinue }: 
             <Cpu className="w-4 h-4 text-cyan-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 2 — In Silico</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-              Scaffold
+              Stage 8 wired
             </span>
           </div>
-          <p className="text-[12px] text-slate-500">Computational triage — pipeline reference only; no engine wired in this build</p>
+          <p className="text-[12px] text-slate-500">Stage 8 (therapeutic-index ranking) runs on live L1 outputs. Other stages remain reference-only.</p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
 
-          {/* Honest banner */}
-          <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-3 flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          {/* Honest banner — scoped to what is / isn't wired */}
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <div className="text-[11px] font-semibold text-rose-300">No L2 engine is wired in this build</div>
+              <div className="text-[11px] font-semibold text-amber-300">Partial wiring — Stage 8 only</div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                None of the stages below execute today. The shortlist L4 currently consumes is generated
-                by L1 directly via allometric projection, not by L2 docking / PBPK / ML triage.
-                This panel exists to show the pipeline shape and the L1 inputs it would consume — not to imply functionality.
+                Stages 0–7 and 9 in the architecture doc (docking, free-energy, full PBPK, QSP/PD coupling)
+                do not execute in this build. Stage 8 (therapeutic-index ranking + first-pass human dose
+                projection) is wired as <span className="font-mono text-slate-300">lib/l2DoseProjection.ts</span>
+                — uses receptor-occupancy theory, well-stirred liver model, and Yee 1997 Caco-2 → F bins
+                on top of live L1 outputs.
               </p>
             </div>
           </div>
@@ -310,26 +389,40 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, onContinue }: 
             )}
           </section>
 
-          {/* L2 PIPELINE STAGES (status only) */}
+          {/* L2 PIPELINE STAGES (mostly status only; Stage 8 wired) */}
           <section>
-            <ScaffoldSectionHeader icon={Atom} label="L2 Pipeline (per architecture doc §4.3)" badge="Not wired" />
+            <ScaffoldSectionHeader icon={Atom} label="L2 Pipeline (per architecture doc §4.3)" badge="Stage 8 wired" />
             <div className="space-y-2">
               {L2_STAGES.map(s => <StageCard key={s.n} stage={s} />)}
             </div>
             <p className="text-[10px] text-slate-500 leading-relaxed mt-3">
-              Engine candidates and stage descriptions are taken from <span className="text-slate-400 font-mono">HakaseBio_4Layer_Architecture_Research</span> §4.2 and §4.3 (paraphrased, with cited compute / virtual-subject numbers preserved as-stated). No selection persists because no engine executes.
+              Engine candidates and stage descriptions are taken from <span className="text-slate-400 font-mono">HakaseBio_4Layer_Architecture_Research</span> §4.2 and §4.3 (paraphrased, with cited compute / virtual-subject numbers preserved as-stated). Stage 8 executes via <span className="font-mono text-slate-400">lib/l2DoseProjection.ts</span>; other stages remain reference-only.
             </p>
           </section>
 
-          {/* RUN BUTTON — disabled, honest copy */}
+          {/* RUN BUTTON — wired to Stage 8 (therapeutic-index ranking) */}
           <button
             type="button"
-            disabled
-            title="No L2 engine integration ships in this build"
-            className="w-full bg-rose-600/15 border border-rose-500/25 text-rose-400/70 font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center cursor-not-allowed"
+            disabled={!hasL1 || running}
+            onClick={handleRun}
+            className={`w-full font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center transition-colors ${
+              hasL1 && !running
+                ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer"
+                : "bg-slate-700/40 border border-slate-600/40 text-slate-500 cursor-not-allowed"
+            }`}
+            title={hasL1 ? "Run Stage 8 — therapeutic-index ranking on live L1 outputs" : "Awaiting L1 In Vitro completion"}
           >
-            <Cpu className="w-4 h-4" />
-            Run In Silico Triage — no engine wired
+            {running ? (
+              <>
+                <Activity className="w-4 h-4 animate-pulse" />
+                Computing therapeutic-index margins…
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                {hasL1 ? "Run Stage 8 — Therapeutic-Index Ranking" : "Run Stage 8 — awaiting L1"}
+              </>
+            )}
           </button>
 
         </div>
@@ -348,10 +441,110 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, onContinue }: 
               <h2 className="text-[18px] font-semibold text-white">L2 — In Silico Contract</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
-                Source: Architecture Research §4 · No engine is wired in this build.
+                Source: Architecture Research §4 · Stage 8 wired; other stages reference-only.
               </p>
             </div>
           </div>
+
+          {/* ── Stage 8 RESULTS (only after Run) ────────────────────────────── */}
+          {projection && (
+            <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/[0.04] p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-cyan-300" />
+                <h3 className="text-[13px] font-semibold text-white">Stage 8 — Therapeutic-Index Ranking · live result</h3>
+                <span className={`ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${verdictColor(projection.verdict)}`}>
+                  {projection.verdict}
+                </span>
+              </div>
+
+              {/* Receptor-occupancy target */}
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                  <div className="text-[11px] font-semibold text-slate-200">Receptor-occupancy target</div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div className="text-slate-500">Target occupancy</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetOccupancy * 100, 0, "%")}</div>
+                  <div className="text-slate-500">L1 Ki</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.ki_nM, 2, " nM")}</div>
+                  <div className="text-slate-500">Required Cmax,unbound</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetCmaxUnbound_nM, 2, " nM")}</div>
+                  <div className="text-slate-500">Plasma fu (L1)</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.fu_fraction * 100, 2, "%")}</div>
+                  <div className="text-slate-500">Required Cmax,total</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetCmaxTotal_nM, 2, " nM")}</div>
+                </div>
+                <div className="text-[9px] text-slate-600 italic mt-2">
+                  Hill slope 1: Cmax,u = {(projection.targetOccupancy / (1 - projection.targetOccupancy)).toFixed(1)}× Ki for {(projection.targetOccupancy * 100).toFixed(0)}% occupancy.
+                </div>
+              </div>
+
+              {/* Therapeutic-index margins */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                  <div className="text-[11px] font-semibold text-slate-200">Therapeutic-index margins</div>
+                  <span className="text-[9px] text-slate-600 ml-auto">SAFE ≥30× · CAUTION 10–30× · RISK &lt;10×</span>
+                </div>
+                <div className="space-y-2">
+                  {projection.margins.map(m => <MarginBar key={m.label} row={m} />)}
+                </div>
+              </div>
+
+              {/* First-pass dose projection */}
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Beaker className="w-3.5 h-3.5 text-cyan-400" />
+                  <div className="text-[11px] font-semibold text-slate-200">First-pass human dose projection</div>
+                  <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-300">
+                    Confidence: low
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div className="text-slate-500">Estimated Vd</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.Vd_L_per_kg, 2, " L/kg")}</div>
+                  <div className="text-slate-500">Estimated F (oral)</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.F_oral * 100, 0, "%")}</div>
+                  <div className="text-slate-500">Estimated hepatic CL</div>
+                  <div className="text-cyan-300 font-mono text-right">{projection.hepaticCL_mL_min_kg !== null ? fmt(projection.hepaticCL_mL_min_kg, 1, " mL/min/kg") : "—"}</div>
+                  <div className="text-slate-500">Predicted dose (mg/kg)</div>
+                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.predictedDose_mg_per_kg, 3)}</div>
+                  <div className="text-slate-300 font-semibold">Predicted dose (mg/day, 70 kg)</div>
+                  <div className="text-cyan-200 font-mono text-right font-semibold">{fmt(projection.predictedDose_mg_per_day, 1)}</div>
+                </div>
+                <details className="text-[9px] text-slate-500 leading-relaxed mt-1">
+                  <summary className="cursor-pointer text-slate-400 hover:text-slate-300">Assumptions used</summary>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5 italic">
+                    <li>{projection.Vd_assumption}</li>
+                    <li>{projection.F_assumption}</li>
+                    <li>{projection.CL_assumption}</li>
+                    <li>{projection.doseAssumption}</li>
+                  </ul>
+                </details>
+              </div>
+
+              {/* Verdict + warnings */}
+              <div className={`rounded-lg border p-3 ${verdictColor(projection.verdict)}`}>
+                <div className="text-[11px] font-semibold mb-1.5">Verdict — {projection.verdict}</div>
+                <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
+                  {projection.rationale.map((r, i) => <li key={`r${i}`}>{r}</li>)}
+                </ul>
+                {projection.warnings.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/10">
+                    <div className="text-[10px] font-semibold mb-1">L1 carry-forward warnings</div>
+                    <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
+                      {projection.warnings.map((w, i) => <li key={`w${i}`}>{w}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[9px] text-slate-600 italic leading-relaxed">
+                {projection.confidenceNote} Generated {new Date(projection.generatedAt).toLocaleTimeString()} from L1 stamp {new Date(projection.l1Stamp).toLocaleTimeString()}.
+              </div>
+            </div>
+          )}
 
           {/* L1 → L2 input contract — sourced from the doc */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
