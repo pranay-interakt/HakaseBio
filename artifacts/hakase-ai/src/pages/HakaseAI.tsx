@@ -3925,6 +3925,7 @@ export function HakaseAI() {
             <Layer3ExVivoScaffold
               layer2Ready={simStatus[2] === "complete"}
               simResults={simResults}
+              inVitroResults={inVitroResults}
               onContinue={() => setActiveLayer(4)}
             />
           )}
