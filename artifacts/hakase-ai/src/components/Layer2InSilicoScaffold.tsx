@@ -1,8 +1,17 @@
-import { useState } from "react";
-import { Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle, CircleDot, Play, Activity, Shield, Beaker, CheckCircle2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle,
+  CircleDot, Play, Activity, Shield, Beaker, CheckCircle2, Settings2, ChevronDown, ChevronRight,
+  Sliders, Loader2, Zap, FlaskConical, ServerCrash, Copy,
+} from "lucide-react";
 import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
-import { computeL2DoseProjection, type L2DoseProjection, type MarginTier } from "@/lib/l2DoseProjection";
+import type { L2DoseProjection, MarginTier, L2InputParams } from "@/lib/l2DoseProjection";
+import {
+  runFullPipeline, runStage0, runStage1, runStage2, runStage3, runStage4,
+  runStage5, runStage6, runStage7, runStage8, runStage9,
+  type PipelineResults, type StageResult, type StageStatus,
+} from "@/lib/l2Pipeline";
 
 interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
@@ -12,172 +21,106 @@ interface Layer2InSilicoScaffoldProps {
   onComplete?: () => void;
 }
 
-function ScaffoldSectionHeader({ icon: Icon, label, badge }: { icon: any; label: string; badge?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <Icon className="w-3.5 h-3.5 text-slate-500" />
-      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{label}</span>
-      {badge && (
-        <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-400/80">
-          {badge}
-        </span>
-      )}
-    </div>
-  );
-}
+// ── Stage definitions (text from architecture doc §4.3, paraphrased) ────────
+type StageDef = {
+  n: number;
+  name: string;
+  detail: string;
+  wired: "in-house" | "ai-service" | "out-of-scope";
+  engines: { name: string; note: string }[];
+};
 
-/**
- * Stage definitions mirror §4.3 ("Suggested L2 pipeline") of
- * `attached_assets/HakaseBio_4Layer_Architecture_Research_*.docx`. Stage
- * names + detail text are paraphrased from the doc; engine lists and the
- * compute / virtual-subject numbers carried in `detail` come straight from
- * the doc. No engine is wired in this product — every stage is tagged
- * "Not wired" and the engines below each stage are reference candidates,
- * not user choices.
- */
-const L2_STAGES = [
+const L2_STAGES: StageDef[] = [
   {
-    n: 0,
-    name: "Ingest L1 outputs",
-    detail: "Normalise units; persist to a Parquet store keyed on InChIKey. Pull target sequence (UniProt), structure (PDB > AlphaFold with pLDDT ≥ 70), and off-target panel (ChEMBL + IUPHAR).",
+    n: 0, name: "Ingest L1 outputs", wired: "in-house",
+    detail: "Validate L1 fields, pin timestamps. Records what was actually handed off — no transformation yet.",
     engines: [
-      { name: "L1 Parquet writer",   note: "no-op — direct in-memory hand-off today" },
-      { name: "ChEMBL / IUPHAR",     note: "L1 already queries ChEMBL via internal proxy" },
+      { name: "L1 Parquet writer (in-memory)",   note: "direct hand-off via simResults + inVitroResults" },
+      { name: "ChEMBL / IUPHAR",     note: "L1 already queries ChEMBL via api-server proxy" },
       { name: "UniProt / PDB / AlphaFold", note: "L1 already fetches these" },
     ],
   },
   {
-    n: 1,
-    name: "Structure prep",
-    detail: "Holo-PDB if available, else AlphaFold. Run PDBFixer for missing residues + protonation. Pocket detection via fpocket or P2Rank.",
+    n: 1, name: "Structure prep + protein druggability", wired: "ai-service",
+    detail: "RDKit descriptors + Lipinski/Veber rule checks (browser-side). Protein druggability via ESM-embedded random-forest classifier on the L1 UniProt target.",
     engines: [
-      { name: "PDBFixer",  note: "BSD — protonation + missing residues" },
-      { name: "fpocket",   note: "GPL — pocket detection" },
-      { name: "P2Rank",    note: "Apache 2.0 — ML pocket detection" },
+      { name: "RDKit-JS",  note: "browser — descriptors, RoF, Veber" },
+      { name: "ai-service /predict/protein-ml",   note: "ESM2 embedding → druggability classifier" },
+      { name: "fpocket / P2Rank",    note: "OOS — pocket detection requires PDB + GPU" },
     ],
   },
   {
-    n: 2,
-    name: "Docking",
-    detail: "Parallel tracks of Vina / Smina / GNINA classical docking and Boltz-1 (or Boltz-2) co-folding. Merge poses, run PoseBusters as hard filter, rescore survivors with GNINA CNN. Top-3 physically-valid poses per compound.",
+    n: 2, name: "Docking", wired: "out-of-scope",
+    detail: "Vina / GNINA / Boltz-1 with PoseBusters QC. Requires GPU cluster and curated receptor PDBs — out of scope for in-browser tier.",
     engines: [
-      { name: "AutoDock Vina / Smina", note: "Apache 2.0 — classical docking" },
-      { name: "GNINA",                  note: "GPL-2 — CNN-rescored" },
-      { name: "DiffDock / DiffDock-L",  note: "MIT — diffusion blind docking; PoseBusters mandatory" },
-      { name: "Boltz-1 / Boltz-2",      note: "MIT — AF3-equivalent co-folding" },
-      { name: "Chai-1",                 note: "Research licence — commercial inquiry needed" },
+      { name: "AutoDock Vina / Smina", note: "Apache 2.0 — classical docking (needs GPU + receptor prep)" },
+      { name: "GNINA",                  note: "GPL-2 — CNN-rescored (GPU)" },
+      { name: "Boltz-1 / Boltz-2",      note: "MIT — AF3-equivalent co-folding (GPU)" },
       { name: "PoseBusters",            note: "BSD-3 — physical-validity QC, mandatory" },
     ],
   },
   {
-    n: 3,
-    name: "ML affinity + ADMET refinement",
-    detail: "DeepPurpose or fine-tuned Uni-Mol for orthogonal affinity. Compare to L1 measured Ki — flag >1-log disagreements. MoLFormer-XL or ChemBERTa-2 fine-tuned for ADMET to triangulate L1.",
+    n: 3, name: "ML affinity + ADMET cross-check", wired: "ai-service",
+    detail: "DeepDTA-style GBM (ESM target embedding × Morgan ligand FP) for orthogonal pKd. ADMET-AI Chemprop GNN for cross-check vs L1. Disagreement is flagged, never hidden.",
     engines: [
-      { name: "DeepPurpose / GraphDTA", note: "BSD-3 — DTI architectures" },
-      { name: "Uni-Mol / Uni-Mol2",     note: "MIT — 3D-aware affinity" },
-      { name: "MoLFormer-XL",           note: "Apache 2.0 — IBM foundation embedding" },
-      { name: "ChemBERTa-2",            note: "MIT — SMILES transformer" },
+      { name: "ai-service /predict/binding-ml", note: "ESM2 + Morgan FP → pKd regressor" },
+      { name: "ai-service /predict/admet-ml",   note: "ADMET-AI Chemprop multi-task GNN" },
+      { name: "Uni-Mol / MoLFormer-XL",         note: "OOS today — would replace GBM with foundation embedding" },
     ],
   },
   {
-    n: 4,
-    name: "Selectivity",
-    detail: "Dock or run ML affinity across ChEMBL / IUPHAR off-target panel for the target family. Compute selectivity indices. Flag hERG (already from L1), CYP3A4, known liabilities.",
+    n: 4, name: "Selectivity + cardiotox cross-check", wired: "ai-service",
+    detail: "L1 selectivity panel (off-target IC50/fold). Cardiotox: trained Morgan-FP RF for Kv11.1 blocker probability — consensus with L1 categorical hERG risk.",
     engines: [
-      { name: "ChEMBL / IUPHAR off-target panel", note: "L1 already has access" },
-      { name: "(reuses Stage 3 ML affinity stack)", note: "" },
+      { name: "L1 selectivity panel", note: "in-house — kinase / GPCR off-target hits" },
+      { name: "ai-service /predict/cardiotox", note: "Morgan FP RF — hERG blocker probability" },
+      { name: "ChEMBL / IUPHAR off-target panel", note: "cited reference; not run by Stage 4 today" },
     ],
   },
   {
-    n: 5,
-    name: "Selective free-energy refinement",
-    detail: "Only top ~30–50 compounds. OpenMM with OpenFF Sage; perturbation network anchored to a reference compound. ~24 GPU-h per compound on A100; ~3–5 GPU-days for the cohort (per doc).",
+    n: 5, name: "Free-energy refinement", wired: "out-of-scope",
+    detail: "OpenMM/OpenFF Sage with TIES relative-binding-FEP — ~24 GPU-h per compound on A100 per architecture doc. Out of scope for in-browser tier.",
     engines: [
       { name: "OpenMM",            note: "MIT — Python-first, GPU-accelerated MD" },
-      { name: "OpenFF Toolkit (Sage / Parsley)", note: "MIT — modern force fields with auto-parameterisation" },
+      { name: "OpenFF Toolkit (Sage)", note: "MIT — modern force fields with auto-parameterisation" },
       { name: "TIES",              note: "open relative-binding-FEP framework on NAMD/OpenMM" },
-      { name: "GROMACS",           note: "LGPL-2.1 — alternative MD engine" },
-      { name: "AMBER (AmberTools)", note: "academic-friendly; pmemd.cuda commercial" },
     ],
   },
   {
-    n: 6,
-    name: "PBPK projection",
-    detail: "Build PK-Sim model parameterised from L1 ADMET (microsomal CL → hepatic CL via well-stirred; logP, pKa, fu_p, MW). Simulate human PK across a dose range — Cmax, AUC, t½, fraction-bound at target.",
+    n: 6, name: "PBPK projection", wired: "in-house",
+    detail: "Two-compartment PBPK (RK4 ODE). Allometric scaling on body weight; albumin- and logP-corrected hepatic CL; Caco-2-derived F. Computes plasma curve, Cmax, AUC, t½, Vdss.",
     engines: [
-      { name: "PK-Sim / MoBi",          note: "GPL-2 — OSS PBPK reference" },
-      { name: "Pumas.jl",               note: "free academic / paid commercial — NLME" },
-      { name: "mrgsolve",               note: "GPL-2 — ODE PK at scale" },
-      { name: "BioGears",               note: "Apache 2.0 — whole-body physiology" },
-      { name: "OpenCOR",                note: "GPL — CellML organ-level PD" },
-      { name: "GastroPlus / Simcyp",    note: "Commercial benchmark only — not core to OSS pipeline (per §4.2.1)" },
+      { name: "lib/pbpk.ts (in-house)", note: "RK4 ODE; Davies & Morris physiology constants" },
+      { name: "PK-Sim / mrgsolve",      note: "cited reference; replace this when wired into a job queue" },
     ],
   },
   {
-    n: 7,
-    name: "QSP / PD coupling",
-    detail: "For targets with curated BioModels QSP, couple PK profile via Tellurium / libRoadRunner — simulate target engagement vs time and downstream pathway markers. For novel targets, build a minimal target-occupancy model (Hill equation around L1 Ki).",
+    n: 7, name: "QSP / PD coupling", wired: "in-house",
+    detail: "Hill-equation receptor occupancy from PBPK unbound-concentration curve. Computes peak occupancy, time-above-50%, AUC of effect.",
     engines: [
-      { name: "Tellurium / libRoadRunner", note: "Apache 2.0 — Python-native SBML" },
-      { name: "COPASI",                    note: "Artistic 2.0 — SBML simulator with sensitivity analysis" },
-      { name: "BioModels repository",      note: "starter QSP models" },
+      { name: "lib/l2Pipeline.ts runStage7", note: "Hill slope 1, Ki from L1, fu from L1 or override" },
+      { name: "Tellurium / libRoadRunner", note: "cited reference for full SBML / QSP model coupling" },
     ],
   },
   {
-    n: 8,
-    name: "Therapeutic-index ranking",
-    wired: true,
-    detail: "Efficacy margin = predicted Cmax,unbound / Ki; safety margin = hERG IC50 / Cmax,unbound (and CYP, off-target). Wired in this build via lib/l2DoseProjection.ts — runs on live L1 outputs. Click 'Run' below.",
+    n: 8, name: "Therapeutic-index ranking", wired: "in-house",
+    detail: "Receptor occupancy → required Cmax,unbound. Margins: hERG, CYP3A4, CC50, worst-off-target. First-pass human dose projection (well-stirred liver model + Caco-2 → F bins).",
     engines: [
-      { name: "lib/l2DoseProjection.ts", note: "in-house — receptor occupancy + well-stirred liver model + Caco-2 → F bins + logP-binned Vd proxy" },
-      { name: "PKNCA / ospsuite-r", note: "GPL — allometric scaling helpers (referenced; not used by current in-house implementation)" },
+      { name: "lib/l2DoseProjection.ts", note: "in-house — Hill, well-stirred liver, Yee 1997, Obach 2008" },
     ],
   },
   {
-    n: 9,
-    name: "Output — ranked shortlist",
-    detail: "Per-compound predicted human dose range, predicted unbound Cmax/AUC at each dose, pose files (PDB), free-energy estimates, liability flags, confidence + uncertainty. Doc-suggested shortlist size: 20–50 compounds.",
+    n: 9, name: "Output / handoff", wired: "in-house",
+    detail: "L2-handoff-v1 JSON: predicted human dose, predicted unbound + total Cmax, liability flags, FEP estimate (null — Stage 5 OOS), confidence flag. Copyable for L3 ingest.",
     engines: [
-      { name: "(downstream contract — handed to L3 Ex-Vivo)", note: "see right pane for the L2→L3 contract" },
+      { name: "Stage9Result schema", note: "in-house — schema_version='L2-handoff-v1'" },
     ],
   },
-] as const;
+];
 
-function StageCard({ stage }: { stage: (typeof L2_STAGES)[number] }) {
-  return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
-      <div className="flex items-start gap-2.5 mb-2">
-        <div className="w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
-          {stage.n}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
-            {(stage as any).wired ? (
-              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">Wired</span>
-            ) : (
-              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-500/30 bg-rose-500/8 text-rose-300">Not wired</span>
-            )}
-          </div>
-          <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{stage.detail}</div>
-        </div>
-      </div>
-      <div className="pl-8 space-y-1">
-        {stage.engines.map(e => (
-          <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
-            <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
-            <span className="text-slate-300 font-medium">{e.name}</span>
-            {e.note && <span className="text-slate-500">— {e.note}</span>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function fmt(n: number, digits: number, suffix = ""): string {
-  if (!isFinite(n)) return "—";
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function fmt(n: number | null | undefined, digits: number, suffix = ""): string {
+  if (n == null || !isFinite(n)) return "—";
   return `${n.toFixed(digits)}${suffix}`;
 }
 
@@ -194,13 +137,27 @@ function verdictColor(v: "GO" | "WATCH" | "NO-GO"): string {
   return "border-rose-500/40 bg-rose-500/10 text-rose-300";
 }
 
+function statusBadgeClass(s: StageStatus | "ready"): string {
+  if (s === "wired")        return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+  if (s === "out-of-scope") return "border-slate-500/40 bg-slate-500/10 text-slate-400";
+  if (s === "error")        return "border-rose-500/40 bg-rose-500/10 text-rose-300";
+  if (s === "skipped")      return "border-amber-500/30 bg-amber-500/8 text-amber-300";
+  return "border-cyan-500/40 bg-cyan-500/8 text-cyan-300";
+}
+
+function wiredBadge(w: StageDef["wired"]): { text: string; cls: string } {
+  if (w === "in-house")     return { text: "Wired · in-house",  cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
+  if (w === "ai-service")   return { text: "Wired · AI service",cls: "border-cyan-500/40 bg-cyan-500/10 text-cyan-300" };
+  return                          { text: "Out of scope",         cls: "border-slate-500/40 bg-slate-500/10 text-slate-400" };
+}
+
+// ── MarginBar (Stage 8 result card) ─────────────────────────────────────────
 function MarginBar({ row }: { row: { label: string; ratio: number | null; tier: MarginTier; numerator: string; denominator: string; assumption: string } }) {
   const display = row.ratio === null || !isFinite(row.ratio)
     ? "—"
     : row.ratio >= 1000 ? `${(row.ratio / 1000).toFixed(1)}k×`
     : row.ratio >= 100  ? `${row.ratio.toFixed(0)}×`
     : `${row.ratio.toFixed(1)}×`;
-  // Bar fill: log-scaled, capped at margin=1000.
   const fillPct = row.ratio === null || !isFinite(row.ratio)
     ? 0
     : Math.min(100, Math.max(2, (Math.log10(Math.max(1, row.ratio)) / 3) * 100));
@@ -241,188 +198,410 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
   );
 }
 
-/**
- * L2 In-Silico — scaffold panel introduced by the April 2026 4-layer redesign.
- * Renders with the same two-pane layout as L1 / L4. The left pane is an
- * HONEST status panel — top half shows the actual L1 outputs this product
- * produces (read from `simResults`); bottom half shows the L2 pipeline
- * stages from the architecture doc with each stage tagged "Not wired" and
- * its candidate engines listed read-only.
- *
- * No fabricated numbers (no costs, no wall-clock estimates, no composite
- * weights) — only what's either in `simResults` (live) or in the doc (cited).
- */
+// ── Stage card (left panel) ────────────────────────────────────────────────
+function StageCard({
+  stage, status, busy, onRun, hasResult, runDisabled, runDisabledReason,
+}: {
+  stage: StageDef;
+  status: StageStatus | "ready";
+  busy: boolean;
+  hasResult: boolean;
+  onRun: () => void;
+  runDisabled: boolean;
+  runDisabledReason?: string;
+}) {
+  const wb = wiredBadge(stage.wired);
+  const canRun = stage.wired !== "out-of-scope";
+  return (
+    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+      <div className="flex items-start gap-2.5 mb-2">
+        <div className="w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
+          {stage.n}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
+            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${wb.cls}`}>{wb.text}</span>
+            {hasResult && (
+              <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
+            )}
+          </div>
+          <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{stage.detail}</div>
+        </div>
+      </div>
+      <div className="pl-8 space-y-1">
+        {stage.engines.map(e => (
+          <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
+            <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
+            <span className="text-slate-300 font-medium">{e.name}</span>
+            {e.note && <span className="text-slate-500">— {e.note}</span>}
+          </div>
+        ))}
+      </div>
+      {canRun && (
+        <div className="pl-8 mt-2.5 flex items-center gap-2">
+          <button
+            type="button"
+            disabled={runDisabled || busy}
+            onClick={onRun}
+            title={runDisabled ? runDisabledReason : `Run Stage ${stage.n}`}
+            className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
+              !runDisabled && !busy
+                ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
+                : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
+            }`}
+          >
+            {busy
+              ? <><Loader2 className="w-3 h-3 animate-spin" />Running…</>
+              : <><Play className="w-3 h-3" />Run stage</>}
+          </button>
+          {runDisabled && runDisabledReason && (
+            <span className="text-[9px] text-slate-500 italic">{runDisabledReason}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Input parameters card ──────────────────────────────────────────────────
+function InputParamsCard({
+  params, setParams,
+}: { params: L2InputParams; setParams: (p: L2InputParams) => void }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const occ = params.targetOccupancy ?? 0.75;
+  const bw  = params.bodyWeightKg ?? 70;
+  const route = params.route ?? "oral";
+  const dpd = params.dosesPerDay ?? 1;
+  return (
+    <section className="rounded-xl border border-cyan-500/25 bg-cyan-500/[0.04] p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+        <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L2 Input Parameters</span>
+        <span className="ml-auto text-[9px] text-slate-500 italic">applied to Stage 6, 7, 8 + handoff</span>
+      </div>
+
+      {/* Occupancy slider */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-slate-300">Target receptor occupancy</span>
+          <span className="text-cyan-300 font-mono">{(occ * 100).toFixed(0)}% (Cmax,u = {(occ / Math.max(1e-3, 1 - occ)).toFixed(2)}× Ki)</span>
+        </div>
+        <input
+          type="range" min={0.5} max={0.95} step={0.05} value={occ}
+          onChange={e => setParams({ ...params, targetOccupancy: parseFloat(e.target.value) })}
+          className="w-full accent-cyan-400"
+        />
+        <div className="flex justify-between text-[9px] text-slate-600">
+          <span>50% (1×Ki)</span><span>75% (3×Ki)</span><span>95% (19×Ki)</span>
+        </div>
+      </div>
+
+      {/* Body weight + route + freq */}
+      <div className="grid grid-cols-3 gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Body weight (kg)</span>
+          <input
+            type="number" min={1} max={250} step={1} value={bw}
+            onChange={e => setParams({ ...params, bodyWeightKg: parseFloat(e.target.value) })}
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono focus:outline-none focus:border-cyan-500/50"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Route</span>
+          <select
+            value={route}
+            onChange={e => setParams({ ...params, route: e.target.value as "oral" | "iv" })}
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 focus:outline-none focus:border-cyan-500/50"
+          >
+            <option value="oral">Oral (PO)</option>
+            <option value="iv">IV (F=1)</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Dosing freq.</span>
+          <select
+            value={dpd}
+            onChange={e => setParams({ ...params, dosesPerDay: parseInt(e.target.value, 10) })}
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 focus:outline-none focus:border-cyan-500/50"
+          >
+            <option value={1}>QD (1×)</option>
+            <option value={2}>BID (2×)</option>
+            <option value={3}>TID (3×)</option>
+            <option value={4}>QID (4×)</option>
+          </select>
+        </label>
+      </div>
+
+      {/* Advanced overrides */}
+      <button
+        type="button"
+        onClick={() => setAdvancedOpen(!advancedOpen)}
+        className="text-[10px] text-slate-400 hover:text-slate-300 flex items-center gap-1"
+      >
+        {advancedOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        Advanced overrides (bypass L1 / models — clear to revert)
+      </button>
+      {advancedOpen && (
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          {[
+            { k: "fuOverride" as const, label: "fu (0–1)",         hint: "L1 plasma protein binding" },
+            { k: "VdOverride" as const, label: "Vd (L/kg)",        hint: "logP-binned proxy" },
+            { k: "FOverride"  as const, label: "F oral (0–1)",     hint: "Caco-2 → F bins (Yee 1997)" },
+            { k: "CLOverride" as const, label: "CL (mL/min/kg)",   hint: "well-stirred liver model" },
+          ].map(({ k, label, hint }) => (
+            <label key={k} className="flex flex-col gap-1">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider">{label}</span>
+              <input
+                type="number" min={0} step="any"
+                value={params[k] ?? ""}
+                placeholder={`use ${hint}`}
+                onChange={e => {
+                  const v = e.target.value;
+                  setParams({ ...params, [k]: v === "" ? undefined : parseFloat(v) });
+                }}
+                className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-cyan-500/50"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Result card scaffolding ────────────────────────────────────────────────
+function ResultShell({ stage, name, icon: Icon, status, reason, children }: {
+  stage: number; name: string; icon: any;
+  status: StageStatus | "ready"; reason?: string; children?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/[0.04] p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 text-cyan-300" />
+        <h3 className="text-[13px] font-semibold text-white">Stage {stage} — {name}</h3>
+        <span className={`ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${statusBadgeClass(status)}`}>{status}</span>
+      </div>
+      {reason && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-2.5 flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <span className="text-[10px] text-amber-200 leading-relaxed">{reason}</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// ── Inline mini PK chart (SVG) ─────────────────────────────────────────────
+function MiniLineChart({ data, xKey, yKey, color, height = 80 }: {
+  data: any[]; xKey: string; yKey: string; color: string; height?: number;
+}) {
+  if (!data.length) return null;
+  const W = 320, H = height, P = 6;
+  const xs = data.map(d => d[xKey]);
+  const ys = data.map(d => d[yKey]);
+  const xmin = Math.min(...xs), xmax = Math.max(...xs);
+  const ymin = 0,                ymax = Math.max(...ys, 0.001);
+  const sx = (x: number) => P + ((x - xmin) / Math.max(1e-6, xmax - xmin)) * (W - 2 * P);
+  const sy = (y: number) => H - P - ((y - ymin) / Math.max(1e-6, ymax - ymin)) * (H - 2 * P);
+  const path = data.map((d, i) => `${i === 0 ? "M" : "L"} ${sx(d[xKey]).toFixed(1)} ${sy(d[yKey]).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" />
+      <text x={P} y={10} fill="#475569" fontSize="9">{ymax.toFixed(2)}</text>
+      <text x={P} y={H - 1} fill="#475569" fontSize="9">0</text>
+      <text x={W - 14} y={H - 1} fill="#475569" fontSize="9">{xmax}h</text>
+    </svg>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, onContinue, onComplete }: Layer2InSilicoScaffoldProps) {
   const hasL1 = !!simResults && !!inVitroResults;
-  const [projection, setProjection] = useState<L2DoseProjection | null>(null);
-  const [running, setRunning]       = useState(false);
 
-  const handleRun = () => {
+  const [params, setParams] = useState<L2InputParams>({
+    targetOccupancy: 0.75, bodyWeightKg: 70, route: "oral", dosesPerDay: 1,
+  });
+  const [results, setResults] = useState<PipelineResults>({});
+  const [busyStage, setBusyStage] = useState<number | null>(null);
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+
+  const wiredCount = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope").length, []);
+
+  // ── Per-stage runners ────────────────────────────────────────────────────
+  const setOne = (key: keyof PipelineResults, value: any) => {
+    setResults(prev => ({ ...prev, [key]: value }));
+  };
+
+  const stage8DosePerAdmin = (): number => {
+    const proj = results.s8?.result;
+    if (!proj || !isFinite(proj.predictedDose_mg_per_day)) return NaN;
+    return proj.predictedDose_mg_per_day / Math.max(1, Math.floor(params.dosesPerDay ?? 1));
+  };
+
+  const runStageHandler = async (n: number) => {
     if (!simResults || !inVitroResults) return;
-    setRunning(true);
-    // Synchronous; small delay just so the spinner is visible.
-    setTimeout(() => {
-      const p = computeL2DoseProjection(simResults, inVitroResults);
-      setProjection(p);
-      setRunning(false);
-      onComplete?.();
-    }, 250);
+    setBusyStage(n);
+    try {
+      switch (n) {
+        case 0: setOne("s0", runStage0(simResults, inVitroResults)); break;
+        case 1: setOne("s1", await runStage1(simResults)); break;
+        case 2: setOne("s2", runStage2()); break;
+        case 3: setOne("s3", await runStage3(simResults)); break;
+        case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
+        case 5: setOne("s5", runStage5()); break;
+        case 6: setOne("s6", runStage6(simResults, inVitroResults, params, stage8DosePerAdmin())); break;
+        case 7: {
+          const pk = results.s6?.result;
+          const fu = results.s8?.result?.fu_fraction;
+          if (!pk || !fu) {
+            setOne("s7", {
+              stage: 7, name: "QSP / PD coupling", status: "error",
+              reason: "Run Stage 6 (PBPK) and Stage 8 (TI) first — Stage 7 needs the PK curve and a valid fu.",
+            } as StageResult<any>);
+          } else {
+            setOne("s7", runStage7(simResults, pk, fu));
+          }
+          break;
+        }
+        case 8: {
+          const r = runStage8(simResults, inVitroResults, params);
+          setOne("s8", r);
+          if (r.status === "wired") onComplete?.();
+          break;
+        }
+        case 9: setOne("s9", runStage9(simResults, results.s8?.result, results.s6?.result, params)); break;
+      }
+    } finally {
+      setBusyStage(null);
+    }
+  };
+
+  const runFull = async () => {
+    if (!simResults || !inVitroResults) return;
+    setPipelineRunning(true);
+    setResults({});
+    try {
+      const out = await runFullPipeline(simResults, inVitroResults, params, n => setBusyStage(n));
+      setResults(out);
+      if (out.s8?.status === "wired") onComplete?.();
+    } finally {
+      setPipelineRunning(false);
+      setBusyStage(null);
+    }
+  };
+
+  const runDisabledReasonForStage = (n: number): string | undefined => {
+    if (!hasL1) return "awaiting L1";
+    if (n === 6) return isFinite(stage8DosePerAdmin()) ? undefined : "needs Stage 8 dose";
+    if (n === 7) return (results.s6?.result && results.s8?.result?.fu_fraction) ? undefined : "needs Stage 6 + 8";
+    if (n === 9) return results.s8?.result ? undefined : "needs Stage 8";
+    return undefined;
   };
 
   return (
     <div className="flex-1 flex overflow-hidden">
 
       {/* ── LEFT STATUS / INPUTS PANEL ─────────────────────────────────────── */}
-      <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
+      <div className="w-[480px] border-r border-white/8 overflow-y-auto flex flex-col">
         <div className="p-5 border-b border-white/8">
           <div className="flex items-center gap-2 mb-1">
             <Cpu className="w-4 h-4 text-cyan-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 2 — In Silico</h2>
-            <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
-              Stage 8 wired
+            <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+              {wiredCount}/10 stages wired
             </span>
           </div>
-          <p className="text-[12px] text-slate-500">Stage 8 (therapeutic-index ranking) runs on live L1 outputs. Other stages remain reference-only.</p>
+          <p className="text-[12px] text-slate-500">Eight stages run in this product. Docking (S2) and free-energy (S5) are GPU-cluster only — explicitly out of scope.</p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
 
-          {/* Honest banner — scoped to what is / isn't wired */}
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="text-[11px] font-semibold text-amber-300">Partial wiring — Stage 8 only</div>
-              <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                Stages 0–7 and 9 in the architecture doc (docking, free-energy, full PBPK, QSP/PD coupling)
-                do not execute in this build. Stage 8 (therapeutic-index ranking + first-pass human dose
-                projection) is wired as <span className="font-mono text-slate-300">lib/l2DoseProjection.ts</span>
-                — uses receptor-occupancy theory, well-stirred liver model, and Yee 1997 Caco-2 → F bins
-                on top of live L1 outputs.
-              </p>
-            </div>
-          </div>
-
-          {/* L1 readiness */}
+          {/* L1 readiness banner */}
           <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${
-            layer1Ready
-              ? "border-emerald-500/25 bg-emerald-500/5"
-              : "border-amber-500/25 bg-amber-500/5"
+            layer1Ready ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/25 bg-amber-500/5"
           }`}>
-            {layer1Ready ? (
-              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            )}
+            {layer1Ready
+              ? <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              : <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
             <div className="flex-1">
               <div className={`text-[11px] font-semibold ${layer1Ready ? "text-emerald-300" : "text-amber-300"}`}>
                 {layer1Ready ? "L1 simulation complete" : "Awaiting L1 In Vitro completion"}
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {layer1Ready
-                  ? "L1 produced the in-vitro digital twin below. These are the actual fields L2 would ingest."
-                  : "Run L1 In Vitro first to see what fields L2 would receive."}
+                  ? "L1 produced the in-vitro digital twin below. These are the actual fields L2 ingests."
+                  : "Run L1 In Vitro first to enable L2 stages."}
               </p>
             </div>
           </div>
 
-          {/* LIVE L1 INPUTS */}
+          {/* L1 INPUTS */}
           <section>
-            <ScaffoldSectionHeader icon={Database} label="L1 Inputs (live from this product)" badge={hasL1 ? "Live" : "Pending"} />
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L1 Inputs</span>
+              <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${hasL1 ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" : "border-amber-500/30 bg-amber-500/8 text-amber-400/80"}`}>
+                {hasL1 ? "Live" : "Pending"}
+              </span>
+            </div>
             <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
-              <L1OutputRow
-                label="Compound"
-                source="L1 / chemistry.ts (RDKit)"
-                value={simResults ? simResults.molName : "—"}
-              />
-              <L1OutputRow
-                label="SMILES"
-                source="user input · RDKit-validated"
-                value={simResults ? (simResults.smiles.length > 22 ? simResults.smiles.slice(0, 22) + "…" : simResults.smiles) : "—"}
-              />
-              <L1OutputRow
-                label="UniProt target"
-                source="L1 / UniProt KB API"
-                value={simResults ? simResults.uniprotId : "—"}
-              />
-              <L1OutputRow
-                label="MW · LogP · TPSA"
-                source="RDKit descriptors"
-                value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"}
-              />
-              <L1OutputRow
-                label="Predicted Kd · Ki · IC50 (nM)"
-                source="ai-service / DeepDTA-style GBM"
-                value={simResults
-                  ? `${simResults.binding.primaryKd.toFixed(1)} · ${simResults.binding.primaryKi.toFixed(1)} · ${simResults.binding.primaryIC50.toFixed(1)}`
-                  : "—"}
-              />
-              <L1OutputRow
-                label="Off-target hits"
-                source="ai-service + ChEMBL"
-                value={simResults ? `${simResults.binding.offTargets.length}` : "—"}
-              />
-              <L1OutputRow
-                label="ADMET (abs · met · tox)"
-                source="ai-service / Chemprop GNN"
-                value={simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}% · ${(simResults.admet.metabolism * 100).toFixed(0)}% · ${(simResults.admet.toxicity * 100).toFixed(0)}%` : "—"}
-              />
-              <L1OutputRow
-                label="Tox alerts (SMARTS + ML)"
-                source="bioactivationEngine + cardiotox RF"
-                value={simResults ? `${simResults.toxAlerts.length}` : "—"}
-              />
-              <L1OutputRow
-                label="QED · SA-score · Confidence"
-                source="RDKit + heuristic"
-                value={simResults ? `${simResults.qed.toFixed(2)} · ${simResults.saScore.toFixed(2)} · ${simResults.confidence.toFixed(2)}` : "—"}
-              />
-              <L1OutputRow
-                label="Go / No-Go"
-                source="L1 cascade gate"
-                value={simResults ? simResults.goNogo : "—"}
-              />
+              <L1OutputRow label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
+              <L1OutputRow label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
+              <L1OutputRow label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
+              <L1OutputRow label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? `${simResults.binding.primaryKi.toFixed(1)}` : "—"} />
+              <L1OutputRow label="hERG IC50 (µM)"      source="L1 in-vitro sim"            value={inVitroResults ? `${inVitroResults.herg.ic50_uM.toFixed(2)}` : "—"} />
+              <L1OutputRow label="Plasma fu (%)"       source="L1 PPB sim"                  value={inVitroResults ? `${inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2)}` : "—"} />
+              <L1OutputRow label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? `${inVitroResults.permeability.caco2Papp.toFixed(1)}` : "—"} />
+              <L1OutputRow label="Microsomal CLint"    source="L1 metabolic stability"      value={inVitroResults ? `${inVitroResults.metabolicStability.microsomalCLint.toFixed(0)} µL/min/mg` : "—"} />
+              <L1OutputRow label="Off-target hits"     source="L1 selectivity panel"        value={inVitroResults ? `${inVitroResults.selectivity.offTargetHits} / ${inVitroResults.selectivity.totalTargetsTested}` : "—"} />
+              <L1OutputRow label="L1 Go / No-Go"       source="L1 cascade gate"             value={simResults ? simResults.goNogo : "—"} />
             </div>
-            {hasL1 && (
-              <p className="text-[10px] text-slate-500 leading-relaxed mt-2">
-                These are real values from <span className="text-slate-400 font-medium">simResults</span> — see <span className="text-slate-400 font-mono">artifacts/hakase-ai/src/lib/admet.ts</span> for field definitions.
-              </p>
-            )}
           </section>
 
-          {/* L2 PIPELINE STAGES (mostly status only; Stage 8 wired) */}
+          {/* INPUT PARAMETERS */}
+          <InputParamsCard params={params} setParams={setParams} />
+
+          {/* PIPELINE STAGES */}
           <section>
-            <ScaffoldSectionHeader icon={Atom} label="L2 Pipeline (per architecture doc §4.3)" badge="Stage 8 wired" />
-            <div className="space-y-2">
-              {L2_STAGES.map(s => <StageCard key={s.n} stage={s} />)}
+            <div className="flex items-center gap-2 mb-3">
+              <Atom className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Pipeline (architecture doc §4.3)</span>
             </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed mt-3">
-              Engine candidates and stage descriptions are taken from <span className="text-slate-400 font-mono">HakaseBio_4Layer_Architecture_Research</span> §4.2 and §4.3 (paraphrased, with cited compute / virtual-subject numbers preserved as-stated). Stage 8 executes via <span className="font-mono text-slate-400">lib/l2DoseProjection.ts</span>; other stages remain reference-only.
-            </p>
+            <div className="space-y-2">
+              {L2_STAGES.map(s => {
+                const key = (`s${s.n}`) as keyof PipelineResults;
+                const r = results[key];
+                const status: StageStatus | "ready" = r ? r.status : "ready";
+                return (
+                  <StageCard
+                    key={s.n} stage={s} status={status}
+                    busy={busyStage === s.n} hasResult={!!r}
+                    onRun={() => runStageHandler(s.n)}
+                    runDisabled={!hasL1 || pipelineRunning || !!runDisabledReasonForStage(s.n)}
+                    runDisabledReason={!hasL1 ? "awaiting L1" : runDisabledReasonForStage(s.n)}
+                  />
+                );
+              })}
+            </div>
           </section>
 
-          {/* RUN BUTTON — wired to Stage 8 (therapeutic-index ranking) */}
+          {/* RUN FULL PIPELINE */}
           <button
             type="button"
-            disabled={!hasL1 || running}
-            onClick={handleRun}
-            className={`w-full font-semibold h-10 rounded-lg gap-2 text-[13px] flex items-center justify-center transition-colors ${
-              hasL1 && !running
+            disabled={!hasL1 || pipelineRunning}
+            onClick={runFull}
+            className={`w-full font-semibold h-11 rounded-lg gap-2 text-[13px] flex items-center justify-center transition-colors ${
+              hasL1 && !pipelineRunning
                 ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer"
                 : "bg-slate-700/40 border border-slate-600/40 text-slate-500 cursor-not-allowed"
             }`}
-            title={hasL1 ? "Run Stage 8 — therapeutic-index ranking on live L1 outputs" : "Awaiting L1 In Vitro completion"}
+            title={hasL1 ? "Run all wired L2 stages with current inputs" : "Awaiting L1 In Vitro completion"}
           >
-            {running ? (
-              <>
-                <Activity className="w-4 h-4 animate-pulse" />
-                Computing therapeutic-index margins…
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                {hasL1 ? "Run Stage 8 — Therapeutic-Index Ranking" : "Run Stage 8 — awaiting L1"}
-              </>
-            )}
+            {pipelineRunning
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline (Stage {busyStage ?? "…"})…</>
+              : <><Play className="w-4 h-4" />Run Full L2 Pipeline ({wiredCount} stages)</>}
           </button>
 
         </div>
@@ -438,115 +617,314 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <Cpu className="w-5 h-5 text-cyan-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-[18px] font-semibold text-white">L2 — In Silico Contract</h2>
+              <h2 className="text-[18px] font-semibold text-white">L2 — In Silico</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
-                Source: Architecture Research §4 · Stage 8 wired; other stages reference-only.
+                Architecture doc §4.3, 8 of 10 stages wired.
               </p>
             </div>
           </div>
 
-          {/* ── Stage 8 RESULTS (only after Run) ────────────────────────────── */}
-          {projection && (
-            <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/[0.04] p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-cyan-300" />
-                <h3 className="text-[13px] font-semibold text-white">Stage 8 — Therapeutic-Index Ranking · live result</h3>
-                <span className={`ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${verdictColor(projection.verdict)}`}>
-                  {projection.verdict}
-                </span>
+          {/* Stage 0 */}
+          {results.s0 && results.s0.result && (
+            <ResultShell stage={0} name="Ingest L1 outputs" icon={Database} status={results.s0.status}>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                <div className="text-slate-500">Compound</div><div className="text-cyan-300 font-mono text-right truncate">{results.s0.result.molName}</div>
+                <div className="text-slate-500">UniProt</div><div className="text-cyan-300 font-mono text-right">{results.s0.result.uniprotId}</div>
+                <div className="text-slate-500">L1 timestamp</div><div className="text-cyan-300 font-mono text-right">{new Date(results.s0.result.l1Stamp).toLocaleTimeString()}</div>
               </div>
-
-              {/* Receptor-occupancy target */}
-              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                  <div className="text-[11px] font-semibold text-slate-200">Receptor-occupancy target</div>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                  <div className="text-slate-500">Target occupancy</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetOccupancy * 100, 0, "%")}</div>
-                  <div className="text-slate-500">L1 Ki</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.ki_nM, 2, " nM")}</div>
-                  <div className="text-slate-500">Required Cmax,unbound</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetCmaxUnbound_nM, 2, " nM")}</div>
-                  <div className="text-slate-500">Plasma fu (L1)</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.fu_fraction * 100, 2, "%")}</div>
-                  <div className="text-slate-500">Required Cmax,total</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.targetCmaxTotal_nM, 2, " nM")}</div>
-                </div>
-                <div className="text-[9px] text-slate-600 italic mt-2">
-                  Hill slope 1: Cmax,u = {(projection.targetOccupancy / (1 - projection.targetOccupancy)).toFixed(1)}× Ki for {(projection.targetOccupancy * 100).toFixed(0)}% occupancy.
-                </div>
+              <div className="text-[10px] text-slate-500 leading-relaxed">
+                Field availability: {Object.entries(results.s0.result.l1Fields).filter(([_, v]) => v).length} / {Object.keys(results.s0.result.l1Fields).length} required L1 fields present.
               </div>
-
-              {/* Therapeutic-index margins */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                  <div className="text-[11px] font-semibold text-slate-200">Therapeutic-index margins</div>
-                  <span className="text-[9px] text-slate-600 ml-auto">SAFE ≥30× · CAUTION 10–30× · RISK &lt;10×</span>
-                </div>
-                <div className="space-y-2">
-                  {projection.margins.map(m => <MarginBar key={m.label} row={m} />)}
-                </div>
-              </div>
-
-              {/* First-pass dose projection */}
-              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <Beaker className="w-3.5 h-3.5 text-cyan-400" />
-                  <div className="text-[11px] font-semibold text-slate-200">First-pass human dose projection</div>
-                  <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-300">
-                    Confidence: low
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                  <div className="text-slate-500">Estimated Vd</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.Vd_L_per_kg, 2, " L/kg")}</div>
-                  <div className="text-slate-500">Estimated F (oral)</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.F_oral * 100, 0, "%")}</div>
-                  <div className="text-slate-500">Estimated hepatic CL</div>
-                  <div className="text-cyan-300 font-mono text-right">{projection.hepaticCL_mL_min_kg !== null ? fmt(projection.hepaticCL_mL_min_kg, 1, " mL/min/kg") : "—"}</div>
-                  <div className="text-slate-500">Predicted dose (mg/kg)</div>
-                  <div className="text-cyan-300 font-mono text-right">{fmt(projection.predictedDose_mg_per_kg, 3)}</div>
-                  <div className="text-slate-300 font-semibold">Predicted dose (mg/day, 70 kg)</div>
-                  <div className="text-cyan-200 font-mono text-right font-semibold">{fmt(projection.predictedDose_mg_per_day, 1)}</div>
-                </div>
-                <details className="text-[9px] text-slate-500 leading-relaxed mt-1">
-                  <summary className="cursor-pointer text-slate-400 hover:text-slate-300">Assumptions used</summary>
-                  <ul className="list-disc list-inside mt-1 space-y-0.5 italic">
-                    <li>{projection.Vd_assumption}</li>
-                    <li>{projection.F_assumption}</li>
-                    <li>{projection.CL_assumption}</li>
-                    <li>{projection.doseAssumption}</li>
-                  </ul>
-                </details>
-              </div>
-
-              {/* Verdict + warnings */}
-              <div className={`rounded-lg border p-3 ${verdictColor(projection.verdict)}`}>
-                <div className="text-[11px] font-semibold mb-1.5">Verdict — {projection.verdict}</div>
-                <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
-                  {projection.rationale.map((r, i) => <li key={`r${i}`}>{r}</li>)}
-                </ul>
-                {projection.warnings.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-white/10">
-                    <div className="text-[10px] font-semibold mb-1">L1 carry-forward warnings</div>
-                    <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
-                      {projection.warnings.map((w, i) => <li key={`w${i}`}>{w}</li>)}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <div className="text-[9px] text-slate-600 italic leading-relaxed">
-                {projection.confidenceNote} Generated {new Date(projection.generatedAt).toLocaleTimeString()} from L1 stamp {new Date(projection.l1Stamp).toLocaleTimeString()}.
-              </div>
-            </div>
+            </ResultShell>
           )}
 
-          {/* L1 → L2 input contract — sourced from the doc */}
+          {/* Stage 1 — Druggability */}
+          {results.s1 && (
+            <ResultShell stage={1} name="Structure prep + druggability" icon={FlaskConical} status={results.s1.status} reason={results.s1.reason}>
+              {results.s1.result && (() => {
+                const r = results.s1.result;
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 text-[11px]">
+                      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">RDKit descriptors</div>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+                          <span className="text-slate-500">MW</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.mw.toFixed(0)}</span>
+                          <span className="text-slate-500">LogP</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.logP.toFixed(2)}</span>
+                          <span className="text-slate-500">TPSA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.tpsa.toFixed(0)}</span>
+                          <span className="text-slate-500">HBD/HBA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.hbd}/{r.rdkit_descriptors.hba}</span>
+                          <span className="text-slate-500">RotB</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.rotBonds}</span>
+                          <span className="text-slate-500">QED · SA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.qed.toFixed(2)} · {r.rdkit_descriptors.saScore.toFixed(2)}</span>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${r.rule_of_5.pass ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8" : "border-amber-500/30 text-amber-300 bg-amber-500/8"}`}>RoF {r.rule_of_5.pass ? "pass" : `${r.rule_of_5.violations} viol.`}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${r.veber_pass ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8" : "border-amber-500/30 text-amber-300 bg-amber-500/8"}`}>Veber {r.veber_pass ? "pass" : "fail"}</span>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">Protein druggability (ESM2)</div>
+                        <div className="text-[18px] font-mono text-cyan-200">
+                          {r.protein.druggability_probability !== null ? `${(r.protein.druggability_probability * 100).toFixed(0)}%` : "—"}
+                        </div>
+                        <div className="text-[10px] text-slate-300">{r.protein.druggability_class ?? "unavailable"}</div>
+                        <div className="text-[9px] text-slate-500 italic">source: {r.protein.source}{r.protein.error ? ` · ${r.protein.error}` : ""}</div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </ResultShell>
+          )}
+
+          {/* Stage 2 OOS */}
+          {results.s2 && (
+            <ResultShell stage={2} name="Docking" icon={ServerCrash} status={results.s2.status} reason={results.s2.reason} />
+          )}
+
+          {/* Stage 3 — ML cross-check */}
+          {results.s3 && results.s3.result && (() => {
+            const r = results.s3.result;
+            return (
+              <ResultShell stage={3} name="ML affinity + ADMET cross-check" icon={Zap} status={results.s3.status}>
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider">Affinity cross-check</div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+                      <span className="text-slate-500">L1 pKi</span><span className="text-cyan-300 font-mono text-right">{fmt(r.l1_pKi, 2)}</span>
+                      <span className="text-slate-500">ML pKd</span><span className="text-cyan-300 font-mono text-right">{fmt(r.binding_ml.pKd_predicted, 2)}</span>
+                      <span className="text-slate-500">|Δ| (log)</span><span className="text-cyan-300 font-mono text-right">{fmt(r.log_disagreement, 2)}</span>
+                      <span className="text-slate-500">ML Kd</span><span className="text-cyan-300 font-mono text-right">{r.binding_ml.Kd_nM !== null ? `${r.binding_ml.Kd_nM.toFixed(1)} nM` : "—"}</span>
+                    </div>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${
+                      r.agreement_class === "strong" ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8"
+                      : r.agreement_class === "moderate" ? "border-amber-500/30 text-amber-300 bg-amber-500/8"
+                      : r.agreement_class === "disagreement" ? "border-rose-500/30 text-rose-300 bg-rose-500/8"
+                      : "border-slate-500/30 text-slate-400 bg-slate-500/8"
+                    }`}>{r.agreement_class}</span>
+                    <div className="text-[9px] text-slate-500 italic">source: {r.binding_ml.source}{r.binding_ml.error ? ` · ${r.binding_ml.error}` : ""}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider">ADMET-AI consistency</div>
+                    <div className="text-[10px] text-slate-300">L1: abs {(r.l1_admet_consistency.absorption_l1*100).toFixed(0)}%, met {(r.l1_admet_consistency.metabolism_l1*100).toFixed(0)}%, tox {(r.l1_admet_consistency.toxicity_l1*100).toFixed(0)}%</div>
+                    <div className="text-[10px] text-slate-300">ML available: {r.admet_ml.available ? "yes" : "no"} ({r.admet_ml.endpoint_count} endpoints)</div>
+                    <ul className="text-[9px] text-slate-500 italic list-disc list-inside space-y-0.5">
+                      {r.l1_admet_consistency.notes.map((n, i) => <li key={i}>{n}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 4 — Selectivity + cardiotox */}
+          {results.s4 && results.s4.result && (() => {
+            const r = results.s4.result;
+            return (
+              <ResultShell stage={4} name="Selectivity + cardiotox cross-check" icon={Shield} status={results.s4.status}>
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider">Selectivity</div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+                      <span className="text-slate-500">Class</span><span className="text-cyan-300 text-right">{r.l1_selectivity.selectivityClass}</span>
+                      <span className="text-slate-500">Hits / tested</span><span className="text-cyan-300 font-mono text-right">{r.l1_selectivity.offTargetHits} / {r.l1_selectivity.totalTargetsTested}</span>
+                      <span className="text-slate-500">Worst fold</span><span className="text-cyan-300 font-mono text-right">{r.l1_selectivity.worstFold !== null ? `${r.l1_selectivity.worstFold.toFixed(1)}×` : "—"}</span>
+                      <span className="text-slate-500">Worst target</span><span className="text-cyan-300 text-right truncate">{r.l1_selectivity.worstName ?? "—"}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider">Cardiac risk consensus</div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
+                      <span className="text-slate-500">L1 hERG</span><span className="text-cyan-300 text-right">{r.herg_l1.risk} ({r.herg_l1.ic50_uM.toFixed(2)} µM)</span>
+                      <span className="text-slate-500">ML class</span><span className="text-cyan-300 text-right">{r.cardiotox_ml.risk_class ?? "—"}</span>
+                      <span className="text-slate-500">ML p(blocker)</span><span className="text-cyan-300 font-mono text-right">{r.cardiotox_ml.blocker_probability !== null ? `${(r.cardiotox_ml.blocker_probability * 100).toFixed(0)}%` : "—"}</span>
+                    </div>
+                    <div className={`text-[10px] px-1.5 py-0.5 rounded-full border inline-block ${
+                      r.consensus_cardiac_risk === "Conflict" ? "border-rose-500/40 text-rose-300 bg-rose-500/10"
+                      : r.consensus_cardiac_risk === "High" ? "border-rose-500/40 text-rose-300 bg-rose-500/10"
+                      : r.consensus_cardiac_risk === "Moderate" ? "border-amber-500/40 text-amber-300 bg-amber-500/10"
+                      : "border-emerald-500/40 text-emerald-300 bg-emerald-500/10"
+                    }`}>Consensus: {r.consensus_cardiac_risk}</div>
+                    <div className="text-[9px] text-slate-500 italic">source: {r.cardiotox_ml.source}{r.cardiotox_ml.error ? ` · ${r.cardiotox_ml.error}` : ""}</div>
+                  </div>
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 5 OOS */}
+          {results.s5 && (
+            <ResultShell stage={5} name="Free-energy refinement" icon={ServerCrash} status={results.s5.status} reason={results.s5.reason} />
+          )}
+
+          {/* Stage 6 — PBPK */}
+          {results.s6 && (
+            <ResultShell stage={6} name="PBPK projection (2-compartment)" icon={Activity} status={results.s6.status} reason={results.s6.reason}>
+              {results.s6.result && (() => {
+                const pk = results.s6.result;
+                return (
+                  <>
+                    <div className="grid grid-cols-4 gap-2 text-[11px]">
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Cmax</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{pk.cmax.toFixed(3)}</div>
+                        <div className="text-[9px] text-slate-600">µg/mL</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Tmax</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{pk.tmax.toFixed(1)}</div>
+                        <div className="text-[9px] text-slate-600">h</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">AUC₀₋₄₈</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{pk.auc.toFixed(1)}</div>
+                        <div className="text-[9px] text-slate-600">µg·h/mL</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">t½</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{pk.halfLifeHr.toFixed(1)}</div>
+                        <div className="text-[9px] text-slate-600">h</div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2">
+                      <div className="text-[10px] text-slate-400 mb-1">Plasma concentration vs time (per administration · {pk.model})</div>
+                      <MiniLineChart data={pk.pkCurve} xKey="time" yKey="conc" color="#67e8f9" height={90} />
+                    </div>
+                    <div className="text-[9px] text-slate-500 italic">Vdss {pk.vdss.toFixed(2)} L/kg · CL {pk.clearance.toFixed(3)} L/h/kg · 1-min RK4 ODE solver, 50-h horizon, Davies & Morris physiology.</div>
+                  </>
+                );
+              })()}
+            </ResultShell>
+          )}
+
+          {/* Stage 7 — PD */}
+          {results.s7 && (
+            <ResultShell stage={7} name="QSP / PD coupling" icon={Activity} status={results.s7.status} reason={results.s7.reason}>
+              {results.s7.result && (() => {
+                const r = results.s7.result;
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Peak occupancy</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{r.peakOccupancyPct.toFixed(0)}%</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Time &gt;50%</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{r.timeAbove50pctH.toFixed(1)}h</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">AUC effect</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{r.AUC_effectH.toFixed(1)}h</div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2">
+                      <div className="text-[10px] text-slate-400 mb-1">Receptor occupancy vs time (Hill slope {r.hillCoeff}, Ki={r.ki_nM.toFixed(1)} nM)</div>
+                      <MiniLineChart data={r.pkPdCurve} xKey="time" yKey="occupancy_pct" color="#a78bfa" height={90} />
+                    </div>
+                    <div className="text-[10px] text-slate-300">{r.rationale}</div>
+                  </>
+                );
+              })()}
+            </ResultShell>
+          )}
+
+          {/* Stage 8 — TI ranking (existing) */}
+          {results.s8 && results.s8.result && (() => {
+            const proj: L2DoseProjection = results.s8.result;
+            return (
+              <ResultShell stage={8} name="Therapeutic-index ranking" icon={CheckCircle2} status={results.s8.status}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${verdictColor(proj.verdict)}`}>
+                    {proj.verdict}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                    <div className="text-[11px] font-semibold text-slate-200">Receptor-occupancy target</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                    <div className="text-slate-500">Target occupancy</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.targetOccupancy * 100, 0, "%")}</div>
+                    <div className="text-slate-500">L1 Ki</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.ki_nM, 2, " nM")}</div>
+                    <div className="text-slate-500">Required Cmax,unbound</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.targetCmaxUnbound_nM, 2, " nM")}</div>
+                    <div className="text-slate-500">Plasma fu</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.fu_fraction * 100, 2, "%")}</div>
+                    <div className="text-slate-500">Required Cmax,total</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.targetCmaxTotal_nM, 2, " nM")}</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                    <div className="text-[11px] font-semibold text-slate-200">Therapeutic-index margins</div>
+                    <span className="text-[9px] text-slate-600 ml-auto">SAFE ≥30× · CAUTION 10–30× · RISK &lt;10×</span>
+                  </div>
+                  <div className="space-y-2">
+                    {proj.margins.map(m => <MarginBar key={m.label} row={m} />)}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Beaker className="w-3.5 h-3.5 text-cyan-400" />
+                    <div className="text-[11px] font-semibold text-slate-200">First-pass human dose projection</div>
+                    <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-300">Confidence: low</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                    <div className="text-slate-500">Estimated Vd</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.Vd_L_per_kg, 2, " L/kg")}</div>
+                    <div className="text-slate-500">Estimated F</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.F_oral * 100, 0, "%")}</div>
+                    <div className="text-slate-500">Estimated hepatic CL</div><div className="text-cyan-300 font-mono text-right">{proj.hepaticCL_mL_min_kg !== null ? fmt(proj.hepaticCL_mL_min_kg, 1, " mL/min/kg") : "—"}</div>
+                    <div className="text-slate-500">Predicted dose (mg/kg/day)</div><div className="text-cyan-300 font-mono text-right">{fmt(proj.predictedDose_mg_per_kg, 3)}</div>
+                    <div className="text-slate-300 font-semibold">Predicted dose (mg/day)</div><div className="text-cyan-200 font-mono text-right font-semibold">{fmt(proj.predictedDose_mg_per_day, 1)}</div>
+                  </div>
+                  <details className="text-[9px] text-slate-500 leading-relaxed mt-1">
+                    <summary className="cursor-pointer text-slate-400 hover:text-slate-300">Assumptions used</summary>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 italic">
+                      <li>{proj.Vd_assumption}</li>
+                      <li>{proj.F_assumption}</li>
+                      <li>{proj.CL_assumption}</li>
+                      <li>{proj.doseAssumption}</li>
+                    </ul>
+                  </details>
+                </div>
+                <div className={`rounded-lg border p-3 ${verdictColor(proj.verdict)}`}>
+                  <div className="text-[11px] font-semibold mb-1.5">Verdict — {proj.verdict}</div>
+                  <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
+                    {proj.rationale.map((r, i) => <li key={`r${i}`}>{r}</li>)}
+                  </ul>
+                  {proj.warnings.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-white/10">
+                      <div className="text-[10px] font-semibold mb-1">L1 carry-forward warnings</div>
+                      <ul className="text-[10px] list-disc list-inside space-y-0.5 leading-relaxed">
+                        {proj.warnings.map((w, i) => <li key={`w${i}`}>{w}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="text-[9px] text-slate-600 italic leading-relaxed">
+                  {proj.confidenceNote} Generated {new Date(proj.generatedAt).toLocaleTimeString()} from L1 stamp {new Date(proj.l1Stamp).toLocaleTimeString()}.
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 9 — Handoff JSON */}
+          {results.s9 && results.s9.result && (
+            <ResultShell stage={9} name="Output / handoff JSON" icon={ArrowRight} status={results.s9.status}>
+              <div className="rounded-lg border border-white/8 bg-black/30 p-3 relative">
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(JSON.stringify(results.s9!.result, null, 2))}
+                  className="absolute top-2 right-2 text-[9px] text-slate-400 hover:text-cyan-300 flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5"
+                  title="Copy JSON to clipboard"
+                ><Copy className="w-3 h-3" />Copy</button>
+                <pre className="text-[10px] text-slate-300 font-mono overflow-x-auto whitespace-pre">
+{JSON.stringify(results.s9.result, null, 2)}
+                </pre>
+              </div>
+              <div className="text-[10px] text-slate-500 italic">Schema <span className="font-mono text-slate-400">L2-handoff-v1</span> — what L3 Ex Vivo would receive when wired.</div>
+            </ResultShell>
+          )}
+
+          {/* L1 → L2 input contract */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-violet-400" />
@@ -574,14 +952,14 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             </div>
           </div>
 
-          {/* L2 → L3 output contract — sourced from the doc */}
+          {/* L2 → L3 output contract */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-amber-400" />
               <h3 className="text-[13px] font-semibold text-white">L2 → L3 Output Contract</h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              When wired, L2 would hand L3 a ranked shortlist (architecture doc §4 — no specific shortlist size or cost estimate is asserted by this product), each carrying:
+              When wired, L2 hands L3 a ranked shortlist (architecture doc §4 — no specific shortlist size or cost estimate is asserted), each carrying:
             </p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
               {[
@@ -621,4 +999,3 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
     </div>
   );
 }
-

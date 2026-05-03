@@ -28,13 +28,39 @@ const HUMAN_HEPATIC_BLOOD_FLOW_ML_MIN_KG = 20;   // Davies & Morris 1993
 const MPPGL = 45;                                // mg microsomal protein per g liver — Barter 2007
 const LIVER_WEIGHT_G_PER_KG = 25.7;              // ICRP Reference Adult Male
 
-// ── Receptor-occupancy target (Stage 8 default) ─────────────────────────────
-const TARGET_OCCUPANCY = 0.75;                   // 75% — common pre-clinical target
-const KI_MULTIPLIER_FOR_TARGET = TARGET_OCCUPANCY / (1 - TARGET_OCCUPANCY); // = 3.0 for 75%
+// ── Receptor-occupancy default (Stage 8) ────────────────────────────────────
+const DEFAULT_TARGET_OCCUPANCY = 0.75;           // 75% — common pre-clinical target
 
 // ── Safety-margin tier cutoffs (FDA cardiac safety convention) ──────────────
 const MARGIN_SAFE_THRESHOLD     = 30;
 const MARGIN_CAUTION_THRESHOLD  = 10;
+
+// ── User-tunable inputs for Stage 8 ─────────────────────────────────────────
+export interface L2InputParams {
+  /** Target receptor occupancy (0–1). Default 0.75. */
+  targetOccupancy?: number;
+  /** Body weight in kg. Default 70. */
+  bodyWeightKg?: number;
+  /** Dosing route. Affects oral F. Default "oral". */
+  route?: "oral" | "iv";
+  /** Doses per day (1=QD, 2=BID, 3=TID). Default 1. */
+  dosesPerDay?: number;
+  /** Override fu (0–1) — bypass L1 plasma protein binding. */
+  fuOverride?: number;
+  /** Override Vd in L/kg — bypass logP-binned proxy. */
+  VdOverride?: number;
+  /** Override F (0–1) — bypass Caco-2 → F bins. */
+  FOverride?: number;
+  /** Override hepatic CL in mL/min/kg — bypass well-stirred liver model. */
+  CLOverride?: number;
+}
+
+const DEFAULTS: Required<Omit<L2InputParams, "fuOverride" | "VdOverride" | "FOverride" | "CLOverride">> = {
+  targetOccupancy: DEFAULT_TARGET_OCCUPANCY,
+  bodyWeightKg:    HUMAN_BODY_WEIGHT_KG,
+  route:           "oral",
+  dosesPerDay:     1,
+};
 
 export type MarginTier = "SAFE" | "CAUTION" | "RISK" | "UNKNOWN";
 
@@ -136,6 +162,12 @@ function scaleHepaticCL(
   };
 }
 
+/** Clamp a value to [0, 1]. */
+function clamp01(v: number): number {
+  if (!isFinite(v)) return 0;
+  return Math.max(0, Math.min(1, v));
+}
+
 /** Tier a safety ratio. */
 function tier(ratio: number | null): MarginTier {
   if (ratio === null || !isFinite(ratio)) return "UNKNOWN";
@@ -151,7 +183,16 @@ function tier(ratio: number | null): MarginTier {
 export function computeL2DoseProjection(
   sim: SimResults,
   iv:  InVitroResults,
+  params: L2InputParams = {},
 ): L2DoseProjection {
+
+  // ── Resolve input params (with defaults) ──────────────────────────────────
+  const occupancy   = clamp01(params.targetOccupancy ?? DEFAULTS.targetOccupancy);
+  const bodyWeight  = isFinite(params.bodyWeightKg as number) && (params.bodyWeightKg as number) > 0
+                      ? (params.bodyWeightKg as number) : DEFAULTS.bodyWeightKg;
+  const route       = params.route ?? DEFAULTS.route;
+  const dosesPerDay = Math.max(1, Math.floor(params.dosesPerDay ?? DEFAULTS.dosesPerDay));
+  const kiMultiplier = occupancy / Math.max(1e-6, 1 - occupancy);
 
   // ── Read live L1 inputs ───────────────────────────────────────────────────
   const ki_nM    = sim.binding.primaryKi;
@@ -164,38 +205,99 @@ export function computeL2DoseProjection(
   const caco2    = iv.permeability.caco2Papp;
   const clint    = iv.metabolicStability.microsomalCLint;
 
-  // ── Validate fu (no silent fallback per user policy) ──────────────────────
-  // fu is required for Cmax,total math and CL scaling. If invalid, we surface
-  // it as an explicit warning + degrade to Cmax,unbound-only margins rather
-  // than substituting a guess.
-  const fuValid = isFinite(fuPct) && fuPct > 0 && fuPct <= 100;
-  const fu      = fuValid ? fuPct / 100 : NaN;
+  // ── Override validity helpers (explicit, no silent fallback) ──────────────
+  // For each override: undefined = "not supplied" (use L1/model). Any *supplied*
+  // value that fails validation is surfaced as an explicit warning so the user
+  // sees their typo instead of silently getting the L1 value back.
+  const overrideWarnings: string[] = [];
+  const supplied = (v: number | undefined): boolean => v !== undefined && !Number.isNaN(v);
+
+  const fuOverrideSupplied = supplied(params.fuOverride);
+  const fuOverrideValid    = fuOverrideSupplied
+                              && isFinite(params.fuOverride as number)
+                              && (params.fuOverride as number) > 0
+                              && (params.fuOverride as number) <= 1;
+  if (fuOverrideSupplied && !fuOverrideValid) {
+    overrideWarnings.push(`fu override ${params.fuOverride} rejected — must be in (0, 1]. Falling back to L1 plasma fu.`);
+  }
+  const fuFromL1 = isFinite(fuPct) && fuPct > 0 && fuPct <= 100 ? fuPct / 100 : NaN;
+  const fu       = fuOverrideValid ? (params.fuOverride as number) : fuFromL1;
+  const fuValid  = isFinite(fu) && fu > 0 && fu <= 1;
+  const fuSource = fuOverrideValid ? "user override" : "L1 plasma protein binding";
   const fuWarning = fuValid
     ? null
-    : `L1 plasma fu out of range (fuPercent=${fuPct}). Cmax,total and dose projection cannot be computed without a valid fu — neither will be reported. Margins below use Cmax,unbound only.`;
+    : `Plasma fu unavailable (L1 reports fuPercent=${fuPct}; no valid override). Cmax,total and dose projection cannot be computed without a valid fu — margins below use Cmax,unbound only.`;
 
-  // ── Receptor-occupancy target (Hill slope 1, 75%) ─────────────────────────
-  const targetCmaxUnbound_nM = KI_MULTIPLIER_FOR_TARGET * ki_nM;
+  // ── Receptor-occupancy target (Hill slope 1, user-tunable occupancy) ──────
+  const targetCmaxUnbound_nM = kiMultiplier * ki_nM;
   const targetCmaxTotal_nM   = fuValid ? targetCmaxUnbound_nM / fu : NaN;
 
-  // ── PK estimation (heuristic, clearly flagged) ────────────────────────────
-  const { Vd, assumption: VdNote } = estimateVd(logP);
-  const { F,  assumption: FNote  } = estimateF(caco2);
-  const clResult = fuValid
-    ? scaleHepaticCL(clint, fu)
-    : { CL: NaN, assumption: `Hepatic CL not computed — invalid plasma fu (fuPercent=${fuPct}); well-stirred liver model requires fu.` };
-  const { CL, assumption: CLNote } = clResult;
+  // ── PK estimation: override > model ───────────────────────────────────────
+  const VdOverrideSupplied = supplied(params.VdOverride);
+  const VdOverrideValid    = VdOverrideSupplied
+                              && isFinite(params.VdOverride as number)
+                              && (params.VdOverride as number) > 0
+                              && (params.VdOverride as number) <= 100;
+  if (VdOverrideSupplied && !VdOverrideValid) {
+    overrideWarnings.push(`Vd override ${params.VdOverride} L/kg rejected — must be in (0, 100]. Falling back to logP-binned proxy.`);
+  }
+  const VdEstimated = estimateVd(logP);
+  const Vd     = VdOverrideValid ? (params.VdOverride as number) : VdEstimated.Vd;
+  const VdNote = VdOverrideValid
+                 ? `Vd ${Vd.toFixed(2)} L/kg — user override (logP-binned proxy would have suggested ${VdEstimated.Vd} L/kg).`
+                 : VdEstimated.assumption;
 
-  // ── Required oral dose for target Cmax,total ──────────────────────────────
-  const dose_mg_per_kg = fuValid
+  const FOverrideSupplied = supplied(params.FOverride);
+  const FOverrideValid    = FOverrideSupplied
+                              && isFinite(params.FOverride as number)
+                              && (params.FOverride as number) > 0
+                              && (params.FOverride as number) <= 1;
+  if (FOverrideSupplied && !FOverrideValid && route !== "iv") {
+    overrideWarnings.push(`F override ${params.FOverride} rejected — must be in (0, 1]. Falling back to Caco-2 → F bin.`);
+  }
+  const FEstimated = estimateF(caco2);
+  const F = route === "iv" ? 1.0
+            : (FOverrideValid ? (params.FOverride as number) : FEstimated.F);
+  const FNote = route === "iv"
+                ? `IV route — F = 1.0 by definition.`
+                : (FOverrideValid
+                  ? `F ${F.toFixed(2)} — user override (Caco-2 → F bins would have suggested ${FEstimated.F.toFixed(2)}).`
+                  : FEstimated.assumption);
+
+  const CLOverrideSupplied = supplied(params.CLOverride);
+  const CLOverrideValid    = CLOverrideSupplied
+                              && isFinite(params.CLOverride as number)
+                              && (params.CLOverride as number) > 0
+                              && (params.CLOverride as number) <= 1000;
+  if (CLOverrideSupplied && !CLOverrideValid) {
+    overrideWarnings.push(`CL override ${params.CLOverride} mL/min/kg rejected — must be in (0, 1000]. Falling back to well-stirred liver model.`);
+  }
+  let CL: number; let CLNote: string;
+  if (CLOverrideValid) {
+    CL = params.CLOverride as number;
+    CLNote = `Hepatic CL ${CL.toFixed(1)} mL/min/kg — user override (well-stirred liver model bypassed).`;
+  } else if (fuValid) {
+    const r = scaleHepaticCL(clint, fu); CL = r.CL; CLNote = r.assumption;
+  } else {
+    CL = NaN;
+    CLNote = `Hepatic CL not computed — invalid plasma fu (fuPercent=${fuPct}); well-stirred liver model requires fu and no valid override given.`;
+  }
+
+  // ── Required oral dose for target Cmax,total per administration ───────────
+  // Dose per administration = Cmax,total × Vd × MW / F (μM·L/kg → mg/kg)
+  // Daily dose = (per-administration dose) × dosesPerDay
+  const dose_per_admin_mg_per_kg = fuValid
     ? (targetCmaxTotal_nM * Vd * mw) / (F * 1e6)
     : NaN;
-  const dose_mg_per_day = fuValid ? dose_mg_per_kg * HUMAN_BODY_WEIGHT_KG : NaN;
+  const dose_mg_per_kg  = fuValid ? dose_per_admin_mg_per_kg * dosesPerDay : NaN;
+  const dose_mg_per_day = fuValid ? dose_mg_per_kg * bodyWeight : NaN;
 
+  const freqLabel = dosesPerDay === 1 ? "QD" : dosesPerDay === 2 ? "BID" : dosesPerDay === 3 ? "TID" : `${dosesPerDay}×/day`;
   const doseAssumption = fuValid
-    ? `Steady-state Cmax = Dose × F / Vd. ` +
-      `Dose(mg/day) = Cmax,total(${targetCmaxTotal_nM.toFixed(1)} nM) × Vd(${Vd} L/kg) × MW(${mw.toFixed(0)}) / F(${F.toFixed(2)}) × 70 kg / 10⁶. ` +
-      `Ignores accumulation, F1st-pass beyond gut, formulation. First-pass projection only.`
+    ? `Per-admin Cmax = Dose × F / Vd. ` +
+      `Dose/admin(mg/kg) = Cmax,total(${targetCmaxTotal_nM.toFixed(1)} nM) × Vd(${Vd.toFixed(2)} L/kg) × MW(${mw.toFixed(0)}) / F(${F.toFixed(2)}) / 10⁶. ` +
+      `Daily dose = ${dose_per_admin_mg_per_kg.toFixed(3)} mg/kg × ${dosesPerDay} (${freqLabel}) × ${bodyWeight} kg = ${dose_mg_per_day.toFixed(1)} mg/day. ` +
+      `Ignores accumulation beyond simple multiplication, gut first-pass, formulation. First-pass projection only.`
     : `Dose projection skipped — invalid plasma fu prevents Cmax,total calculation.`;
 
   // ── Therapeutic-index margins (per architecture doc §4.3 Stage 8: ─────────
@@ -260,6 +362,8 @@ export function computeL2DoseProjection(
 
   // Surface fu validation issue first if it occurred
   if (fuWarning) warnings.push(fuWarning);
+  // Surface any rejected user overrides (typo guard, no silent fallback)
+  overrideWarnings.forEach(w => warnings.push(w));
 
   // Carry through L1 categorical signals
   if (sim.goNogo === "NO-GO") {
@@ -298,14 +402,15 @@ export function computeL2DoseProjection(
 
   if (fuValid) {
     rationale.push(
-      `Predicted starting human dose ≈ ${dose_mg_per_day.toFixed(1)} mg/day for 70-kg adult ` +
-      `to reach ${(TARGET_OCCUPANCY * 100).toFixed(0)}% receptor occupancy ` +
-      `(Cmax,u ≈ ${targetCmaxUnbound_nM.toFixed(1)} nM = ${KI_MULTIPLIER_FOR_TARGET}× Ki).`,
+      `Predicted starting human dose ≈ ${dose_mg_per_day.toFixed(1)} mg/day (${freqLabel}) for ${bodyWeight}-kg adult ` +
+      `to reach ${(occupancy * 100).toFixed(0)}% receptor occupancy ` +
+      `(Cmax,u ≈ ${targetCmaxUnbound_nM.toFixed(1)} nM = ${kiMultiplier.toFixed(2)}× Ki). ` +
+      `fu source: ${fuSource}.`,
     );
   } else {
     rationale.push(
-      `Required Cmax,unbound ≈ ${targetCmaxUnbound_nM.toFixed(1)} nM = ${KI_MULTIPLIER_FOR_TARGET}× Ki ` +
-      `for ${(TARGET_OCCUPANCY * 100).toFixed(0)}% receptor occupancy. ` +
+      `Required Cmax,unbound ≈ ${targetCmaxUnbound_nM.toFixed(1)} nM = ${kiMultiplier.toFixed(2)}× Ki ` +
+      `for ${(occupancy * 100).toFixed(0)}% receptor occupancy. ` +
       `Dose projection withheld — invalid plasma fu.`,
     );
   }
@@ -317,7 +422,7 @@ export function computeL2DoseProjection(
     smiles:      sim.smiles,
     uniprotId:   sim.uniprotId,
 
-    targetOccupancy:      TARGET_OCCUPANCY,
+    targetOccupancy:      occupancy,
     targetCmaxUnbound_nM,
     targetCmaxTotal_nM,
     fu_fraction:          fu,
