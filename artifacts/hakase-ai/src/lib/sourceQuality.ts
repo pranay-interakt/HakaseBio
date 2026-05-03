@@ -4,6 +4,7 @@
  * Tiers (per critic spec):
  *   experimental (1.0) — direct measured assay data (ChEMBL activity, BindingDB)
  *   enriched     (0.7) — database-derived but inferred (ChEMBL similarity, Open Targets tractability)
+ *   ml           (0.7) — validated ML model (held-out CV AUC reported, training set cited)
  *   heuristic    (0.3) — rules / patterns / interpolation (TPSA brackets, pharmacophore matching)
  *   inferred     (0.1) — model prediction without validation (pharmacophore-jitter pIC50)
  *
@@ -11,11 +12,12 @@
  * to decide whether L1→L2 auto-advance is permitted.
  */
 
-export type QualityTier = "experimental" | "enriched" | "heuristic" | "inferred";
+export type QualityTier = "experimental" | "enriched" | "ml" | "heuristic" | "inferred";
 
 export const TIER_SCORE: Record<QualityTier, number> = {
   experimental: 1.0,
   enriched:     0.7,
+  ml:           0.7,
   heuristic:    0.3,
   inferred:     0.1,
 };
@@ -64,6 +66,7 @@ export function tierChipClasses(tier: QualityTier): string {
   switch (tier) {
     case "experimental": return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
     case "enriched":     return "bg-blue-500/15    text-blue-300    border-blue-500/30";
+    case "ml":           return "bg-violet-500/15  text-violet-300  border-violet-500/30";
     case "heuristic":    return "bg-amber-500/15   text-amber-300   border-amber-500/30";
     case "inferred":     return "bg-rose-500/15    text-rose-300    border-rose-500/30";
   }

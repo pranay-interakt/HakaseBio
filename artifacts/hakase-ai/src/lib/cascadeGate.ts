@@ -48,6 +48,18 @@ export interface CascadeGateResult {
 }
 
 /**
+ * Live ML predictions surfaced from the ai-service. When a row is `available`
+ * the gate flips that output's tier from "heuristic" to "ml" (score 0.7) and
+ * uses the `note` as the per-output rationale. Pass only what's actually loaded
+ * — undefined keys leave the heuristic default in place.
+ */
+export interface CascadeMlOverrides {
+  hepatotoxicity?:    { available: boolean; note: string };
+  absorption_admet?:  { available: boolean; note: string };
+  binding_estimate?:  { available: boolean; note: string };
+}
+
+/**
  * Source attribution is currently *static* per-output — derived from inspection
  * of the underlying engine, not from runtime metadata. As individual L1 engines
  * (admet.ts, inVitroSim.ts, bioactivationEngine.ts) get rewritten to surface
@@ -122,6 +134,7 @@ function bestTargetTier(suggestions: TargetSuggestion[]): { tier: QualityTier; n
 export function evaluateCascadeGate(
   simResults: SimResults | null,
   targetSuggestions: TargetSuggestion[],
+  mlOverrides: CascadeMlOverrides = {},
 ): CascadeGateResult {
   const detail = defaultDetail();
 
@@ -132,6 +145,17 @@ export function evaluateCascadeGate(
     score: TIER_SCORE[tgt.tier],
     note:  tgt.note,
   };
+
+  // Override per-output tier to "ml" when a validated ML prediction is loaded.
+  // We check `available` explicitly so a fallback / failed prediction does NOT
+  // upgrade the tier (otherwise the gate would silently lie about quality).
+  const mlKeys = ["hepatotoxicity", "absorption_admet", "binding_estimate"] as const;
+  for (const k of mlKeys) {
+    const ov = mlOverrides[k];
+    if (ov?.available) {
+      detail[k] = { tier: "ml", score: TIER_SCORE.ml, note: ov.note };
+    }
+  }
 
   // Compute safety-min and non-safety-avg.
   const safetyScores = SAFETY_KEYS.map((k) => detail[k as SafetyKey].score);

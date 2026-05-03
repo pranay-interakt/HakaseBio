@@ -68,6 +68,10 @@ import {
   predictSolubilityMl,
   predictBinding,
   predictBindingMl,
+  predictDiliMl,
+  predictAdmetMl,
+  type DiliMlResult,
+  type MlAdmetResult,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
@@ -255,6 +259,15 @@ export function HakaseAI() {
   const [bindingMlLoading, setBindingMlLoading] = useState(false);
   const bindingSeqRef = useRef(0);
   const bindingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── L1 ML predictions used to flip stage-gate badges from HEURISTIC → ML
+  // (DILI-ML hepatotox + ADMET-ML absorption). Binding-ML already has state above.
+  // The ai-service caches per-SMILES so calling these here is cheap even if L2/L3
+  // also call them later. Stale-request guards via *SeqRef.
+  const [diliMl, setDiliMl] = useState<DiliMlResult | null>(null);
+  const diliMlSeqRef = useRef(0);
+  const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
+  const admetMlSeqRef = useRef(0);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
@@ -801,9 +814,65 @@ export function HakaseAI() {
   //   (b) every safety-critical output meets minimum quality ≥ 0.6, and
   //   (c) average non-safety quality ≥ 0.6.
   // Otherwise the user sees a stage-gate banner and must explicitly override.
+  // ── L1 ML predictions: fire on SMILES change so the stage-gate can flip
+  // hepatotoxicity / absorption_admet badges from HEURISTIC → ML when the
+  // ai-service returns a real prediction. Stale-request guards prevent an
+  // older response from overwriting a newer one. Failures are surfaced as
+  // null (the gate keeps the heuristic default — no silent upgrade).
+  useEffect(() => {
+    const sm = (smiles ?? "").trim();
+    if (!sm || !rdkitReady || !molProps?.isValid) {
+      setDiliMl(null);
+      setAdmetMl(null);
+      return;
+    }
+    const seqDili = ++diliMlSeqRef.current;
+    const seqAdmet = ++admetMlSeqRef.current;
+    predictDiliMl(sm)
+      .then(r => { if (diliMlSeqRef.current === seqDili) setDiliMl(r); })
+      .catch(() => { if (diliMlSeqRef.current === seqDili) setDiliMl(null); });
+    predictAdmetMl(sm)
+      .then(r => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(r); })
+      .catch(() => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(null); });
+  }, [smiles, rdkitReady, molProps?.isValid]);
+
   const cascadeGate = useMemo(
-    () => evaluateCascadeGate(simResults, targetSuggestions),
-    [simResults, targetSuggestions],
+    () => {
+      // Build ML overrides for the stage-gate. We only mark a row as `available`
+      // when the ai-service genuinely returned an ML prediction (source === "ml"
+      // AND the leaf field is non-null). A "fallback" response or null leaf must
+      // NOT upgrade the tier — that would lie about data quality.
+      const overrides: Parameters<typeof evaluateCascadeGate>[2] = {};
+      if (diliMl && diliMl.source === "ml" && diliMl.prediction.risk_class !== null) {
+        const auc = diliMl.model_info?.performance?.cv_roc_auc_mean;
+        const cite = auc != null
+          ? `DILIrank Chemprop+Morgan-RF (CV ROC-AUC ${auc.toFixed(2)})`
+          : `DILIrank Chemprop+Morgan-RF`;
+        overrides.hepatotoxicity = {
+          available: true,
+          note: `ML — ${cite}; risk_class=${diliMl.prediction.risk_class}`,
+        };
+      }
+      if (admetMl && admetMl.source === "ml" && admetMl.ml_available) {
+        const eng = admetMl.model_info?.engine ?? "Chemprop ADMET";
+        overrides.absorption_admet = {
+          available: true,
+          note: `ML — ${eng}; Caco-2 + HIA + bioavailability heads`,
+        };
+      }
+      if (bindingMl && bindingMl.source === "ml" && bindingMl.prediction.pKd_predicted !== null) {
+        const tr = bindingMl.model_info?.training;
+        const cite = tr
+          ? `DeepDTA-GBM (BindingDB, n=${tr.n_train.toLocaleString()})`
+          : `DeepDTA-GBM (BindingDB)`;
+        overrides.binding_estimate = {
+          available: true,
+          note: `ML — ${cite}; pKd=${bindingMl.prediction.pKd_predicted.toFixed(2)}`,
+        };
+      }
+      return evaluateCascadeGate(simResults, targetSuggestions, overrides);
+    },
+    [simResults, targetSuggestions, diliMl, admetMl, bindingMl],
   );
   const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
   // Reset override whenever the molecule or target evidence changes.
