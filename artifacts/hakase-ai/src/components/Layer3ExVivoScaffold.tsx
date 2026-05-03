@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import {
   Microscope, ArrowRight, Database, Shield, Sparkles, AlertCircle, AlertTriangle,
   CircleDot, Play, Activity, Loader2, Copy, Check, Sliders, ChevronDown, ChevronRight,
-  FlaskConical, ServerCrash, FileText, Atom, Beaker,
+  FlaskConical, ServerCrash, FileText, Atom, Beaker, UserPen, Trash2, Pencil,
 } from "lucide-react";
 import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
@@ -28,7 +28,7 @@ interface Layer3ExVivoScaffoldProps {
 
 /* ─── Stage definitions (per Spec v1.1 §3 + §10 + Appendix B) ─────────────── */
 
-type WiredKind = "in-house" | "ml-service" | "external-data" | "out-of-scope-yet";
+type WiredKind = "in-house" | "ml-service" | "external-data" | "stub-with-manual";
 
 type StageStatus = "ready" | "running" | "complete" | "error" | "out-of-scope-yet";
 
@@ -38,8 +38,10 @@ type StageDef = {
   detail: string;
   wired: WiredKind;
   engines: { name: string; note: string }[];
-  /** When wired = "out-of-scope-yet": short reason shown on the disabled Run button. */
+  /** When wired = "stub-with-manual": short reason shown above the manual-entry option. */
   pendingReason?: string;
+  /** True for stages 2–6: ML model is not yet wired but a Manual Entry path is available. */
+  acceptsManualEntry: boolean;
 };
 
 const L3_STAGES: StageDef[] = [
@@ -51,65 +53,70 @@ const L3_STAGES: StageDef[] = [
       { name: "GTEx Portal v2 REST",                  note: "v8 dataset (v10 not yet at medianGeneExpression endpoint)" },
       { name: "lib/transporterFlags.ts (QSAR)",       note: "BSEP, OAT1/3, OCT2, OATP1B1/3, P-gp, BCRP, MRP2 — Polli/Morgan/Karlgren/Truong/Wittwer/Matsson/El-Sheikh" },
     ],
+    acceptsManualEntry: false,
   },
   {
-    n: 2, name: "DILI severity + mechanism classifier", wired: "out-of-scope-yet",
-    detail: "Gradient-boosted ensemble on Morgan FP (radius 2, 2048 bits) + L1 ADMET vector + L2 hepatic Cu + transporter flags. Targets: 3-class severity + 4-channel mechanism (mitochondrial / BSEP / ROS / immune). Calibrated probabilities via temperature scaling.",
+    n: 2, name: "DILI severity + mechanism classifier", wired: "stub-with-manual",
+    detail: "Gradient-boosted ensemble on Morgan FP + L1 ADMET + L2 hepatic Cu + transporter flags. Targets: 5-class severity + 4-channel mechanism (mitochondrial / BSEP / ROS / immune). Until the ML model is trained, you can enter a known DILI severity from FDA label / DILIrank lookup.",
     engines: [
       { name: "ai-service /predict/dili-ml", note: "LightGBM/XGBoost — TO BUILD (not yet wired in ai-service)" },
       { name: "DILIrank (FDA) + LTKB",        note: "~700 adjudicated compounds — bulk-download to Parquet" },
-      { name: "QMRF + V&V40 reports",         note: "OECD QSAR five validation principles + FDA 2024 AI draft guidance" },
+      { name: "Manual entry (this build)",    note: "user-asserted DILIrank class + mechanism flags + citation" },
     ],
-    pendingReason: "Stage 2 not wired — dili-ml service + DILIrank training pipeline pending (spec §7.1, ETA 5–7 d).",
+    pendingReason: "ML classifier pending (spec §7.1, ETA 5–7 d). Manual entry available for known compounds.",
+    acceptsManualEntry: true,
   },
   {
-    n: 3, name: "Cell-type aggregation (Drug2cell + Tabula Sapiens)", wired: "out-of-scope-yet",
-    detail: "Per cell type in Tabula Sapiens v2 (~480 across 28 organs): score = target_gene_expression × predicted drug affinity. Aggregated to organoid IC50 prediction via published organoid-composition fractions and Hill fit.",
+    n: 3, name: "Cell-type aggregation (Drug2cell + Tabula Sapiens)", wired: "stub-with-manual",
+    detail: "Per cell type in Tabula Sapiens v2 (~480 across 28 organs): score = target_gene_expression × predicted drug affinity, aggregated to organoid IC50 via published organoid-composition fractions and Hill fit. Manual entry accepts a measured organoid IC50 from a CRO panel (T2 wet-data path).",
     engines: [
       { name: "drug2cell (Teichmann lab, MIT)", note: "pip install — pin Tabula Sapiens v2 by SHA" },
       { name: "Tabula Sapiens v2 (CELLxGENE)",  note: "bulk-download to local Parquet for v1 (Census API later)" },
-      { name: "lib/cellTypeAggregator.ts",      note: "TO BUILD — wraps drug2cell output with organoid-composition map" },
+      { name: "Manual entry (this build)",      note: "Cellosaurus CVCL accession + measured organoid IC50 + citation" },
     ],
-    pendingReason: "Stage 3 not wired — Drug2cell sidecar + Tabula Sapiens v2 bulk ingest pending (spec §3.2, ETA 7–10 d).",
+    pendingReason: "Drug2cell + Tabula Sapiens bulk ingest pending (spec §3.2, ETA 7–10 d). Manual entry available for already-measured organoid panels.",
+    acceptsManualEntry: true,
   },
   {
-    n: 4, name: "Patient-line projection (oncology only)", wired: "out-of-scope-yet",
-    detail: "Predicted IC50 distribution across patient-line genomics from HCMI catalogue + DepMap PRISM cell-line response, conditioned on indication + target gene.",
+    n: 4, name: "Patient-line projection (oncology only)", wired: "stub-with-manual",
+    detail: "Predicted IC50 distribution across patient-line genomics from HCMI catalogue + DepMap PRISM, conditioned on indication + target gene. Manual entry accepts already-measured DepMap PRISM IC50 rows, or marks the readout as not_applicable when the compound is non-oncology.",
     engines: [
       { name: "lib/patientLineProjection.ts",   note: "TO BUILD — null when out-of-domain (non-oncology)" },
       { name: "HCMI (NCI / ATCC)",              note: "~700 next-gen cancer models with paired matched-normal genomics" },
       { name: "DepMap PRISM",                   note: "6,000 cmpds × 2,000 cell lines IC50 — labelled-proxy with explicit '2D not organoid' tag" },
+      { name: "Manual entry (this build)",      note: "DepMap accession + measured IC50 rows, OR explicit non-oncology not_applicable" },
     ],
-    pendingReason: "Stage 4 not wired — HCMI + DepMap snapshots pending DVC ingest (spec §3.5, ETA 5–7 d, oncology only).",
+    pendingReason: "HCMI + DepMap snapshots pending DVC ingest (spec §3.5, ETA 5–7 d, oncology only).",
+    acceptsManualEntry: true,
   },
   {
-    n: 5, name: "DILI biomarker proxy + permeability surfacing", wired: "out-of-scope-yet",
-    detail: "Rule-based mapping from Stage 2 mechanism flags to expected biomarker pattern (mito → GLDH; cholestatic → ALP; hepatocellular → ALT, miR-122; immune → eosinophilia priors). Permeability + brain Kp,uu surfaced from L1 Caco-2 + L2 PBPK gut + brain compartments.",
+    n: 5, name: "DILI biomarker proxy + permeability", wired: "stub-with-manual",
+    detail: "Deterministic mapping from Stage 2 mechanism flags to expected biomarker pattern (mito → GLDH; cholestatic → ALP/bilirubin; hepatocellular → ALT, miR-122; immune → eosinophilia priors). Permeability auto-pulled from L1 Caco-2. Manual override for brain Kp,uu when MDR1-MDCK or PET data is available.",
     engines: [
-      { name: "lib/biomarkerProxy.ts",          note: "TO BUILD — deterministic mapping table" },
-      { name: "lib/permeabilityProjection.ts",  note: "TO BUILD — wraps L1 Caco-2 + L2 gut/brain Cu" },
+      { name: "lib/biomarkerProxy.ts (deterministic)", note: "rule table per spec §3.6 — Antoine 2013 / Wang 2009 / Andrade 2019" },
+      { name: "lib/permeabilityProjection.ts",         note: "L1 Caco-2 surfacing; brain Kp,uu manual override available" },
+      { name: "Manual entry (this build)",             note: "biomarker override + brain Kp,uu measured value (optional)" },
     ],
-    pendingReason: "Stage 5 depends on Stage 2 (DILI mechanism flags) and the L2 PBPK gut + brain compartments (spec §3.6 + §3.7, ETA 3 d after Stage 2).",
+    pendingReason: "Auto-runs deterministically once Stage 2 is filled; biomarker rule table is in-house. Manual override available for measured brain Kp,uu.",
+    acceptsManualEntry: true,
   },
   {
-    n: 6, name: "Cascade integration tests + L3→L4 envelope", wired: "out-of-scope-yet",
-    detail: "End-to-end integration tests across all wired stages. Per-readout `tier` field, per-readout CascadeFlagState, applicability-domain score, fold-error band (cohortN=0 until calibration). Mixed-tier envelopes are normal.",
+    n: 6, name: "Cascade integration + L3→L4 envelope", wired: "stub-with-manual",
+    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L4 Amber Curator. No data entry — runs whenever any Stage 1–5 result exists.",
     engines: [
-      { name: "lib/exVivoSurrogate.ts",         note: "TO BUILD — top-level orchestrator with per-readout ReadoutBlock<V> envelope" },
-      { name: "L3→L4 envelope tests",           note: "round-trip cascade integrity, Amber-Curator load-bearing predicate" },
+      { name: "lib/exVivoSurrogate.ts (orchestrator)", note: "per-readout ReadoutBlock<V> envelope; mixed-tier envelopes are normal" },
+      { name: "L3→L4 envelope (Amber Curator gate)",   note: "canSignLoadBearing requires kind:'pass' — t-user maps to prediction_only" },
     ],
-    pendingReason: "Stage 6 depends on Stages 1–5 (spec §10.6 / Appendix B, ETA 2–3 d after Stage 5).",
+    pendingReason: "Always runnable as soon as any Stage 1–5 has a result.",
+    acceptsManualEntry: true,
   },
 ];
 
-/* ─── L3 input parameter shape (extends L2 + L3-specific knobs) ─────────────── */
+/* ─── L3 input parameter shape ────────────────────────────────────────────── */
 
 interface L3InputParams {
-  /** L2 chain params — target occupancy, BW, route, dosing freq, fu/Vd/F/CL overrides. */
   l2: L2InputParams;
-  /** Bypass L1 primaryIC50 (nM). Empty/undefined = use L1. */
   ic50_nM_override?: number;
-  /** Floor for surfacing transporter flags. 0 surfaces all; 0.5 hides low-confidence calls. */
   transporterConfidenceFloor: number;
 }
 
@@ -117,6 +124,74 @@ const L3_DEFAULT_PARAMS: L3InputParams = {
   l2: { targetOccupancy: 0.75, bodyWeightKg: 70, route: "oral", dosesPerDay: 1 },
   transporterConfidenceFloor: 0,
 };
+
+/* ─── Manual-entry result shapes (each carries source = "user-provided") ──── */
+
+const DILI_SEVERITY_OPTIONS = [
+  { value: "none",         label: "None — no DILI signal" },
+  { value: "mild",         label: "Mild — vMost-DILI-Concern absent" },
+  { value: "moderate",     label: "Moderate — vLess-DILI-Concern" },
+  { value: "severe",       label: "Severe — vMost-DILI-Concern" },
+  { value: "most-concern", label: "Most-Concern — boxed warning / withdrawn" },
+] as const;
+
+type DiliSeverity = typeof DILI_SEVERITY_OPTIONS[number]["value"];
+
+interface Stage2ManualResult {
+  source: "user-provided";
+  severity: DiliSeverity;
+  mechanisms: { mitochondrial: boolean; bsep: boolean; ros: boolean; immune: boolean };
+  citation: string;
+  enteredAt: string;
+}
+
+interface Stage3ManualResult {
+  source: "user-provided";
+  organoidCvcl: string;
+  measuredIc50_uM: number;
+  assayFormat: string;
+  citation: string;
+  enteredAt: string;
+}
+
+interface Stage4ManualRow { depmapId: string; ic50_uM: number; citation: string; }
+
+interface Stage4ManualResult {
+  source: "user-provided";
+  mode: "oncology-rows" | "non-oncology-na";
+  rows: Stage4ManualRow[];
+  enteredAt: string;
+}
+
+interface Stage5BiomarkerEntry { name: string; rationale: string; }
+
+interface Stage5Result {
+  /** "derived-from-stage-2" = deterministic mapping; "user-provided" = override or solo entry. */
+  source: "derived-from-stage-2" | "user-provided";
+  biomarkers: Stage5BiomarkerEntry[];
+  brainKpUu_override?: number;
+  caco2Papp_x10minus6: number;
+  enteredAt: string;
+}
+
+type ReadoutTier = "t0" | "t-user" | "pending" | "n/a";
+
+interface Stage6PerReadout {
+  stage: number;
+  name: string;
+  tier: ReadoutTier;
+  cascadeKind: "pass" | "fail" | "prediction_only" | "not_applicable";
+}
+
+type EnvelopeKind = "mixed" | "all-pending" | "all-t-user" | "all-t0";
+
+interface Stage6Result {
+  source: "orchestration";
+  perReadoutTiers: Stage6PerReadout[];
+  envelopeKind: EnvelopeKind;
+  loadBearingCount: number;
+  enteredAt: string;
+}
 
 /* ─── Reference content (preserved verbatim from prior scaffold) ─────────── */
 
@@ -141,27 +216,24 @@ const L3_MODALITIES = [
     summary: "Tumour + non-tumour 3D cultures with patient genomics + clinical metadata.",
     sources: [
       { name: "HCMI (NCI / ATCC)",          note: "~700 next-gen cancer models with paired matched-normal genomics" },
-      { name: "Hubrecht HUB Organoid Biobank", note: "largest non-cancer + cancer biobank globally; HUB Foundation MTA, commercial sublicensing required" },
-      { name: "hPSCreg",                     note: "~7,500 hiPSC/hESC lines with provenance, ethics, QC" },
-      { name: "ATCC organoid lines",         note: "Commercial MTA (~$2–6k / line — only concrete cost asserted by the doc)" },
+      { name: "Hubrecht HUB Organoid Biobank", note: "largest non-cancer + cancer biobank globally; HUB Foundation MTA" },
+      { name: "ATCC organoid lines",         note: "Commercial MTA (~$2–6k / line)" },
       { name: "Cellosaurus (organoid records)", note: "~5K entries, CC-BY 4.0 — every L3 row should carry a CVCL accession" },
     ],
   },
   {
     name: "Microphysiological systems / organ-on-chip",
-    summary: "Multi-tissue chips with media flow + mechanical cues. Public footprint is qualification papers; T3 vendor adapters are opt-in upgrades per surrogate spec.",
+    summary: "Multi-tissue chips with media flow + mechanical cues. T3 vendor adapters are opt-in upgrades.",
     sources: [
-      { name: "Emulate (Liver-/Brain-/Intestine-/Lung-Chip S1)", note: "Liver-Chip qualification, Ewart 2022: 87% sensitivity vs Tox21" },
-      { name: "CN Bio (PhysioMimix OOC)",                       note: "strong on liver clearance + first-pass metabolism" },
-      { name: "Mimetas (OrganoPlate 3-lane / Graft)",            note: "higher throughput (96-well), tubule + BBB models" },
-      { name: "TissUse (HUMIMIC Chip2 / Chip4 / ChipX)",         note: "multi-organ co-culture, ADME-T focused" },
-      { name: "InSphero (Akura Flow / 96-well 3D)",              note: "scaffold-free spheroids, high-throughput hepatotox" },
-      { name: "MPS-Database (FDA / U. Pittsburgh DILI consortium)", note: "T1 retrieval target; only public MPS dataset of meaningful size" },
+      { name: "Emulate (Liver/Brain/Intestine/Lung-Chip S1)", note: "Liver-Chip qualification, Ewart 2022: 87% sensitivity vs Tox21" },
+      { name: "CN Bio (PhysioMimix OOC)",                     note: "strong on liver clearance + first-pass metabolism" },
+      { name: "Mimetas / TissUse / InSphero",                 note: "higher-throughput 3D / multi-organ chips" },
+      { name: "MPS-Database (FDA / U. Pittsburgh DILI)",      note: "T1 retrieval target; only public MPS dataset of meaningful size" },
     ],
   },
 ] as const;
 
-/* ─── Reusable bits (visual mirror of L2 scaffold) ────────────────────────── */
+/* ─── Visual helpers (mirror L2 scaffold pattern, amber accent) ───────────── */
 
 function wiredBadge(w: WiredKind): { text: string; cls: string } {
   switch (w) {
@@ -171,8 +243,8 @@ function wiredBadge(w: WiredKind): { text: string; cls: string } {
       return { text: "ai-service", cls: "border-violet-500/30 bg-violet-500/8 text-violet-300" };
     case "external-data":
       return { text: "external data", cls: "border-cyan-500/30 bg-cyan-500/8 text-cyan-300" };
-    case "out-of-scope-yet":
-      return { text: "not wired yet", cls: "border-amber-500/30 bg-amber-500/8 text-amber-300" };
+    case "stub-with-manual":
+      return { text: "stub · manual ok", cls: "border-amber-500/30 bg-amber-500/8 text-amber-300" };
   }
 }
 
@@ -183,6 +255,15 @@ function statusBadgeClass(s: StageStatus): string {
     case "error":    return "border-rose-500/40 bg-rose-500/10 text-rose-300";
     case "out-of-scope-yet": return "border-amber-500/40 bg-amber-500/10 text-amber-300";
     case "ready":    return "border-white/10 bg-white/[0.02] text-slate-400";
+  }
+}
+
+function tierBadgeClass(t: ReadoutTier): string {
+  switch (t) {
+    case "t0":      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+    case "t-user":  return "border-cyan-500/40 bg-cyan-500/10 text-cyan-300";
+    case "pending": return "border-slate-500/30 bg-slate-500/10 text-slate-400";
+    case "n/a":     return "border-amber-500/40 bg-amber-500/10 text-amber-300";
   }
 }
 
@@ -199,7 +280,7 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
 }
 
 function StageCard({
-  stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason,
+  stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason, children,
 }: {
   stage: StageDef;
   status: StageStatus;
@@ -208,9 +289,10 @@ function StageCard({
   onRun: () => void;
   runDisabled: boolean;
   runDisabledReason?: string;
+  children?: React.ReactNode;
 }) {
   const wb = wiredBadge(stage.wired);
-  const canRun = stage.wired !== "out-of-scope-yet";
+  const canAutoRun = stage.wired === "in-house" || stage.n === 5 || stage.n === 6;
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
       <div className="flex items-start gap-2.5 mb-2">
@@ -237,8 +319,8 @@ function StageCard({
           </div>
         ))}
       </div>
-      <div className="pl-8 mt-2.5 flex items-center gap-2">
-        {canRun ? (
+      {canAutoRun && (
+        <div className="pl-8 mt-2.5 flex items-center gap-2">
           <button
             type="button"
             disabled={runDisabled || busy}
@@ -254,18 +336,12 @@ function StageCard({
               ? <><Loader2 className="w-3 h-3 animate-spin" />Running…</>
               : <><Play className="w-3 h-3" />Run stage</>}
           </button>
-        ) : (
-          <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/8 text-amber-300/80 italic">
-            Stub · honest absence
-          </span>
-        )}
-        {runDisabled && runDisabledReason && (
-          <span className="text-[9px] text-slate-500 italic">{runDisabledReason}</span>
-        )}
-        {!canRun && stage.pendingReason && (
-          <span className="text-[9px] text-slate-500 italic">{stage.pendingReason}</span>
-        )}
-      </div>
+          {runDisabled && runDisabledReason && (
+            <span className="text-[9px] text-slate-500 italic">{runDisabledReason}</span>
+          )}
+        </div>
+      )}
+      {children}
     </div>
   );
 }
@@ -312,7 +388,6 @@ function L3InputParamsCard({
         <span className="ml-auto text-[9px] text-slate-500 italic">applied to Stage 1 (L2 chain auto-rerun)</span>
       </div>
 
-      {/* Occupancy slider — reused from L2 */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-slate-300">Target receptor occupancy (drives L2 dose → L3 Cu)</span>
@@ -328,7 +403,6 @@ function L3InputParamsCard({
         </div>
       </div>
 
-      {/* BW + Route + Freq */}
       <div className="grid grid-cols-3 gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400 uppercase tracking-wider">Body weight (kg)</span>
@@ -364,7 +438,6 @@ function L3InputParamsCard({
         </label>
       </div>
 
-      {/* L3-specific row: transporter floor + GTEx dataset (display-only) */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400 uppercase tracking-wider">Transporter conf. floor</span>
@@ -387,7 +460,6 @@ function L3InputParamsCard({
         </label>
       </div>
 
-      {/* Advanced overrides */}
       <button
         type="button"
         onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -437,7 +509,273 @@ function L3InputParamsCard({
   );
 }
 
-/* ─── Stage-1 result rendering (tissue selectivity + transporter cards) ──── */
+/* ─── Manual-entry form components ────────────────────────────────────────── */
+
+function ManualToggle({
+  enabled, setEnabled, hasResult, onClear,
+}: { enabled: boolean; setEnabled: (v: boolean) => void; hasResult: boolean; onClear: () => void; }) {
+  return (
+    <div className="pl-8 mt-2.5 flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 text-[10px]">
+        <span className="text-slate-500 uppercase tracking-wider">Source:</span>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="radio" checked={!enabled} onChange={() => setEnabled(false)} className="accent-amber-400" />
+          <span className={!enabled ? "text-amber-300" : "text-slate-500"}>ML model (not yet wired)</span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="radio" checked={enabled} onChange={() => setEnabled(true)} className="accent-amber-400" />
+          <span className={enabled ? "text-amber-300" : "text-slate-500"}>Manual entry</span>
+        </label>
+      </div>
+      {hasResult && (
+        <button
+          type="button" onClick={onClear}
+          className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border border-rose-500/30 bg-rose-500/8 text-rose-300/80 hover:bg-rose-500/15 flex items-center gap-1"
+        >
+          <Trash2 className="w-2.5 h-2.5" /> Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Stage2ManualForm({ onSave }: { onSave: (r: Stage2ManualResult) => void }) {
+  const [severity, setSeverity] = useState<DiliSeverity>("moderate");
+  const [mech, setMech] = useState({ mitochondrial: false, bsep: false, ros: false, immune: false });
+  const [citation, setCitation] = useState("");
+  const valid = citation.trim().length >= 3;
+  return (
+    <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
+      <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        <UserPen className="w-3 h-3" /> Manual entry · tagged source: user-provided
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">DILI severity (FDA / DILIrank class)</span>
+        <select
+          value={severity} onChange={e => setSeverity(e.target.value as DiliSeverity)}
+          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 focus:outline-none focus:border-cyan-500/50"
+        >
+          {DILI_SEVERITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-2 gap-1.5">
+        {([
+          ["mitochondrial", "Mitochondrial damage"],
+          ["bsep", "BSEP inhibition / cholestatic"],
+          ["ros", "ROS / oxidative stress"],
+          ["immune", "Immune-mediated"],
+        ] as const).map(([k, label]) => (
+          <label key={k} className="flex items-center gap-2 text-[10px] text-slate-300 cursor-pointer">
+            <input
+              type="checkbox" checked={mech[k]}
+              onChange={e => setMech({ ...mech, [k]: e.target.checked })}
+              className="accent-cyan-400"
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Citation (FDA label / DOI / PMID)</span>
+        <input
+          type="text" value={citation} onChange={e => setCitation(e.target.value)}
+          placeholder="e.g. NDA 21-879 prescribing info §5.2; or PMID:31784823"
+          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-cyan-500/50"
+        />
+      </label>
+      <button
+        type="button" disabled={!valid}
+        onClick={() => onSave({ source: "user-provided", severity, mechanisms: mech, citation: citation.trim(), enteredAt: new Date().toISOString() })}
+        className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
+          valid
+            ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
+            : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
+        }`}
+        title={valid ? "Save user-provided DILI assessment" : "Enter a citation (≥3 chars) before saving"}
+      >
+        <Check className="w-3 h-3" /> Save manual entry
+      </button>
+    </div>
+  );
+}
+
+function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void }) {
+  const [cvcl, setCvcl] = useState("");
+  const [ic50, setIc50] = useState<string>("");
+  const [assay, setAssay] = useState("CellTiter-Glo 72h, 384-well organoid");
+  const [citation, setCitation] = useState("");
+  const ic50num = parseFloat(ic50);
+  const valid = cvcl.match(/^CVCL_[A-Z0-9]{4}$/i) !== null && isFinite(ic50num) && ic50num > 0 && citation.trim().length >= 3;
+  return (
+    <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
+      <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        <UserPen className="w-3 h-3" /> Manual entry · T2 wet-data path
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Cellosaurus CVCL</span>
+          <input
+            type="text" value={cvcl} onChange={e => setCvcl(e.target.value.trim())}
+            placeholder="CVCL_xxxx"
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Measured IC50 (µM)</span>
+          <input
+            type="number" min={0} step="any" value={ic50} onChange={e => setIc50(e.target.value)}
+            placeholder="e.g. 0.42"
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+          />
+        </label>
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Assay format</span>
+        <input
+          type="text" value={assay} onChange={e => setAssay(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Citation (CRO report / DOI / PMID)</span>
+        <input
+          type="text" value={citation} onChange={e => setCitation(e.target.value)}
+          placeholder="e.g. Charles River report CR-2025-0421; or PMID:33175020"
+          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+        />
+      </label>
+      <button
+        type="button" disabled={!valid}
+        onClick={() => onSave({
+          source: "user-provided", organoidCvcl: cvcl.toUpperCase(), measuredIc50_uM: ic50num,
+          assayFormat: assay.trim(), citation: citation.trim(), enteredAt: new Date().toISOString(),
+        })}
+        className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
+          valid
+            ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
+            : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
+        }`}
+        title={valid ? "Save organoid measurement" : "Need valid CVCL_ accession, positive IC50, and citation"}
+      >
+        <Check className="w-3 h-3" /> Save organoid measurement
+      </button>
+    </div>
+  );
+}
+
+function Stage4ManualForm({ onSave }: { onSave: (r: Stage4ManualResult) => void }) {
+  const [mode, setMode] = useState<"oncology-rows" | "non-oncology-na">("oncology-rows");
+  const [rows, setRows] = useState<Stage4ManualRow[]>([{ depmapId: "", ic50_uM: NaN, citation: "" }]);
+  const validRows = rows.filter(r => /^ACH-\d{6}$/i.test(r.depmapId) && isFinite(r.ic50_uM) && r.ic50_uM > 0 && r.citation.trim().length >= 3);
+  const valid = mode === "non-oncology-na" || validRows.length > 0;
+  return (
+    <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
+      <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        <UserPen className="w-3 h-3" /> Manual entry · DepMap PRISM rows or non-oncology N/A
+      </div>
+      <div className="flex items-center gap-3 text-[10px]">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="radio" checked={mode === "oncology-rows"} onChange={() => setMode("oncology-rows")} className="accent-cyan-400" />
+          <span className={mode === "oncology-rows" ? "text-cyan-300" : "text-slate-500"}>Oncology — paste cell-line IC50 rows</span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="radio" checked={mode === "non-oncology-na"} onChange={() => setMode("non-oncology-na")} className="accent-cyan-400" />
+          <span className={mode === "non-oncology-na" ? "text-cyan-300" : "text-slate-500"}>Non-oncology — mark not_applicable</span>
+        </label>
+      </div>
+      {mode === "oncology-rows" && (
+        <>
+          <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+            {rows.map((r, i) => (
+              <div key={i} className="grid grid-cols-[110px_80px_1fr_24px] gap-1.5 items-center">
+                <input
+                  type="text" value={r.depmapId} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, depmapId: e.target.value.trim() } : x))}
+                  placeholder="ACH-000001"
+                  className="bg-white/5 border border-white/10 rounded-md px-1.5 py-1 text-[10px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+                <input
+                  type="number" min={0} step="any" value={isFinite(r.ic50_uM) ? r.ic50_uM : ""}
+                  onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, ic50_uM: parseFloat(e.target.value) } : x))}
+                  placeholder="µM"
+                  className="bg-white/5 border border-white/10 rounded-md px-1.5 py-1 text-[10px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+                <input
+                  type="text" value={r.citation} onChange={e => setRows(rows.map((x, j) => j === i ? { ...x, citation: e.target.value } : x))}
+                  placeholder="DepMap PRISM 24Q2 / DOI / PMID"
+                  className="bg-white/5 border border-white/10 rounded-md px-1.5 py-1 text-[10px] text-cyan-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+                <button
+                  type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))}
+                  className="text-rose-400/70 hover:text-rose-300"
+                  title="Remove row"
+                ><Trash2 className="w-3 h-3 mx-auto" /></button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button" onClick={() => setRows([...rows, { depmapId: "", ic50_uM: NaN, citation: "" }])}
+            className="text-[10px] text-cyan-300/70 hover:text-cyan-200 flex items-center gap-1"
+          >+ Add cell-line row</button>
+          <div className="text-[9px] text-slate-500">{validRows.length} of {rows.length} rows valid (need ACH-NNNNNN + positive IC50 + citation).</div>
+        </>
+      )}
+      {mode === "non-oncology-na" && (
+        <div className="text-[10px] text-amber-200/80 italic leading-relaxed">
+          Non-oncology compound — patient-line projection is out of domain by design (HCMI + DepMap PRISM are oncology-only).
+          This readout will be marked <span className="font-mono">kind: "not_applicable"</span> in the cascade envelope.
+        </div>
+      )}
+      <button
+        type="button" disabled={!valid}
+        onClick={() => onSave({
+          source: "user-provided", mode,
+          rows: mode === "oncology-rows" ? validRows.map(r => ({ ...r, depmapId: r.depmapId.toUpperCase() })) : [],
+          enteredAt: new Date().toISOString(),
+        })}
+        className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
+          valid
+            ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
+            : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
+        }`}
+      >
+        <Check className="w-3 h-3" /> Save{mode === "non-oncology-na" ? " not_applicable" : ` ${validRows.length} row${validRows.length === 1 ? "" : "s"}`}
+      </button>
+    </div>
+  );
+}
+
+function Stage5OverrideForm({ onSave, currentBrainKpUu }: { onSave: (brainKpUu: number | undefined) => void; currentBrainKpUu?: number }) {
+  const [val, setVal] = useState<string>(currentBrainKpUu !== undefined ? String(currentBrainKpUu) : "");
+  const num = parseFloat(val);
+  const valid = val === "" || (isFinite(num) && num >= 0);
+  return (
+    <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
+      <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        <UserPen className="w-3 h-3" /> Optional override · brain Kp,uu (measured)
+      </div>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Brain Kp,uu (unitless, MDR1-MDCK ER or PET)</span>
+        <input
+          type="number" min={0} step="any" value={val} onChange={e => setVal(e.target.value)}
+          placeholder="leave blank to mark as unmeasured"
+          className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+        />
+      </label>
+      <button
+        type="button" disabled={!valid}
+        onClick={() => onSave(val === "" ? undefined : num)}
+        className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
+          valid ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
+                : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
+        }`}
+      >
+        <Check className="w-3 h-3" /> Save override
+      </button>
+    </div>
+  );
+}
+
+/* ─── Stage-1 result rendering helpers (unchanged) ───────────────────────── */
 
 function ConfidencePill({ c }: { c: "high" | "medium" | "low" }) {
   const styles = c === "high"
@@ -612,6 +950,41 @@ function TransporterFlagsBlock({ flags, floor }: { flags: TransporterFlagsResult
   );
 }
 
+/* ─── Stage 5 deterministic mapping (per Spec v1.1 §3.6) ──────────────────── */
+
+function deriveStage5FromStage2(
+  s2: Stage2ManualResult,
+  l1: InVitroResults,
+  brainKpUu_override?: number,
+): Stage5Result {
+  const biomarkers: Stage5BiomarkerEntry[] = [];
+  if (s2.mechanisms.mitochondrial) {
+    biomarkers.push({ name: "GLDH (glutamate dehydrogenase)", rationale: "Mitochondrial damage marker · Antoine 2013" });
+  }
+  if (s2.mechanisms.bsep) {
+    biomarkers.push({ name: "ALP (alkaline phosphatase)", rationale: "Cholestatic pattern from BSEP inhibition · DILIN classification" });
+    biomarkers.push({ name: "Total bilirubin",            rationale: "Cholestatic pattern · Hy's Law triad component" });
+  }
+  if (s2.mechanisms.ros) {
+    biomarkers.push({ name: "ALT (alanine aminotransferase)", rationale: "Hepatocellular damage from oxidative stress" });
+    biomarkers.push({ name: "miR-122",                        rationale: "Early hepatocellular biomarker · Wang 2009 / Starkey Lewis 2011" });
+  }
+  if (s2.mechanisms.immune) {
+    biomarkers.push({ name: "Eosinophil count",       rationale: "Immune-mediated DILI prior · Andrade 2019" });
+    biomarkers.push({ name: "ALT + IgE elevation",     rationale: "Hypersensitivity reaction marker" });
+  }
+  if (biomarkers.length === 0) {
+    biomarkers.push({ name: "Routine LFT panel",      rationale: "No DILI mechanism flagged — ALT/AST/ALP routine monitoring only" });
+  }
+  return {
+    source: brainKpUu_override !== undefined ? "user-provided" : "derived-from-stage-2",
+    biomarkers,
+    brainKpUu_override,
+    caco2Papp_x10minus6: l1.permeability.caco2Papp,
+    enteredAt: new Date().toISOString(),
+  };
+}
+
 /* ─── Main scaffold ────────────────────────────────────────────────────────── */
 
 interface Stage1Result {
@@ -627,11 +1000,68 @@ type StageResultBlock<V> =
 
 interface PipelineResults {
   s1?: StageResultBlock<Stage1Result>;
-  s2?: StageResultBlock<never>;
-  s3?: StageResultBlock<never>;
-  s4?: StageResultBlock<never>;
-  s5?: StageResultBlock<never>;
-  s6?: StageResultBlock<never>;
+  s2?: StageResultBlock<Stage2ManualResult>;
+  s3?: StageResultBlock<Stage3ManualResult>;
+  s4?: StageResultBlock<Stage4ManualResult>;
+  s5?: StageResultBlock<Stage5Result>;
+  s6?: StageResultBlock<Stage6Result>;
+}
+
+function buildStage6Envelope(results: PipelineResults): Stage6Result {
+  const tiers: Stage6PerReadout[] = [];
+
+  if (results.s1?.status === "complete") {
+    tiers.push({ stage: 1, name: "Tissue selectivity + transporter flags", tier: "t0", cascadeKind: results.s1.result.matrix.cascadeState.kind });
+  } else {
+    tiers.push({ stage: 1, name: "Tissue selectivity + transporter flags", tier: "pending", cascadeKind: "not_applicable" });
+  }
+
+  for (const n of [2, 3] as const) {
+    const r = results[`s${n}` as "s2" | "s3"];
+    const def = L3_STAGES.find(s => s.n === n)!;
+    if (r?.status === "complete") {
+      tiers.push({ stage: n, name: def.name, tier: "t-user", cascadeKind: "prediction_only" });
+    } else {
+      tiers.push({ stage: n, name: def.name, tier: "pending", cascadeKind: "not_applicable" });
+    }
+  }
+
+  // Stage 4 special: non-oncology mode → not_applicable
+  const s4 = results.s4;
+  const def4 = L3_STAGES.find(s => s.n === 4)!;
+  if (s4?.status === "complete") {
+    if (s4.result.mode === "non-oncology-na") {
+      tiers.push({ stage: 4, name: def4.name, tier: "n/a", cascadeKind: "not_applicable" });
+    } else {
+      tiers.push({ stage: 4, name: def4.name, tier: "t-user", cascadeKind: "prediction_only" });
+    }
+  } else {
+    tiers.push({ stage: 4, name: def4.name, tier: "pending", cascadeKind: "not_applicable" });
+  }
+
+  // Stage 5
+  const def5 = L3_STAGES.find(s => s.n === 5)!;
+  if (results.s5?.status === "complete") {
+    const tier: ReadoutTier = results.s5.result.source === "derived-from-stage-2" ? "t0" : "t-user";
+    tiers.push({ stage: 5, name: def5.name, tier, cascadeKind: "prediction_only" });
+  } else {
+    tiers.push({ stage: 5, name: def5.name, tier: "pending", cascadeKind: "not_applicable" });
+  }
+
+  const completed = tiers.filter(t => t.tier !== "pending");
+  let envelopeKind: EnvelopeKind;
+  if (completed.length === 0) envelopeKind = "all-pending";
+  else if (completed.every(t => t.tier === "t-user" || t.tier === "n/a")) envelopeKind = "all-t-user";
+  else if (completed.every(t => t.tier === "t0" || t.tier === "n/a")) envelopeKind = "all-t0";
+  else envelopeKind = "mixed";
+
+  return {
+    source: "orchestration",
+    perReadoutTiers: tiers,
+    envelopeKind,
+    loadBearingCount: 0, // none — every L3 readout is prediction_only or not_applicable; canSignLoadBearing only accepts kind:"pass"
+    enteredAt: new Date().toISOString(),
+  };
 }
 
 export function Layer3ExVivoScaffold({
@@ -646,28 +1076,28 @@ export function Layer3ExVivoScaffold({
   const [busyStage, setBusyStage] = useState<number | null>(null);
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [manualMode, setManualMode] = useState<{ s2: boolean; s3: boolean; s4: boolean; s5: boolean }>({
+    s2: false, s3: false, s4: false, s5: false,
+  });
 
-  const wiredCount = useMemo(() => L3_STAGES.filter(s => s.wired !== "out-of-scope-yet").length, []);
+  const wiredCount = useMemo(() => L3_STAGES.filter(s => s.wired === "in-house").length, []);
+  const acceptsManualCount = useMemo(() => L3_STAGES.filter(s => s.acceptsManualEntry).length, []);
 
   const setOne = <K extends keyof PipelineResults>(key: K, value: PipelineResults[K]) => {
     setResults(prev => ({ ...prev, [key]: value }));
   };
 
-  /** Stage 1 runner — tissue selectivity + transporter flags. */
   const runStage1 = async () => {
     if (!simResults || !inVitroResults) return;
     setBusyStage(1);
     setOne("s1", { status: "running" });
     try {
       const transporters = predictTransporterFlags(simResults.lipinski);
-      // Apply IC50 override by temporarily mutating a shallow copy of simResults.
       const simForRun = params.ic50_nM_override !== undefined && isFinite(params.ic50_nM_override) && params.ic50_nM_override > 0
         ? { ...simResults, binding: { ...simResults.binding, primaryIC50: params.ic50_nM_override } }
         : simResults;
       const matrix = await computeTissueSelectivityMatrix({
-        sim: simForRun,
-        iv: inVitroResults,
-        l2Params: params.l2,
+        sim: simForRun, iv: inVitroResults, l2Params: params.l2,
       });
       setOne("s1", { status: "complete", result: { matrix, transporters } });
     } catch (err: any) {
@@ -677,68 +1107,141 @@ export function Layer3ExVivoScaffold({
     }
   };
 
+  const runStage5 = () => {
+    const s2 = results.s2;
+    if (!s2 || s2.status !== "complete" || !inVitroResults) {
+      setOne("s5", { status: "error", reason: "Stage 5 needs Stage 2 (DILI mechanism flags) first." });
+      return;
+    }
+    setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2.result, inVitroResults) });
+  };
+
+  const runStage6 = () => {
+    setOne("s6", { status: "complete", result: buildStage6Envelope(results) });
+  };
+
   const runStageHandler = async (n: number) => {
     if (n === 1) return runStage1();
-    // Stages 2–6 are honest stubs — do not invent results.
-    const def = L3_STAGES.find(s => s.n === n);
-    setOne((`s${n}` as keyof PipelineResults), {
-      status: "out-of-scope-yet",
-      reason: def?.pendingReason ?? "Stage not yet wired.",
-    });
+    if (n === 5) return runStage5();
+    if (n === 6) return runStage6();
+    // Stages 2, 3, 4: must use Manual Entry form to populate
   };
 
   const runFull = async () => {
     if (!simResults || !inVitroResults) return;
     setPipelineRunning(true);
-    setResults({});
     try {
       await runStage1();
-      // Stages 2–6 surface as "not yet wired" cards rather than running fake work.
-      for (const s of L3_STAGES) {
-        if (s.wired === "out-of-scope-yet") {
-          setOne((`s${s.n}` as keyof PipelineResults), {
-            status: "out-of-scope-yet",
-            reason: s.pendingReason ?? "Stage not yet wired.",
-          });
-        }
+      // Stage 5 derives from Stage 2 if present
+      const s2Now = results.s2;
+      if (s2Now?.status === "complete" && inVitroResults) {
+        setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2Now.result, inVitroResults) });
       }
+      // Stage 6 always orchestrates over current state
+      setResults(prev => ({ ...prev, s6: { status: "complete", result: buildStage6Envelope(prev) } }));
     } finally {
       setPipelineRunning(false);
     }
   };
 
   const copyHandoff = async () => {
-    const s1 = results.s1;
-    if (!s1 || s1.status !== "complete") return;
     const handoff = {
-      schema_version: "L3-T0-stage1-v1",
-      tier: "t0",
+      schema_version: "L3-T0-v2-with-manual",
+      tier: "mixed",
       compound: { name: simResults?.molName, smiles: simResults?.smiles, uniprot: simResults?.uniprotId },
-      tissue_selectivity: {
-        gene: s1.result.matrix.geneSymbol,
-        gtex_dataset: s1.result.matrix.gtexDatasetId,
-        gtex_snapshot: s1.result.matrix.gtexSnapshot,
-        ic50_uM: s1.result.matrix.ic50_uM,
-        Cu_plasma_uM: s1.result.matrix.Cu_plasma_uM,
-        cmax_total_uM: s1.result.matrix.cmax_total_uM,
-        rows: s1.result.matrix.rows,
-      },
-      transporter_flags: s1.result.transporters,
-      cascade_state: s1.result.matrix.cascadeState,
       l3_input_params: params,
-      generated_at: s1.result.matrix.generatedAt,
-      stages_pending: L3_STAGES.filter(s => s.wired === "out-of-scope-yet").map(s => ({ n: s.n, name: s.name, reason: s.pendingReason })),
+      stages: {
+        s1: results.s1?.status === "complete" ? {
+          status: "complete", source: "in-house-ml",
+          tissue_selectivity: results.s1.result.matrix,
+          transporter_flags: results.s1.result.transporters,
+        } : { status: results.s1?.status ?? "pending" },
+        s2: results.s2?.status === "complete" ? { status: "complete", ...results.s2.result } : { status: results.s2?.status ?? "pending" },
+        s3: results.s3?.status === "complete" ? { status: "complete", ...results.s3.result } : { status: results.s3?.status ?? "pending" },
+        s4: results.s4?.status === "complete" ? { status: "complete", ...results.s4.result } : { status: results.s4?.status ?? "pending" },
+        s5: results.s5?.status === "complete" ? { status: "complete", ...results.s5.result } : { status: results.s5?.status ?? "pending" },
+        s6: results.s6?.status === "complete" ? { status: "complete", ...results.s6.result } : { status: results.s6?.status ?? "pending" },
+      },
+      provenance: {
+        s1: results.s1?.status === "complete" ? "in-house-ml" : "pending",
+        s2: results.s2?.status === "complete" ? "user-provided" : "pending",
+        s3: results.s3?.status === "complete" ? "user-provided" : "pending",
+        s4: results.s4?.status === "complete" ? (results.s4.result.mode === "non-oncology-na" ? "not-applicable" : "user-provided") : "pending",
+        s5: results.s5?.status === "complete" ? results.s5.result.source : "pending",
+        s6: results.s6?.status === "complete" ? "orchestration" : "pending",
+      },
+      generated_at: new Date().toISOString(),
     };
     await navigator.clipboard.writeText(JSON.stringify(handoff, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const stage1Status: StageStatus = (() => {
-    const r = results.s1;
-    if (!r) return "ready";
-    return r.status as StageStatus;
-  })();
+  // ── Per-stage manual-form children for StageCard ──────────────────────────
+  const renderManualChildren = (n: 2 | 3 | 4 | 5): React.ReactNode | null => {
+    const key = (`s${n}` as "s2" | "s3" | "s4" | "s5");
+    const r = results[key];
+    const enabled = manualMode[key];
+    const setEnabled = (v: boolean) => setManualMode({ ...manualMode, [key]: v });
+    const onClear = () => setOne(key, undefined);
+    const hasResult = !!r && r.status === "complete";
+
+    if (hasResult) {
+      // Already saved — show summary + clear/edit
+      return (
+        <div className="pl-8 mt-2.5 space-y-1.5">
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/8 p-2 text-[10px] text-emerald-200">
+            <div className="flex items-center gap-1.5">
+              <Check className="w-3 h-3" />
+              <span className="font-semibold">Saved · source: {(r as any).result.source ?? "user-provided"}</span>
+            </div>
+            <div className="mt-1 text-slate-300 leading-relaxed">
+              {n === 2 && (() => {
+                const v = (r as StageResultBlock<Stage2ManualResult> & { status: "complete" }).result;
+                return <>severity = <span className="text-cyan-300">{v.severity}</span>; mechanisms: {Object.entries(v.mechanisms).filter(([_, on]) => on).map(([k]) => k).join(", ") || "none"}; cite: <span className="text-slate-400 italic">{v.citation}</span></>;
+              })()}
+              {n === 3 && (() => {
+                const v = (r as StageResultBlock<Stage3ManualResult> & { status: "complete" }).result;
+                return <>{v.organoidCvcl} · IC50 {v.measuredIc50_uM.toFixed(3)} µM · {v.assayFormat} · cite: <span className="text-slate-400 italic">{v.citation}</span></>;
+              })()}
+              {n === 4 && (() => {
+                const v = (r as StageResultBlock<Stage4ManualResult> & { status: "complete" }).result;
+                return v.mode === "non-oncology-na"
+                  ? <>marked <span className="font-mono text-amber-300">not_applicable</span> · non-oncology compound</>
+                  : <>{v.rows.length} cell-line{v.rows.length === 1 ? "" : "s"} (DepMap PRISM rows)</>;
+              })()}
+              {n === 5 && (() => {
+                const v = (r as StageResultBlock<Stage5Result> & { status: "complete" }).result;
+                return <>{v.biomarkers.length} biomarker{v.biomarkers.length === 1 ? "" : "s"}; Caco-2 {v.caco2Papp_x10minus6.toFixed(1)}×10⁻⁶ cm/s{v.brainKpUu_override !== undefined ? `; brain Kp,uu = ${v.brainKpUu_override.toFixed(2)}` : ""}</>;
+              })()}
+            </div>
+          </div>
+          <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult onClear={onClear} />
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult={false} onClear={onClear} />
+        {enabled && n === 2 && <Stage2ManualForm onSave={r => setOne("s2", { status: "complete", result: r })} />}
+        {enabled && n === 3 && <Stage3ManualForm onSave={r => setOne("s3", { status: "complete", result: r })} />}
+        {enabled && n === 4 && <Stage4ManualForm onSave={r => setOne("s4", { status: "complete", result: r })} />}
+        {enabled && n === 5 && (
+          <Stage5OverrideForm
+            onSave={brain => {
+              const s2 = results.s2;
+              if (!s2 || s2.status !== "complete" || !inVitroResults) {
+                setOne("s5", { status: "error", reason: "Manual brain Kp,uu override needs Stage 2 to be filled first." });
+                return;
+              }
+              setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2.result, inVitroResults, brain) });
+            }}
+          />
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -750,17 +1253,16 @@ export function Layer3ExVivoScaffold({
             <Microscope className="w-4 h-4 text-amber-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 3 — Ex Vivo</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              {wiredCount}/6 stages wired
+              {wiredCount}/6 wired · {acceptsManualCount} manual
             </span>
           </div>
           <p className="text-[12px] text-slate-500">
-            T0 in-silico surrogate (default) · Stage 1 wired · Stages 2–6 honest stubs per Spec v1.1 Appendix B
+            T0 in-silico surrogate · Stage 1 wired · Stages 2–6 accept Manual Entry per Spec v1.1 Appendix B
           </p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
 
-          {/* L1/L2 readiness banner */}
           <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${
             hasL1 ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/25 bg-amber-500/5"
           }`}>
@@ -769,19 +1271,16 @@ export function Layer3ExVivoScaffold({
               : <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
             <div className="flex-1">
               <div className={`text-[11px] font-semibold ${hasL1 ? "text-emerald-300" : "text-amber-300"}`}>
-                {hasL1
-                  ? (layer2Ready ? "L1 + L2 complete" : "L1 complete — L2 chain auto-rerun on Stage 1 click")
-                  : "Awaiting L1 In Vitro completion"}
+                {hasL1 ? (layer2Ready ? "L1 + L2 complete" : "L1 complete — L2 chain auto-rerun on Stage 1 click") : "Awaiting L1 In Vitro completion"}
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
-                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs using the parameters below — L2 click is not required."
-                  : "Run L1 In Vitro first to enable L3 Stage 1."}
+                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stages 2–6 accept Manual Entry tagged source: user-provided."
+                  : "Run L1 In Vitro first to enable L3."}
               </p>
             </div>
           </div>
 
-          {/* L1 INPUTS */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-3.5 h-3.5 text-slate-500" />
@@ -802,10 +1301,8 @@ export function Layer3ExVivoScaffold({
             </div>
           </section>
 
-          {/* INPUT PARAMETERS */}
           <L3InputParamsCard params={params} setParams={setParams} simResults={simResults} />
 
-          {/* PIPELINE STAGES */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Atom className="w-3.5 h-3.5 text-slate-500" />
@@ -816,20 +1313,28 @@ export function Layer3ExVivoScaffold({
                 const key = (`s${s.n}`) as keyof PipelineResults;
                 const r = results[key];
                 const status: StageStatus = r ? (r.status as StageStatus) : "ready";
+                const runDisabled =
+                  !hasL1 || pipelineRunning ||
+                  (s.n === 5 && !(results.s2?.status === "complete"));
+                const runDisabledReason =
+                  !hasL1 ? "awaiting L1"
+                  : (s.n === 5 && !(results.s2?.status === "complete")) ? "needs Stage 2"
+                  : undefined;
                 return (
                   <StageCard
                     key={s.n} stage={s} status={status}
                     busy={busyStage === s.n} hasResult={!!r}
                     onRun={() => runStageHandler(s.n)}
-                    runDisabled={!hasL1 || pipelineRunning}
-                    runDisabledReason={!hasL1 ? "awaiting L1" : undefined}
-                  />
+                    runDisabled={runDisabled}
+                    runDisabledReason={runDisabledReason}
+                  >
+                    {(s.n === 2 || s.n === 3 || s.n === 4 || s.n === 5) && renderManualChildren(s.n as 2 | 3 | 4 | 5)}
+                  </StageCard>
                 );
               })}
             </div>
           </section>
 
-          {/* RUN FULL PIPELINE */}
           <button
             type="button"
             disabled={!hasL1 || pipelineRunning}
@@ -839,24 +1344,23 @@ export function Layer3ExVivoScaffold({
                 ? "bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
                 : "bg-slate-700/40 border border-slate-600/40 text-slate-500 cursor-not-allowed"
             }`}
-            title={hasL1 ? "Run all L3 stages — Stage 1 computes; Stages 2–6 surface their honest pending status" : "Awaiting L1 In Vitro completion"}
+            title={hasL1 ? "Run Stage 1, derive Stage 5 from Stage 2 if present, and orchestrate Stage 6" : "Awaiting L1 In Vitro completion"}
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline…</>
-              : <><Play className="w-4 h-4" />Run Full L3 Pipeline ({wiredCount} wired + {6 - wiredCount} stub{6 - wiredCount === 1 ? "" : "s"})</>}
+              : <><Play className="w-4 h-4" />Run L3 Pipeline (S1 + derived S5 + envelope S6)</>}
           </button>
 
-          {results.s1?.status === "complete" && (
+          {(results.s1?.status === "complete" || results.s2?.status === "complete" || results.s6?.status === "complete") && (
             <button
               type="button"
               onClick={copyHandoff}
               className="w-full h-9 rounded-lg gap-2 text-[12px] flex items-center justify-center border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15 text-amber-300"
             >
-              {copied ? <><Check className="w-4 h-4" /> Copied L3-T0 handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L3-T0 handoff JSON</>}
+              {copied ? <><Check className="w-4 h-4" /> Copied L3 handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L3 handoff JSON (with provenance)</>}
             </button>
           )}
 
-          {/* MODALITIES (reference) */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Microscope className="w-3.5 h-3.5 text-slate-500" />
@@ -896,7 +1400,6 @@ export function Layer3ExVivoScaffold({
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto space-y-5">
 
-          {/* Header */}
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
               <Microscope className="w-5 h-5 text-amber-400" />
@@ -905,25 +1408,24 @@ export function Layer3ExVivoScaffold({
               <h2 className="text-[18px] font-semibold text-white">L3 — Ex Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
-                Per Spec v1.1 §3 + §10, Stage 1 wired now (tissue selectivity + transporter flags);
-                Stages 2–6 are honest stubs awaiting build.
+                Stage 1 wired now. Stages 2–6 accept Manual Entry tagged source: user-provided
+                (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
               </p>
             </div>
           </div>
 
-          {/* Idle state */}
-          {!results.s1 && (
+          {/* Idle */}
+          {!results.s1 && !results.s2 && !results.s3 && !results.s4 && !results.s5 && !results.s6 && (
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-6 text-center">
               <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L3 pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Adjust parameters at left, then click <span className="text-amber-300 font-semibold">Run Stage 1</span> or
-                <span className="text-amber-300 font-semibold"> Run Full L3 Pipeline</span>. No vendor required for T0.
+                Run Stage 1 (computed) and/or fill any of Stages 2–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L3 Pipeline</span> to assemble the envelope.
               </p>
             </div>
           )}
 
-          {/* Stage 1 — Running */}
+          {/* Stage 1 — Running / Error / Complete */}
           {results.s1?.status === "running" && (
             <ResultShell stage={1} name="Tissue selectivity + transporter flags" icon={FlaskConical} status="running">
               <div className="flex items-center gap-2 text-[11px] text-slate-300">
@@ -932,17 +1434,11 @@ export function Layer3ExVivoScaffold({
               </div>
             </ResultShell>
           )}
-
-          {/* Stage 1 — Error */}
           {results.s1?.status === "error" && (
             <ResultShell stage={1} name="Tissue selectivity + transporter flags" icon={AlertTriangle} status="error" reason={results.s1.reason}>
-              <p className="text-[10px] text-rose-200/60">
-                No silent fallback per honesty policy — failure is surfaced and Stage 1 cards are not rendered.
-              </p>
+              <p className="text-[10px] text-rose-200/60">No silent fallback per honesty policy — failure is surfaced and Stage 1 cards are not rendered.</p>
             </ResultShell>
           )}
-
-          {/* Stage 1 — Complete */}
           {results.s1?.status === "complete" && (
             <>
               <ResultShell stage={1} name="Tissue selectivity (54 GTEx tissues)" icon={FlaskConical} status="complete">
@@ -955,11 +1451,134 @@ export function Layer3ExVivoScaffold({
             </>
           )}
 
-          {/* Stages 2–6 — honest stubs */}
+          {/* Stage 2 result */}
+          {results.s2?.status === "complete" && (() => {
+            const v = results.s2.result;
+            return (
+              <ResultShell stage={2} name="DILI severity + mechanism (user-provided)" icon={Beaker} status="complete">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div className="text-slate-500">Severity</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.severity}</div>
+                  <div className="text-slate-500">Mechanisms</div>
+                  <div className="text-cyan-300 font-mono text-right">{Object.entries(v.mechanisms).filter(([_, on]) => on).map(([k]) => k).join(", ") || "none"}</div>
+                  <div className="text-slate-500">Citation</div>
+                  <div className="text-slate-300 italic text-right">{v.citation}</div>
+                  <div className="text-slate-500">Source</div>
+                  <div className="text-cyan-300 font-mono text-right">user-provided</div>
+                </div>
+                <div className="text-[10px] text-amber-300/80 italic">Cascade flag: prediction_only · wet anchor (T2/T3) required for IND-supporting claims.</div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 3 result */}
+          {results.s3?.status === "complete" && (() => {
+            const v = results.s3.result;
+            return (
+              <ResultShell stage={3} name="Cell-type / organoid IC50 (user-provided)" icon={Atom} status="complete">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div className="text-slate-500">Organoid (CVCL)</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.organoidCvcl}</div>
+                  <div className="text-slate-500">Measured IC50</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.measuredIc50_uM.toFixed(3)} µM</div>
+                  <div className="text-slate-500">Assay format</div>
+                  <div className="text-slate-300 text-right">{v.assayFormat}</div>
+                  <div className="text-slate-500">Citation</div>
+                  <div className="text-slate-300 italic text-right">{v.citation}</div>
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 4 result */}
+          {results.s4?.status === "complete" && (() => {
+            const v = results.s4.result;
+            return (
+              <ResultShell stage={4} name="Patient-line projection (user-provided)" icon={FlaskConical} status="complete">
+                {v.mode === "non-oncology-na" ? (
+                  <div className="text-[11px] text-amber-200">
+                    Marked <span className="font-mono">kind: "not_applicable"</span> — non-oncology compound, patient-line projection out of domain by design.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden">
+                    <div className="grid grid-cols-[120px_90px_1fr] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                      <div>DepMap ID</div><div className="text-right">IC50 (µM)</div><div>Citation</div>
+                    </div>
+                    {v.rows.map(r => (
+                      <div key={r.depmapId} className="grid grid-cols-[120px_90px_1fr] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                        <div className="font-mono text-cyan-300">{r.depmapId}</div>
+                        <div className="text-right font-mono text-cyan-200">{r.ic50_uM.toFixed(3)}</div>
+                        <div className="text-slate-400 italic truncate">{r.citation}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 5 result */}
+          {results.s5?.status === "complete" && (() => {
+            const v = results.s5.result;
+            return (
+              <ResultShell stage={5} name="DILI biomarker proxy + permeability" icon={Activity} status="complete">
+                <div className="text-[10px] text-slate-400">Source: {v.source} · derived deterministically per Spec v1.1 §3.6</div>
+                <div className="space-y-1.5">
+                  {v.biomarkers.map(b => (
+                    <div key={b.name} className="rounded-md border border-white/8 bg-black/30 p-2">
+                      <div className="text-[11px] font-semibold text-white">{b.name}</div>
+                      <div className="text-[10px] text-slate-400 italic">{b.rationale}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] pt-1 border-t border-white/5">
+                  <div className="text-slate-500">Caco-2 Papp (L1)</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.caco2Papp_x10minus6.toFixed(1)} ×10⁻⁶ cm/s</div>
+                  <div className="text-slate-500">Brain Kp,uu</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.brainKpUu_override !== undefined ? v.brainKpUu_override.toFixed(2) : "unmeasured (user override available)"}</div>
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Stage 6 envelope */}
+          {results.s6?.status === "complete" && (() => {
+            const v = results.s6.result;
+            return (
+              <ResultShell stage={6} name="L3 cascade integration + L3→L4 envelope" icon={Shield} status="complete">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div className="text-slate-500">Envelope kind</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.envelopeKind}</div>
+                  <div className="text-slate-500">Load-bearing readouts</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.loadBearingCount} (canSignLoadBearing requires kind:"pass" — none of L3 qualifies)</div>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden">
+                  <div className="grid grid-cols-[40px_1fr_70px_110px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                    <div>S</div><div>Readout</div><div className="text-center">Tier</div><div>Cascade</div>
+                  </div>
+                  {v.perReadoutTiers.map(t => (
+                    <div key={t.stage} className="grid grid-cols-[40px_1fr_70px_110px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                      <div className="font-mono text-amber-300">{t.stage}</div>
+                      <div className="text-slate-200 truncate">{t.name}</div>
+                      <div className="flex justify-center">
+                        <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-semibold ${tierBadgeClass(t.tier)}`}>{t.tier}</span>
+                      </div>
+                      <div className="font-mono text-slate-400">{t.cascadeKind}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[10px] text-amber-300/80 italic leading-relaxed">
+                  Mixed-tier envelopes are normal per Spec v1.1 §2.3. L4 Amber Curator's <span className="font-mono">canSignLoadBearing</span> compile-time gate refuses to sign load-bearing claims based on prediction_only / user-provided readouts.
+                </div>
+              </ResultShell>
+            );
+          })()}
+
+          {/* Show pending stubs only when nothing has been entered for them */}
           {([2, 3, 4, 5, 6] as const).map(n => {
             const key = (`s${n}` as keyof PipelineResults);
             const r = results[key];
-            if (!r) return null;
+            if (r) return null;
             const def = L3_STAGES.find(s => s.n === n)!;
             return (
               <ResultShell
@@ -969,78 +1588,32 @@ export function Layer3ExVivoScaffold({
                 reason={def.pendingReason}
               >
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  This stage is intentionally absent rather than fabricated. When wired, it will surface here as a result
-                  card with computation method, training-cohort hash (where ML), applicability-domain score, and a
-                  measured fold-error band. Until then, downstream cascade integration treats this readout as
-                  <span className="text-amber-300"> kind: "not_applicable"</span> per the discriminated <span className="font-mono">CascadeFlagState</span> union.
+                  Use <span className="text-cyan-300 font-semibold">Manual Entry</span> on the left panel to populate this readout from FDA label / DILIrank / CRO panel data.
+                  Cascade kind will be <span className="font-mono">prediction_only</span> with source <span className="font-mono">user-provided</span> — wet anchoring (T2/T3) still required for IND-supporting claims.
                 </p>
               </ResultShell>
             );
           })}
 
-          {/* L2 → L3 input contract */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ArrowRight className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-[13px] font-semibold text-white">L2 → L3 Input Contract (consumed by Stage 1)</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
-              {[
-                "L1 IC50 (nM, primary target)",
-                "L1 plasma fu (fraction)",
-                "L1 Caco-2 Papp → bioavailability F",
-                "L1 ADMET descriptors (logP, MW, TPSA, HBD/HBA)",
-                "L2 PBPK Cmax (predicted, mg/L → µM)",
-                "L2 dose projection (mg/day for occupancy target)",
-                "GTEx v8 median tissue expression (gene-resolved)",
-                "Cascade state propagation (CascadeFlagState union)",
-              ].map(field => (
-                <div key={field} className="flex items-center gap-2 border-b border-white/5 py-1">
-                  <Database className="w-3 h-3 text-slate-600 shrink-0" />
-                  <span className="text-slate-300">{field}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* L3 → L4 graduation dossier */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-[13px] font-semibold text-white">L3 → L4 Envelope (per-readout `tier` field)</h3>
+              <h3 className="text-[13px] font-semibold text-white">L3 → L4 Envelope (per-readout tier)</h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              Per Spec v1.1 §2.3: each readout carries its own tier badge ("t0" / "t1" / "t2" / "t3"),
-              fold-error band, and applicability-domain score. Mixed-tier envelopes are normal.
-              Amber Curator at L4 refuses to sign load-bearing claims that rest only on T0 — compile-time
-              guaranteed via the discriminated <span className="font-mono">CascadeFlagState</span> union.
+              Each readout carries its own tier badge (<span className="font-mono">t0</span> in-house ML, <span className="font-mono">t-user</span> manual entry,
+              <span className="font-mono"> n/a</span> not_applicable, <span className="font-mono">pending</span> not yet filled). Mixed-tier envelopes are normal.
+              Amber Curator at L4 refuses to sign load-bearing claims unless a readout is <span className="font-mono">kind: "pass"</span> — user-provided values always
+              map to <span className="font-mono">prediction_only</span>, never to <span className="font-mono">pass</span>.
             </p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
-              {[
-                "Per-readout tier badge",
-                "Per-readout CascadeFlagState",
-                "Computation method + provenance hash",
-                "Applicability-domain score + rationale",
-                "Fold-error band (cohortN=0 until calibrated)",
-                "GTEx / Tabula Sapiens / DILIrank snapshots",
-                "L1 + L2 evidence carried forward",
-                "Tier-aware downstream weighting",
-              ].map(field => (
-                <div key={field} className="flex items-center gap-2 border-b border-white/5 py-1">
-                  <Shield className="w-3 h-3 text-slate-600 shrink-0" />
-                  <span className="text-slate-300">{field}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
             <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              <span className="font-semibold text-amber-300">Build status:</span> Stage 1 of 6 wired
-              (tissue selectivity + transporter flags). Stages 2–6 (dili-ml, cellTypeAggregator,
-              patientLineProjection, biomarker proxy, cascade integration tests) per Spec v1.1
-              Appendix B remain to ship.
+              <span className="font-semibold text-amber-300">Build status:</span> Stage 1 wired (in-house ML).
+              Stages 2–6 accept Manual Entry to keep the cascade non-empty for known compounds.
+              Premium tier (DrugBank integration) will replace Manual Entry for Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
           </div>
 
