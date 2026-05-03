@@ -18,6 +18,7 @@ import {
   type TransporterFlagsResult,
   type TransporterChannel,
 } from "@/lib/transporterFlags";
+import { predictDiliMl, type DiliMlResult } from "@/lib/aiService";
 
 interface Layer3ExVivoScaffoldProps {
   layer2Ready: boolean;
@@ -56,14 +57,13 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: false,
   },
   {
-    n: 2, name: "DILI severity + mechanism classifier", wired: "stub-with-manual",
-    detail: "Gradient-boosted ensemble on Morgan FP + L1 ADMET + L2 hepatic Cu + transporter flags. Targets: 5-class severity + 4-channel mechanism (mitochondrial / BSEP / ROS / immune). Until the ML model is trained, you can enter a known DILI severity from FDA label / DILIrank lookup.",
+    n: 2, name: "DILI risk classifier (binary) + manual severity", wired: "ml-service",
+    detail: "Random Forest on Morgan FP (1024-bit, r=2) + 6 RDKit descriptors, trained on TDC DILI (Xu 2015, n=475, 5-fold CV ROC-AUC ≈ 0.88). ML predicts a binary DILI-risk probability + qualitative class (Low/Moderate/High). The 5-class severity + 4 mechanism flags (mitochondrial / BSEP / ROS / immune) used in the Stage 2 schema are NOT predicted by the binary model — those still require Manual Entry (FDA label or DILIrank lookup). Stage 5 biomarker derivation is gated on Manual Entry being filled (it needs the mechanism flags).",
     engines: [
-      { name: "ai-service /predict/dili-ml", note: "LightGBM/XGBoost — TO BUILD (not yet wired in ai-service)" },
-      { name: "DILIrank (FDA) + LTKB",        note: "~700 adjudicated compounds — bulk-download to Parquet" },
-      { name: "Manual entry (this build)",    note: "user-asserted DILIrank class + mechanism flags + citation" },
+      { name: "ai-service /predict/dili-ml", note: "Random Forest, sklearn, ~57ms inference, prewarmed at boot" },
+      { name: "TDC DILI (Xu et al. 2015)",    note: "475 cmpds curated from FDA label hepatotoxicity sections, CC-BY 4.0" },
+      { name: "Manual entry (this build)",    note: "user-asserted DILIrank class + mechanism flags + citation (drives Stage 5)" },
     ],
-    pendingReason: "ML classifier pending (spec §7.1, ETA 5–7 d). Manual entry available for known compounds.",
     acceptsManualEntry: true,
   },
   {
@@ -138,12 +138,23 @@ const DILI_SEVERITY_OPTIONS = [
 type DiliSeverity = typeof DILI_SEVERITY_OPTIONS[number]["value"];
 
 interface Stage2ManualResult {
+  kind: "manual";
   source: "user-provided";
   severity: DiliSeverity;
   mechanisms: { mitochondrial: boolean; bsep: boolean; ros: boolean; immune: boolean };
   citation: string;
   enteredAt: string;
 }
+
+interface Stage2MlResult {
+  kind: "ml";
+  source: "ml";
+  prediction: DiliMlResult["prediction"];
+  modelInfo: DiliMlResult["model_info"];
+  enteredAt: string;
+}
+
+type Stage2Result = Stage2ManualResult | Stage2MlResult;
 
 interface Stage3ManualResult {
   source: "user-provided";
@@ -292,7 +303,7 @@ function StageCard({
   children?: React.ReactNode;
 }) {
   const wb = wiredBadge(stage.wired);
-  const canAutoRun = stage.wired === "in-house" || stage.n === 5 || stage.n === 6;
+  const canAutoRun = stage.wired === "in-house" || stage.wired === "ml-service" || stage.n === 5 || stage.n === 6;
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
       <div className="flex items-start gap-2.5 mb-2">
@@ -585,7 +596,7 @@ function Stage2ManualForm({ onSave }: { onSave: (r: Stage2ManualResult) => void 
       </label>
       <button
         type="button" disabled={!valid}
-        onClick={() => onSave({ source: "user-provided", severity, mechanisms: mech, citation: citation.trim(), enteredAt: new Date().toISOString() })}
+        onClick={() => onSave({ kind: "manual", source: "user-provided", severity, mechanisms: mech, citation: citation.trim(), enteredAt: new Date().toISOString() })}
         className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
           valid
             ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
@@ -1000,7 +1011,7 @@ type StageResultBlock<V> =
 
 interface PipelineResults {
   s1?: StageResultBlock<Stage1Result>;
-  s2?: StageResultBlock<Stage2ManualResult>;
+  s2?: StageResultBlock<Stage2Result>;
   s3?: StageResultBlock<Stage3ManualResult>;
   s4?: StageResultBlock<Stage4ManualResult>;
   s5?: StageResultBlock<Stage5Result>;
@@ -1016,14 +1027,24 @@ function buildStage6Envelope(results: PipelineResults): Stage6Result {
     tiers.push({ stage: 1, name: "Tissue selectivity + transporter flags", tier: "pending", cascadeKind: "not_applicable" });
   }
 
-  for (const n of [2, 3] as const) {
-    const r = results[`s${n}` as "s2" | "s3"];
-    const def = L3_STAGES.find(s => s.n === n)!;
-    if (r?.status === "complete") {
-      tiers.push({ stage: n, name: def.name, tier: "t-user", cascadeKind: "prediction_only" });
-    } else {
-      tiers.push({ stage: n, name: def.name, tier: "pending", cascadeKind: "not_applicable" });
-    }
+  // Stage 2: ML → t0 (in-silico surrogate); Manual → t-user (user wet-data path).
+  // If both saved (user ran ML then also filled manual), manual wins for tier
+  // because severity + mechanism are the load-bearing assertions.
+  const def2 = L3_STAGES.find(s => s.n === 2)!;
+  const s2 = results.s2;
+  if (s2?.status === "complete") {
+    const tier: ReadoutTier = s2.result.kind === "manual" ? "t-user" : "t0";
+    tiers.push({ stage: 2, name: def2.name, tier, cascadeKind: "prediction_only" });
+  } else {
+    tiers.push({ stage: 2, name: def2.name, tier: "pending", cascadeKind: "not_applicable" });
+  }
+
+  // Stage 3 (still manual-only this build)
+  const def3 = L3_STAGES.find(s => s.n === 3)!;
+  if (results.s3?.status === "complete") {
+    tiers.push({ stage: 3, name: def3.name, tier: "t-user", cascadeKind: "prediction_only" });
+  } else {
+    tiers.push({ stage: 3, name: def3.name, tier: "pending", cascadeKind: "not_applicable" });
   }
 
   // Stage 4 special: non-oncology mode → not_applicable
@@ -1080,7 +1101,7 @@ export function Layer3ExVivoScaffold({
     s2: false, s3: false, s4: false, s5: false,
   });
 
-  const wiredCount = useMemo(() => L3_STAGES.filter(s => s.wired === "in-house").length, []);
+  const wiredCount = useMemo(() => L3_STAGES.filter(s => s.wired === "in-house" || s.wired === "ml-service").length, []);
   const acceptsManualCount = useMemo(() => L3_STAGES.filter(s => s.acceptsManualEntry).length, []);
 
   const setOne = <K extends keyof PipelineResults>(key: K, value: PipelineResults[K]) => {
@@ -1109,11 +1130,38 @@ export function Layer3ExVivoScaffold({
 
   const runStage5 = () => {
     const s2 = results.s2;
-    if (!s2 || s2.status !== "complete" || !inVitroResults) {
-      setOne("s5", { status: "error", reason: "Stage 5 needs Stage 2 (DILI mechanism flags) first." });
+    if (!s2 || s2.status !== "complete" || s2.result.kind !== "manual" || !inVitroResults) {
+      setOne("s5", { status: "error", reason: "Stage 5 needs Stage 2 Manual Entry (mechanism flags) — DILI-ML alone does not predict mechanisms." });
       return;
     }
     setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2.result, inVitroResults) });
+  };
+
+  const runStage2Ml = async () => {
+    if (!simResults?.smiles) return;
+    setBusyStage(2);
+    setOne("s2", { status: "running" });
+    try {
+      const r = await predictDiliMl(simResults.smiles);
+      if (r.source !== "ml" || !r.ml_available) {
+        setOne("s2", { status: "error", reason: r.error ?? "DILI-ML unavailable" });
+        return;
+      }
+      setOne("s2", {
+        status: "complete",
+        result: {
+          kind: "ml",
+          source: "ml",
+          prediction: r.prediction,
+          modelInfo: r.model_info,
+          enteredAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      setOne("s2", { status: "error", reason: err?.message ?? String(err) });
+    } finally {
+      setBusyStage(null);
+    }
   };
 
   const runStage6 = () => {
@@ -1122,9 +1170,10 @@ export function Layer3ExVivoScaffold({
 
   const runStageHandler = async (n: number) => {
     if (n === 1) return runStage1();
+    if (n === 2) return runStage2Ml();
     if (n === 5) return runStage5();
     if (n === 6) return runStage6();
-    // Stages 2, 3, 4: must use Manual Entry form to populate
+    // Stages 3, 4: must use Manual Entry form to populate
   };
 
   const runFull = async () => {
@@ -1132,12 +1181,14 @@ export function Layer3ExVivoScaffold({
     setPipelineRunning(true);
     try {
       await runStage1();
-      // Stage 5 derives from Stage 2 if present
+      await runStage2Ml();
+      // Stage 5 only auto-derives if Stage 2 manual entry already exists
+      // (ML-only S2 does NOT carry mechanism flags — Manual Entry is required).
       const s2Now = results.s2;
-      if (s2Now?.status === "complete" && inVitroResults) {
+      if (s2Now?.status === "complete" && s2Now.result.kind === "manual" && inVitroResults) {
         setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2Now.result, inVitroResults) });
       }
-      // Stage 6 always orchestrates over current state
+      // Stage 6 always orchestrates over current state (mixed-tier envelope)
       setResults(prev => ({ ...prev, s6: { status: "complete", result: buildStage6Envelope(prev) } }));
     } finally {
       setPipelineRunning(false);
@@ -1164,7 +1215,7 @@ export function Layer3ExVivoScaffold({
       },
       provenance: {
         s1: results.s1?.status === "complete" ? "in-house-ml" : "pending",
-        s2: results.s2?.status === "complete" ? "user-provided" : "pending",
+        s2: results.s2?.status === "complete" ? (results.s2.result.kind === "ml" ? "ml-binary-classifier" : "user-provided") : "pending",
         s3: results.s3?.status === "complete" ? "user-provided" : "pending",
         s4: results.s4?.status === "complete" ? (results.s4.result.mode === "non-oncology-na" ? "not-applicable" : "user-provided") : "pending",
         s5: results.s5?.status === "complete" ? results.s5.result.source : "pending",
@@ -1197,7 +1248,11 @@ export function Layer3ExVivoScaffold({
             </div>
             <div className="mt-1 text-slate-300 leading-relaxed">
               {n === 2 && (() => {
-                const v = (r as StageResultBlock<Stage2ManualResult> & { status: "complete" }).result;
+                const v = (r as StageResultBlock<Stage2Result> & { status: "complete" }).result;
+                if (v.kind === "ml") {
+                  const p = v.prediction;
+                  return <>DILI-ML prob = <span className="text-violet-300 font-mono">{p.dili_probability != null ? p.dili_probability.toFixed(3) : "—"}</span> · class <span className="text-violet-300">{p.risk_class ?? "—"}</span> · severity hint <span className="text-slate-400 italic">{p.severity_hint ?? "—"}</span> <span className="text-amber-400/70">(mechanisms not predicted — fill Manual Entry to unlock Stage 5)</span></>;
+                }
                 return <>severity = <span className="text-cyan-300">{v.severity}</span>; mechanisms: {Object.entries(v.mechanisms).filter(([_, on]) => on).map(([k]) => k).join(", ") || "none"}; cite: <span className="text-slate-400 italic">{v.citation}</span></>;
               })()}
               {n === 3 && (() => {
@@ -1235,6 +1290,10 @@ export function Layer3ExVivoScaffold({
                 setOne("s5", { status: "error", reason: "Manual brain Kp,uu override needs Stage 2 to be filled first." });
                 return;
               }
+              if (s2.result.kind !== "manual") {
+                setOne("s5", { status: "error", reason: "Stage 5 brain-Kp,uu override needs Stage 2 Manual Entry (mechanism flags) — ML alone is insufficient." });
+                return;
+              }
               setOne("s5", { status: "complete", result: deriveStage5FromStage2(s2.result, inVitroResults, brain) });
             }}
           />
@@ -1257,7 +1316,7 @@ export function Layer3ExVivoScaffold({
             </span>
           </div>
           <p className="text-[12px] text-slate-500">
-            T0 in-silico surrogate · Stage 1 wired · Stages 2–6 accept Manual Entry per Spec v1.1 Appendix B
+            T0 in-silico surrogate · Stages 1–2 wired (in-house ML) · Stages 3–6 accept Manual Entry per Spec v1.1 Appendix B
           </p>
         </div>
 
@@ -1275,7 +1334,7 @@ export function Layer3ExVivoScaffold({
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
-                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stages 2–6 accept Manual Entry tagged source: user-provided."
+                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stages 3–6 accept Manual Entry tagged source: user-provided."
                   : "Run L1 In Vitro first to enable L3."}
               </p>
             </div>
@@ -1315,10 +1374,10 @@ export function Layer3ExVivoScaffold({
                 const status: StageStatus = r ? (r.status as StageStatus) : "ready";
                 const runDisabled =
                   !hasL1 || pipelineRunning ||
-                  (s.n === 5 && !(results.s2?.status === "complete"));
+                  (s.n === 5 && !(results.s2?.status === "complete" && results.s2.result.kind === "manual"));
                 const runDisabledReason =
                   !hasL1 ? "awaiting L1"
-                  : (s.n === 5 && !(results.s2?.status === "complete")) ? "needs Stage 2"
+                  : (s.n === 5 && !(results.s2?.status === "complete" && results.s2.result.kind === "manual")) ? "needs Stage 2 Manual Entry (mechanism flags)"
                   : undefined;
                 return (
                   <StageCard
@@ -1408,7 +1467,7 @@ export function Layer3ExVivoScaffold({
               <h2 className="text-[18px] font-semibold text-white">L3 — Ex Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
-                Stage 1 wired now. Stages 2–6 accept Manual Entry tagged source: user-provided
+                Stages 1–2 wired (in-house ML). Stages 3–6 accept Manual Entry tagged source: user-provided
                 (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
               </p>
             </div>
@@ -1420,7 +1479,7 @@ export function Layer3ExVivoScaffold({
               <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L3 pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stage 1 (computed) and/or fill any of Stages 2–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L3 Pipeline</span> to assemble the envelope.
+                Run Stages 1–2 (computed) and/or fill any of Stages 3–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L3 Pipeline</span> to assemble the envelope.
               </p>
             </div>
           )}
@@ -1454,6 +1513,34 @@ export function Layer3ExVivoScaffold({
           {/* Stage 2 result */}
           {results.s2?.status === "complete" && (() => {
             const v = results.s2.result;
+            if (v.kind === "ml") {
+              const p = v.prediction;
+              const probStr = p.dili_probability != null ? p.dili_probability.toFixed(3) : "—";
+              const auc = v.modelInfo.performance?.cv_roc_auc_mean;
+              const aucStr = auc != null ? auc.toFixed(3) : "—";
+              return (
+                <ResultShell stage={2} name="DILI risk (ML — binary classifier)" icon={Beaker} status="complete">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                    <div className="text-slate-500">DILI-positive prob.</div>
+                    <div className="text-violet-300 font-mono text-right">{probStr}</div>
+                    <div className="text-slate-500">Risk class</div>
+                    <div className="text-violet-300 font-mono text-right">{p.risk_class ?? "—"}</div>
+                    <div className="text-slate-500">Severity hint (heuristic)</div>
+                    <div className="text-slate-300 italic text-right">{p.severity_hint ?? "—"}</div>
+                    <div className="text-slate-500">Engine</div>
+                    <div className="text-violet-300 font-mono text-right text-[10px]">DILI-ML v1 · RF</div>
+                    <div className="text-slate-500">Training (TDC DILI)</div>
+                    <div className="text-slate-300 font-mono text-right text-[10px]">n={v.modelInfo.training?.n_train ?? "—"} · CV AUC {aucStr}</div>
+                    <div className="text-slate-500">Source</div>
+                    <div className="text-violet-300 font-mono text-right">ml</div>
+                  </div>
+                  <div className="text-[10px] text-amber-300/80 italic">
+                    Binary classifier only — 5-class severity + mechanism flags (mito / BSEP / ROS / immune)
+                    are NOT predicted. Stage 5 biomarker derivation requires Manual Entry to be filled.
+                  </div>
+                </ResultShell>
+              );
+            }
             return (
               <ResultShell stage={2} name="DILI severity + mechanism (user-provided)" icon={Beaker} status="complete">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
@@ -1611,8 +1698,8 @@ export function Layer3ExVivoScaffold({
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
             <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              <span className="font-semibold text-amber-300">Build status:</span> Stage 1 wired (in-house ML).
-              Stages 2–6 accept Manual Entry to keep the cascade non-empty for known compounds.
+              <span className="font-semibold text-amber-300">Build status:</span> Stages 1–2 wired (in-house ML — tissue selectivity + DILI binary classifier).
+              Stages 3–6 accept Manual Entry to keep the cascade non-empty for known compounds.
               Premium tier (DrugBank integration) will replace Manual Entry for Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
           </div>

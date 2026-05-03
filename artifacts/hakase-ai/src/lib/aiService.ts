@@ -471,6 +471,10 @@ export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
   return post<MlAdmetResult>("/admet-ml", { smiles });
 }
 
+export async function predictDiliMl(smiles: string): Promise<DiliMlResult> {
+  return post<DiliMlResult>("/dili-ml", { smiles });
+}
+
 export async function predictCardiotox(smiles: string): Promise<CardiotoxResult> {
   return post<CardiotoxResult>("/cardiotox", { smiles });
 }
