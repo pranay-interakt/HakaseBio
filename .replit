@@ -45,4 +45,4 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["cairo", "catch2", "comic-neue", "coordgenlibs", "eigen", "glibcLocales", "inchi", "maeparser", "rapidjson"]
+packages = ["arrow-cpp", "cairo", "catch2", "comic-neue", "coordgenlibs", "eigen", "glibcLocales", "inchi", "maeparser", "pkg-config", "rapidjson"]

@@ -53,6 +53,11 @@ from models.dili_ml import (
     is_ready as dili_ml_status,
     warmup as dili_ml_warmup,
 )
+from models.celltype_aggregation import (
+    predict_celltype_aggregation,
+    is_ready as celltype_aggregation_status,
+    warmup as celltype_aggregation_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -117,6 +122,7 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=solubility_ml_warmup, name="solubility-ml-prewarm", daemon=True).start()
     threading.Thread(target=binding_ml_warmup, name="binding-ml-prewarm", daemon=True).start()
     threading.Thread(target=dili_ml_warmup, name="dili-ml-prewarm", daemon=True).start()
+    threading.Thread(target=celltype_aggregation_warmup, name="celltype-aggregation-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -231,6 +237,43 @@ def api_predict_binding_ml(req: BindingMlRequest):
         raise HTTPException(status_code=500, detail=f"BindingML prediction failed: {str(e)}")
 
 
+class CellTypeAggregationTarget(BaseModel):
+    gene_symbol: str
+    uniprot_id: str | None = None
+    affinity_pKi: float | None = None
+
+
+class CellTypeAggregationRequest(BaseModel):
+    targets: list[CellTypeAggregationTarget]
+    top_n: int = 25
+
+
+@app.post("/predict/celltype-aggregation")
+def api_predict_celltype_aggregation(req: CellTypeAggregationRequest):
+    """Layer 3 Stage 3 — Drug2cell-style scoring over Tabula Sapiens v2.
+
+    Atlas Parquet must be provisioned via colab_notebooks/prepare_tabula_sapiens.ipynb
+    before this endpoint can succeed. When the Parquet is missing the endpoint returns
+    HTTP 503 with `source = "data-not-provisioned"` and a remediation hint — there is
+    NO synthetic fallback (project-wide policy: NO fake data, NO silent fallbacks).
+    """
+    try:
+        result = predict_celltype_aggregation(
+            targets=[t.model_dump() for t in req.targets],
+            top_n=req.top_n,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CellTypeAggregation failed: {type(e).__name__}: {e}")
+
+    sanitized = sanitize(result)
+    if sanitized.get("source") == "data-not-provisioned":
+        # 503 lets callers distinguish "atlas not loaded yet" from a real prediction failure.
+        raise HTTPException(status_code=503, detail=sanitized)
+    if sanitized.get("source") == "input-error":
+        raise HTTPException(status_code=400, detail=sanitized)
+    return sanitized
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -241,6 +284,7 @@ def api_models_status():
         "protein_ml": protein_ml_status(),
         "solubility_ml": solubility_ml_status(),
         "binding_ml": binding_ml_status(),
+        "celltype_aggregation": celltype_aggregation_status(),
     }
 
 
@@ -254,6 +298,7 @@ def api_models_warmup():
         "protein_ml": protein_ml_warmup(),
         "solubility_ml": solubility_ml_warmup(),
         "binding_ml": binding_ml_warmup(),
+        "celltype_aggregation": celltype_aggregation_warmup(),
     }
 
 

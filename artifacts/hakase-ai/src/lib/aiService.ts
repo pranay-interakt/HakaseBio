@@ -422,6 +422,130 @@ export interface ModelStatusResponse {
   solubility_ml?: ModelLoadStatus;
   binding_ml?: ModelLoadStatus;
   dili_ml?: ModelLoadStatus;
+  celltype_aggregation?: {
+    loaded: boolean;
+    atlas_path?: string;
+    rows?: number;
+    loaded_at?: string;
+    exists_on_disk?: boolean;
+    load_error?: string | null;
+    provenance?: Record<string, string>;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// L3 Stage 3 — Cell-type aggregation (Drug2cell + Tabula Sapiens v2)
+// ---------------------------------------------------------------------------
+
+export interface CellTypeAggregationTarget {
+  gene_symbol: string;
+  uniprot_id?: string;
+  affinity_pKi?: number;
+}
+
+export interface CellTypeAggregationRow {
+  cell_type: string;
+  tissue: string;
+  organ: string;
+  score: number;
+  mean_expression_unweighted: number;
+  n_cells: number;
+  pct_expressing_mean: number;
+  n_target_genes_present: number;
+}
+
+export interface CellTypeAggregationOrganRow {
+  organ: string;
+  organ_score: number;
+  n_cell_types: number;
+  top_cell_type: string;
+}
+
+export interface CellTypeAggregationPrediction {
+  top_cell_types: CellTypeAggregationRow[];
+  bottom_cell_types: CellTypeAggregationRow[];
+  per_organ: CellTypeAggregationOrganRow[];
+  targets_in_domain: string[];
+  targets_out_of_domain: string[];
+  weights: Array<{ gene_symbol: string; weight: number }>;
+  weighting_mode: string;
+}
+
+export interface CellTypeAggregationModelInfo {
+  engine: string;
+  method: string;
+  scope_caveat: string;
+  atlas: {
+    name: string;
+    sha?: string;
+    preparation_date?: string;
+    n_genes?: string;
+    n_cell_types?: string;
+    n_organs?: string;
+    notebook_version?: string;
+    loaded_at?: string;
+  };
+  license: string;
+}
+
+/** Discriminated by `source`. Errors and the data-not-provisioned condition are
+ *  surfaced explicitly — callers must NOT silently coerce them into a fake "ml" success. */
+export type CellTypeAggregationResult =
+  | {
+      source: "ml";
+      ml_available: true;
+      prediction: CellTypeAggregationPrediction;
+      model_info: CellTypeAggregationModelInfo;
+    }
+  | {
+      source: "data-not-provisioned";
+      ml_available: false;
+      error: string;
+      atlas_path?: string;
+      remediation?: string;
+    }
+  | {
+      source: "out-of-domain";
+      ml_available: true;
+      error: string;
+      targets_out_of_domain: string[];
+      model_info: { engine: string; atlas: string };
+    }
+  | {
+      source: "input-error";
+      ml_available: false;
+      error: string;
+    };
+
+export async function predictCellTypeAggregation(
+  targets: CellTypeAggregationTarget[],
+  topN: number = 25,
+): Promise<CellTypeAggregationResult> {
+  const res = await fetch(`${API_BASE}/celltype-aggregation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targets, top_n: topN }),
+  });
+  // 503 carries the data-not-provisioned envelope inside `detail` (FastAPI HTTPException shape).
+  // 400 carries input-error. Surface them as the typed result, not as thrown errors,
+  // so the UI can render the explicit remediation copy instead of a generic toast.
+  if (res.status === 503 || res.status === 400) {
+    const body = await res.json().catch(() => null);
+    const detail = body?.detail ?? body;
+    if (detail && typeof detail === "object" && "source" in detail) {
+      return detail as CellTypeAggregationResult;
+    }
+    return {
+      source: res.status === 503 ? "data-not-provisioned" : "input-error",
+      ml_available: false,
+      error: typeof detail === "string" ? detail : "Cell-type aggregation unavailable.",
+    };
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "Cell-type aggregation failed");
+  }
+  return res.json();
 }
 
 export interface DiliMlResult {

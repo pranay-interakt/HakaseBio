@@ -18,7 +18,7 @@ import {
   type TransporterFlagsResult,
   type TransporterChannel,
 } from "@/lib/transporterFlags";
-import { predictDiliMl, type DiliMlResult } from "@/lib/aiService";
+import { predictDiliMl, predictCellTypeAggregation, predictProtein, type DiliMlResult } from "@/lib/aiService";
 
 interface Layer3ExVivoScaffoldProps {
   layer2Ready: boolean;
@@ -67,14 +67,13 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: true,
   },
   {
-    n: 3, name: "Cell-type aggregation (Drug2cell + Tabula Sapiens)", wired: "stub-with-manual",
-    detail: "Per cell type in Tabula Sapiens v2 (~480 across 28 organs): score = target_gene_expression × predicted drug affinity, aggregated to organoid IC50 via published organoid-composition fractions and Hill fit. Manual entry accepts a measured organoid IC50 from a CRO panel (T2 wet-data path).",
+    n: 3, name: "Cell-type aggregation (Drug2cell + Tabula Sapiens)", wired: "ml-service",
+    detail: "Drug2cell-pattern scoring over Tabula Sapiens v2 (~480 cell types × 28 organs): score(cell_type, tissue) = Σᵢ wᵢ · mean_log1p_expression(geneᵢ, cell_type, tissue), where wᵢ is the min-max normalized pKi of target_i (or uniform 1.0 when pKi absent). Atlas Parquet preprocessed off-platform via colab_notebooks/prepare_tabula_sapiens.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for measured organoid IC50 (T2 wet-data path).",
     engines: [
-      { name: "drug2cell (Teichmann lab, MIT)", note: "pip install — pin Tabula Sapiens v2 by SHA" },
-      { name: "Tabula Sapiens v2 (CELLxGENE)",  note: "bulk-download to local Parquet for v1 (Census API later)" },
-      { name: "Manual entry (this build)",      note: "Cellosaurus CVCL accession + measured organoid IC50 + citation" },
+      { name: "ai-service /predict/celltype-aggregation", note: "Drug2cell-pattern weighted aggregation; HTTP 503 + data-not-provisioned when atlas Parquet absent — NO synthetic fallback" },
+      { name: "Tabula Sapiens v2 (CELLxGENE Census)",     note: "Aggregated off-platform in Colab → tabula_sapiens_aggregated.parquet (mean log1p expression per cell_type × tissue × gene); pinned by Census SHA" },
+      { name: "Manual entry (CRO organoid panels)",       note: "Cellosaurus CVCL accession + measured organoid IC50 + citation" },
     ],
-    pendingReason: "Drug2cell + Tabula Sapiens bulk ingest pending (spec §3.2, ETA 7–10 d). Manual entry available for already-measured organoid panels.",
     acceptsManualEntry: true,
   },
   {
@@ -157,6 +156,7 @@ interface Stage2MlResult {
 type Stage2Result = Stage2ManualResult | Stage2MlResult;
 
 interface Stage3ManualResult {
+  kind: "manual";
   source: "user-provided";
   organoidCvcl: string;
   measuredIc50_uM: number;
@@ -164,6 +164,16 @@ interface Stage3ManualResult {
   citation: string;
   enteredAt: string;
 }
+
+interface Stage3MlResult {
+  kind: "ml";
+  source: "ml";
+  prediction: import("../lib/aiService").CellTypeAggregationPrediction;
+  modelInfo: import("../lib/aiService").CellTypeAggregationModelInfo;
+  enteredAt: string;
+}
+
+type Stage3Result = Stage3MlResult | Stage3ManualResult;
 
 interface Stage4ManualRow { depmapId: string; ic50_uM: number; citation: string; }
 
@@ -658,7 +668,7 @@ function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void 
       <button
         type="button" disabled={!valid}
         onClick={() => onSave({
-          source: "user-provided", organoidCvcl: cvcl.toUpperCase(), measuredIc50_uM: ic50num,
+          kind: "manual", source: "user-provided", organoidCvcl: cvcl.toUpperCase(), measuredIc50_uM: ic50num,
           assayFormat: assay.trim(), citation: citation.trim(), enteredAt: new Date().toISOString(),
         })}
         className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
@@ -1012,7 +1022,7 @@ type StageResultBlock<V> =
 interface PipelineResults {
   s1?: StageResultBlock<Stage1Result>;
   s2?: StageResultBlock<Stage2Result>;
-  s3?: StageResultBlock<Stage3ManualResult>;
+  s3?: StageResultBlock<Stage3Result>;
   s4?: StageResultBlock<Stage4ManualResult>;
   s5?: StageResultBlock<Stage5Result>;
   s6?: StageResultBlock<Stage6Result>;
@@ -1039,10 +1049,13 @@ function buildStage6Envelope(results: PipelineResults): Stage6Result {
     tiers.push({ stage: 2, name: def2.name, tier: "pending", cascadeKind: "not_applicable" });
   }
 
-  // Stage 3 (still manual-only this build)
+  // Stage 3: ML (Drug2cell + Tabula Sapiens) → t0; Manual organoid IC50 → t-user.
+  // If both saved, manual wins for tier (measured > predicted).
   const def3 = L3_STAGES.find(s => s.n === 3)!;
-  if (results.s3?.status === "complete") {
-    tiers.push({ stage: 3, name: def3.name, tier: "t-user", cascadeKind: "prediction_only" });
+  const s3 = results.s3;
+  if (s3?.status === "complete") {
+    const tier: ReadoutTier = s3.result.kind === "manual" ? "t-user" : "t0";
+    tiers.push({ stage: 3, name: def3.name, tier, cascadeKind: "prediction_only" });
   } else {
     tiers.push({ stage: 3, name: def3.name, tier: "pending", cascadeKind: "not_applicable" });
   }
@@ -1168,12 +1181,60 @@ export function Layer3ExVivoScaffold({
     setOne("s6", { status: "complete", result: buildStage6Envelope(results) });
   };
 
+  const runStage3Ml = async () => {
+    if (!simResults?.uniprotId) {
+      setOne("s3", { status: "error", reason: "Stage 3 ML needs an L1 UniProt target — no gene to score against the Tabula Sapiens v2 atlas." });
+      return;
+    }
+    setBusyStage(3);
+    setOne("s3", { status: "running" });
+    try {
+      // Resolve the HUGO gene symbol from UniProt via the existing protein endpoint
+      // — refuses to silently substitute the UniProt accession as a gene symbol.
+      const protein = await predictProtein(simResults.uniprotId);
+      const geneSymbol = (protein?.gene_name ?? "").toString().trim().toUpperCase();
+      if (!geneSymbol) {
+        setOne("s3", { status: "error", reason: `Stage 3 ML needs a HUGO gene symbol; UniProt ${simResults.uniprotId} returned no gene_name.` });
+        return;
+      }
+      const targets = [{ gene_symbol: geneSymbol }];
+      const r = await predictCellTypeAggregation(targets, 25);
+      if (r.source === "data-not-provisioned") {
+        setOne("s3", { status: "error", reason: r.error + (r.remediation ? ` — ${r.remediation}` : "") });
+        return;
+      }
+      if (r.source === "out-of-domain") {
+        setOne("s3", { status: "error", reason: `${r.error} (out-of-domain genes: ${r.targets_out_of_domain.join(", ")})` });
+        return;
+      }
+      if (r.source === "input-error") {
+        setOne("s3", { status: "error", reason: r.error });
+        return;
+      }
+      setOne("s3", {
+        status: "complete",
+        result: {
+          kind: "ml",
+          source: "ml",
+          prediction: r.prediction,
+          modelInfo: r.model_info,
+          enteredAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      setOne("s3", { status: "error", reason: err?.message ?? String(err) });
+    } finally {
+      setBusyStage(null);
+    }
+  };
+
   const runStageHandler = async (n: number) => {
     if (n === 1) return runStage1();
     if (n === 2) return runStage2Ml();
+    if (n === 3) return runStage3Ml();
     if (n === 5) return runStage5();
     if (n === 6) return runStage6();
-    // Stages 3, 4: must use Manual Entry form to populate
+    // Stage 4: must use Manual Entry form to populate
   };
 
   const runFull = async () => {
@@ -1182,6 +1243,11 @@ export function Layer3ExVivoScaffold({
     try {
       await runStage1();
       await runStage2Ml();
+      // Stage 3 ML auto-runs if an L1 UniProt + gene symbol is available;
+      // it gracefully no-ops with an error block when the atlas Parquet is not provisioned yet.
+      if (simResults?.uniprotId) {
+        await runStage3Ml();
+      }
       // Stage 5 only auto-derives if Stage 2 manual entry already exists
       // (ML-only S2 does NOT carry mechanism flags — Manual Entry is required).
       const s2Now = results.s2;
@@ -1216,7 +1282,7 @@ export function Layer3ExVivoScaffold({
       provenance: {
         s1: results.s1?.status === "complete" ? "in-house-ml" : "pending",
         s2: results.s2?.status === "complete" ? (results.s2.result.kind === "ml" ? "ml-binary-classifier" : "user-provided") : "pending",
-        s3: results.s3?.status === "complete" ? "user-provided" : "pending",
+        s3: results.s3?.status === "complete" ? (results.s3.result.kind === "ml" ? "ml-celltype-aggregation" : "user-provided") : "pending",
         s4: results.s4?.status === "complete" ? (results.s4.result.mode === "non-oncology-na" ? "not-applicable" : "user-provided") : "pending",
         s5: results.s5?.status === "complete" ? results.s5.result.source : "pending",
         s6: results.s6?.status === "complete" ? "orchestration" : "pending",
@@ -1256,7 +1322,11 @@ export function Layer3ExVivoScaffold({
                 return <>severity = <span className="text-cyan-300">{v.severity}</span>; mechanisms: {Object.entries(v.mechanisms).filter(([_, on]) => on).map(([k]) => k).join(", ") || "none"}; cite: <span className="text-slate-400 italic">{v.citation}</span></>;
               })()}
               {n === 3 && (() => {
-                const v = (r as StageResultBlock<Stage3ManualResult> & { status: "complete" }).result;
+                const v = (r as StageResultBlock<Stage3Result> & { status: "complete" }).result;
+                if (v.kind === "ml") {
+                  const top = v.prediction.top_cell_types[0];
+                  return <>top cell-type <span className="text-violet-300">{top?.cell_type ?? "—"}</span> · organ <span className="text-violet-300">{top?.organ ?? "—"}</span> · score <span className="text-violet-300 font-mono">{top ? top.score.toFixed(3) : "—"}</span> <span className="text-slate-400 italic">(Drug2cell + {v.modelInfo.atlas.name})</span></>;
+                }
                 return <>{v.organoidCvcl} · IC50 {v.measuredIc50_uM.toFixed(3)} µM · {v.assayFormat} · cite: <span className="text-slate-400 italic">{v.citation}</span></>;
               })()}
               {n === 4 && (() => {
@@ -1558,9 +1628,55 @@ export function Layer3ExVivoScaffold({
             );
           })()}
 
-          {/* Stage 3 result */}
+          {/* Stage 3 result — ML (Drug2cell + Tabula Sapiens v2) or Manual organoid IC50 */}
           {results.s3?.status === "complete" && (() => {
             const v = results.s3.result;
+            if (v.kind === "ml") {
+              const top = v.prediction.top_cell_types.slice(0, 5);
+              const organs = v.prediction.per_organ.slice(0, 5);
+              return (
+                <ResultShell stage={3} name="Cell-type aggregation (Drug2cell + Tabula Sapiens v2)" icon={Atom} status="complete">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mb-2">
+                    <div className="text-slate-500">Atlas</div>
+                    <div className="text-violet-300 font-mono text-right">{v.modelInfo.atlas.name}</div>
+                    <div className="text-slate-500">Targets in domain</div>
+                    <div className="text-violet-300 font-mono text-right">{v.prediction.targets_in_domain.join(", ") || "—"}</div>
+                    {v.prediction.targets_out_of_domain.length > 0 && (
+                      <>
+                        <div className="text-slate-500">Out of atlas</div>
+                        <div className="text-amber-300 font-mono text-right">{v.prediction.targets_out_of_domain.join(", ")}</div>
+                      </>
+                    )}
+                    <div className="text-slate-500">Weighting</div>
+                    <div className="text-slate-300 text-right">{v.prediction.weighting_mode}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden mb-2">
+                    <div className="grid grid-cols-[1fr_120px_70px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                      <div>Top cell type · tissue</div><div>Organ</div><div className="text-right">Score</div>
+                    </div>
+                    {top.map(r => (
+                      <div key={`${r.cell_type}|${r.tissue}`} className="grid grid-cols-[1fr_120px_70px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                        <div className="text-violet-200 truncate" title={`${r.cell_type} · ${r.tissue}`}>{r.cell_type} <span className="text-slate-500">· {r.tissue}</span></div>
+                        <div className="text-slate-300 truncate">{r.organ}</div>
+                        <div className="text-right font-mono text-violet-300">{r.score.toFixed(3)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden">
+                    <div className="grid grid-cols-[1fr_70px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                      <div>Top organs</div><div className="text-right">Org. score</div>
+                    </div>
+                    {organs.map(r => (
+                      <div key={r.organ} className="grid grid-cols-[1fr_70px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                        <div className="text-violet-200">{r.organ} <span className="text-slate-500">· {r.n_cell_types} types</span></div>
+                        <div className="text-right font-mono text-violet-300">{r.organ_score.toFixed(3)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[10px] text-amber-300/80 italic mt-2">Cascade flag: prediction_only · expression × affinity score, NOT a measured organoid IC50. Wet anchor (T2/T3) required for IND-supporting claims.</div>
+                </ResultShell>
+              );
+            }
             return (
               <ResultShell stage={3} name="Cell-type / organoid IC50 (user-provided)" icon={Atom} status="complete">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
@@ -1661,8 +1777,9 @@ export function Layer3ExVivoScaffold({
             );
           })()}
 
-          {/* Show pending stubs only when nothing has been entered for them */}
-          {([2, 3, 4, 5, 6] as const).map(n => {
+          {/* Pending stubs — only for stages NOT wired to ML (4, 5, 6).
+              Stages 2 + 3 surface their own running/error/complete blocks via the ML path. */}
+          {([4, 5, 6] as const).map(n => {
             const key = (`s${n}` as keyof PipelineResults);
             const r = results[key];
             if (r) return null;
@@ -1670,7 +1787,7 @@ export function Layer3ExVivoScaffold({
             return (
               <ResultShell
                 key={n} stage={n} name={def.name}
-                icon={n === 2 ? Beaker : n === 3 ? Atom : n === 4 ? FlaskConical : n === 5 ? Activity : ServerCrash}
+                icon={n === 4 ? FlaskConical : n === 5 ? Activity : ServerCrash}
                 status="out-of-scope-yet"
                 reason={def.pendingReason}
               >
