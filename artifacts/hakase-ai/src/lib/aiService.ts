@@ -421,6 +421,50 @@ export interface ModelStatusResponse {
   protein_ml?: ModelLoadStatus;
   solubility_ml?: ModelLoadStatus;
   binding_ml?: ModelLoadStatus;
+  dili_ml?: ModelLoadStatus;
+}
+
+export interface DiliMlResult {
+  smiles: string;
+  source: "ml" | "fallback";
+  ml_available: boolean;
+  error?: string;
+  prediction: {
+    dili_probability: number | null;
+    risk_class: "Low" | "Moderate" | "High" | null;
+    severity_hint:
+      | "none-or-mild"
+      | "moderate"
+      | "severe"
+      | "most-concern"
+      | null;
+  };
+  model_info: {
+    engine: string;
+    method?: string;
+    scope_caveat?: string;
+    training?: {
+      dataset: string;
+      n_train: number;
+      n_positives: number;
+      n_negatives: number;
+      label_definition: string;
+    };
+    performance?: {
+      cv_roc_auc_mean: number | null;
+      cv_roc_auc_std: number | null;
+      cv_folds: number;
+    };
+    features?: {
+      morgan_nbits: number;
+      morgan_radius: number;
+      rdkit_descriptors: string[];
+    };
+    inference_time_ms?: number;
+    license?: string;
+    reference?: string;
+    load_status?: ModelLoadStatus;
+  };
 }
 
 export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
