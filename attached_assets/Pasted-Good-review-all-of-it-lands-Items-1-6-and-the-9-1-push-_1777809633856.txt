@@ -1,0 +1,88 @@
+Good review, all of it lands. Items 1–6 and the §9.1 push-back are correct; I cited literature upper bounds as predictions and underestimated the integration friction. Pinning each one down:
+
+## 1. Re-estimate honestly
+
+You're right. Specific cuts I missed:
+
+- **CELLxGENE Census in TypeScript.** The official clients are Python (`cellxgene-census`) and R only. The realistic options are (a) stand up a Python sidecar service behind a thin REST shim — adds infra, requires service ownership; (b) bulk-download the Tabula Sapiens v2 + HCA v2 cell-type expression matrices to local Parquet and query in TypeScript directly — simpler, but the Census API gives us slicing we'd lose. I'd go with (b) for v1, accepting the loss of dynamic slicing, and revisit if we hit a slicing requirement we can't pre-compute. Either way, +1 week vs. what the spec said.
+- **Organoid composition table.** Curating ~15 organoid types with cell-type fractions, citations, and version pinning is 3–5 days of literature work, not in-line with Stage 3. Should be its own card on the build board with a named owner (probably whoever owns the L3 biology side).
+- **DILI training infra.** Confirmed — `cardiotox-ml` was bespoke. Either we generalise it into a small training framework (better long-term, slower now) or build dili-ml as a second bespoke pipeline (faster now, debt later). I'd argue for generalising, because tissue-deconv-ml and organoid-response-ml are both coming behind dili-ml and they'll all benefit. That's another week up front.
+
+Honest re-estimate, with the spec to be updated: **6–9 weeks single-dev, 4–6 weeks parallelised across two. Plan 8 weeks** and treat the calibration cohort assembly as a separate parallel track.
+
+## 2. organoid-response-ml — concrete bootstrap and minimum-N
+
+Fair criticism, this was hand-wavy. Concrete numbers:
+
+- **Day-1 bootstrap cohort, realistically:** 50–150 compound-organoid pairs assembled from HCMI published validation studies, the PDXE encyclopedia (Novartis 2015 — predates organoid era but the efficacy data is comparable), Tox21 organoid-mode expansions since 2023, and supplementary data from major HUB-line validation papers. Heavily oncology-skewed. DepMap PRISM gives 6000 × 2000 IC50s but those are 2D cell lines, useful only as labelled-proxy with an explicit "2D not organoid" tag.
+- **Minimum-N to ship the calibration model:** 30 compound-organoid pairs per organoid type, OR cohort spans ≥3 chemical scaffolds. Below that, the model is suppressed and we surface the structural prediction (cellTypeAggregator output) alone with its un-calibrated band.
+- **Retraining trigger:** not weekly. Trigger when calibration cohort grows by ≥10% OR observed fold-error band shifts by ≥1.2× — whichever comes first. Steady-state will probably be monthly, not weekly.
+- **Ownership:** Performance & Lineage Swarm (per the HAIOps playbook) owns the retraining pipeline. Compliance Swarm owns the QMRF refresh per retrain. Each retrain bumps the model_version and emits a cascade flag 6 event with the new fold-error band.
+
+## 3. Drug2cell — attribution, not reimplementation
+
+You called this right. Drug2cell is at github.com/Teichlab/drug2cell from the Teichmann lab at Sanger, MIT-licensed. The clean path is `pip install drug2cell`, attribute properly, pin the snapshot of Tabula Sapiens v2 by SHA, and wrap the Python output in our cellTypeAggregator. The spec's "reimplemented" framing was wrong — fixing in v1.1.
+
+## 4. `prediction_only` as a discriminated union, not a string
+
+Agreed, this needs to be a tagged enum branch in the envelope type so consumers must handle it explicitly:
+
+```typescript
+type CascadeFlagState =
+  | { kind: 'pass' }
+  | { kind: 'fail'; reason: string; remediation: RemediationRoute }
+  | { kind: 'prediction_only'; method: string; foldError: FoldErrorBand;
+      applicabilityDomain: { inDomain: boolean; score: number };
+      snapshotsWithinCadence: boolean };
+
+// Curators / consumers force exhaustive handling:
+function evaluateForSigning(s: CascadeFlagState): SignatureDecision {
+  switch (s.kind) {
+    case 'pass': return canSign;
+    case 'fail': return blockWithReason(s.reason);
+    case 'prediction_only': return requireWetAnchor(s.method, s.foldError);
+    default: const _exhaustive: never = s; return _exhaustive;
+  }
+}
+```
+
+Amber Curator's refusal-to-sign becomes a function whose type signature accepts only `{ kind: 'pass' }` or a specific approved subset for load-bearing fields. Compile-time guarantee, not runtime business logic. Updating the spec.
+
+## 5. T1 retrieval — real spec
+
+Was understated. Concrete additions:
+
+- **Similarity gates:** Tanimoto ≥ 0.85 = "very similar analog" (high-confidence retrieval); 0.7–0.85 = "near analog" (informational); < 0.5 = no match returned. Two thresholds, surfaced separately so the user can see which bucket a hit falls into.
+- **Distinct typed errors:** `NoAnalogsFound` (clean empty state, similarity scan completed) vs. `ServiceUnreachable` (ToxRefDB or MPS-Database is down — we don't know if analogs exist) vs. `RegistrationRequired` (the API needs auth we haven't completed). Each is a different envelope state, not a single "no data" string.
+- **ToxRefDB friction:** registration-gated, finicky API, schemas have shifted. Realistic ingest is closer to 1.5–2 weeks. Plus MPS-Database which is small and the schema changes — their team is responsive but we have to build to a moving target.
+- **Pattern match to existing code:** mirror the ChEMBL similar-targets v2 retrieval path that already works at L1. Same Tanimoto computation, same caching, same provenance discipline.
+
+T1 stage estimate moves from 5–7 days to **~2 weeks, parallel to Stages 3–6**.
+
+## 6. `tier` per readout, confirmed
+
+Confirming the implementation rule explicitly: `tier` lives on each readout block, never at envelope level. The doc's example showed it that way; the prose was sloppy. v1.1 will spell out the invariant: an L3 envelope is a heterogeneous bag of readouts, each with its own tier, applicability, and `prediction_only`/`pass`/`fail` state. Mixed-tier envelopes are the normal case, not an edge case.
+
+## §9.1 push-back — accepted
+
+You're right and this is the most important fix in the list, because it violates the doc's own honesty rule. Rewriting §9.1 to:
+
+> "Target fold-error bands, to be measured against initial calibration cohorts. The bands surfaced in the UI will be the actual measured values from those cohorts, not the literature-derived targets. We do not narrow the band ahead of the data."
+
+Same discipline as the rest of the doc. Numbers will appear when measured, not before.
+
+## Stages 1–2 greenlight
+
+Confirmed understanding: Stages 1–2 (tissue selectivity + transporter flags + DILI-ML) ship now, target ~2 weeks for L3 Run button enabled with real defensible cards. Items 1–6 above pin down before Stages 3–6 commit. T1/T2/T3 stay opt-in upgrades, on their own track.
+
+## Proposal for landing this
+
+Two options on how the resolutions get captured:
+
+**(a) Ship v1.1 of the spec doc** with every item baked into the relevant section: §3.2 (Drug2cell attribution), §7.3 (organoid-response-ml minimum-N + retraining trigger + ownership), §8 (`prediction_only` as discriminated union with the TypeScript example), §9.1 (target-not-prediction wording), §10 (re-estimated build, T1 as 2 weeks parallel), §10.7 (T1 retrieval real spec), and a clarifying note on per-readout tier invariant. Diff is moderate but contained.
+
+**(b) Ship a v1.0 → v1.1 deltas addendum** as a separate ~5-page doc that captures only the resolutions to items 1–6 + the §9.1 fix. Faster, and preserves the v1.0 spec as a snapshot of the original direction proposal.
+
+I'd recommend (a) — the spec is meant to be the buildable artifact, and a deltas-only addendum risks the team reading v1.0 and missing the corrections. But (b) is reasonable if you want the original direction doc preserved for the record. Your call.
+
+Either way I can have it landed in a couple of hours. Want me to go ahead with (a)?
