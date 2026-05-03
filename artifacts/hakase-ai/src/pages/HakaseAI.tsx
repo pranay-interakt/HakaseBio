@@ -875,8 +875,17 @@ export function HakaseAI() {
     [simResults, targetSuggestions, diliMl, admetMl, bindingMl],
   );
   const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
+  // Inline override form state — replaces window.prompt() which is silently
+  // blocked inside sandboxed preview iframes (returns null with no UI).
+  const [overrideFormOpen, setOverrideFormOpen] = useState(false);
+  const [overrideJustification, setOverrideJustification] = useState(
+    "Reviewed manually; advancing to L2 with awareness of heuristic-only safety signals.",
+  );
   // Reset override whenever the molecule or target evidence changes.
-  useEffect(() => { setCascadeOverride(null); }, [smiles, targetSuggestions.length]);
+  useEffect(() => {
+    setCascadeOverride(null);
+    setOverrideFormOpen(false);
+  }, [smiles, targetSuggestions.length]);
 
   useEffect(() => {
     if (!simResults) return;
@@ -3738,33 +3747,65 @@ export function HakaseAI() {
                             ))}
                           </div>
                         </details>
-                        {!passed && !overridden && simResults && (
+                        {!passed && !overridden && simResults && !overrideFormOpen && (
                           <button
-                            onClick={() => {
-                              const justification = window.prompt(
-                                "Override the stage-gate? Enter justification (logged to provenance):",
-                                "Reviewed manually; advancing to L2 with awareness of heuristic-only safety signals.",
-                              );
-                              if (!justification || !justification.trim()) return;
-                              const reviewer = (typeof window !== "undefined" && window.localStorage?.getItem("hakase.reviewer")) || "anonymous";
-                              const rec = recordCascadeOverride(g, reviewer, justification.trim());
-                              setCascadeOverride(rec);
-                              const prov = createProvenance("cascadeGate.ts", "browser", smiles);
-                              prov.databaseQueries = [{ database: "Cascade gate override", status: "skipped" }];
-                              // Conform to SafetyOverride: { fromLayer, toLayer, verdict, timestamp, reason? }
-                              setHAIOpsCtx(prev => mergeLayerProvenance(addOverride(prev, {
-                                fromLayer: 1,
-                                toLayer: 2,
-                                verdict: "OVERRIDE_CASCADE_GATE",
-                                timestamp: rec.timestamp,
-                                reason: `${rec.reviewer}: ${rec.justification} — blockedBy=[${rec.blockedBy.join(", ")}] safetyMin=${rec.safetyMinScore.toFixed(2)} avgNonSafety=${rec.avgNonSafetyScore.toFixed(2)}`,
-                              }), 1, prov));
-                            }}
+                            onClick={() => setOverrideFormOpen(true)}
                             data-testid="cascade-override-button"
                             className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 hover:bg-rose-500/25 text-[10px] font-semibold transition-colors"
                           >
                             Override & advance to L2
                           </button>
+                        )}
+                        {!passed && !overridden && simResults && overrideFormOpen && (
+                          <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5 space-y-2">
+                            <div className="text-[10px] font-semibold text-rose-200">
+                              Justification (logged to provenance):
+                            </div>
+                            <textarea
+                              value={overrideJustification}
+                              onChange={e => setOverrideJustification(e.target.value)}
+                              rows={3}
+                              className="w-full text-[10px] font-mono bg-slate-950/60 border border-white/10 rounded p-1.5 text-slate-200 focus:outline-none focus:border-rose-400/40 resize-none"
+                              placeholder="Why are you overriding the stage-gate?"
+                              autoFocus
+                              data-testid="cascade-override-justification"
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const j = overrideJustification.trim();
+                                  if (!j) return;
+                                  const reviewer = (typeof window !== "undefined" && window.localStorage?.getItem("hakase.reviewer")) || "anonymous";
+                                  const rec = recordCascadeOverride(g, reviewer, j);
+                                  setCascadeOverride(rec);
+                                  setOverrideFormOpen(false);
+                                  const prov = createProvenance("cascadeGate.ts", "browser", smiles);
+                                  prov.databaseQueries = [{ database: "Cascade gate override", status: "skipped" }];
+                                  setHAIOpsCtx(prev => mergeLayerProvenance(addOverride(prev, {
+                                    fromLayer: 1,
+                                    toLayer: 2,
+                                    verdict: "OVERRIDE_CASCADE_GATE",
+                                    timestamp: rec.timestamp,
+                                    reason: `${rec.reviewer}: ${rec.justification} — blockedBy=[${rec.blockedBy.join(", ")}] safetyMin=${rec.safetyMinScore.toFixed(2)} avgNonSafety=${rec.avgNonSafetyScore.toFixed(2)}`,
+                                  }), 1, prov));
+                                }}
+                                disabled={!overrideJustification.trim()}
+                                data-testid="cascade-override-confirm"
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/25 border border-rose-500/40 text-rose-100 hover:bg-rose-500/35 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-semibold transition-colors"
+                              >
+                                Confirm override
+                              </button>
+                              <button
+                                onClick={() => setOverrideFormOpen(false)}
+                                className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-[10px] font-semibold transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <span className="ml-auto text-[9px] font-mono text-slate-500">
+                                reviewer: {(typeof window !== "undefined" && window.localStorage?.getItem("hakase.reviewer")) || "anonymous"}
+                              </span>
+                            </div>
+                          </div>
                         )}
                         {overridden && cascadeOverride && (
                           <div className="text-[9px] text-amber-400/80 font-mono">
