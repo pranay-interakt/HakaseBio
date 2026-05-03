@@ -48,6 +48,11 @@ from models.binding_ml import (
     is_ready as binding_ml_status,
     warmup as binding_ml_warmup,
 )
+from models.dili_ml import (
+    predict_dili_ml,
+    is_ready as dili_ml_status,
+    warmup as dili_ml_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -111,6 +116,7 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=protein_ml_warmup, name="protein-ml-prewarm", daemon=True).start()
     threading.Thread(target=solubility_ml_warmup, name="solubility-ml-prewarm", daemon=True).start()
     threading.Thread(target=binding_ml_warmup, name="binding-ml-prewarm", daemon=True).start()
+    threading.Thread(target=dili_ml_warmup, name="dili-ml-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -169,6 +175,17 @@ def api_predict_cardiotox(req: SmilesRequest):
         raise HTTPException(status_code=500, detail=f"CardioTox prediction failed: {str(e)}")
 
 
+@app.post("/predict/dili-ml")
+def api_predict_dili_ml(req: SmilesRequest):
+    """Layer 3 Stage 2 — binary DILI-risk classifier (TDC DILI / Xu 2015, RF)."""
+    try:
+        return sanitize(predict_dili_ml(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DILI-ML prediction failed: {str(e)}")
+
+
 @app.post("/predict/protein-ml")
 def api_predict_protein_ml(req: ProteinRequest):
     """Dedicated ESM-2 druggability prediction (independent second opinion)."""
@@ -220,6 +237,7 @@ def api_models_status():
     return {
         "admet_ml": admet_ml_status(),
         "cardiotox": cardiotox_status(),
+        "dili_ml": dili_ml_status(),
         "protein_ml": protein_ml_status(),
         "solubility_ml": solubility_ml_status(),
         "binding_ml": binding_ml_status(),
@@ -232,6 +250,7 @@ def api_models_warmup():
     return {
         "admet_ml": admet_ml_warmup(),
         "cardiotox": cardiotox_warmup(),
+        "dili_ml": dili_ml_warmup(),
         "protein_ml": protein_ml_warmup(),
         "solubility_ml": solubility_ml_warmup(),
         "binding_ml": binding_ml_warmup(),
