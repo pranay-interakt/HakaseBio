@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import {
   Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle,
   CircleDot, Play, Activity, Shield, Beaker, CheckCircle2, Settings2, ChevronDown, ChevronRight,
@@ -9,9 +9,10 @@ import type { InVitroResults } from "@/lib/inVitroSim";
 import type { L2DoseProjection, MarginTier, L2InputParams } from "@/lib/l2DoseProjection";
 import {
   runFullPipeline, runStage0, runStage1, runStage2Docking, runStage3, runStage4,
-  runStage5, runStage6, runStage7, runStage8, runStage9,
+  runStage5, runStage5Fep, runStage6, runStage7, runStage8, runStage9,
   type PipelineResults, type StageResult, type StageStatus,
 } from "@/lib/l2Pipeline";
+import { getFepConfig, type FepConfigStatus, type FepJobStatus } from "@/lib/aiService";
 
 interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
@@ -78,12 +79,13 @@ const L2_STAGES: StageDef[] = [
     ],
   },
   {
-    n: 5, name: "Free-energy refinement", wired: "out-of-scope",
-    detail: "OpenMM/OpenFF Sage with TIES relative-binding-FEP — ~24 GPU-h per compound on A100 per architecture doc. Out of scope for in-browser tier.",
+    n: 5, name: "Free-energy refinement", wired: "ai-service",
+    detail: "OpenMM + OpenFF Sage with TIES relative-binding-FEP, dispatched to a RunPod Serverless GPU endpoint (A100/H100). Computes ΔΔG (Ligand B − Ligand A) for the same PDB receptor. Opt-in per pair: ~24 GPU-h ≈ $40–$50. Use Ligand A = current L1 compound, Ligand B = proposed analog.",
     engines: [
-      { name: "OpenMM",            note: "MIT — Python-first, GPU-accelerated MD" },
-      { name: "OpenFF Toolkit (Sage)", note: "MIT — modern force fields with auto-parameterisation" },
-      { name: "TIES",              note: "open relative-binding-FEP framework on NAMD/OpenMM" },
+      { name: "OpenMM 8.x",            note: "MIT — Python-first, GPU-accelerated MD (worker container)" },
+      { name: "OpenFF Toolkit (Sage 2.x)", note: "MIT — modern force fields with auto-parameterisation" },
+      { name: "TIES-MD",               note: "open relative-binding-FEP framework on OpenMM" },
+      { name: "RunPod Serverless",     note: "dispatch backend — requires RUNPOD_API_KEY + RUNPOD_FEP_ENDPOINT_ID" },
     ],
   },
   {
@@ -425,11 +427,34 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
   const [busyStage, setBusyStage] = useState<number | null>(null);
   const [pipelineRunning, setPipelineRunning] = useState(false);
 
+  // FEP inputs — Stage 5 needs a Ligand B SMILES + PDB ID + explicit GPU-cost confirmation.
+  // Ligand A defaults to the L1 compound; PDB defaults to the Stage 2-resolved receptor when present.
+  const [fepLigandB,     setFepLigandB]     = useState<string>("");
+  const [fepPdbId,       setFepPdbId]       = useState<string>("");
+  const [fepCostOk,      setFepCostOk]      = useState<boolean>(false);
+  const [fepConfig,      setFepConfig]      = useState<FepConfigStatus | null>(null);
+  const [fepProgress,    setFepProgress]    = useState<string>("");
+
+  // Load Stage-5 backend config status once on mount so the Run button can be
+  // disabled with the exact missing-secret reason instead of letting the user click and 503.
+  useEffect(() => {
+    let cancelled = false;
+    getFepConfig().then(c => { if (!cancelled) setFepConfig(c); })
+                  .catch(e => { if (!cancelled) setFepConfig({ configured: false, reason: e?.message ?? "config probe failed" }); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Auto-prefill PDB from Stage 2 once it lands, only if the user hasn't typed something.
+  useEffect(() => {
+    const s2pdb = results.s2?.result?.pdb_id;
+    if (s2pdb && !fepPdbId) setFepPdbId(s2pdb);
+  }, [results.s2, fepPdbId]);
+
   // "Auto-pipeline" stages = wired stages that the Run-Full-Pipeline button executes.
-  // Stage 2 (docking) is wired but intentionally opt-in (30–90 s wall time per ligand),
-  // so the full-pipeline button skips it and the user clicks it from its own card.
-  const wiredCount  = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope").length, []);
-  const autoRunCount = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope" && s.n !== 2).length, []);
+  // Stage 2 (Vina docking, 30–90 s/ligand) and Stage 5 (TIES FEP, ~24 GPU-h ≈ $50/pair)
+  // are both wired but intentionally opt-in — full-pipeline skips both, user clicks each card.
+  const wiredCount   = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope").length, []);
+  const autoRunCount = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope" && s.n !== 2 && s.n !== 5).length, []);
 
   // ── Per-stage runners ────────────────────────────────────────────────────
   const setOne = (key: keyof PipelineResults, value: any) => {
@@ -452,7 +477,32 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         case 2: setOne("s2", await runStage2Docking(simResults)); break;
         case 3: setOne("s3", await runStage3(simResults)); break;
         case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
-        case 5: setOne("s5", runStage5()); break;
+        case 5: {
+          // Stage 5 is opt-in and requires explicit Ligand B + PDB ID + cost confirmation
+          // + a configured RunPod backend. runDisabledReasonForStage(5) gates the button,
+          // but re-check here so we never silently dispatch an unconfirmed $50 job.
+          if (!fepConfig?.configured) {
+            setOne("s5", {
+              stage: 5, name: "Free-energy refinement", status: "error",
+              reason: `RunPod is not configured: ${fepConfig?.reason ?? "config probe pending"}. Set RUNPOD_API_KEY and RUNPOD_FEP_ENDPOINT_ID secrets on the AI service.`,
+            } as StageResult<any>);
+            break;
+          }
+          if (!fepCostOk) {
+            setOne("s5", {
+              stage: 5, name: "Free-energy refinement", status: "error",
+              reason: "GPU-cost confirmation required — tick the ‘I understand ~24 GPU-h ≈ $40–$50’ box on the Stage 5 card before dispatching.",
+            } as StageResult<any>);
+            break;
+          }
+          setFepProgress("submitting…");
+          const r = await runStage5Fep(simResults, fepLigandB, fepPdbId, {
+            onProgress: (s: FepJobStatus) => setFepProgress(`${s.status}: ${s.progress}`),
+          });
+          setOne("s5", r);
+          setFepProgress("");
+          break;
+        }
         case 6: setOne("s6", runStage6(simResults, inVitroResults, params, stage8DosePerAdmin())); break;
         case 7: {
           const pk = results.s6?.result;
@@ -473,7 +523,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
           if (r.status === "wired") onComplete?.();
           break;
         }
-        case 9: setOne("s9", runStage9(simResults, results.s8?.result, results.s6?.result, params)); break;
+        case 9: setOne("s9", runStage9(simResults, results.s8?.result, results.s6?.result, params, results.s5?.result)); break;
       }
     } finally {
       setBusyStage(null);
@@ -496,6 +546,14 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
 
   const runDisabledReasonForStage = (n: number): string | undefined => {
     if (!hasL1) return "awaiting L1";
+    if (n === 5) {
+      if (fepConfig === null) return "checking RunPod config…";
+      if (!fepConfig.configured) return "RunPod not configured";
+      if (!fepLigandB.trim())    return "needs Ligand B SMILES";
+      if (fepPdbId.trim().length !== 4) return "needs 4-letter PDB ID";
+      if (!fepCostOk)            return "confirm ~$50 GPU cost";
+      return undefined;
+    }
     if (n === 6) return isFinite(stage8DosePerAdmin()) ? undefined : "needs Stage 8 dose";
     if (n === 7) return (results.s6?.result && results.s8?.result?.fu_fraction) ? undefined : "needs Stage 6 + 8";
     if (n === 9) return results.s8?.result ? undefined : "needs Stage 8";
@@ -512,10 +570,10 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             <Cpu className="w-4 h-4 text-cyan-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 2 — In Silico</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              {wiredCount}/10 wired · {autoRunCount} auto + S2 opt-in
+              {wiredCount}/10 wired · {autoRunCount} auto + S2/S5 opt-in
             </span>
           </div>
-          <p className="text-[12px] text-slate-500">Nine stages wired in this product. Stage 2 docking (AutoDock Vina, CPU) is opt-in from its own card — 30–90 s per ligand, so it's not auto-run by the full-pipeline button. Stage 5 free-energy refinement remains GPU-cluster only and explicitly out of scope.</p>
+          <p className="text-[12px] text-slate-500">Ten stages wired. Two are opt-in from their own cards: <span className="text-cyan-300">Stage 2</span> docking (AutoDock Vina, 30–90 s CPU) and <span className="text-cyan-300">Stage 5</span> TIES relative-binding FEP (RunPod Serverless, ~24 GPU-h ≈ $40–$50 per pair). Run-Full-Pipeline executes the other {autoRunCount} auto stages.</p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
@@ -603,7 +661,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline (Stage {busyStage ?? "…"})…</>
-              : <><Play className="w-4 h-4" />Run Full L2 Pipeline ({autoRunCount} auto stages · S2 opt-in)</>}
+              : <><Play className="w-4 h-4" />Run Full L2 Pipeline ({autoRunCount} auto · S2/S5 opt-in)</>}
           </button>
 
         </div>
@@ -622,7 +680,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <h2 className="text-[18px] font-semibold text-white">L2 — In Silico</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
-                Architecture doc §4.3 — {wiredCount} of 10 stages wired ({autoRunCount} auto-run by Run-Full; Stage 2 docking is wired via AutoDock Vina but opt-in from its own card).
+                Architecture doc §4.3 — {wiredCount} of 10 stages wired ({autoRunCount} auto-run by Run-Full; Stage 2 docking and Stage 5 TIES FEP are opt-in from their own cards due to wall time / GPU cost).
               </p>
             </div>
           </div>
@@ -875,10 +933,200 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             );
           })()}
 
-          {/* Stage 5 OOS */}
-          {results.s5 && (
-            <ResultShell stage={5} name="Free-energy refinement" icon={ServerCrash} status={results.s5.status} reason={results.s5.reason} />
-          )}
+          {/* Stage 5 — TIES relative-binding FEP (opt-in, RunPod GPU) */}
+          <ResultShell
+            stage={5} name="Free-energy refinement (TIES on RunPod)" icon={Zap}
+            status={results.s5?.status ?? "ready"}
+            reason={results.s5?.reason}
+          >
+            {/* Backend status banner — surfaces missing-secret reason verbatim */}
+            <div className={`rounded-lg border p-2.5 flex items-start gap-2 ${
+              fepConfig === null ? "border-slate-500/30 bg-slate-500/8"
+              : fepConfig.configured ? "border-emerald-500/30 bg-emerald-500/8"
+              : "border-amber-500/30 bg-amber-500/8"
+            }`}>
+              {fepConfig === null
+                ? <Loader2 className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 animate-spin" />
+                : fepConfig.configured
+                  ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  : <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />}
+              <div className="flex-1">
+                <div className={`text-[11px] font-semibold ${
+                  fepConfig === null ? "text-slate-300"
+                  : fepConfig.configured ? "text-emerald-300" : "text-amber-300"
+                }`}>
+                  {fepConfig === null
+                    ? "Probing RunPod backend…"
+                    : fepConfig.configured
+                      ? "RunPod backend configured — Stage 5 dispatch enabled"
+                      : "RunPod backend not configured"}
+                </div>
+                {fepConfig && !fepConfig.configured && fepConfig.reason && (
+                  <div className="text-[10px] text-amber-200/80 leading-relaxed mt-1">
+                    {fepConfig.reason}. Set <span className="font-mono text-amber-100">RUNPOD_API_KEY</span> and <span className="font-mono text-amber-100">RUNPOD_FEP_ENDPOINT_ID</span> on the AI service to enable Stage 5. Per project policy, no ΔΔG estimate is fabricated when the GPU backend is unavailable.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Inputs (hidden after a successful run; collapsible) */}
+            {results.s5?.status !== "wired" && (
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-2.5">
+                <div className="grid grid-cols-1 gap-2.5">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">Ligand A SMILES (reference, from L1)</span>
+                    <input
+                      type="text" value={simResults?.smiles ?? ""} readOnly
+                      className="bg-black/30 border border-white/10 rounded-md px-2 py-1.5 text-[11px] text-slate-400 font-mono focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">Ligand B SMILES (perturbed analog)</span>
+                    <input
+                      type="text" value={fepLigandB}
+                      onChange={e => setFepLigandB(e.target.value)}
+                      placeholder="e.g. Cc1ccc(NC(=O)c2cccnc2)cc1"
+                      className="bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-[11px] text-cyan-200 font-mono focus:outline-none focus:border-cyan-500/50 placeholder:text-slate-600 placeholder:italic"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">PDB ID (4-letter receptor; auto-filled from Stage 2 when available)</span>
+                    <input
+                      type="text" value={fepPdbId} maxLength={4}
+                      onChange={e => setFepPdbId(e.target.value.toUpperCase())}
+                      placeholder="e.g. 6G2N"
+                      className="bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-[11px] text-cyan-200 font-mono uppercase focus:outline-none focus:border-cyan-500/50 placeholder:text-slate-600 placeholder:italic"
+                    />
+                  </label>
+                </div>
+
+                <label className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox" checked={fepCostOk}
+                    onChange={e => setFepCostOk(e.target.checked)}
+                    className="mt-0.5 accent-cyan-500"
+                  />
+                  <span className="text-[10px] text-slate-300 leading-relaxed">
+                    I understand this dispatch consumes <span className="text-amber-300 font-semibold">~24 GPU-h on a RunPod A100 (~$40–$50)</span> and is billed to the RunPod account associated with <span className="font-mono">RUNPOD_API_KEY</span>.
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  disabled={
+                    !hasL1 || pipelineRunning || busyStage === 5 ||
+                    !!runDisabledReasonForStage(5)
+                  }
+                  onClick={() => runStageHandler(5)}
+                  className={`w-full font-semibold h-9 rounded-md gap-2 text-[12px] flex items-center justify-center transition-colors ${
+                    !runDisabledReasonForStage(5) && !pipelineRunning && busyStage !== 5
+                      ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer"
+                      : "bg-slate-700/40 border border-slate-600/40 text-slate-500 cursor-not-allowed"
+                  }`}
+                  title={runDisabledReasonForStage(5) ?? "Dispatch FEP job to RunPod"}
+                >
+                  {busyStage === 5
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />FEP running… {fepProgress && <span className="font-mono text-[10px] opacity-80">({fepProgress})</span>}</>
+                    : <><Play className="w-3.5 h-3.5" />Dispatch FEP {runDisabledReasonForStage(5) && <span className="text-[10px] opacity-70">— {runDisabledReasonForStage(5)}</span>}</>}
+                </button>
+                <p className="text-[9px] text-slate-500 italic leading-relaxed">
+                  TIES protocol: 12 λ-windows × 3 replicas × 5 ns/window. Job is async; this card polls every 30 s for up to 36 h. RunPod job_id is recorded in the result and visible in the RunPod console.
+                </p>
+              </div>
+            )}
+
+            {/* Result */}
+            {results.s5?.status === "wired" && results.s5.result && (() => {
+              const r = results.s5.result;
+              const f = r.fep;
+              const ddgClass =
+                f.ddg_kcal_mol < -1.5 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : f.ddg_kcal_mol >  1.5 ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-300";
+              const verdict =
+                f.ddg_kcal_mol < -1.5 ? "Ligand B substantially tighter than A"
+                : f.ddg_kcal_mol > 1.5 ? "Ligand B substantially weaker than A"
+                : "Within ±1.5 kcal/mol — within FEP noise floor";
+              return (
+                <>
+                  <div className="grid grid-cols-3 gap-2 text-[11px]">
+                    <div className={`rounded border p-2 text-center ${ddgClass}`}>
+                      <div className="text-[9px] uppercase tracking-wider opacity-80">ΔΔG (B − A)</div>
+                      <div className="text-[14px] font-mono font-semibold">{f.ddg_kcal_mol >= 0 ? "+" : ""}{f.ddg_kcal_mol.toFixed(2)}</div>
+                      <div className="text-[9px] opacity-80">kcal/mol ± {f.ddg_uncertainty_kcalmol.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-wider">ΔΔG / k_B T</div>
+                      <div className="text-[14px] text-cyan-300 font-mono">{f.ddg_kT.toFixed(2)}</div>
+                      <div className="text-[9px] text-slate-600">k_B T units (298 K)</div>
+                    </div>
+                    <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-wider">GPU time</div>
+                      <div className="text-[14px] text-cyan-300 font-mono">{(f.gpu_minutes / 60).toFixed(1)}</div>
+                      <div className="text-[9px] text-slate-600">GPU-hours</div>
+                    </div>
+                  </div>
+
+                  <div className={`text-[10px] px-2.5 py-1.5 rounded-md border ${ddgClass}`}>
+                    {verdict}
+                  </div>
+
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3 space-y-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Perturbation</div>
+                    <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-0.5 text-[10px]">
+                      <span className="text-slate-500">Ligand A</span><span className="text-cyan-300 font-mono break-all">{r.ligand_a_smiles}</span>
+                      <span className="text-slate-500">Ligand B</span><span className="text-cyan-300 font-mono break-all">{r.ligand_b_smiles}</span>
+                      <span className="text-slate-500">Receptor</span><span className="text-cyan-300 font-mono">PDB {r.pdb_id}</span>
+                      <span className="text-slate-500">Engine</span><span className="text-cyan-300 font-mono">{f.engine_version}</span>
+                      <span className="text-slate-500">Force field</span><span className="text-cyan-300 font-mono">{f.force_field}</span>
+                      <span className="text-slate-500">Wallclock</span><span className="text-cyan-300 font-mono">{f.wallclock_minutes.toFixed(1)} min</span>
+                      <span className="text-slate-500">RunPod job</span><span className="text-cyan-300 font-mono break-all">{f.runpod_job_id}</span>
+                    </div>
+                  </div>
+
+                  <details className="rounded-lg border border-white/8 bg-white/[0.02] p-2">
+                    <summary className="cursor-pointer text-[10px] text-slate-300 hover:text-cyan-300">
+                      Per-λ-window breakdown ({f.windows.length} windows)
+                    </summary>
+                    <table className="w-full text-[10px] mt-2 font-mono">
+                      <thead className="text-slate-500 border-b border-white/10">
+                        <tr><th className="text-left py-1 px-1">λ</th><th className="text-right py-1 px-1">ΔG (kcal/mol)</th><th className="text-right py-1 px-1">stderr</th></tr>
+                      </thead>
+                      <tbody className="text-slate-300">
+                        {f.windows.map((w, i) => (
+                          <tr key={i} className="border-b border-white/5">
+                            <td className="py-0.5 px-1">{w.lambda.toFixed(3)}</td>
+                            <td className="text-right py-0.5 px-1 text-cyan-300">{w.dG_kcal_mol >= 0 ? "+" : ""}{w.dG_kcal_mol.toFixed(3)}</td>
+                            <td className="text-right py-0.5 px-1 text-slate-500">±{w.stderr_kcal_mol.toFixed(3)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+
+                  {f.warnings.length > 0 && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-2">
+                      <div className="text-[10px] text-amber-300 font-semibold mb-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />Worker warnings
+                      </div>
+                      <ul className="text-[10px] text-amber-200 list-disc list-inside space-y-0.5 leading-relaxed">
+                        {f.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => { setOne("s5", undefined); setFepCostOk(false); setFepProgress(""); }}
+                    className="text-[10px] text-slate-400 hover:text-cyan-300 underline underline-offset-2"
+                  >
+                    Reset Stage 5 (run another perturbation)
+                  </button>
+                </>
+              );
+            })()}
+          </ResultShell>
+
 
           {/* Stage 6 — PBPK */}
           {results.s6 && (

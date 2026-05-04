@@ -194,6 +194,43 @@ router.get("/ai/dock/status/:jobId", async (req, res) => {
   }
 });
 
+// L2 Stage 5 — TIES relative-binding FEP via RunPod Serverless (async, ~24 GPU-h)
+router.get("/ai/fep/config", async (_req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/fep/config`);
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.post("/ai/fep", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/fep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.get("/ai/fep/status/:jobId", async (req, res) => {
+  try {
+    const resp = await fetch(
+      `${AI_SERVICE_URL}/predict/fep/status/${encodeURIComponent(req.params.jobId)}`,
+    );
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 router.post("/ai/celltype-aggregation", async (req, res) => {
   try {
     const resp = await fetch(`${AI_SERVICE_URL}/predict/celltype-aggregation`, {

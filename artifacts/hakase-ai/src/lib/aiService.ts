@@ -737,6 +737,125 @@ export async function runDockingToCompletion(
   throw new Error(`Docking job ${job_id} exceeded ${timeout / 1000}s timeout`);
 }
 
+// ---------------------------------------------------------------------------
+// L2 Stage 5 — TIES relative-binding FEP via RunPod Serverless (async, ~24 GPU-h)
+// ---------------------------------------------------------------------------
+
+export interface FepWindow {
+  lambda: number;
+  dG_kcal_mol: number;
+  stderr_kcal_mol: number;
+}
+
+export interface FepResult {
+  /** Relative binding free energy ΔΔG = ΔG_bind(B) − ΔG_bind(A), in kcal/mol. */
+  ddg_kcal_mol: number;
+  /** 1-σ uncertainty on ΔΔG, in kcal/mol (forward/backward bootstrap or BAR). */
+  ddg_uncertainty_kcalmol: number;
+  /** Same ΔΔG expressed in units of k_B T at 298 K — for occupancy ratio math. */
+  ddg_kT: number;
+  /** Per-lambda-window ΔG accumulation (TI integral or BAR per window). */
+  windows: FepWindow[];
+  wallclock_minutes: number;
+  gpu_minutes: number;
+  /** Worker-reported toolchain string, e.g. "OpenMM 8.1.1 + OpenFF Sage 2.2.0 + TIES-MD 1.7". */
+  engine_version: string;
+  /** Worker-reported FF tag, e.g. "openff-2.2.0". */
+  force_field: string;
+  warnings: string[];
+  runpod_job_id: string;
+}
+
+export interface FepJobStatus {
+  job_id: string;
+  status: "queued" | "running" | "done" | "failed";
+  ligand_a_smiles: string;
+  ligand_b_smiles: string;
+  pdb_id: string;
+  progress: string;
+  started_at: number;
+  finished_at: number;
+  runpod_job_id: string | null;
+  error: string | null;
+  result: FepResult | null;
+}
+
+export interface FepConfigStatus {
+  configured: boolean;
+  reason: string | null;
+}
+
+export async function getFepConfig(): Promise<FepConfigStatus> {
+  const res = await fetch(`${API_BASE}/fep/config`);
+  if (!res.ok) {
+    return { configured: false, reason: `Could not reach FEP config endpoint (HTTP ${res.status})` };
+  }
+  return res.json();
+}
+
+export async function startFep(
+  ligandASmiles: string,
+  ligandBSmiles: string,
+  pdbId: string,
+  opts: { nLambdaWindows?: number; nReplicas?: number; nsPerWindow?: number } = {},
+): Promise<{ job_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/fep`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ligand_a_smiles:  ligandASmiles,
+      ligand_b_smiles:  ligandBSmiles,
+      pdb_id:           pdbId,
+      n_lambda_windows: opts.nLambdaWindows ?? 12,
+      n_replicas:       opts.nReplicas      ?? 3,
+      ns_per_window:    opts.nsPerWindow    ?? 5.0,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "FEP submission failed");
+  }
+  return res.json();
+}
+
+export async function getFepStatus(jobId: string): Promise<FepJobStatus> {
+  const res = await fetch(`${API_BASE}/fep/status/${encodeURIComponent(jobId)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "FEP status fetch failed");
+  }
+  return res.json();
+}
+
+/** Submit a FEP job and poll until done | failed | timeout. Default 36 h hard cap
+ *  matches the worker side. No silent fallback: timeout produces an explicit error. */
+export async function runFepToCompletion(
+  ligandASmiles: string,
+  ligandBSmiles: string,
+  pdbId: string,
+  opts: {
+    nLambdaWindows?: number;
+    nReplicas?: number;
+    nsPerWindow?: number;
+    pollIntervalMs?: number;
+    timeoutMs?: number;
+    onProgress?: (status: FepJobStatus) => void;
+  } = {},
+): Promise<FepJobStatus> {
+  const { job_id } = await startFep(ligandASmiles, ligandBSmiles, pdbId, opts);
+  const interval = opts.pollIntervalMs ?? 30_000;       // 30 s — match worker poll cadence
+  const timeout  = opts.timeoutMs      ?? 36 * 3600_000; // 36 h hard cap
+  const deadline = Date.now() + timeout;
+  await new Promise(r => setTimeout(r, 1_000));
+  while (Date.now() < deadline) {
+    const s = await getFepStatus(job_id);
+    opts.onProgress?.(s);
+    if (s.status === "done" || s.status === "failed") return s;
+    await new Promise(r => setTimeout(r, interval));
+  }
+  throw new Error(`FEP job ${job_id} exceeded ${(timeout / 3600_000).toFixed(1)} h timeout`);
+}
+
 export async function getModelStatus(): Promise<ModelStatusResponse> {
   const res = await fetch(`${API_BASE}/models/status`);
   if (!res.ok) throw new Error("Failed to fetch model status");

@@ -59,6 +59,7 @@ from models.celltype_aggregation import (
     warmup as celltype_aggregation_warmup,
 )
 from models import docking_vina
+from models import fep_runpod
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -378,6 +379,83 @@ def api_dock_submit(req: DockingRequest):
 @app.get("/predict/dock/status/{job_id}")
 def api_dock_status(job_id: str):
     job = docking_vina.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    return sanitize(job)
+
+
+class FepRequest(BaseModel):
+    ligand_a_smiles: str
+    ligand_b_smiles: str
+    pdb_id: str
+    n_lambda_windows: int = 12
+    n_replicas: int = 3
+    ns_per_window: float = 5.0
+
+
+@app.get("/predict/fep/config")
+def api_fep_config():
+    """Report whether the RunPod backend for Stage 5 FEP is configured.
+
+    Returned to the UI so the Run button can be disabled with an honest
+    message when credentials are missing — instead of letting the user
+    click and hit a 503 mid-submission.
+    """
+    ok, reason = fep_runpod.runpod_configured()
+    return {"configured": ok, "reason": reason if not ok else None}
+
+
+@app.post("/predict/fep")
+def api_fep_submit(req: FepRequest):
+    """Layer 2 Stage 5 — relative-binding free-energy refinement (TIES on RunPod).
+
+    Asynchronous job: returns job_id immediately. Poll
+    GET /predict/fep/status/{job_id} for progress + result.
+
+    Pipeline (delegated to a user-provisioned RunPod Serverless worker):
+      OpenMM + OpenFF Sage + TIES → relative-binding FEP, ΔΔG (B - A)
+      Typical wall time ~24 GPU-h on A100 per ligand pair.
+
+    Strict project policy: NO fabricated ΔΔG. If RunPod credentials are
+    unset, this endpoint returns 503 with the exact missing-secret name
+    so the operator can fix it; the UI surfaces the reason verbatim.
+    """
+    if not req.ligand_a_smiles or not req.ligand_a_smiles.strip():
+        raise HTTPException(status_code=400, detail="ligand_a_smiles is required")
+    if not req.ligand_b_smiles or not req.ligand_b_smiles.strip():
+        raise HTTPException(status_code=400, detail="ligand_b_smiles is required")
+    if not req.pdb_id or not req.pdb_id.strip():
+        raise HTTPException(status_code=400, detail="pdb_id is required")
+    if not (4 <= req.n_lambda_windows <= 32):
+        raise HTTPException(status_code=400, detail="n_lambda_windows must be 4..32")
+    if not (1 <= req.n_replicas <= 5):
+        raise HTTPException(status_code=400, detail="n_replicas must be 1..5")
+    if not (0.1 <= req.ns_per_window <= 50.0):
+        raise HTTPException(status_code=400, detail="ns_per_window must be 0.1..50.0")
+
+    ok, reason = fep_runpod.runpod_configured()
+    if not ok:
+        # 503 (Service Unavailable) — the endpoint exists but its GPU backend
+        # is intentionally unconfigured. The UI shows `reason` verbatim.
+        raise HTTPException(status_code=503, detail=f"RunPod not configured: {reason}")
+
+    try:
+        job_id = fep_runpod.submit_fep(
+            ligand_a_smiles  = req.ligand_a_smiles.strip(),
+            ligand_b_smiles  = req.ligand_b_smiles.strip(),
+            pdb_id           = req.pdb_id.strip(),
+            n_lambda_windows = req.n_lambda_windows,
+            n_replicas       = req.n_replicas,
+            ns_per_window    = req.ns_per_window,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/predict/fep/status/{job_id}")
+def api_fep_status(job_id: str):
+    job = fep_runpod.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
     return sanitize(job)

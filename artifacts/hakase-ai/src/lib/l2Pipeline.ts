@@ -23,9 +23,10 @@ import { runPBPK, type PBPKOutput } from "./pbpk";
 import { computeL2DoseProjection, type L2DoseProjection, type L2InputParams } from "./l2DoseProjection";
 import {
   predictBindingMl, predictAdmetMl, predictCardiotox, predictProteinMl,
-  runDockingToCompletion,
+  runDockingToCompletion, runFepToCompletion,
   type BindingMlResult, type MlAdmetResult, type CardiotoxResult, type ProteinMlResult,
   type DockResult, type DockJobStatus,
+  type FepResult, type FepJobStatus,
 } from "./aiService";
 import { fetchUniProt, fetchPdbStructure, type PdbStructure } from "./proteinApi";
 
@@ -559,12 +560,98 @@ export async function runStage4(sim: SimResults, iv: InVitroResults): Promise<St
   };
 }
 
-// ── Stage 5 — Free-energy refinement (OUT-OF-SCOPE) ─────────────────────────
-export function runStage5(): StageResult<never> {
+// ── Stage 5 — Free-energy refinement (TIES FEP via RunPod Serverless) ───────
+export interface Stage5Result {
+  /** TIES relative-binding-FEP output verbatim from ai-service /predict/fep. */
+  fep: FepResult;
+  /** Reference ligand SMILES (Ligand A — ΔG of binding subtracted). */
+  ligand_a_smiles: string;
+  /** Perturbed ligand SMILES (Ligand B — ΔG of binding measured against). */
+  ligand_b_smiles: string;
+  /** PDB receptor used for both endpoints of the perturbation. */
+  pdb_id: string;
+  /** Source provenance label for Stage 5 quality tier. */
+  source: "fep";
+}
+
+/** Default Stage 5 stub used by Run-Full-Pipeline. Doesn't dispatch FEP — that's
+ *  opt-in from the Stage 5 card because each pair costs ~$40–50 (24 GPU-h). */
+export function runStage5(): StageResult<Stage5Result> {
   return {
     stage: 5, name: "Free-energy refinement",
-    status: "out-of-scope",
-    reason: "OpenMM/OpenFF/TIES relative-binding-FEP requires ~24 GPU-h per compound on A100 (per architecture doc §4.3). Out of scope for in-browser tier — would need MD job submission to a cluster. No ΔΔG estimate is fabricated.",
+    status: "skipped",
+    reason: "Stage 5 FEP is opt-in from its own card — TIES relative-binding-FEP on RunPod Serverless takes ~24 GPU-h per ligand pair (~$40–50 on A100). Run-Full-Pipeline skips it; click the Run button on the Stage 5 card after entering Ligand B SMILES and confirming the GPU cost.",
+  };
+}
+
+/** Dispatch a relative-binding-FEP job (Ligand A → B in `pdbId`) to the
+ *  ai-service → RunPod Serverless backend. Async; polls until done/failed/timeout.
+ *
+ *  Per project policy, no fabricated ΔΔG: if RunPod is not configured this returns
+ *  StageResult.status="error" with the exact missing-secret name. */
+export async function runStage5Fep(
+  sim: SimResults,
+  ligandBSmiles: string,
+  pdbId: string,
+  opts: {
+    nLambdaWindows?: number;
+    nReplicas?: number;
+    nsPerWindow?: number;
+    onProgress?: (s: FepJobStatus) => void;
+  } = {},
+): Promise<StageResult<Stage5Result>> {
+  const t0 = performance.now();
+  if (!sim.smiles) {
+    return {
+      stage: 5, name: "Free-energy refinement", status: "error",
+      reason: "No SMILES on L1 simResults — cannot define Ligand A endpoint.",
+    };
+  }
+  if (!ligandBSmiles?.trim()) {
+    return {
+      stage: 5, name: "Free-energy refinement", status: "error",
+      reason: "Ligand B SMILES is required — FEP needs an explicit perturbed-state ligand.",
+    };
+  }
+  if (!pdbId?.trim() || pdbId.trim().length !== 4) {
+    return {
+      stage: 5, name: "Free-energy refinement", status: "error",
+      reason: "PDB ID is required (4-letter RCSB code) — FEP needs an experimental receptor for both endpoints.",
+    };
+  }
+
+  let final: FepJobStatus;
+  try {
+    final = await runFepToCompletion(sim.smiles, ligandBSmiles.trim(), pdbId.trim(), opts);
+  } catch (e: any) {
+    return {
+      stage: 5, name: "Free-energy refinement", status: "error",
+      reason: `FEP job failed: ${e?.message ?? e}`,
+      ranAt: new Date().toISOString(),
+      durationMs: performance.now() - t0,
+    };
+  }
+  if (final.status === "failed" || !final.result) {
+    return {
+      stage: 5, name: "Free-energy refinement", status: "error",
+      reason: `FEP job failed: ${final.error ?? "unknown error"}`,
+      ranAt: new Date().toISOString(),
+      durationMs: performance.now() - t0,
+    };
+  }
+
+  return {
+    stage: 5, name: "Free-energy refinement",
+    status: "wired",
+    ranAt:  new Date().toISOString(),
+    durationMs: performance.now() - t0,
+    result: {
+      fep: final.result,
+      ligand_a_smiles: sim.smiles,
+      ligand_b_smiles: ligandBSmiles.trim(),
+      pdb_id: pdbId.trim().toUpperCase(),
+      source: "fep",
+    },
   };
 }
 
@@ -721,7 +808,12 @@ export interface Stage9Result {
   predicted_unbound_cmax_nM:    number | null;
   predicted_total_cmax_uM:      number | null;          // from PBPK
   liability_flags:              string[];
-  free_energy_estimate_kcalmol: null;                   // not computed (Stage 5 OOS)
+  /** ΔΔG (B − A) in kcal/mol from Stage 5 TIES FEP, or null if Stage 5 was skipped. */
+  free_energy_estimate_kcalmol: number | null;
+  /** 1-σ uncertainty on ΔΔG (kcal/mol), or null. */
+  free_energy_uncertainty_kcalmol: number | null;
+  /** Reference vs perturbed ligand pair for the FEP, or null. */
+  free_energy_pair: { ligand_a_smiles: string; ligand_b_smiles: string; pdb_id: string } | null;
   confidence:                   "low";
   produced_at:                  string;
 }
@@ -731,6 +823,7 @@ export function runStage9(
   proj: L2DoseProjection | undefined,
   pk: PBPKOutput | undefined,
   params: L2InputParams,
+  fep?: Stage5Result | undefined,
 ): StageResult<Stage9Result> {
   const t0 = performance.now();
   if (!proj) {
@@ -769,7 +862,13 @@ export function runStage9(
       predicted_unbound_cmax_nM: isFinite(proj.targetCmaxUnbound_nM) ? proj.targetCmaxUnbound_nM : null,
       predicted_total_cmax_uM:   pk ? pk.cmax * 1000 / sim.lipinski.mw : null,
       liability_flags: flags,
-      free_energy_estimate_kcalmol: null,
+      free_energy_estimate_kcalmol:    fep ? fep.fep.ddg_kcal_mol            : null,
+      free_energy_uncertainty_kcalmol: fep ? fep.fep.ddg_uncertainty_kcalmol : null,
+      free_energy_pair: fep ? {
+        ligand_a_smiles: fep.ligand_a_smiles,
+        ligand_b_smiles: fep.ligand_b_smiles,
+        pdb_id:          fep.pdb_id,
+      } : null,
       confidence: "low",
       produced_at: new Date().toISOString(),
     },
@@ -783,7 +882,7 @@ export interface PipelineResults {
   s2?: StageResult<Stage2Result>;
   s3?: StageResult<Stage3Result>;
   s4?: StageResult<Stage4Result>;
-  s5?: StageResult<never>;
+  s5?: StageResult<Stage5Result>;
   s6?: StageResult<Stage6Result>;
   s7?: StageResult<Stage7Result>;
   s8?: StageResult<Stage8Result>;
@@ -820,6 +919,6 @@ export async function runFullPipeline(
     } as StageResult<Stage7Result>;
     onProgress?.(7);
   }
-  out.s9 = runStage9(sim, projection, out.s6.result, params); onProgress?.(9);
+  out.s9 = runStage9(sim, projection, out.s6.result, params, out.s5?.result); onProgress?.(9);
   return out;
 }
