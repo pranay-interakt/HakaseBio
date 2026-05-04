@@ -830,3 +830,192 @@ export function gateSubStudies(pkg: PreClinicalPackage): {
 
   return { ddiCocktail, tqtAdvised, renalArm, hepaticArm, foodEffect };
 }
+
+// ── §9 Phase 1 Protocol output ────────────────────────────────────────────
+
+export const PHASE1_PLAN_SCHEMA_VERSION = "1.0.0" as const;
+
+export interface SubStudyDecision {
+  selected: boolean;
+  feasible: boolean;
+  reason: string;
+}
+
+export interface Phase1Plan {
+  schemaVersion: typeof PHASE1_PLAN_SCHEMA_VERSION;
+  emittedAt: string;
+  source: {
+    schemaVersion: string;
+    compoundName: string | null;
+    smiles: string;
+    pkgEmittedAt: string;
+    pkgEmitterEngine: string;
+    pkgEmitterVersion: string;
+  };
+  scoping: ClinicalScoping;
+  startingDose: {
+    method: StartingDoseMethod;
+    safetyFactor: number;
+    bodyWeightKg: number;
+    mabelTargetOccupancy: number | null;
+    doseMgPerKg: number;
+    doseMg: number;
+    rationale: string;
+    warnings: string[];
+  };
+  sad: {
+    escalationScheme: EscalationScheme;
+    cohortSize: number;
+    sentinelDosing: boolean;
+    maxPlannedDoseMg: number | null;
+    exposureCapMultipleOfNoael: number;
+    levels: EscalationLevel[];
+    warnings: string[];
+  };
+  mad:
+    | {
+        enabled: true;
+        durationDays: number;
+        cohortSize: number;
+        accumulationRatioTarget: number;
+        carryForwardLowestSadIndex: number;
+      }
+    | { enabled: false };
+  subStudies: {
+    foodEffect: SubStudyDecision;
+    ddiCocktail: SubStudyDecision;
+    tqtRequired: SubStudyDecision;
+    renalImpairment: SubStudyDecision;
+    hepaticImpairment: SubStudyDecision;
+  };
+  stoppingRules: StoppingRules;
+  indGate: {
+    pass: boolean;
+    reason: string;
+    indEnablingComplete: boolean;
+    override: IndGateOverride;
+  };
+  warnings: string[];
+}
+
+export interface BuildPhase1PlanArgs {
+  pkg: PreClinicalPackage;
+  design: Phase1Design;
+  dose: StartingDoseResult;
+  escalation: EscalationResult;
+  indGate: IndGateStatus;
+  subGates: ReturnType<typeof gateSubStudies>;
+}
+
+export type BuildPhase1PlanResult =
+  | { ok: true; plan: Phase1Plan }
+  | { ok: false; refuseReason: string };
+
+/**
+ * Assemble the §9 Phase 1 Protocol handoff. Refuses (no fake fallbacks) if
+ * any required upstream computation is not OK.
+ */
+export function buildPhase1Plan(
+  args: BuildPhase1PlanArgs,
+): BuildPhase1PlanResult {
+  const { pkg, design, dose, escalation, indGate, subGates } = args;
+  if (!indGate.pass)
+    return { ok: false, refuseReason: `IND-enabling gate is closed: ${indGate.reason}` };
+  if (!dose.ok || dose.doseMgPerKg === null || dose.doseMg === null)
+    return {
+      ok: false,
+      refuseReason: dose.refuseReason ?? "Starting-dose computation refused.",
+    };
+  if (!escalation.ok)
+    return {
+      ok: false,
+      refuseReason:
+        escalation.refuseReason ?? "Escalation generation refused.",
+    };
+
+  const warnings: string[] = [
+    ...dose.warnings,
+    ...escalation.warnings,
+    ...pkg.provenance.warnings,
+  ];
+
+  const decide = (
+    selected: boolean,
+    gate: { feasible: boolean; reason: string },
+  ): SubStudyDecision => ({
+    selected,
+    feasible: gate.feasible,
+    reason: gate.reason,
+  });
+
+  const plan: Phase1Plan = {
+    schemaVersion: PHASE1_PLAN_SCHEMA_VERSION,
+    emittedAt: new Date().toISOString(),
+    source: {
+      schemaVersion: pkg.schemaVersion,
+      compoundName: pkg.compound.preferredName,
+      smiles: pkg.compound.smiles,
+      pkgEmittedAt: pkg.provenance.emittedAt,
+      pkgEmitterEngine: pkg.provenance.emitterEngine,
+      pkgEmitterVersion: pkg.provenance.emitterVersion,
+    },
+    scoping: design.scoping,
+    startingDose: {
+      method: design.startingDose.method,
+      safetyFactor: design.startingDose.safetyFactor,
+      bodyWeightKg: design.startingDose.bodyWeightKg,
+      mabelTargetOccupancy:
+        design.startingDose.method === "MABEL"
+          ? design.startingDose.mabelTargetOccupancy
+          : null,
+      doseMgPerKg: dose.doseMgPerKg,
+      doseMg: dose.doseMg,
+      rationale: dose.rationale,
+      warnings: dose.warnings,
+    },
+    sad: {
+      escalationScheme: design.sad.escalationScheme,
+      cohortSize: design.sad.cohortSize,
+      sentinelDosing: design.sad.sentinelDosing,
+      maxPlannedDoseMg: design.sad.maxPlannedDoseMg,
+      exposureCapMultipleOfNoael: design.sad.exposureCapMultipleOfNoael,
+      levels: escalation.levels,
+      warnings: escalation.warnings,
+    },
+    mad: design.mad.enabled
+      ? {
+          enabled: true,
+          durationDays: design.mad.durationDays,
+          cohortSize: design.mad.cohortSize,
+          accumulationRatioTarget: design.mad.accumulationRatioTarget,
+          carryForwardLowestSadIndex: design.mad.carryForwardLowest,
+        }
+      : { enabled: false },
+    subStudies: {
+      foodEffect: decide(design.subStudies.foodEffect, subGates.foodEffect),
+      ddiCocktail: decide(design.subStudies.ddiCocktail, subGates.ddiCocktail),
+      tqtRequired: decide(design.subStudies.tqtRequired, subGates.tqtAdvised),
+      renalImpairment: decide(design.subStudies.renalImpairment, subGates.renalArm),
+      hepaticImpairment: decide(design.subStudies.hepaticImpairment, subGates.hepaticArm),
+    },
+    stoppingRules: design.stoppingRules,
+    indGate: {
+      pass: indGate.pass,
+      reason: indGate.reason,
+      indEnablingComplete: pkg.animalCohort.indEnablingComplete,
+      override: design.indGateOverride,
+    },
+    warnings,
+  };
+
+  // Honest cross-checks
+  for (const k of ["foodEffect","ddiCocktail","tqtRequired","renalImpairment","hepaticImpairment"] as const) {
+    const d = plan.subStudies[k];
+    if (d.selected && !d.feasible) {
+      warnings.push(
+        `Sub-study "${k}" selected but gate is not feasible — ${d.reason}`,
+      );
+    }
+  }
+  return { ok: true, plan };
+}

@@ -24,6 +24,9 @@ import {
   Wand2,
   Undo2,
   X as XIcon,
+  Copy,
+  Download,
+  FileJson,
 } from "lucide-react";
 import {
   isPreClinicalPackage,
@@ -52,11 +55,20 @@ import {
   evaluateIndGate,
   gateSubStudies,
   derivePhase1Defaults,
+  buildPhase1Plan,
   type StartingDoseResult,
   type EscalationResult,
   type IndGateStatus,
   type AutoFilledField,
+  type Phase1Plan,
 } from "@/lib/phase1Plan";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export interface Phase1PlannerHandle {
   applyTemplatePartial: (
@@ -183,6 +195,10 @@ export default function Phase1Planner({
   const [autoBannerDismissed, setAutoBannerDismissed] = useState(false);
   const lastPkgIdRef = useRef<string | null>(null);
   const [planEmitted, setPlanEmitted] = useState(false);
+  const [emittedPlan, setEmittedPlan] = useState<Phase1Plan | null>(null);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planEmitError, setPlanEmitError] = useState<string | null>(null);
+  const [copyOk, setCopyOk] = useState(false);
 
   const setManualField = <K extends keyof ManualPackageInput>(
     k: K,
@@ -214,6 +230,9 @@ export default function Phase1Planner({
         setAutoBannerDismissed(false);
         lastPkgIdRef.current = null;
         setPlanEmitted(false);
+        setEmittedPlan(null);
+        setPlanModalOpen(false);
+        setPlanEmitError(null);
         onImportError(null);
         onPackageReady(null);
       },
@@ -255,11 +274,18 @@ export default function Phase1Planner({
       setAutoApplied([]);
       setAutoBannerOpen(false);
       setAutoBannerDismissed(false);
+      setEmittedPlan(null);
+      setPlanEmitted(false);
+      setPlanModalOpen(false);
+      setPlanEmitError(null);
       return;
     }
     const pkgId = `${pkg.compound.smiles}|${pkg.provenance.emittedAt}`;
     if (lastPkgIdRef.current === pkgId) return;
     lastPkgIdRef.current = pkgId;
+    setEmittedPlan(null);
+    setPlanEmitted(false);
+    setPlanEmitError(null);
 
     const { overrides, applied } = derivePhase1Defaults(pkg);
     setDesign((d) => {
@@ -357,9 +383,47 @@ export default function Phase1Planner({
   );
 
   const handleEmitPlan = () => {
-    if (!pkg || !indGate || !indGate.pass) return;
-    if (!dose || !dose.ok) return;
+    setPlanEmitError(null);
+    if (!pkg || !indGate || !dose || !escalation || !subGates) return;
+    const r = buildPhase1Plan({ pkg, design, dose, escalation, indGate, subGates });
+    if (!r.ok) {
+      setPlanEmitError(r.refuseReason);
+      return;
+    }
+    setEmittedPlan(r.plan);
     setPlanEmitted(true);
+    setPlanModalOpen(true);
+  };
+
+  const handleCopyPlan = async () => {
+    if (!emittedPlan) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(emittedPlan, null, 2));
+      setCopyOk(true);
+      setTimeout(() => setCopyOk(false), 1600);
+    } catch {
+      // clipboard may be blocked; fall back silently — user can still download
+    }
+  };
+
+  const handleDownloadPlan = () => {
+    if (!emittedPlan) return;
+    const blob = new Blob([JSON.stringify(emittedPlan, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const slug =
+      (emittedPlan.source.compoundName ?? "compound")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") || "compound";
+    a.href = url;
+    a.download = `phase1-plan_${slug}_${emittedPlan.emittedAt.replace(/[:.]/g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -1202,6 +1266,19 @@ export default function Phase1Planner({
                   ? "Starting dose method refused — see right panel."
                   : "Ready. Emits a typed Phase1Plan."}
           </p>
+          {planEmitError && (
+            <p className="text-[10px] text-rose-300 text-center mt-1 leading-snug">
+              Refused: {planEmitError}
+            </p>
+          )}
+          {emittedPlan && (
+            <button
+              onClick={() => setPlanModalOpen(true)}
+              className="w-full text-[11px] text-violet-300 hover:text-violet-200 mt-2 inline-flex items-center justify-center gap-1.5"
+            >
+              <FileJson className="w-3 h-3" /> View emitted Phase 1 plan
+            </button>
+          )}
         </div>
       </div>
 
@@ -1220,6 +1297,136 @@ export default function Phase1Planner({
           />
         )}
       </div>
+
+      {/* Emitted Phase 1 Plan modal */}
+      <Dialog open={planModalOpen} onOpenChange={setPlanModalOpen}>
+        <DialogContent className="max-w-4xl bg-[#0b0d14] border-violet-500/30 text-white max-h-[88vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-white/8">
+            <DialogTitle className="flex items-center gap-2 text-[15px]">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              Phase 1 Protocol Emitted
+            </DialogTitle>
+            <DialogDescription className="text-[12px] text-slate-400">
+              {emittedPlan ? (
+                <>
+                  <span className="text-violet-300">{emittedPlan.source.compoundName ?? "Unnamed compound"}</span>
+                  {" · §9 Phase1Plan v"}{emittedPlan.schemaVersion}
+                  {" · emitted "}{new Date(emittedPlan.emittedAt).toLocaleString()}
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+
+          {emittedPlan && (
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <PlanSummaryCard
+                  label="Starting dose"
+                  value={`${emittedPlan.startingDose.doseMg.toFixed(3)} mg`}
+                  hint={`${emittedPlan.startingDose.doseMgPerKg.toFixed(5)} mg/kg · ${emittedPlan.startingDose.method} · SF ${emittedPlan.startingDose.safetyFactor}×`}
+                />
+                <PlanSummaryCard
+                  label="SAD escalation"
+                  value={`${emittedPlan.sad.levels.length} levels`}
+                  hint={`${emittedPlan.sad.escalationScheme} · cohort ${emittedPlan.sad.cohortSize}${emittedPlan.sad.sentinelDosing ? " + sentinel" : ""}`}
+                />
+                <PlanSummaryCard
+                  label="MAD"
+                  value={emittedPlan.mad.enabled ? `${emittedPlan.mad.durationDays} d` : "Off"}
+                  hint={emittedPlan.mad.enabled ? `cohort ${emittedPlan.mad.cohortSize} · accum target ${emittedPlan.mad.accumulationRatioTarget}×` : "MAD disabled in design"}
+                />
+                <PlanSummaryCard
+                  label="Sub-studies"
+                  value={`${Object.values(emittedPlan.subStudies).filter((s) => s.selected && s.feasible).length} active`}
+                  hint={`${Object.values(emittedPlan.subStudies).filter((s) => s.selected && !s.feasible).length} selected-but-blocked`}
+                />
+              </div>
+
+              {/* Sub-study breakdown */}
+              <div className="rounded-lg border border-white/8 bg-black/20 p-3">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Sub-study decisions</div>
+                <div className="space-y-1.5">
+                  {(["foodEffect","ddiCocktail","tqtRequired","renalImpairment","hepaticImpairment"] as const).map((k) => {
+                    const d = emittedPlan.subStudies[k];
+                    const tone = d.selected
+                      ? d.feasible
+                        ? "text-emerald-300"
+                        : "text-rose-300"
+                      : "text-slate-500";
+                    const status = d.selected
+                      ? d.feasible
+                        ? "ON · feasible"
+                        : "ON · BLOCKED"
+                      : "off";
+                    return (
+                      <div key={k} className="flex items-start gap-3 text-[11px]">
+                        <span className="w-36 text-slate-400">{k}</span>
+                        <span className={`w-32 font-mono ${tone}`}>{status}</span>
+                        <span className="flex-1 text-slate-500">{d.reason}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* IND gate */}
+              <div className={`rounded-lg border p-3 text-[11px] ${emittedPlan.indGate.pass ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-200" : "border-amber-500/30 bg-amber-500/5 text-amber-200"}`}>
+                <div className="font-semibold mb-1 text-[12px]">
+                  IND-enabling Gate · {emittedPlan.indGate.pass ? "OPEN" : "CLOSED"}
+                </div>
+                {emittedPlan.indGate.reason}
+                {emittedPlan.indGate.override.active && (
+                  <div className="mt-1.5 text-[10px] text-amber-200/80 italic">
+                    Override active — justification: "{emittedPlan.indGate.override.justification}"
+                  </div>
+                )}
+              </div>
+
+              {emittedPlan.warnings.length > 0 && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-300 mb-1.5">Warnings ({emittedPlan.warnings.length})</div>
+                  <ul className="text-[11px] text-amber-200/90 list-disc list-inside space-y-0.5">
+                    {emittedPlan.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {/* Full JSON */}
+              <details open className="rounded-lg border border-white/8 bg-black/40">
+                <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 select-none flex items-center gap-2">
+                  <FileJson className="w-3 h-3" /> Full Phase1Plan JSON ({JSON.stringify(emittedPlan).length.toLocaleString()} bytes)
+                </summary>
+                <pre className="text-[10px] text-slate-300 font-mono p-3 overflow-x-auto leading-snug max-h-[40vh] overflow-y-auto border-t border-white/5">
+{JSON.stringify(emittedPlan, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+
+          <div className="px-6 py-3 border-t border-white/8 flex items-center justify-end gap-2">
+            <Button onClick={handleCopyPlan} variant="outline" className="bg-transparent border-violet-500/40 text-violet-200 hover:bg-violet-500/10 h-8 text-[12px] gap-1.5">
+              <Copy className="w-3 h-3" /> {copyOk ? "Copied!" : "Copy JSON"}
+            </Button>
+            <Button onClick={handleDownloadPlan} variant="outline" className="bg-transparent border-violet-500/40 text-violet-200 hover:bg-violet-500/10 h-8 text-[12px] gap-1.5">
+              <Download className="w-3 h-3" /> Download .json
+            </Button>
+            <Button onClick={() => setPlanModalOpen(false)} className="bg-violet-600 hover:bg-violet-500 h-8 text-[12px]">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PlanSummaryCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-lg border border-white/8 bg-black/20 p-3">
+      <div className="text-[9px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-[15px] font-semibold text-white mt-1 tabular-nums">{value}</div>
+      <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">{hint}</div>
     </div>
   );
 }
