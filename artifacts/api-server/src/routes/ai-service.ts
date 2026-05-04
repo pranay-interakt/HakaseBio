@@ -167,6 +167,33 @@ router.post("/ai/binding-ml", async (req, res) => {
   }
 });
 
+// L2 Stage 2 — AutoDock Vina docking (async job submission + polling)
+router.post("/ai/dock", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/dock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.get("/ai/dock/status/:jobId", async (req, res) => {
+  try {
+    const resp = await fetch(
+      `${AI_SERVICE_URL}/predict/dock/status/${encodeURIComponent(req.params.jobId)}`,
+    );
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 router.post("/ai/celltype-aggregation", async (req, res) => {
   try {
     const resp = await fetch(`${AI_SERVICE_URL}/predict/celltype-aggregation`, {

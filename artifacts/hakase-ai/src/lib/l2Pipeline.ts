@@ -23,8 +23,85 @@ import { runPBPK, type PBPKOutput } from "./pbpk";
 import { computeL2DoseProjection, type L2DoseProjection, type L2InputParams } from "./l2DoseProjection";
 import {
   predictBindingMl, predictAdmetMl, predictCardiotox, predictProteinMl,
+  runDockingToCompletion,
   type BindingMlResult, type MlAdmetResult, type CardiotoxResult, type ProteinMlResult,
+  type DockResult, type DockJobStatus,
 } from "./aiService";
+import { fetchUniProt, fetchPdbStructure, type PdbStructure } from "./proteinApi";
+
+/** Resnames that should NOT count as "co-crystal ligand present" when ranking
+ *  PDB candidates (waters/ions/buffers/cryoprotectants). Mirrors the backend
+ *  HETATM blocklist in artifacts/ai-service/models/docking_vina.py. */
+const PDB_LIGAND_BLOCKLIST = new Set([
+  "HOH", "WAT", "DOD", "H2O",
+  "NA", "K", "CL", "MG", "CA", "ZN", "FE", "MN", "CU", "NI", "CO",
+  "SO4", "PO4", "PEG", "EDO", "GOL", "MES", "TRS", "HEPES", "DMSO",
+  "ACT", "BME", "DTT", "FMT", "CIT", "EPE", "MPD", "1PE", "PG4", "PGE",
+]);
+
+/** Score a PDB candidate for docking suitability. Higher = better.
+ *  Priorities:
+ *    + experimental method (X-ray > cryo-EM > NMR > other)
+ *    + resolution (lower Å is better; missing resolution is penalised)
+ *    + presence of a non-blocklisted co-crystal ligand (enables co-crystal box) */
+function scorePdbForDocking(s: PdbStructure): { score: number; rationale: string } {
+  const reasons: string[] = [];
+  let score = 0;
+
+  const m = s.method.toLowerCase();
+  if (m.includes("x-ray")) { score += 100; reasons.push("X-ray"); }
+  else if (m.includes("electron microscopy") || m.includes("cryo")) { score += 70; reasons.push("cryo-EM"); }
+  else if (m.includes("nmr")) { score += 30; reasons.push("NMR"); }
+  else { score += 10; reasons.push(s.method); }
+
+  if (s.resolution !== null && isFinite(s.resolution)) {
+    // 1.0 Å → +50, 2.0 Å → +30, 3.0 Å → +10, 4.0 Å → 0
+    const resBonus = Math.max(0, 50 - (s.resolution - 1.0) * 20);
+    score += resBonus;
+    reasons.push(`${s.resolution.toFixed(2)} Å`);
+  } else {
+    reasons.push("no resolution");
+  }
+
+  const drugLike = s.ligands.filter(l => !PDB_LIGAND_BLOCKLIST.has(l.toUpperCase()));
+  if (drugLike.length > 0) {
+    score += 40;
+    reasons.push(`co-crystal ligand: ${drugLike.slice(0, 2).join(", ")}`);
+  } else {
+    reasons.push("no drug-like co-crystal ligand (blind dock likely)");
+  }
+
+  return { score, rationale: reasons.join(" · ") };
+}
+
+interface RankedPdb {
+  pdbId: string;
+  score: number;
+  rationale: string;
+}
+
+/** Fetch metadata for up to `maxCandidates` PDB IDs in parallel and rank for
+ *  docking suitability. Returns the ranked list (best first). PDBs that fail
+ *  metadata fetch are dropped (with a warning). */
+async function rankPdbCandidates(
+  pdbIds: string[],
+  maxCandidates = 5,
+): Promise<{ ranked: RankedPdb[]; warnings: string[] }> {
+  const candidates = pdbIds.slice(0, maxCandidates);
+  const warnings: string[] = [];
+  const settled = await Promise.allSettled(candidates.map(id => fetchPdbStructure(id)));
+  const ranked: RankedPdb[] = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      const { score, rationale } = scorePdbForDocking(r.value);
+      ranked.push({ pdbId: r.value.pdbId, score, rationale });
+    } else {
+      warnings.push(`PDB ${candidates[i]}: metadata fetch failed (${r.reason?.message ?? r.reason})`);
+    }
+  });
+  ranked.sort((a, b) => b.score - a.score);
+  return { ranked, warnings };
+}
 
 export type StageStatus = "wired" | "out-of-scope" | "error" | "skipped";
 
@@ -156,12 +233,149 @@ export async function runStage1(sim: SimResults): Promise<StageResult<Stage1Resu
   };
 }
 
-// ── Stage 2 — Docking (OUT-OF-SCOPE) ────────────────────────────────────────
+// ── Stage 2 — Docking (AutoDock Vina, in-app, physical scoring) ─────────────
+export interface Stage2Result {
+  /** Docking output verbatim from ai-service /predict/dock. */
+  dock: DockResult;
+  /** PDB ID actually used (auto-resolved from L1 UniProt or supplied). */
+  pdb_id: string;
+  /** Ranked list of PDB candidates considered (best first). The top entry was
+   *  the one actually docked against. Surfaced so the user can see what
+   *  alternatives were available and on what basis the choice was made. */
+  pdb_candidates: RankedPdb[];
+  /** Best (mode 1) Vina affinity in kcal/mol. Empirical Vina score, NOT a
+   *  thermodynamic ΔG — Vina's scoring function is a calibrated heuristic. */
+  best_affinity_kcal_mol: number;
+  /** HEURISTIC mapping from Vina score to a log-Kd-equivalent for Stage-3 cross-check.
+   *  Uses the ΔG-style relation pKd ≈ -score / (RT·ln10) at 298K (RT=0.5925 kcal/mol →
+   *  divisor 1.364). NOT an experimental Kd; Vina is not a true free-energy method.
+   *  Use only for orthogonal sanity-check against the ML pKd, never as a reportable potency. */
+  best_pKd_equivalent: number;
+  /** RMSD of the second-best pose vs mode 1 (lower bound). Pose convergence indicator;
+   *  poses tightly clustered (RMSD < 2 Å) suggest a confident binding mode. */
+  pose_convergence_rmsd: number | null;
+  /** Source provenance label for Stage 2 quality tier. */
+  source: "physical";
+}
+
+/** Heuristic conversion: best Vina affinity (kcal/mol) → pKd-equivalent at 298 K.
+ *  pKd = -ΔG / (RT · ln 10), RT(298K) = 0.5925 kcal/mol → divisor 1.364. */
+function vinaAffinityToPKd(deltaG_kcal_mol: number): number {
+  return -deltaG_kcal_mol / 1.364;
+}
+
+export async function runStage2Docking(sim: SimResults): Promise<StageResult<Stage2Result>> {
+  if (!sim.uniprotId) {
+    return {
+      stage: 2, name: "Docking",
+      status: "error",
+      reason: "No UniProt ID on L1 simResults — cannot resolve a receptor PDB to dock against.",
+    };
+  }
+
+  // 1. Resolve and rank PDB candidates from the L1 UniProt target.
+  //    The UniProt cross-reference order is deposit order, NOT quality-ranked,
+  //    so we explicitly score the top candidates by experimental method,
+  //    resolution, and presence of a non-blocklisted co-crystal ligand. The
+  //    chosen PDB and the ranking rationale are both surfaced in the result.
+  let pdbId: string;
+  let pdbCandidates: RankedPdb[] = [];
+  const rankWarnings: string[] = [];
+  try {
+    const protein = await fetchUniProt(sim.uniprotId);
+    if (!protein.pdbIds.length) {
+      return {
+        stage: 2, name: "Docking",
+        status: "error",
+        reason: `UniProt ${sim.uniprotId} has no experimental PDB structures (only AlphaFold). AutoDock Vina requires an experimental receptor; AlphaFold-only docking is out of scope (would need pocket conditioning + extra QC).`,
+      };
+    }
+    const ranking = await rankPdbCandidates(protein.pdbIds, 5);
+    rankWarnings.push(...ranking.warnings);
+    if (ranking.ranked.length === 0) {
+      return {
+        stage: 2, name: "Docking",
+        status: "error",
+        reason: `Could not fetch RCSB metadata for any of the top ${Math.min(5, protein.pdbIds.length)} PDB candidates of UniProt ${sim.uniprotId}: ${ranking.warnings.join("; ")}`,
+      };
+    }
+    pdbCandidates = ranking.ranked;
+    pdbId = ranking.ranked[0].pdbId;
+  } catch (e: any) {
+    return {
+      stage: 2, name: "Docking",
+      status: "error",
+      reason: `Failed to fetch PDB list for UniProt ${sim.uniprotId}: ${e?.message ?? e}`,
+    };
+  }
+
+  // 2. Submit + poll the docking job.
+  let final: DockJobStatus;
+  try {
+    final = await runDockingToCompletion(sim.smiles, pdbId, {
+      exhaustiveness: 8,
+      numModes: 5,
+      pollIntervalMs: 2000,
+      timeoutMs: 600_000,
+    });
+  } catch (e: any) {
+    return {
+      stage: 2, name: "Docking",
+      status: "error",
+      reason: `Vina docking job failed: ${e?.message ?? e}`,
+    };
+  }
+
+  if (final.status === "failed" || !final.result) {
+    return {
+      stage: 2, name: "Docking",
+      status: "error",
+      reason: `Vina docking failed: ${final.error ?? "unknown error"}`,
+    };
+  }
+
+  const dock = final.result;
+  if (!dock.poses.length) {
+    return {
+      stage: 2, name: "Docking",
+      status: "error",
+      reason: "Vina returned no poses for this ligand-receptor pair. The receptor box may be incompatible with this ligand size, or the ligand may be too flexible for the search budget.",
+    };
+  }
+
+  const best = dock.poses[0];
+  const second = dock.poses[1];
+  const pose_convergence_rmsd = second ? second.rmsd_lb : null;
+
+  // Merge any PDB-ranking warnings into the docking result so they surface
+  // alongside backend warnings (e.g. blind-dock fallback).
+  const mergedDock: DockResult = rankWarnings.length
+    ? { ...dock, warnings: [...rankWarnings, ...dock.warnings] }
+    : dock;
+
+  return {
+    stage: 2, name: "Docking",
+    status: "wired",
+    result: {
+      dock: mergedDock,
+      pdb_id: pdbId,
+      pdb_candidates: pdbCandidates,
+      best_affinity_kcal_mol: best.affinity_kcal_mol,
+      best_pKd_equivalent: vinaAffinityToPKd(best.affinity_kcal_mol),
+      pose_convergence_rmsd,
+      source: "physical",
+    },
+  };
+}
+
+/** Legacy synchronous Stage 2 — retained as a no-op fallback for callers that
+ *  still prefer the OOS placeholder (e.g. the runFullPipeline default which we
+ *  intentionally don't auto-run docking from, since it's the most expensive stage). */
 export function runStage2(): StageResult<never> {
   return {
     stage: 2, name: "Docking",
-    status: "out-of-scope",
-    reason: "Vina/GNINA/Boltz-1 require ligand-prep, receptor-prep, GPU compute, and PoseBusters QC. Out of scope for in-browser tier — would need a docking job-queue backed by an A100/H100 cluster. Reference engines documented below; no docking score is fabricated.",
+    status: "skipped",
+    reason: "Stage 2 docking is opt-in (clicked from the Stage 2 card) — not auto-run by Run-Full-Pipeline because it's the most expensive stage (~30–90 s wall time per ligand).",
   };
 }
 
@@ -566,7 +780,7 @@ export function runStage9(
 export interface PipelineResults {
   s0?: StageResult<Stage0Result>;
   s1?: StageResult<Stage1Result>;
-  s2?: StageResult<never>;
+  s2?: StageResult<Stage2Result>;
   s3?: StageResult<Stage3Result>;
   s4?: StageResult<Stage4Result>;
   s5?: StageResult<never>;

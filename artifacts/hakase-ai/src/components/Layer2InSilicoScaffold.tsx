@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import {
   Cpu, ArrowRight, Database, Microscope, Atom, Sparkles, AlertCircle, AlertTriangle,
   CircleDot, Play, Activity, Shield, Beaker, CheckCircle2, Settings2, ChevronDown, ChevronRight,
@@ -8,7 +8,7 @@ import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
 import type { L2DoseProjection, MarginTier, L2InputParams } from "@/lib/l2DoseProjection";
 import {
-  runFullPipeline, runStage0, runStage1, runStage2, runStage3, runStage4,
+  runFullPipeline, runStage0, runStage1, runStage2Docking, runStage3, runStage4,
   runStage5, runStage6, runStage7, runStage8, runStage9,
   type PipelineResults, type StageResult, type StageStatus,
 } from "@/lib/l2Pipeline";
@@ -50,13 +50,13 @@ const L2_STAGES: StageDef[] = [
     ],
   },
   {
-    n: 2, name: "Docking", wired: "out-of-scope",
-    detail: "Vina / GNINA / Boltz-1 with PoseBusters QC. Requires GPU cluster and curated receptor PDBs — out of scope for in-browser tier.",
+    n: 2, name: "Docking", wired: "ai-service",
+    detail: "AutoDock Vina (CPU) on the L1 UniProt's top experimental PDB. Receptor auto-prepped via OpenBabel (-xr); ligand 3D-embedded with RDKit/UFF then PDBQT'd via OpenBabel (Gasteiger, pH 7.4). Box auto-picked from a co-crystallized HETATM ligand when available (HETATM blocklist excludes waters/ions/buffers/cryoprotectants); blind-dock fallback is explicit and warning-flagged.",
     engines: [
-      { name: "AutoDock Vina / Smina", note: "Apache 2.0 — classical docking (needs GPU + receptor prep)" },
-      { name: "GNINA",                  note: "GPL-2 — CNN-rescored (GPU)" },
-      { name: "Boltz-1 / Boltz-2",      note: "MIT — AF3-equivalent co-folding (GPU)" },
-      { name: "PoseBusters",            note: "BSD-3 — physical-validity QC, mandatory" },
+      { name: "AutoDock Vina 1.2.7",   note: "Apache 2.0 — classical docking, runs locally via subprocess" },
+      { name: "OpenBabel 3.1.1",       note: "GPL-2 — receptor & ligand PDBQT preparation" },
+      { name: "RDKit 2026.3.1",        note: "BSD-3 — ligand 3D embedding + UFF energy minimisation" },
+      { name: "GNINA / Boltz-2",       note: "OOS — CNN-rescored docking + AF3-equiv co-folding (GPU)" },
     ],
   },
   {
@@ -436,7 +436,11 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
   const [busyStage, setBusyStage] = useState<number | null>(null);
   const [pipelineRunning, setPipelineRunning] = useState(false);
 
-  const wiredCount = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope").length, []);
+  // "Auto-pipeline" stages = wired stages that the Run-Full-Pipeline button executes.
+  // Stage 2 (docking) is wired but intentionally opt-in (30–90 s wall time per ligand),
+  // so the full-pipeline button skips it and the user clicks it from its own card.
+  const wiredCount  = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope").length, []);
+  const autoRunCount = useMemo(() => L2_STAGES.filter(s => s.wired !== "out-of-scope" && s.n !== 2).length, []);
 
   // ── Per-stage runners ────────────────────────────────────────────────────
   const setOne = (key: keyof PipelineResults, value: any) => {
@@ -456,7 +460,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
       switch (n) {
         case 0: setOne("s0", runStage0(simResults, inVitroResults)); break;
         case 1: setOne("s1", await runStage1(simResults)); break;
-        case 2: setOne("s2", runStage2()); break;
+        case 2: setOne("s2", await runStage2Docking(simResults)); break;
         case 3: setOne("s3", await runStage3(simResults)); break;
         case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
         case 5: setOne("s5", runStage5()); break;
@@ -519,10 +523,10 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             <Cpu className="w-4 h-4 text-cyan-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 2 — In Silico</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              {wiredCount}/10 stages run in app
+              {wiredCount}/10 wired · {autoRunCount} auto + S2 opt-in
             </span>
           </div>
-          <p className="text-[12px] text-slate-500">Eight stages run in this product. Docking (S2) and free-energy (S5) are GPU-cluster only — explicitly out of scope.</p>
+          <p className="text-[12px] text-slate-500">Nine stages wired in this product. Stage 2 docking (AutoDock Vina, CPU) is opt-in from its own card — 30–90 s per ligand, so it's not auto-run by the full-pipeline button. Stage 5 free-energy refinement remains GPU-cluster only and explicitly out of scope.</p>
         </div>
 
         <div className="flex-1 p-5 space-y-6">
@@ -610,7 +614,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline (Stage {busyStage ?? "…"})…</>
-              : <><Play className="w-4 h-4" />Run Full L2 Pipeline ({wiredCount} stages)</>}
+              : <><Play className="w-4 h-4" />Run Full L2 Pipeline ({autoRunCount} auto stages · S2 opt-in)</>}
           </button>
 
         </div>
@@ -629,7 +633,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <h2 className="text-[18px] font-semibold text-white">L2 — In Silico</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
-                Architecture doc §4.3 — 8 of 10 stages run live in this app.
+                Architecture doc §4.3 — {wiredCount} of 10 stages wired ({autoRunCount} auto-run by Run-Full; Stage 2 docking is wired via AutoDock Vina but opt-in from its own card).
               </p>
             </div>
           </div>
@@ -686,9 +690,130 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             </ResultShell>
           )}
 
-          {/* Stage 2 OOS */}
+          {/* Stage 2 — AutoDock Vina docking */}
           {results.s2 && (
-            <ResultShell stage={2} name="Docking" icon={ServerCrash} status={results.s2.status} reason={results.s2.reason} />
+            <ResultShell stage={2} name="Docking (AutoDock Vina)" icon={Atom} status={results.s2.status} reason={results.s2.reason}>
+              {results.s2.result && (() => {
+                const s2 = results.s2.result;
+                const dock = s2.dock;
+                const mlPKd = results.s3?.result?.binding_ml.pKd_predicted ?? null;
+                const dockPkd = s2.best_pKd_equivalent;
+                const cross = (mlPKd !== null && isFinite(mlPKd)) ? Math.abs(dockPkd - mlPKd) : null;
+                const crossClass: "strong" | "moderate" | "disagreement" | "unknown" =
+                  cross === null ? "unknown" : cross < 1 ? "strong" : cross < 2 ? "moderate" : "disagreement";
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Best ΔG</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{s2.best_affinity_kcal_mol.toFixed(2)}</div>
+                        <div className="text-[9px] text-slate-600">kcal/mol</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center" title="Heuristic transform of Vina score, NOT an experimental or thermodynamic Kd. Use only as orthogonal sanity-check vs ML pKd.">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">pKd-equiv*</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{s2.best_pKd_equivalent.toFixed(2)}</div>
+                        <div className="text-[9px] text-slate-600">heuristic, 298 K</div>
+                      </div>
+                      <div className="rounded border border-white/8 bg-white/[0.02] p-2 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider">Pose RMSD₂</div>
+                        <div className="text-[13px] text-cyan-300 font-mono">{s2.pose_convergence_rmsd !== null ? s2.pose_convergence_rmsd.toFixed(2) : "—"}</div>
+                        <div className="text-[9px] text-slate-600">Å (mode 2 vs 1)</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Receptor</span>
+                        <span className="text-[11px] text-cyan-300 font-mono">{dock.pdb_id}</span>
+                        <span className="text-[9px] text-slate-500">({dock.receptor_atom_count.toLocaleString()} atoms)</span>
+                        <span className={`ml-auto text-[9px] px-1.5 py-0.5 rounded-full border ${
+                          dock.box.method === "co_crystal"
+                            ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8"
+                            : "border-amber-500/30 text-amber-300 bg-amber-500/8"
+                        }`}>
+                          box: {dock.box.method === "co_crystal" ? `co-crystal (${dock.box.source_residue})` : "blind dock"}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        center [{dock.box.center.map(c => c.toFixed(1)).join(", ")}] Å · size [{dock.box.size.map(c => c.toFixed(1)).join(", ")}] Å
+                      </div>
+                      {s2.pdb_candidates.length > 0 && (
+                        <div className="pt-1 border-t border-white/5 mt-1">
+                          <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">PDB ranking ({s2.pdb_candidates.length} considered)</div>
+                          <ul className="text-[10px] text-slate-400 space-y-0.5">
+                            {s2.pdb_candidates.map((c, i) => (
+                              <li key={c.pdbId} className={i === 0 ? "text-cyan-300" : ""}>
+                                <span className="font-mono">{i === 0 ? "▸" : " "} {c.pdbId}</span>
+                                <span className="text-slate-500"> — {c.rationale} (score {c.score.toFixed(0)})</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Top {dock.poses.length} poses</div>
+                      <div className="grid grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
+                        <span className="text-slate-500">mode</span>
+                        <span className="text-slate-500 text-right">ΔG (kcal/mol)</span>
+                        <span className="text-slate-500 text-right">RMSD lb</span>
+                        <span className="text-slate-500 text-right">RMSD ub</span>
+                        {dock.poses.map(p => (
+                          <Fragment key={p.mode}>
+                            <span className="text-cyan-300 font-mono">{p.mode}</span>
+                            <span className="text-cyan-300 font-mono text-right">{p.affinity_kcal_mol.toFixed(2)}</span>
+                            <span className="text-cyan-300 font-mono text-right">{p.rmsd_lb.toFixed(2)}</span>
+                            <span className="text-cyan-300 font-mono text-right">{p.rmsd_ub.toFixed(2)}</span>
+                          </Fragment>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider">Cross-check vs Stage 3 binding-ml</div>
+                      <div className="text-[9px] text-amber-300/70 italic leading-snug">
+                        * pKd-equiv is a heuristic transform of the empirical Vina score (pKd ≈ −score / 1.364 at 298 K) — not an experimental or thermodynamic Kd. Used here only as an orthogonal sanity-check against the ML pKd.
+                      </div>
+                      {mlPKd === null ? (
+                        <div className="text-[10px] text-slate-500 italic">Run Stage 3 to compare Vina pKd-equiv vs ML pKd.</div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-3 gap-x-2 text-[10px]">
+                            <span className="text-slate-500">Vina pKd-equiv</span>
+                            <span className="text-slate-500 text-center">ML pKd</span>
+                            <span className="text-slate-500 text-right">|Δ| (log)</span>
+                            <span className="text-cyan-300 font-mono">{dockPkd.toFixed(2)}</span>
+                            <span className="text-cyan-300 font-mono text-center">{mlPKd.toFixed(2)}</span>
+                            <span className="text-cyan-300 font-mono text-right">{cross!.toFixed(2)}</span>
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full border inline-block ${
+                            crossClass === "strong" ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8"
+                            : crossClass === "moderate" ? "border-amber-500/30 text-amber-300 bg-amber-500/8"
+                            : "border-rose-500/30 text-rose-300 bg-rose-500/8"
+                          }`}>{crossClass}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {dock.warnings.length > 0 && (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-0.5">
+                        <div className="text-[10px] text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Warnings
+                        </div>
+                        <ul className="text-[10px] text-amber-200/80 list-disc list-inside space-y-0.5">
+                          {dock.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="text-[9px] text-slate-500 italic">
+                      {dock.vina_version} · {dock.runtime_seconds.toFixed(1)} s wall · ligand {dock.ligand_atom_count} atoms · physical-tier scoring (provenance: {s2.source})
+                    </div>
+                  </>
+                );
+              })()}
+            </ResultShell>
           )}
 
           {/* Stage 3 — ML cross-check */}

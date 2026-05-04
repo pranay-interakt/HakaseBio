@@ -12,10 +12,11 @@
  * to decide whether L1→L2 auto-advance is permitted.
  */
 
-export type QualityTier = "experimental" | "enriched" | "ml" | "heuristic" | "inferred";
+export type QualityTier = "experimental" | "physical" | "enriched" | "ml" | "heuristic" | "inferred";
 
 export const TIER_SCORE: Record<QualityTier, number> = {
   experimental: 1.0,
+  physical:     0.85, // physics-based on actual coordinates (e.g. AutoDock Vina docking)
   enriched:     0.7,
   ml:           0.7,
   heuristic:    0.3,
@@ -65,6 +66,7 @@ export function tierLabel(tier: QualityTier): string {
 export function tierChipClasses(tier: QualityTier): string {
   switch (tier) {
     case "experimental": return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+    case "physical":     return "bg-teal-500/15    text-teal-300    border-teal-500/30";
     case "enriched":     return "bg-blue-500/15    text-blue-300    border-blue-500/30";
     case "ml":           return "bg-violet-500/15  text-violet-300  border-violet-500/30";
     case "heuristic":    return "bg-amber-500/15   text-amber-300   border-amber-500/30";

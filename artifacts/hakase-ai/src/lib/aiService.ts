@@ -621,6 +621,122 @@ export async function predictBindingMl(
   });
 }
 
+// ---------------------------------------------------------------------------
+// L2 Stage 2 — AutoDock Vina docking (async job)
+// ---------------------------------------------------------------------------
+
+export interface DockPose {
+  mode: number;
+  affinity_kcal_mol: number;
+  rmsd_lb: number;
+  rmsd_ub: number;
+}
+
+export interface DockBox {
+  center: [number, number, number];
+  size:   [number, number, number];
+  /** "co_crystal" — centered on a co-crystallized HETATM ligand.
+   *  "blind_dock" — whole-receptor box (last-resort fallback). */
+  method: "co_crystal" | "blind_dock";
+  /** Residue label like "XK2 A 263" when method = co_crystal; null for blind dock. */
+  source_residue: string | null;
+}
+
+export interface DockHetatmCandidate {
+  label: string;
+  resname: string;
+  chain: string;
+  resi: number;
+  atom_count: number;
+  center: [number, number, number];
+  size:   [number, number, number];
+}
+
+export interface DockResult {
+  poses: DockPose[];
+  box: DockBox;
+  pdb_id: string;
+  co_crystal_ligands: DockHetatmCandidate[];
+  chosen_box_ligand: string | null;
+  receptor_atom_count: number;
+  ligand_atom_count: number;
+  runtime_seconds: number;
+  vina_version: string;
+  warnings: string[];
+}
+
+export interface DockJobStatus {
+  job_id: string;
+  status: "queued" | "running" | "done" | "failed";
+  smiles: string;
+  pdb_id: string;
+  progress: string;
+  started_at: number;
+  finished_at: number;
+  error: string | null;
+  result: DockResult | null;
+}
+
+export async function startDocking(
+  smiles: string,
+  pdbId: string,
+  opts: { exhaustiveness?: number; numModes?: number } = {},
+): Promise<{ job_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/dock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      smiles,
+      pdb_id: pdbId,
+      exhaustiveness: opts.exhaustiveness ?? 8,
+      num_modes: opts.numModes ?? 5,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "Docking submission failed");
+  }
+  return res.json();
+}
+
+export async function getDockStatus(jobId: string): Promise<DockJobStatus> {
+  const res = await fetch(`${API_BASE}/dock/status/${encodeURIComponent(jobId)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "Docking status fetch failed");
+  }
+  return res.json();
+}
+
+/** Submit a docking job, then poll until done | failed | timeout. Resolves with
+ *  the final terminal status (caller checks .status to differentiate done/failed).
+ *  No silent fallback: a timeout produces a failed status with a specific error. */
+export async function runDockingToCompletion(
+  smiles: string,
+  pdbId: string,
+  opts: {
+    exhaustiveness?: number;
+    numModes?: number;
+    pollIntervalMs?: number;
+    timeoutMs?: number;
+    onProgress?: (status: DockJobStatus) => void;
+  } = {},
+): Promise<DockJobStatus> {
+  const { job_id } = await startDocking(smiles, pdbId, opts);
+  const interval = opts.pollIntervalMs ?? 2000;
+  const timeout = opts.timeoutMs ?? 600_000;  // 10 min hard cap
+  const deadline = Date.now() + timeout;
+  // Initial sleep so the worker thread has a chance to enter "running"
+  await new Promise(r => setTimeout(r, 500));
+  while (Date.now() < deadline) {
+    const s = await getDockStatus(job_id);
+    opts.onProgress?.(s);
+    if (s.status === "done" || s.status === "failed") return s;
+    await new Promise(r => setTimeout(r, interval));
+  }
+  throw new Error(`Docking job ${job_id} exceeded ${timeout / 1000}s timeout`);
+}
+
 export async function getModelStatus(): Promise<ModelStatusResponse> {
   const res = await fetch(`${API_BASE}/models/status`);
   if (!res.ok) throw new Error("Failed to fetch model status");
