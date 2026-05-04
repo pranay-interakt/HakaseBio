@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/hakase-clinical/"
+title = "Hakase Clinical — Phase 1–4 Planner"
+version = "1.0.0"
+id = "artifacts/hakase-clinical"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/hakase-clinical/" ]
+localPort = 20817
+
+[services.development]
+run = "pnpm --filter @workspace/hakase-clinical run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hakase-clinical", "run", "build" ]
+publicDir = "artifacts/hakase-clinical/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20817"
+BASE_PATH = "/hakase-clinical/"
