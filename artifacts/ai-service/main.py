@@ -58,6 +58,7 @@ from models.celltype_aggregation import (
     is_ready as celltype_aggregation_status,
     warmup as celltype_aggregation_warmup,
 )
+from models import docking_vina
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -330,6 +331,56 @@ def api_predict_protein(req: ProteinRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Protein analysis failed: {str(e)}")
+
+
+class DockingRequest(BaseModel):
+    smiles: str
+    pdb_id: str
+    exhaustiveness: int = 8
+    num_modes: int = 5
+
+
+@app.post("/predict/dock")
+def api_dock_submit(req: DockingRequest):
+    """Layer 2 Stage 2 — AutoDock Vina docking (in-app, physical scoring).
+
+    Asynchronous job: returns job_id immediately. Poll
+    GET /predict/dock/status/{job_id} for progress + result.
+
+    Pipeline (subprocess-based, no conflicting Python deps):
+      RDKit 2026 → 3D embed + UFF optimize
+      → obabel → ligand PDBQT (Gasteiger charges, pH 7.4)
+      → RCSB fetch + clean → receptor PDBQT
+      → box selection (co-crystal centroid first, blind dock fallback)
+      → AutoDock Vina v1.2.7
+
+    Strict project policy: NO fake data, NO silent fallbacks. Box method is
+    always reported (`co_crystal` | `blind_dock`) so the reviewer can never
+    confuse a blind dock for a pocket-targeted one.
+    """
+    if not req.smiles or not req.smiles.strip():
+        raise HTTPException(status_code=400, detail="smiles is required")
+    if not req.pdb_id or not req.pdb_id.strip():
+        raise HTTPException(status_code=400, detail="pdb_id is required")
+    if not (1 <= req.exhaustiveness <= 32):
+        raise HTTPException(status_code=400, detail="exhaustiveness must be 1..32")
+    if not (1 <= req.num_modes <= 20):
+        raise HTTPException(status_code=400, detail="num_modes must be 1..20")
+    job_id = docking_vina.submit_dock(
+        smiles=req.smiles.strip(),
+        pdb_id=req.pdb_id.strip(),
+        exhaustiveness=req.exhaustiveness,
+        num_modes=req.num_modes,
+    )
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/predict/dock/status/{job_id}")
+def api_dock_status(job_id: str):
+    job = docking_vina.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    return sanitize(job)
 
 
 @app.post("/predict/full-pipeline")
