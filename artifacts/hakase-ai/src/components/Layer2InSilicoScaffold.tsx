@@ -146,9 +146,12 @@ function statusBadgeClass(s: StageStatus | "ready"): string {
 }
 
 function wiredBadge(w: StageDef["wired"]): { text: string; cls: string } {
-  if (w === "in-house")     return { text: "Wired · in-house",  cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
-  if (w === "ai-service")   return { text: "Wired · AI service",cls: "border-cyan-500/40 bg-cyan-500/10 text-cyan-300" };
-  return                          { text: "Out of scope",         cls: "border-slate-500/40 bg-slate-500/10 text-slate-400" };
+  // User-facing language: hide the in-house vs ai-service plumbing detail
+  // (which is shown inside the expandable toolchain). Surface only what
+  // matters to the reviewer: does this stage actually execute, or is it
+  // cited as reference only?
+  if (w === "out-of-scope") return { text: "Reference only", cls: "border-slate-500/40 bg-slate-500/10 text-slate-400" };
+  return                           { text: "Runs in app",    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
 }
 
 // ── MarginBar (Stage 8 result card) ─────────────────────────────────────────
@@ -516,7 +519,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             <Cpu className="w-4 h-4 text-cyan-400" />
             <h2 className="text-[15px] font-semibold text-white">Layer 2 — In Silico</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              {wiredCount}/10 stages wired
+              {wiredCount}/10 stages run in app
             </span>
           </div>
           <p className="text-[12px] text-slate-500">Eight stages run in this product. Docking (S2) and free-energy (S5) are GPU-cluster only — explicitly out of scope.</p>
@@ -626,7 +629,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <h2 className="text-[18px] font-semibold text-white">L2 — In Silico</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
-                Architecture doc §4.3, 8 of 10 stages wired.
+                Architecture doc §4.3 — 8 of 10 stages run live in this app.
               </p>
             </div>
           </div>
