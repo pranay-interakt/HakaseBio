@@ -153,6 +153,246 @@ export const EMPTY_PHASE1_DESIGN: Phase1Design = {
   },
 };
 
+// ── Smart defaults from §8 ────────────────────────────────────────────────
+
+export interface AutoFilledField {
+  /** Dotted path into Phase1Design, e.g. "scoping.riskTolerance". */
+  path: string;
+  /** Human label for the banner. */
+  label: string;
+  /** Concise rationale anchored to a §8 field. */
+  reason: string;
+  /** Stringified value applied. */
+  value: string;
+}
+
+export interface DerivedPhase1Defaults {
+  overrides: Phase1Design;
+  applied: AutoFilledField[];
+}
+
+const isFinitePos = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v > 0;
+
+/**
+ * Derive Phase 1 design defaults from a §8 PreClinicalPackage.
+ * Only fields with a *defensible* §8 anchor are populated. Free-text fields
+ * (indication, TPP, populationRationale beyond a stub) and fields needing a
+ * therapeutic-target input (max planned dose) are left at EMPTY values for
+ * the user to fill — never invented.
+ *
+ * Returns the FULL Phase1Design (caller decides whether to merge per-field).
+ */
+export function derivePhase1Defaults(
+  pkg: PreClinicalPackage,
+): DerivedPhase1Defaults {
+  const out: Phase1Design = JSON.parse(JSON.stringify(EMPTY_PHASE1_DESIGN));
+  const applied: AutoFilledField[] = [];
+
+  const ac = pkg.animalCohort;
+  const iv = pkg.inVitro;
+  const isBiologic =
+    pkg.compound.smiles.startsWith("BIOLOGIC:") ||
+    (isFinitePos(pkg.compound.molecularWeight) &&
+      pkg.compound.molecularWeight > 5000);
+
+  // Risk tolerance ← overall preclinical risk
+  if (ac.overallRisk === "high") {
+    out.scoping.riskTolerance = "conservative";
+    applied.push({
+      path: "scoping.riskTolerance",
+      label: "Risk tolerance",
+      value: "conservative",
+      reason: `animalCohort.overallRisk = "high"`,
+    });
+  }
+
+  // Population branch ← high-risk signal
+  const highRiskFlag = ac.toxicityFlags.some((f) => f.risk === "high");
+  if (ac.overallRisk === "high" || highRiskFlag) {
+    out.scoping.population = "patients";
+    out.scoping.populationRationale =
+      ac.overallRisk === "high"
+        ? "L4 overall risk = high — healthy-volunteer exposure not appropriate."
+        : `Toxicity flag of risk=high present (${ac.toxicityFlags.find((f) => f.risk === "high")?.organ ?? "unspecified organ"}).`;
+    applied.push({
+      path: "scoping.population",
+      label: "Population branch",
+      value: "patients",
+      reason:
+        ac.overallRisk === "high"
+          ? `animalCohort.overallRisk = "high"`
+          : `animalCohort.toxicityFlags contains risk = "high"`,
+    });
+  }
+
+  // Starting-dose method
+  const hedBsaOk = isFinitePos(ac.hedBsaMgPerKg);
+  const hedPbpkOk = isFinitePos(ac.hedPbpkMgPerKg);
+  if (isBiologic && isFinitePos(iv.primaryTargetIc50nM)) {
+    out.startingDose.method = "MABEL";
+    applied.push({
+      path: "startingDose.method",
+      label: "Starting-dose method",
+      value: "MABEL",
+      reason: `compound.molecularWeight > 5000 (or BIOLOGIC: prefix) AND inVitro.primaryTargetIc50nM is present — MABEL is the FDA/EMA-recommended method for biologics with a defined target.`,
+    });
+  } else if (hedBsaOk && hedPbpkOk) {
+    out.startingDose.method = "Lower-of-both";
+    applied.push({
+      path: "startingDose.method",
+      label: "Starting-dose method",
+      value: "Lower-of-both (HED-BSA / HED-PBPK)",
+      reason: `Both animalCohort.hedBsaMgPerKg and animalCohort.hedPbpkMgPerKg are present — most conservative choice.`,
+    });
+  } else if (hedBsaOk) {
+    out.startingDose.method = "HED-BSA";
+    applied.push({
+      path: "startingDose.method",
+      label: "Starting-dose method",
+      value: "HED-BSA",
+      reason: `Only animalCohort.hedBsaMgPerKg is present (HED-PBPK missing).`,
+    });
+  } else if (hedPbpkOk) {
+    out.startingDose.method = "HED-PBPK";
+    applied.push({
+      path: "startingDose.method",
+      label: "Starting-dose method",
+      value: "HED-PBPK",
+      reason: `Only animalCohort.hedPbpkMgPerKg is present (HED-BSA missing).`,
+    });
+  }
+
+  // Safety factor — anchored to risk + biologic
+  let sf = 10;
+  let sfReason = `animalCohort.overallRisk = "low" → standard 10×.`;
+  if (out.startingDose.method === "MABEL") {
+    sf = 100;
+    sfReason = `MABEL selected (biologic with defined target) — EMA TGN1412 lessons advise ≥100×.`;
+  } else if (ac.overallRisk === "high") {
+    sf = 100;
+    sfReason = `animalCohort.overallRisk = "high" — 100× per FDA 2005 guidance.`;
+  } else if (ac.overallRisk === "moderate") {
+    sf = 50;
+    sfReason = `animalCohort.overallRisk = "moderate" — 50× midpoint.`;
+  }
+  if (sf !== EMPTY_PHASE1_DESIGN.startingDose.safetyFactor) {
+    out.startingDose.safetyFactor = sf;
+    applied.push({
+      path: "startingDose.safetyFactor",
+      label: "Safety factor",
+      value: `${sf}×`,
+      reason: sfReason,
+    });
+  }
+
+  // Sub-studies
+  if (ac.routeOfAdministration === "oral") {
+    out.subStudies.foodEffect = true;
+    applied.push({
+      path: "subStudies.foodEffect",
+      label: "Food-effect arm",
+      value: "enabled",
+      reason: `animalCohort.routeOfAdministration = "oral" — food-effect arm is meaningful.`,
+    });
+  }
+  if (isFinitePos(iv.hergIc50UM) && iv.hergIc50UM < 10) {
+    out.subStudies.tqtRequired = true;
+    applied.push({
+      path: "subStudies.tqtRequired",
+      label: "Thorough-QT arm",
+      value: "enabled",
+      reason: `inVitro.hergIc50UM = ${iv.hergIc50UM} µM < 10 µM threshold — TQT advised per ICH E14.`,
+    });
+  }
+  const cyp = pkg.cypTransporterPanel;
+  if (cyp) {
+    const inhibProbs = [
+      cyp.cyp.cyp1a2InhibitionProb,
+      cyp.cyp.cyp2c9InhibitionProb,
+      cyp.cyp.cyp2c19InhibitionProb,
+      cyp.cyp.cyp2d6InhibitionProb,
+      cyp.cyp.cyp3a4InhibitionProb,
+      cyp.transporters.pgpInhibitionProb,
+      cyp.transporters.bcrpInhibitionProb,
+      cyp.transporters.oatp1b1InhibitionProb,
+      cyp.transporters.oatp1b3InhibitionProb,
+    ].filter((v): v is number => typeof v === "number");
+    const maxInhib = inhibProbs.length ? Math.max(...inhibProbs) : 0;
+    const induction = cyp.cyp.inductionMrnaFoldChange;
+    const inductionTrip =
+      typeof induction === "number" && induction >= 2;
+    if (maxInhib > 0.5 || inductionTrip) {
+      out.subStudies.ddiCocktail = true;
+      applied.push({
+        path: "subStudies.ddiCocktail",
+        label: "DDI cocktail arm",
+        value: "enabled",
+        reason: inductionTrip
+          ? `cypTransporterPanel.cyp.inductionMrnaFoldChange = ${induction}× ≥ 2 — induction risk.`
+          : `cypTransporterPanel max inhibition probability = ${maxInhib.toFixed(2)} > 0.5 — DDI signal.`,
+      });
+    }
+  }
+  const cf = pkg.clearanceFractions;
+  if (cf) {
+    if (cf.renalFraction > 0.3) {
+      out.subStudies.renalImpairment = true;
+      applied.push({
+        path: "subStudies.renalImpairment",
+        label: "Renal-impairment arm",
+        value: "enabled",
+        reason: `clearanceFractions.renalFraction = ${(cf.renalFraction * 100).toFixed(0)}% > 30% — FDA renal-impairment study advised.`,
+      });
+    }
+    if (cf.hepaticFraction > 0.3) {
+      out.subStudies.hepaticImpairment = true;
+      applied.push({
+        path: "subStudies.hepaticImpairment",
+        label: "Hepatic-impairment arm",
+        value: "enabled",
+        reason: `clearanceFractions.hepaticFraction = ${(cf.hepaticFraction * 100).toFixed(0)}% > 30% — FDA hepatic-impairment study advised.`,
+      });
+    }
+  }
+
+  // MAD duration ← projected human t½
+  const t12 = pkg.inSilico.humanProjectedHalfLifeHours;
+  if (typeof t12 === "number" && Number.isFinite(t12)) {
+    let dur = 14;
+    let durReason = "";
+    if (t12 > 48) {
+      dur = 28;
+      durReason = `inSilico.humanProjectedHalfLifeHours = ${t12} h > 48 h — 28-day MAD needed for steady-state.`;
+    } else if (t12 < 6) {
+      dur = 7;
+      durReason = `inSilico.humanProjectedHalfLifeHours = ${t12} h < 6 h — 7-day MAD sufficient for steady-state.`;
+    }
+    if (dur !== EMPTY_PHASE1_DESIGN.mad.durationDays) {
+      out.mad.durationDays = dur;
+      applied.push({
+        path: "mad.durationDays",
+        label: "MAD duration",
+        value: `${dur} days`,
+        reason: durReason,
+      });
+    }
+  }
+
+  // Stopping rule severity
+  if (ac.overallRisk === "high") {
+    out.stoppingRules.haltOnAeGrade = 2;
+    applied.push({
+      path: "stoppingRules.haltOnAeGrade",
+      label: "Halt-on AE grade",
+      value: "Grade 2",
+      reason: `animalCohort.overallRisk = "high" — halt threshold lowered to Grade 2.`,
+    });
+  }
+
+  return { overrides: out, applied };
+}
+
 // ── Computation ────────────────────────────────────────────────────────────
 
 export interface StartingDoseResult {

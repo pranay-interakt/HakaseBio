@@ -21,6 +21,9 @@ import {
   Layers,
   ShieldAlert,
   KeyRound,
+  Wand2,
+  Undo2,
+  X as XIcon,
 } from "lucide-react";
 import {
   isPreClinicalPackage,
@@ -48,9 +51,11 @@ import {
   generateEscalation,
   evaluateIndGate,
   gateSubStudies,
+  derivePhase1Defaults,
   type StartingDoseResult,
   type EscalationResult,
   type IndGateStatus,
+  type AutoFilledField,
 } from "@/lib/phase1Plan";
 
 export interface Phase1PlannerHandle {
@@ -173,6 +178,10 @@ export default function Phase1Planner({
 
   // Phase 1 clinical-side design state
   const [design, setDesign] = useState<Phase1Design>(EMPTY_PHASE1_DESIGN);
+  const [autoApplied, setAutoApplied] = useState<AutoFilledField[]>([]);
+  const [autoBannerOpen, setAutoBannerOpen] = useState(false);
+  const [autoBannerDismissed, setAutoBannerDismissed] = useState(false);
+  const lastPkgIdRef = useRef<string | null>(null);
   const [planEmitted, setPlanEmitted] = useState(false);
 
   const setManualField = <K extends keyof ManualPackageInput>(
@@ -200,6 +209,10 @@ export default function Phase1Planner({
         setUpstreamOpen(true);
         setEntryMode("api");
         setDesign(EMPTY_PHASE1_DESIGN);
+        setAutoApplied([]);
+        setAutoBannerOpen(false);
+        setAutoBannerDismissed(false);
+        lastPkgIdRef.current = null;
         setPlanEmitted(false);
         onImportError(null);
         onPackageReady(null);
@@ -232,6 +245,43 @@ export default function Phase1Planner({
   // Auto-collapse upstream card when a package is activated
   useEffect(() => {
     if (pkg !== null) setUpstreamOpen(false);
+  }, [pkg]);
+
+  // Smart-defaults: derive Phase 1 fields from §8 on activation.
+  // Only fields still at their EMPTY default get overwritten — user edits are preserved.
+  useEffect(() => {
+    if (pkg === null) {
+      lastPkgIdRef.current = null;
+      setAutoApplied([]);
+      setAutoBannerOpen(false);
+      setAutoBannerDismissed(false);
+      return;
+    }
+    const pkgId = `${pkg.compound.smiles}|${pkg.provenance.emittedAt}`;
+    if (lastPkgIdRef.current === pkgId) return;
+    lastPkgIdRef.current = pkgId;
+
+    const { overrides, applied } = derivePhase1Defaults(pkg);
+    setDesign((d) => {
+      const empty = EMPTY_PHASE1_DESIGN;
+      const next: Phase1Design = JSON.parse(JSON.stringify(d));
+      const sectKeys = Object.keys(empty) as (keyof Phase1Design)[];
+      for (const sk of sectKeys) {
+        const cur = d[sk] as unknown as Record<string, unknown>;
+        const def = empty[sk] as unknown as Record<string, unknown>;
+        const ovr = overrides[sk] as unknown as Record<string, unknown>;
+        const merged = next[sk] as unknown as Record<string, unknown>;
+        for (const fk of Object.keys(ovr)) {
+          if (JSON.stringify(cur[fk]) === JSON.stringify(def[fk])) {
+            merged[fk] = ovr[fk];
+          }
+        }
+      }
+      return next;
+    });
+    setAutoApplied(applied);
+    setAutoBannerOpen(false);
+    setAutoBannerDismissed(false);
   }, [pkg]);
 
   // ── Upstream handlers ──────────────────────────────────────────────────
@@ -442,6 +492,69 @@ export default function Phase1Planner({
               </div>
             )}
           </div>
+
+          {/* Auto-fill banner — appears after §8 activation */}
+          {pkg && autoApplied.length > 0 && !autoBannerDismissed && (
+            <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.06]">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <Wand2 className="h-4 w-4 text-violet-300 shrink-0" />
+                <div className="text-sm text-violet-100 flex-1">
+                  <span className="font-medium">{autoApplied.length} field{autoApplied.length === 1 ? "" : "s"} auto-populated from §8.</span>{" "}
+                  <span className="text-violet-200/70">User-edited values were preserved. Review and adjust as needed.</span>
+                </div>
+                <button
+                  onClick={() => setAutoBannerOpen((v) => !v)}
+                  className="text-xs uppercase tracking-wider text-violet-200 hover:text-white px-2 py-1 rounded border border-violet-500/40 hover:border-violet-400"
+                >
+                  {autoBannerOpen ? "Hide" : "Details"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (!pkg) return;
+                    setDesign((d) => {
+                      const next: Phase1Design = JSON.parse(JSON.stringify(d));
+                      for (const f of autoApplied) {
+                        const [sect, key] = f.path.split(".") as [
+                          keyof Phase1Design,
+                          string,
+                        ];
+                        const emptySect = EMPTY_PHASE1_DESIGN[
+                          sect
+                        ] as unknown as Record<string, unknown>;
+                        (next[sect] as unknown as Record<string, unknown>)[
+                          key
+                        ] = emptySect[key];
+                      }
+                      return next;
+                    });
+                    setAutoApplied([]);
+                  }}
+                  className="text-xs uppercase tracking-wider text-violet-200 hover:text-white px-2 py-1 rounded border border-violet-500/40 hover:border-violet-400 inline-flex items-center gap-1"
+                  title="Revert auto-filled fields to empty defaults"
+                >
+                  <Undo2 className="h-3 w-3" /> Undo
+                </button>
+                <button
+                  onClick={() => setAutoBannerDismissed(true)}
+                  className="text-violet-200/60 hover:text-white p-1"
+                  title="Dismiss"
+                >
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {autoBannerOpen && (
+                <div className="border-t border-violet-500/20 px-4 py-3 space-y-2">
+                  {autoApplied.map((f) => (
+                    <div key={f.path} className="text-xs grid grid-cols-[160px_120px_1fr] gap-3">
+                      <span className="text-violet-200/80 truncate" title={f.path}>{f.label}</span>
+                      <span className="text-white font-mono">{f.value}</span>
+                      <span className="text-violet-200/60">{f.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── 2. Population & Scoping ────────────────────────────── */}
           <DesignSection
