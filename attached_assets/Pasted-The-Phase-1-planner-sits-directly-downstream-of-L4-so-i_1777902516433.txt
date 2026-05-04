@@ -1,0 +1,17 @@
+The Phase 1 planner sits directly downstream of L4, so its inputs are the typed `PreClinicalPackage` plus a small set of clinical-side parameters that constrain study design. Standard inputs split into three groups.
+
+**From the L4 PreClinicalPackage (mandatory, upstream-derived)**
+
+NOAEL (mg/kg/day) and the species it was derived in, with the safety factor applied. MTD if reached, plus the dose-limiting toxicity profile. The FIH starting dose calculation — both HED-BSA (allometric, FDA 2005 guidance) and HED-PBPK projections, with the lower of the two typically anchoring the starting dose. `animalPk` (CL, Vd, t½, F, protein binding across species) and the `humanPkProjection` derived from PBPK. `toxFlags` — cardio (hERG, QT signal), hepatic, renal, CNS, repro/dev, genotox, immunogenicity. The `formulationResult` — drug product, route, strength, stability shelf-life. `speciesJustification` and `regulatoryChecklist` (IND-enabling completeness boolean). Full `provenance` chain back to L1 IC50 / SMILES.
+
+**Clinical-side scoping inputs (decisions Phase 1 planner needs)**
+
+Population branch — healthy volunteers vs. patients (oncology, severe disease, or PK-altered organ-impairment cohorts almost always go patient). Indication and target product profile. Geography / regulatory region (FDA / EMA / PMDA / CDSCO — drives ICH E vs. local rules). Sponsor risk tolerance and any prior human exposure (none for true FIH).
+
+**Study-design parameters the planner outputs (and accepts as overrides)**
+
+SAD: starting dose, MRSD cap, dose increments (often modified Fibonacci or PK-guided), cohort size (typically 6 + 2 sentinel), stopping rules tied to AE grade and PK exposure multiples vs. NOAEL. MAD: dose levels carried forward from SAD, duration (usually 7–14 days, longer for chronic indications), accumulation ratio target. Food-effect: fed/fasted crossover, typically at a mid SAD dose. DDI: CYP/transporter probes selected from the in vitro panel in `toxFlags`. TQT: conditional — triggered when the cardio flag or hERG/QT signal in `toxFlags` is set; otherwise a concentration-QT analysis nested in SAD/MAD substitutes. Special populations: hepatic / renal impairment, elderly, pediatric (deferred), pregnancy (almost always excluded at Phase 1).
+
+Every one of these flows through the same gate-override-provenance pattern as L1–L4: the planner refuses to emit a protocol unless `indEnablingComplete === true` or an explicit override-with-justification is supplied, and each design decision carries a provenance pointer back through L4 → L3 → L2 → L1.
+
+The first scoping question for any Phase 1 run is the healthy-volunteer-vs-patient branch — it changes starting-dose conservatism, inclusion criteria, and whether MTD is even an ethical endpoint.
