@@ -48,3 +48,9 @@ id = "IfES0Yn0LGzqjii0QFSBj"
 uri = "file://artifacts/hakase-ai/docs/layer-1-in-vitro.md"
 type = "text"
 title = "Layer 1 — In Vitro Digital Twin (Complete Documentation)"
+
+[[outputs]]
+id = "Giu7YGzeIO6goQ5qB6flu"
+uri = "file://attached_assets/L4_Animal_Cohort_Spec.md"
+type = "text"
+title = "L4 Animal Cohort — Spec & Output Reference"
