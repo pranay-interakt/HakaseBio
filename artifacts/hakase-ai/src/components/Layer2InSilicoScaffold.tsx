@@ -145,15 +145,6 @@ function statusBadgeClass(s: StageStatus | "ready"): string {
   return "border-cyan-500/40 bg-cyan-500/8 text-cyan-300";
 }
 
-function wiredBadge(w: StageDef["wired"]): { text: string; cls: string } {
-  // User-facing language: hide the in-house vs ai-service plumbing detail
-  // (which is shown inside the expandable toolchain). Surface only what
-  // matters to the reviewer: does this stage actually execute, or is it
-  // cited as reference only?
-  if (w === "out-of-scope") return { text: "Reference only", cls: "border-slate-500/40 bg-slate-500/10 text-slate-400" };
-  return                           { text: "Runs in app",    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" };
-}
-
 // ── MarginBar (Stage 8 result card) ─────────────────────────────────────────
 function MarginBar({ row }: { row: { label: string; ratio: number | null; tier: MarginTier; numerator: string; denominator: string; assumption: string } }) {
   const display = row.ratio === null || !isFinite(row.ratio)
@@ -213,7 +204,6 @@ function StageCard({
   runDisabled: boolean;
   runDisabledReason?: string;
 }) {
-  const wb = wiredBadge(stage.wired);
   const canRun = stage.wired !== "out-of-scope";
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
@@ -224,7 +214,6 @@ function StageCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
-            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${wb.cls}`}>{wb.text}</span>
             {hasResult && (
               <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
             )}
