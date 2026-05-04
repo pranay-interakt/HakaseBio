@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "1.0.0",
+  "compound": {
+    "smiles": "CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5",
+    "inchiKey": "KTUFNOKKBVMGRW-UHFFFAOYSA-N",
+    "molecularWeight": 493.6,
+    "chemblId": "CHEMBL941",
+    "preferredName": "Imatinib"
+  },
+  "inVitro": {
+    "hergIc50UM": 7.8,
+    "caco2Permeability": 9.6,
+    "plasmaProteinBindingFraction": 0.95,
+    "primaryTargetUniprot": "P00519",
+    "primaryTargetGeneSymbol": "ABL1",
+    "primaryTargetIc50nM": 25
+  },
+  "inSilico": {
+    "humanProjectedCmaxNgPerMl": 2500,
+    "humanProjectedAucNgHPerMl": 41000,
+    "humanProjectedHalfLifeHours": 18.0,
+    "humanProjectedClearanceLPerHPerKg": 0.21,
+    "freeEnergyDdgKcalPerMol": -2.3,
+    "freeEnergyUncertaintyKcalPerMol": 0.4
+  },
+  "animalCohort": {
+    "speciesId": "dog",
+    "speciesDisplayName": "Beagle Dog",
+    "studyTypeId": "13-week-tox",
+    "studyTypeLabel": "13-week repeat-dose oral toxicology",
+    "routeOfAdministration": "oral",
+    "noaelMgPerKg": 15,
+    "mtdMgPerKg": 60,
+    "fihDoseMg": 25,
+    "fihDoseMgPerKg": 0.36,
+    "hedBsaMgPerKg": 8.33,
+    "hedPbpkMgPerKg": 6.10,
+    "safetyMarginNoael": 18.0,
+    "overallRisk": "moderate",
+    "toxicityFlags": [
+      {
+        "organ": "Liver",
+        "risk": "moderate",
+        "finding": "ALT elevation 2-4× ULN at MTD; reversible",
+        "ichReference": "ICH S7A"
+      },
+      {
+        "organ": "Cardiac",
+        "risk": "moderate",
+        "finding": "hERG IC50 < 10 µM — TQT advised",
+        "ichReference": "ICH S7B"
+      }
+    ],
+    "formulation": {
+      "formulationType": "capsule",
+      "bcsClass": "IV"
+    },
+    "indEnablingComplete": true
+  },
+  "cypTransporterPanel": {
+    "cyp": {
+      "cyp1a2InhibitionProb": 0.18,
+      "cyp2c9InhibitionProb": 0.31,
+      "cyp2c19InhibitionProb": 0.24,
+      "cyp2d6InhibitionProb": 0.46,
+      "cyp3a4InhibitionProb": 0.83,
+      "inductionMrnaFoldChange": 1.6,
+      "source": "in-vitro-experimental"
+    },
+    "transporters": {
+      "pgpInhibitionProb": 0.78,
+      "bcrpInhibitionProb": 0.62,
+      "oatp1b1InhibitionProb": 0.34,
+      "oatp1b3InhibitionProb": 0.28,
+      "oct2InhibitionProb": 0.11,
+      "mate1InhibitionProb": 0.09,
+      "source": "in-vitro-experimental"
+    }
+  },
+  "clearanceFractions": null,
+  "provenance": {
+    "emittedAt": "2026-05-04T12:05:00Z",
+    "emitterEngine": "HakaseBioDigitalTwin",
+    "emitterVersion": "1.0.0",
+    "l1EngineVersion": "ADMET-AI 0.4.1",
+    "l2EngineVersion": "PK-Sim 11.2",
+    "l4EngineVersion": "HakaseAnimalTox 1.0.0",
+    "databaseQueries": [
+      { "database": "ChEMBL", "status": "success", "timestamp": "2026-05-04T12:03:11Z", "resultCount": 1 },
+      { "database": "PK-DB", "status": "success", "timestamp": "2026-05-04T12:03:30Z", "resultCount": 22 },
+      { "database": "Clearance_Hepatocyte_AZ", "status": "skipped", "timestamp": null, "resultCount": null }
+    ],
+    "warnings": [
+      "§6.1.b clearance fractions could not be derived from available data (hepatocyte assay skipped) — Special-Pop renal/hepatic arm planning will be blocked downstream.",
+      "hERG IC50 = 7.8 µM is below the 10 µM TQT threshold — thorough QT advised."
+    ]
+  }
+}

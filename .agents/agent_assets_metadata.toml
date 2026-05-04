@@ -54,3 +54,27 @@ id = "Giu7YGzeIO6goQ5qB6flu"
 uri = "file://attached_assets/L4_Animal_Cohort_Spec.md"
 type = "text"
 title = "L4 Animal Cohort — Spec & Output Reference"
+
+[[outputs]]
+id = "eUAr29CbLV8Dp1Up2jRWm"
+uri = "file://attached_assets/preclinical-packages/01-ibuprofen-full.json"
+type = "unspecified"
+title = "01 · Ibuprofen — happy path (full §6.1.a + §6.1.b)"
+
+[[outputs]]
+id = "EVhQorIeBvVqhk1RHT2Du"
+uri = "file://attached_assets/preclinical-packages/02-imatinib-oncology-partial.json"
+type = "unspecified"
+title = "02 · Imatinib — oncology, §6.1.b missing (Special-Pop blocked)"
+
+[[outputs]]
+id = "W504ANMoWlq5qbM9lODAm"
+uri = "file://attached_assets/preclinical-packages/03-biologic-mab-mabel.json"
+type = "unspecified"
+title = "03 · mAb-XR-001 biologic — IND incomplete, MABEL + override path"
+
+[[outputs]]
+id = "X3F-YQg6xzarG-co1GbZv"
+uri = "file://attached_assets/preclinical-packages/README.md"
+type = "text"
+title = "README — what each fixture exercises"

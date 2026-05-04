@@ -331,7 +331,9 @@ function refuseWith(reason: string): StartingDoseResult {
 
 // ── Dose escalation ────────────────────────────────────────────────────────
 
-const MOD_FIBONACCI_FACTORS = [2.0, 1.67, 1.5, 1.4, 1.33, 1.33, 1.33];
+const MOD_FIBONACCI_SEED = [2.0, 1.67, 1.5, 1.4];
+const MOD_FIBONACCI_TAIL = 1.33;
+const MAX_ESCALATION_LEVELS = 12;
 
 export interface EscalationLevel {
   index: number;
@@ -417,16 +419,18 @@ export function generateEscalation(
     };
   }
 
-  const factors =
-    scheme === "modified-fibonacci"
-      ? MOD_FIBONACCI_FACTORS
-      : scheme === "geometric-2x"
-        ? Array(20).fill(2.0)
-        : scheme === "geometric-1.5x"
-          ? Array(20).fill(1.5)
-          : null;
+  const factorAt = (stepIdx: number): number | null => {
+    if (scheme === "modified-fibonacci") {
+      return stepIdx < MOD_FIBONACCI_SEED.length
+        ? MOD_FIBONACCI_SEED[stepIdx]
+        : MOD_FIBONACCI_TAIL;
+    }
+    if (scheme === "geometric-2x") return 2.0;
+    if (scheme === "geometric-1.5x") return 1.5;
+    return null;
+  };
 
-  if (factors === null) {
+  if (factorAt(0) === null) {
     if (scheme === "PK-guided") {
       return {
         ok: false,
@@ -451,15 +455,17 @@ export function generateEscalation(
     doseMgPerKg: startingDoseMgPerKg,
     factorFromPrev: null,
   });
-  for (let i = 0; i < factors.length && levels.length < 12; i++) {
-    const next = curMg * factors[i];
+  while (levels.length < MAX_ESCALATION_LEVELS) {
+    const f = factorAt(levels.length - 1);
+    if (f === null) break;
+    const next = curMg * f;
     if (next > maxPlannedDoseMg * 1.001) break;
     curMg = next;
     levels.push({
       index: levels.length + 1,
       doseMg: curMg,
       doseMgPerKg: curMg / bodyWeightKg,
-      factorFromPrev: factors[i],
+      factorFromPrev: f,
     });
   }
   if (levels.length < 3) {
