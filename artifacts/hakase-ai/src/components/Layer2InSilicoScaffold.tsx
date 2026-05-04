@@ -226,17 +226,23 @@ function StageCard({
               <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
             )}
           </div>
-          <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{stage.detail}</div>
+          <details className="mt-0.5 group">
+            <summary className="cursor-pointer list-none text-[10px] text-slate-500 hover:text-slate-300 select-none inline-flex items-center gap-1">
+              <span className="text-slate-600 group-open:rotate-90 transition-transform inline-block w-2">▸</span>
+              <span>What this stage does &amp; toolchain</span>
+            </summary>
+            <div className="text-[10px] text-slate-500 leading-relaxed mt-1.5">{stage.detail}</div>
+            <div className="space-y-1 mt-1.5">
+              {stage.engines.map(e => (
+                <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
+                  <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
+                  <span className="text-slate-300 font-medium">{e.name}</span>
+                  {e.note && <span className="text-slate-500">— {e.note}</span>}
+                </div>
+              ))}
+            </div>
+          </details>
         </div>
-      </div>
-      <div className="pl-8 space-y-1">
-        {stage.engines.map(e => (
-          <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
-            <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
-            <span className="text-slate-300 font-medium">{e.name}</span>
-            {e.note && <span className="text-slate-500">— {e.note}</span>}
-          </div>
-        ))}
       </div>
       {canRun && (
         <div className="pl-8 mt-2.5 flex items-center gap-2">
