@@ -609,10 +609,13 @@ export default function Phase1Planner({
               {autoBannerOpen && (
                 <div className="border-t border-violet-500/20 px-4 py-3 space-y-2">
                   {autoApplied.map((f) => (
-                    <div key={f.path} className="text-xs grid grid-cols-[160px_120px_1fr] gap-3">
+                    <div
+                      key={f.path}
+                      className="text-xs grid grid-cols-[minmax(0,140px)_minmax(0,140px)_minmax(0,1fr)] gap-3 items-start"
+                    >
                       <span className="text-violet-200/80 truncate" title={f.path}>{f.label}</span>
-                      <span className="text-white font-mono">{f.value}</span>
-                      <span className="text-violet-200/60">{f.reason}</span>
+                      <span className="text-white font-mono break-words min-w-0">{f.value}</span>
+                      <span className="text-violet-200/60 break-words min-w-0">{f.reason}</span>
                     </div>
                   ))}
                 </div>
