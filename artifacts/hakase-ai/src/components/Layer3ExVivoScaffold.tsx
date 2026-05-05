@@ -1376,7 +1376,7 @@ export function Layer3ExVivoScaffold({
     <div className="flex-1 flex overflow-hidden">
 
       {/* ── LEFT STATUS / INPUTS PANEL ──────────────────────────────────────── */}
-      <div className="w-[42%] min-w-0 max-w-[480px] border-r border-white/8 overflow-y-auto flex flex-col">
+      <div className="w-[480px] border-r border-white/8 overflow-y-auto flex flex-col">
         <div className="p-5 border-b border-white/8">
           <div className="flex items-center gap-2 mb-1">
             <Microscope className="w-4 h-4 text-amber-400" />
