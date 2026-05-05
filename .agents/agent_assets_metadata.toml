@@ -78,3 +78,9 @@ id = "X3F-YQg6xzarG-co1GbZv"
 uri = "file://attached_assets/preclinical-packages/README.md"
 type = "text"
 title = "README — what each fixture exercises"
+
+[[outputs]]
+id = "lu8lPNzLcB6aScsdWtz4K"
+uri = "file://attached_assets/screenshots/27dcdc89-5e47-4ba9-8198-06dd67562010-00-2io8be1wnjwfs_sisko_replit_dev_mockup_preview_confirmation-layer_ConfirmationLayer.png"
+type = "image"
+title = "Confirmation Layer (L2) — first cut"
