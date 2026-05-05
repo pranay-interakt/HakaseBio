@@ -112,7 +112,7 @@ import {
   Sun, Moon, Workflow
 } from "lucide-react";
 // 4-Layer Pre-Clinical Architecture (April 2026 redesign).
-// L1 In Vitro → L2 In Silico → L3 Ex Vivo → L4 Animal Cohort.
+// L1 In Vitro → L2 Confirmation (In-Silico ↔ Ex-Vivo) → L3 Animal Cohort → L4 First In Human.
 // Patient Cohort + Trial code is preserved but gated unreachable.
 import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
 import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
@@ -1230,8 +1230,8 @@ export function HakaseAI() {
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
-    // Tick budgets per layer — L2 In Silico and L3 Ex Vivo are scaffolds in
-    // this build (no Run handler), so 0 ticks. L4 Animal Cohort uses the same
+    // Tick budgets per layer — L2 Confirmation (In-Silico ↔ Ex-Vivo) is a scaffold in
+    // this build (no Run handler), so 0 ticks. L3 Animal Cohort uses the same
     // 16-tick budget the relocated runner inherited from former internal slot 2.
     const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 3 ? 16 : 0;
     let tick = 0;
@@ -1795,7 +1795,7 @@ export function HakaseAI() {
   };
 
   // 4-Layer Pre-Clinical Architecture (April 2026 redesign):
-  // L1 In Vitro → L2 In Silico → L3 Ex Vivo → L4 Animal Cohort.
+  // L1 In Vitro → L2 Confirmation (In-Silico ↔ Ex-Vivo) → L3 Animal Cohort → L4 First In Human.
   // Patient Cohort + Trial were former internal slots 3/4 — moved out of
   // pre-clinical scope (now handed to Hakase Clinical via API per Section 8
   // of the architecture doc) and gated unreachable via HIDE_PATIENT_TRIAL_LAYERS.

@@ -1380,7 +1380,7 @@ export function Layer3ExVivoScaffold({
         <div className="p-5 border-b border-white/8">
           <div className="flex items-center gap-2 mb-1">
             <Microscope className="w-4 h-4 text-amber-400" />
-            <h2 className="text-[15px] font-semibold text-white">Layer 3 — Ex Vivo</h2>
+            <h2 className="text-[15px] font-semibold text-white">L2 · Ex-Vivo sub-track</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
               {wiredCount}/6 wired · {acceptsManualCount} manual
             </span>
@@ -1828,7 +1828,7 @@ export function Layer3ExVivoScaffold({
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[12px] font-semibold transition-colors"
             >
               <ArrowRight className="w-4 h-4" />
-              Continue to L4 Animal Cohort
+              Continue to L3 Animal Cohort
             </button>
           </div>
 

@@ -679,7 +679,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             <div className="flex-1">
               <h2 className="text-[18px] font-semibold text-white">L2 — In Silico</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
-                Computational triage between L1 wet-style assays and L3 ex-vivo tissue work.
+                Computational triage between L1 wet-style assays and the Ex-Vivo sub-track within L2 Confirmation.
                 Architecture doc §4.3 — {wiredCount} of 10 stages wired ({autoRunCount} auto-run by Run-Full; Stage 2 docking and Stage 5 TIES FEP are opt-in from their own cards due to wall time / GPU cost).
               </p>
             </div>
@@ -1291,7 +1291,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
 {JSON.stringify(results.s9.result, null, 2)}
                 </pre>
               </div>
-              <div className="text-[10px] text-slate-500 italic">Schema <span className="font-mono text-slate-400">L2-handoff-v1</span> — what L3 Ex Vivo would receive when wired.</div>
+              <div className="text-[10px] text-slate-500 italic">Schema <span className="font-mono text-slate-400">L2-handoff-v1</span> — what the Ex-Vivo sub-track would receive when wired.</div>
             </ResultShell>
           )}
 
@@ -1323,14 +1323,14 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             </div>
           </div>
 
-          {/* L2 → L3 output contract */}
+          {/* L2 In-Silico → L2 Ex-Vivo sub-track output contract */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-amber-400" />
-              <h3 className="text-[13px] font-semibold text-white">L2 → L3 Output Contract</h3>
+              <h3 className="text-[13px] font-semibold text-white">L2 In-Silico → Ex-Vivo Output Contract</h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              When wired, L2 hands L3 a ranked shortlist (architecture doc §4 — no specific shortlist size or cost estimate is asserted), each carrying:
+              When wired, the in-silico sub-track hands the ex-vivo sub-track a ranked shortlist (architecture doc §4 — no specific shortlist size or cost estimate is asserted), each carrying:
             </p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
               {[
@@ -1359,7 +1359,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[12px] font-semibold transition-colors"
             >
               <Microscope className="w-4 h-4" />
-              Reviewed L2 contract — continue to L3 Ex Vivo
+              Reviewed L2 In-Silico — switch to Ex-Vivo sub-track
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
