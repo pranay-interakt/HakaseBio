@@ -1,0 +1,180 @@
+Thanks for sharing this – it's a very concrete snapshot of where your heuristics are now, and it perfectly illustrates why you need both better models *and* the Gate Service we just discussed.
+
+Let me give you an honest assessment and then a prioritized improvement plan.
+
+---
+
+## What this screenshot tells me
+
+You have a **classic heuristic-based pre-filter** running before L2 (Animal Cohort). It's blocking on four safety-critical outputs: hERG, hepatotoxicity, bioactivation, cyp_panel.
+
+The heuristics are crude but not unreasonable for a *cheap filter*:
+- hERG: logP > 4 + low HBD + MW > 300 – this catches some known hERG liabilities (high logP + aromaticity), but misses many others (e.g., basic amines, specific scaffolds).
+- Hepatotoxicity: logP > 4.5 or MW > 550 – extremely coarse. Most hepatotoxic drugs don't fit that.
+- Bioactivation: SMARTS alert scan – that's actually decent, but lacks metabolic context (CYP-mediated activation).
+- CYP panel: inferred from logP/MW – essentially useless for isoform-specific inhibition.
+
+**The real problem:** These heuristics are *blocking* L2 entry. That's good because you're forcing a human review. But the heuristics themselves are so weak that either:
+- You'll get many false positives (safe compounds blocked, wasting reviewer time)
+- Or reviewers will learn to override routinely (making the gate pointless)
+
+The solution is not to remove the gate – it's to **upgrade the heuristics to ML-based predictions with quantified uncertainty**, so the gate becomes meaningful.
+
+---
+
+## Improvement plan: replace each heuristic with a deployable model
+
+I'll order by impact (safety + frequency of false positives/negatives) and deployability.
+
+### 1. hERG (highest impact, highest deployability)
+
+**Current heuristic:** logP > 4 + low HBD + MW > 300 → block.
+
+**Problem:** Sensitivity ~0.6, specificity ~0.7 at best. Misses many hERG blockers (e.g., dofetilide: logP 1.4, MW 442, high HBD). Flags many safe compounds.
+
+**Recommended replacement:** **BayeshERG** (GNN-based Bayesian deep learning, pretrained on 300k molecules).
+
+| Property | Heuristic | BayeshERG |
+|----------|-----------|-----------|
+| AUC-ROC | ~0.7 | 0.92–0.95 |
+| Output | binary | probability + uncertainty |
+| Falsifier-ready? | No | Yes – uncertainty quantifies "low confidence" vs "confirmed blocker" |
+
+**Integration:** Call BayeshERG (runs in browser via ONNX, ~50MB model). Output: `{ probability: 0.87, uncertainty: 0.12 }`. Gate logic: if probability > 0.8 AND uncertainty < 0.2 → block (high confidence blocker). If uncertainty > 0.4 → mark as "needs patch clamp" (defer to ex-vivo). This gives you a typed falsifier: `FX-HERG-high-confidence` vs `FX-HERG-uncertain`.
+
+**Deployment effort:** 2-3 weeks (ONNX conversion, wrapper service).
+
+---
+
+### 2. Hepatotoxicity (high impact, medium deployability)
+
+**Current heuristic:** logP > 4.5 or MW > 550 → block.
+
+**Problem:** Captures some DILI compounds but misses most (e.g., acetaminophen: logP 0.5, MW 151). High false positive rate on large lipophilic molecules that are actually safe.
+
+**Recommended replacement:** **VitroBert** or **HTP (HepatoToxicity Portal)**.
+
+| Property | Heuristic | VitroBert/HTP |
+|----------|-----------|---------------|
+| AUROC | ~0.55 | 0.78–0.83 |
+| AUPRC | low | 0.65–0.72 |
+| Output | binary | probability + applicability domain |
+
+**Integration:** Run VitroBert (BERT-based, ~110M params) as a web worker (slow but feasible) or call as a microservice. Output: `{ probability: 0.73, calibrationProximity: 0.88 }`. Gate logic: if probability > 0.7 AND calibrationProximity > 0.8 → block. If calibrationProximity < 0.5 → mark as "out of domain, needs expert review".
+
+**Deployment effort:** 3-4 weeks (model hosting, calibration curve generation).
+
+**Alternative (lighter):** Use ADMET-AI's hepatotoxicity head (you already have it) but note it's one of its weaker endpoints. Still better than logP rule.
+
+---
+
+### 3. CYP panel (medium-high impact, high deployability)
+
+**Current heuristic:** inferred from logP/MW → effectively random.
+
+**Problem:** No isoform-specific information. Can't distinguish CYP3A4 (common) from CYP2D6 (problematic). No inhibition vs substrate.
+
+**Recommended replacement:** **CYP-Pro** (lightweight, SMILES-in, 6 major CYPs).
+
+| Property | Heuristic | CYP-Pro |
+|----------|-----------|---------|
+| Accuracy per isoform | ~50% (guess) | 0.82–0.89 |
+| Outputs | blocker? (binary) | inhibition probability + substrate probability for each of 6 isoforms |
+| Falsifier-ready? | No | Yes – per-isoform confidence |
+
+**Integration:** CYP-Pro runs in browser (<20M params). Output: `{ cyp3a4: { inhibition: 0.91, substrate: 0.23 }, cyp2d6: { inhibition: 0.34, substrate: 0.78 }, ... }`. Gate logic: if any isoform has inhibition > 0.8 → block (high confidence inhibitor). If multiple isoforms have moderate inhibition (>0.5) → flag for cassette assay.
+
+**Deployment effort:** 1-2 weeks (ONNX conversion).
+
+---
+
+### 4. Bioactivation (medium impact, medium deployability)
+
+**Current heuristic:** SMARTS alert scan – actually decent for detecting structural alerts (e.g., anilines, nitro groups, furans). But lacks metabolic context.
+
+**Problem:** Many compounds with alerts never bioactivate because the relevant CYP isn't expressed or the metabolism is slow. High false positive rate.
+
+**Recommended improvement:** **SOMM (Site of Metabolism prediction)** + **CYP-specific bioactivation probability**.
+
+**Approach:** Use a pretrained SOMM model (e.g., FAME 3, or the GLORY/SOM series) to predict which sites are metabolized by which CYP. Then overlay SMARTS alerts on the predicted sites. If an alert is present *and* the site is predicted to be metabolized by a relevant CYP, then block.
+
+**Integration:** Run a lightweight SOMM predictor (many available, e.g., CypReact, or a fine-tuned transformer). Output: `{ sites: [{ atom, cypIsoform, probability }], bioactivationRisk: 0.63 }`. Gate logic: if bioactivationRisk > 0.7 → block.
+
+**Deployment effort:** 4-5 weeks (integrating SOMM model, linking to SMARTS alerts).
+
+**Alternative (simpler):** Keep SMARTS alerts but add a CYP inhibition filter – if compound inhibits CYP3A4, it might be a time-dependent inhibitor (bioactivation risk). That's a cheap heuristic improvement.
+
+---
+
+### 5. Other ADMET heuristics (lower priority but easy wins)
+
+| Heuristic | Current method | Recommended upgrade | Deployability |
+|-----------|----------------|---------------------|---------------|
+| absorption (TPSA) | TPSA < 140 → good | Caco-2 permeability predictor (e.g., from ADMET-AI or a small RF model) | High (already in ADMET-AI) |
+| distribution (LogP) | LogP-derived | Volume of distribution predictor (e.g., from ADMET-AI or a PBPK prior) | Medium |
+| metabolism | LogP rules | CYP isoform metabolism predictor (CYP-Pro covers this) | High |
+| binding estimate | Pharmacophore + jitter | Use a proper affinity predictor (e.g., RF with ECFP, or a GNN) | High (you can train on ChEMBL) |
+| target identification | 20 pharmacophore | Use a target prediction tool (e.g., SwissTargetPrediction, or a GNN-based multi-task model) | Medium (API call) |
+
+---
+
+## How this integrates with your Gate Service and HAIOps
+
+Recall the Gate Service contract from before. Each of these heuristic→model upgrades becomes a **registered gate** in HAIOps:
+
+```
+// For hERG:
+POST /gates/register
+{
+  gateId: "herg_safety_gate_v2",
+  falsifierId: "FX-HERG-blocker",
+  triggerCondition: { kind: "on_data_arrival", dataType: "in_silico_prediction" },
+  evaluationSLA: { unit: "hours", value: 1 }  // must evaluate within 1 hour of trigger
+}
+```
+
+When the model evaluates, it calls `POST /gates/evaluate` with the outcome and comparison result. HAIOps then:
+- If `failed`: spawns a `Tox-Reviewer-Agent` task, freezes downstream dose calculations, notifies project lead.
+- If `indeterminate` (uncertainty too high): spawns an `ExVivo-Planner-Agent` to schedule a patch clamp assay, updates the ConfirmationPackage's `repairPath`.
+
+The **human override** button in your screenshot becomes a HAIOps `override` record, with authority chain, just as your spec defines. The reviewer clicks it, selects the FalsifierId they're accepting, cites the policy, and HAIOps records that override in the audit log.
+
+---
+
+## Prioritized implementation roadmap (for the heuristic layer)
+
+Assuming limited engineering bandwidth, here's what I'd do in order:
+
+| Phase | What | Effort | Impact |
+|-------|------|--------|--------|
+| **1 (2 weeks)** | Replace hERG heuristic with BayeshERG. This gives you the biggest safety win and a falsifier-ready output. | 2 weeks | High (safety, false positive reduction) |
+| **2 (2 weeks)** | Replace CYP panel heuristic with CYP-Pro. Immediate improvement for drug-drug interaction risk. | 2 weeks | High (safety, drug interaction) |
+| **3 (3 weeks)** | Replace hepatotoxicity heuristic with VitroBert or ADMET-AI's hepatotoxicity head. Reduces false negatives. | 3 weeks | Medium-high (DILI risk) |
+| **4 (3 weeks)** | Upgrade bioactivation with SOMM + SMARTS overlay. Reduces false positives on safe compounds with alerts. | 3 weeks | Medium (safety, specificity) |
+| **5 (2 weeks)** | Add proper binding affinity predictor (replace pharmacophore jitter). Improves candidate ranking. | 2 weeks | Medium (hit-to-lead) |
+| **6 (ongoing)** | Deploy the Gate Service and register these new gates with HAIOps. | 2 weeks (initial) | High (orchestration, audit) |
+
+**Total time to meaningful improvement:** 4-5 weeks for the first two (hERG + CYP). That's fast.
+
+---
+
+## Final honest take
+
+Your current heuristics are a **liability** disguised as a gate. They block compounds for the wrong reasons and pass compounds that should be blocked. The reviewers will learn to ignore the gate or will waste hours on false positives.
+
+But you already knew that – which is why you're asking.
+
+The good news: upgrading to lightweight, browser-deployable ML models is not expensive. BayeshERG and CYP-Pro are small enough to run in a web worker. VitroBert is heavier but can be a microservice. Your architecture (v2.0.0) already has the schema and the falsifier framework to absorb these upgrades cleanly.
+
+**The one thing I'd add to your screenshot:** After upgrading to models, your gate UI should show not just "blocked" but *why* with uncertainty quantification. For example:
+
+```
+hERG: High confidence blocker (p=0.92, uncertainty=0.09) → BLOCK
+hepatotoxicity: Moderate risk (p=0.67, calibration proximity=0.45) → NEEDS EXPERT REVIEW
+cyp_panel: CYP2D6 inhibition predicted (p=0.85), CYP3A4 substrate (p=0.72) → BLOCK
+bioactivation: Alert at site 7, predicted CYP3A4 metabolism (p=0.81) → BLOCK
+```
+
+That gives the reviewer actual information, not a binary toggle.
+
+Would you like me to write the exact integration code for BayeshERG into your L1→L2 gate, or the ONNX conversion recipe for CYP-Pro?
