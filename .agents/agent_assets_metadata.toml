@@ -96,3 +96,9 @@ id = "WiEaEB1B3Kab1AlltYZk8"
 uri = "file://artifacts/hakase-ai/docs/layer-2-confirmation.md"
 type = "text"
 title = "Layer 2 — In Silico Confirmation Layer (Comprehensive Spec)"
+
+[[outputs]]
+id = "DBuhtmbbrQyqg2I8ZReht"
+uri = "file://artifacts/hakase-ai/docs/glossary.md"
+type = "text"
+title = "HakaseAI Glossary — Every Term, Acronym, and Connection"
