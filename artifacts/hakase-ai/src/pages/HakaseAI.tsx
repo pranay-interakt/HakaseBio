@@ -2000,7 +2000,12 @@ export function HakaseAI() {
 
               {/* Starter Templates */}
               <div className="p-3 flex-1 overflow-y-auto">
-                <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Starter Templates</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">Starter Templates</div>
+                  <span className="text-[8px] font-bold tracking-widest text-cyan-300 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
+                    V2.0.0
+                  </span>
+                </div>
                 {savedProjects.map((proj) => (
                   <div
                     key={proj.name}
@@ -4062,33 +4067,22 @@ export function HakaseAI() {
                     In-silico ↔ ex-vivo joint synthesis · evidence reconciliation before L3 Animal Cohort
                   </p>
                 </div>
-                {/* Sub-track tabs */}
-                <div className="ml-auto flex items-center gap-0.5 rounded-full bg-white/5 border border-white/10 p-0.5 shrink-0">
-                  <button
-                    onClick={() => setConfirmationSubTrack("insilico")}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                      confirmationSubTrack === "insilico"
-                        ? "bg-cyan-600/30 text-cyan-200 border border-cyan-500/40"
-                        : "text-slate-400 hover:text-slate-200 border border-transparent"
-                    }`}
-                  >
-                    <Cpu className="w-3 h-3" /> In-Silico sub-track
-                  </button>
-                  <button
-                    onClick={() => setConfirmationSubTrack("exvivo")}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                      confirmationSubTrack === "exvivo"
-                        ? "bg-cyan-600/30 text-cyan-200 border border-cyan-500/40"
-                        : "text-slate-400 hover:text-slate-200 border border-transparent"
-                    }`}
-                  >
-                    <Microscope className="w-3 h-3" /> Ex-Vivo sub-track
-                  </button>
+                {/* v2.0.0 architecture marker — both sub-tracks now render
+                    side-by-side, so the previous tab toggle is gone. */}
+                <div className="ml-auto flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] font-bold tracking-widest text-cyan-300 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30">
+                    V2.0.0 CONFIRMATION
+                  </span>
+                  <span className="hidden md:flex items-center gap-1 text-[10px] text-slate-500">
+                    <Cpu className="w-3 h-3 text-cyan-400/70" /> In-Silico
+                    <span className="text-slate-600 mx-1">↔</span>
+                    <Microscope className="w-3 h-3 text-emerald-400/70" /> Ex-Vivo
+                  </span>
                 </div>
               </div>
               {/* v2.0.0 Confirmation orchestrator — directive emission, falsifier
-                  check, override authoring, joint output synthesis. Sits above
-                  the existing in-silico / ex-vivo sub-track scaffolds. */}
+                  check, override authoring, joint output synthesis. Spans full
+                  width above the two sub-track columns since it synthesises both. */}
               <ConfirmationLayerPanel
                 compoundIdRaw={(simResults?.molName ?? molName ?? "compound").replace(/\s+/g, "-").toLowerCase()}
                 l1={simResults}
@@ -4099,24 +4093,41 @@ export function HakaseAI() {
                 }}
                 workedExampleSeed={workedExampleSeed}
               />
-              {/* Active sub-track */}
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {confirmationSubTrack === "insilico" ? (
-                  <Layer2InSilicoScaffold
-                    layer1Ready={simStatus[1] === "complete"}
-                    simResults={simResults}
-                    inVitroResults={inVitroResults}
-                    onContinue={() => setActiveLayer(3)}
-                    onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
-                  />
-                ) : (
-                  <Layer3ExVivoScaffold
-                    layer2Ready={simStatus[2] === "complete"}
-                    simResults={simResults}
-                    inVitroResults={inVitroResults}
-                    onContinue={() => setActiveLayer(3)}
-                  />
-                )}
+              {/* Two-column workspace: In-Silico (left) | Ex-Vivo (right).
+                  Each column scrolls independently and runs its own stages
+                  with results rendered inline. */}
+              <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-white/8">
+                <div className="flex flex-col overflow-hidden">
+                  <div className="px-4 py-2 border-b border-white/8 bg-cyan-950/10 flex items-center gap-2 shrink-0">
+                    <Cpu className="w-3.5 h-3.5 text-cyan-300" />
+                    <span className="text-[11px] font-semibold text-cyan-200 uppercase tracking-widest">In-Silico sub-track</span>
+                    <span className="ml-auto text-[10px] text-slate-500">Stage 0–5 · run inline</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    <Layer2InSilicoScaffold
+                      layer1Ready={simStatus[1] === "complete"}
+                      simResults={simResults}
+                      inVitroResults={inVitroResults}
+                      onContinue={() => setActiveLayer(3)}
+                      onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col overflow-hidden">
+                  <div className="px-4 py-2 border-b border-white/8 bg-emerald-950/10 flex items-center gap-2 shrink-0">
+                    <Microscope className="w-3.5 h-3.5 text-emerald-300" />
+                    <span className="text-[11px] font-semibold text-emerald-200 uppercase tracking-widest">Ex-Vivo sub-track</span>
+                    <span className="ml-auto text-[10px] text-slate-500">Directive-bound assays · run inline</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    <Layer3ExVivoScaffold
+                      layer2Ready={simStatus[2] === "complete"}
+                      simResults={simResults}
+                      inVitroResults={inVitroResults}
+                      onContinue={() => setActiveLayer(3)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
