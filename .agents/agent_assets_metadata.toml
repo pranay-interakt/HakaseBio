@@ -84,3 +84,9 @@ id = "lu8lPNzLcB6aScsdWtz4K"
 uri = "file://attached_assets/screenshots/27dcdc89-5e47-4ba9-8198-06dd67562010-00-2io8be1wnjwfs_sisko_replit_dev_mockup_preview_confirmation-layer_ConfirmationLayer.png"
 type = "image"
 title = "Confirmation Layer (L2) — first cut"
+
+[[outputs]]
+id = "zGp7fz4_l8-l-cMsL1eMz"
+uri = "file://artifacts/hakase-ai/docs/layer-2-in-silico-and-layer-3-ex-vivo.md"
+type = "text"
+title = "L2 In-Silico & L3 Ex-Vivo — Current State Reference"
