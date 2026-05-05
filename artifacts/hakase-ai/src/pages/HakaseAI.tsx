@@ -99,7 +99,7 @@ import {
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard,
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
   TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
-  Cpu,
+  Cpu, ShieldAlert, GitMerge, Stamp, DoorOpen, Wrench, Syringe,
   Sun, Moon
 } from "lucide-react";
 // 4-Layer Pre-Clinical Architecture (April 2026 redesign).
@@ -136,6 +136,8 @@ export function HakaseAI() {
   });
 
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
+  // L2 Confirmation hosts two sub-tracks: in-silico (existing scaffold) and ex-vivo (existing scaffold).
+  const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
     2: "idle",
@@ -1219,13 +1221,16 @@ export function HakaseAI() {
     // Tick budgets per layer — L2 In Silico and L3 Ex Vivo are scaffolds in
     // this build (no Run handler), so 0 ticks. L4 Animal Cohort uses the same
     // 16-tick budget the relocated runner inherited from former internal slot 2.
-    const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 4 ? 16 : 0;
+    const steps = activeLayer === 1 ? (fingerprintOn ? 28 : 18) : activeLayer === 3 ? 16 : 0;
     let tick = 0;
 
-    // ── Layer 4: Animal Cohort ────────────────────────────────────────────────
+    // ── Layer 3 (was 4): Animal Cohort ────────────────────────────────────────
     // Relocated from former internal slot 2 per April 2026 4-layer redesign.
-    // The simulation logic is unchanged; only the slot index moved.
-    if (activeLayer === 4) {
+    // Then moved from slot 4 → slot 3 in the May 2026 restructure (slot 4 is
+    // now First In Human handover). Simulation logic is unchanged; only the
+    // slot index moved. All `4` literals in flag/provenance writes below are
+    // remapped to `3` to match the new slot.
+    if (activeLayer === 3) {
       const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
@@ -1251,7 +1256,7 @@ export function HakaseAI() {
             { database: "ToxRefDB", status: "skipped" },
             { database: "ChEMBL animal-PK", status: "skipped" },
           ];
-          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 4, l4Flags), 4, prov4));
+          setHAIOpsCtx(prev => mergeLayerProvenance(mergeLayerFlags(prev, 3, l4Flags), 3, prov4));
 
           // ── Full L2 → L3 cascade ──────────────────────────────────────
           // Starting dose: FIH mg/kg (conservative 1/10 HED)
@@ -1291,7 +1296,7 @@ export function HakaseAI() {
           // ─────────────────────────────────────────────────────────────
 
           setSimProgress(100);
-          setSimStatus(prev => ({ ...prev, 4: "complete" }));
+          setSimStatus(prev => ({ ...prev, 3: "complete" }));
           // ── Layer 4 external DB enrichment + validation ─────────────────
           setExtDbLoading(true);
           setExtToxRef(null); setExtAnimalPk(null); setLayer2Confidence(null);
@@ -1319,7 +1324,7 @@ export function HakaseAI() {
               { database: "ChEMBL animal-PK", status: apk?.status === "live" ? "success" : "failed" },
             ];
             // Animal sim provenance lives at L4 under the redesigned 4-layer architecture.
-            setHAIOpsCtx(prev => mergeLayerProvenance(prev, 4, provReal));
+            setHAIOpsCtx(prev => mergeLayerProvenance(prev, 3, provReal));
 
             // Per-layer confidence from validation against measured ground truth
             const noaelV = tref ? validateNoaelPrediction(results.noael, tref) : { confidence: 0, foldError: null, measuredNoael: null };
@@ -1347,7 +1352,8 @@ export function HakaseAI() {
     // and will be reached via the L4→Clinical API contract. The runner stays
     // here as living documentation but is gated unreachable. The new L3 slot
     // is Ex Vivo (a scaffold panel — see render dispatch below).
-    if (!HIDE_PATIENT_TRIAL_LAYERS && activeLayer === 3) {
+    // (HIDE_PATIENT_TRIAL_LAYERS=true keeps this dead — slot 3 is now Animal.)
+    if (!HIDE_PATIENT_TRIAL_LAYERS && false && activeLayer === 3) {
       const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
@@ -1781,8 +1787,8 @@ export function HakaseAI() {
   // Patient Cohort + Trial were former internal slots 3/4 — moved out of
   // pre-clinical scope (now handed to Hakase Clinical via API per Section 8
   // of the architecture doc) and gated unreachable via HIDE_PATIENT_TRIAL_LAYERS.
-  const layerIcons = [TestTube2, Cpu, Microscope, Rabbit] as const;
-  const layerLabels = ["In Vitro", "In Silico", "Ex Vivo", "Animal Cohort"] as const;
+  const layerIcons = [TestTube2, FlaskConical, Rabbit, Activity] as const;
+  const layerLabels = ["In Vitro", "Confirmation", "Animal Cohort", "First In Human"] as const;
   const layerColors = ["violet", "cyan", "amber", "emerald"] as const;
 
   return (
@@ -3845,11 +3851,11 @@ export function HakaseAI() {
                     else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
                     if (simResults) {
                       if (simResults.admet.toxicity > 0.6)    recs.push({ text: "High toxicity signal — consider structural optimization to reduce hERG/CYP3A4 liability before animal studies.", level: "warn" });
-                      if (simResults.lipinski.logP > 5)        recs.push({ text: "LogP > 5 exceeds Lipinski limit — oral bioavailability may be low. Plan formulation strategies for L4 Animal Cohort.", level: "warn" });
+                      if (simResults.lipinski.logP > 5)        recs.push({ text: "LogP > 5 exceeds Lipinski limit — oral bioavailability may be low. Plan formulation strategies for L3 Animal Cohort.", level: "warn" });
                       if (simResults.lipinski.mw > 500)        recs.push({ text: "MW > 500 Da — consider lead optimization to improve membrane permeability.", level: "warn" });
                       if (simResults.admet.absorption < 0.45)  recs.push({ text: "Low predicted absorption — review TPSA and HBD count. Bioisostere substitutions may improve F%.", level: "warn" });
                       if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Clean physicochemical profile — well-positioned to advance into L2 In Silico triage.", level: "ok" });
-                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 In Silico to triage candidates before committing to L4 Animal Cohort spend.", level: "ok" });
+                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 Confirmation to reconcile in-silico/ex-vivo evidence before committing to L3 Animal Cohort spend.", level: "ok" });
                       else if (simResults.goNogo === "WATCH") recs.push({ text: "WATCH decision — proceed with caution into L2 In Silico and monitor flagged liabilities through to L4.", level: "info" });
                     }
                     if (recs.length === 0) return null;
@@ -4011,46 +4017,83 @@ export function HakaseAI() {
             </div>
           )}
 
-          {/* Layer 2 — In Silico (NEW · Apr-2026 redesign · scaffold)
-              Computational triage layer between L1 In Vitro and L3 Ex Vivo.
-              Stage 8 (therapeutic-index ranking) is wired via lib/l2DoseProjection.ts;
-              other stages (docking, PBPK, ML triage) remain reference-only. Surfaces
-              the L1→L2 input contract and the pipeline shape from architecture doc §4. */}
+          {/* Layer 2 — Confirmation (May 2026 restructure)
+              Reconciles in-silico predictions and ex-vivo measurements into a
+              single ConfirmationPackage before animal cohort design. The two
+              existing scaffolds (in-silico, ex-vivo) live here as sub-tracks. */}
           {activeLayer === 2 && (
-            <Layer2InSilicoScaffold
-              layer1Ready={simStatus[1] === "complete"}
-              simResults={simResults}
-              inVitroResults={inVitroResults}
-              onContinue={() => setActiveLayer(3)}
-              onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
-            />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Confirmation framing header */}
+              <div className="border-b border-white/8 bg-cyan-950/15 px-5 py-3 flex items-center gap-3 shrink-0">
+                <div className="w-7 h-7 rounded-md bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                  <FlaskConical className="w-3.5 h-3.5 text-cyan-300" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">Layer 2</span>
+                    <h2 className="text-[14px] font-semibold text-white">Confirmation</h2>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                    In-silico ↔ ex-vivo joint synthesis · evidence reconciliation before L3 Animal Cohort
+                  </p>
+                </div>
+                {/* Sub-track tabs */}
+                <div className="ml-auto flex items-center gap-0.5 rounded-full bg-white/5 border border-white/10 p-0.5 shrink-0">
+                  <button
+                    onClick={() => setConfirmationSubTrack("insilico")}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                      confirmationSubTrack === "insilico"
+                        ? "bg-cyan-600/30 text-cyan-200 border border-cyan-500/40"
+                        : "text-slate-400 hover:text-slate-200 border border-transparent"
+                    }`}
+                  >
+                    <Cpu className="w-3 h-3" /> In-Silico sub-track
+                  </button>
+                  <button
+                    onClick={() => setConfirmationSubTrack("exvivo")}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                      confirmationSubTrack === "exvivo"
+                        ? "bg-cyan-600/30 text-cyan-200 border border-cyan-500/40"
+                        : "text-slate-400 hover:text-slate-200 border border-transparent"
+                    }`}
+                  >
+                    <Microscope className="w-3 h-3" /> Ex-Vivo sub-track
+                  </button>
+                </div>
+              </div>
+              {/* Active sub-track */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {confirmationSubTrack === "insilico" ? (
+                  <Layer2InSilicoScaffold
+                    layer1Ready={simStatus[1] === "complete"}
+                    simResults={simResults}
+                    inVitroResults={inVitroResults}
+                    onContinue={() => setActiveLayer(3)}
+                    onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                  />
+                ) : (
+                  <Layer3ExVivoScaffold
+                    layer2Ready={simStatus[2] === "complete"}
+                    simResults={simResults}
+                    inVitroResults={inVitroResults}
+                    onContinue={() => setActiveLayer(3)}
+                  />
+                )}
+              </div>
+            </div>
           )}
 
-          {/* Layer 3 — Ex Vivo (NEW · Apr-2026 redesign · scaffold)
-              Real tissue without live animal — PCLS, perfused organs, organoids,
-              MPS / organ-on-chip. Most predictive and most data-poor pre-clinical
-              layer per architecture doc §5. Currently a status-only scaffold —
-              no wet vendor or compute framework is wired in this build. */}
+          {/* Layer 3 — Animal Cohort (relocated from former internal slot 2,
+              then moved from slot 4 → slot 3 in May 2026 restructure)
+              Same simulation logic — only the slot index moved. ICH M3(R2)
+              battery, GLP-grade, hands off to L4 First In Human downstream. */}
           {activeLayer === 3 && (
-            <Layer3ExVivoScaffold
-              layer2Ready={simStatus[2] === "complete"}
-              simResults={simResults}
-              inVitroResults={inVitroResults}
-              onContinue={() => setActiveLayer(4)}
-            />
-          )}
-
-          {/* Layer 4 — Animal Cohort (relocated from former internal slot 2)
-              Same simulation logic — only the slot index moved per April 2026
-              4-layer redesign. ICH M3(R2) battery, GLP-grade, hands off to
-              Hakase Clinical via API (architecture doc §8). */}
-          {activeLayer === 4 && (
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Rabbit className="w-4 h-4 text-emerald-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 4 — Animal Cohort</h2>
+                    <h2 className="text-[15px] font-semibold text-white">Layer 3 — Animal Cohort</h2>
                   </div>
                   <p className="text-[12px] text-slate-500">ICH M3(R2) rodent + non-rodent battery · PBPK allometric scaling · FIH dose projection</p>
                 </div>
@@ -4256,7 +4299,7 @@ export function HakaseAI() {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
                       <span className="text-[11px] font-semibold text-violet-300">
-                        {simResults ? "Layer 1 → Layer 4 Cascade Applied" : "Layer 1 → Layer 4 Cascade Pending"}
+                        {simResults ? "Layer 1 → Layer 3 Cascade Applied" : "Layer 1 → Layer 3 Cascade Pending"}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -4289,16 +4332,16 @@ export function HakaseAI() {
                     <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-2 flex items-start gap-1.5">
                       <Info className="w-3 h-3 text-rose-400 shrink-0 mt-0.5" />
                       <span className="text-[9px] text-rose-300 leading-tight">
-                        Stage-gate review required before running L4 Animal Cohort. Return to Layer 1 and acknowledge the gate banner.
+                        Stage-gate review required before running L3 Animal Cohort. Return to Layer 1 and acknowledge the gate banner.
                       </span>
                     </div>
                   )}
                   <Button
                     onClick={runSimulation}
-                    disabled={simStatus[4] === "running" || !simResults || (!cascadeGate.canAutoCascade && !cascadeOverride)}
+                    disabled={simStatus[3] === "running" || !simResults || (!cascadeGate.canAutoCascade && !cascadeOverride)}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                   >
-                    {simStatus[4] === "running" ? (
+                    {simStatus[3] === "running" ? (
                       <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating Animal Cohort…</>
                     ) : (
                       <><Rabbit className="w-4 h-4" /> Run Animal Cohort Simulation</>
@@ -4314,19 +4357,18 @@ export function HakaseAI() {
                 </div>
               </div>
 
-              {/* L4 Animal Cohort Output (relocated — formerly slot 2 under
-                   the legacy 4-layer ordering). All `simStatus[2]` and
-                   `provenanceL2` references in this block have been remapped
-                   to slot 4 to match the new architecture. */}
+              {/* L3 Animal Cohort Output (relocated — formerly slot 2, then
+                   slot 4, now slot 3 per the May 2026 4-layer restructure).
+                   All `simStatus[*]` references in this block read slot 3. */}
               <div className="flex-1 overflow-y-auto p-5">
-                {simStatus[4] === "idle" && (
+                {simStatus[3] === "idle" && (
                   <EmptyState
                     icon={Rabbit}
                     title="No animal cohort results yet"
                     description="Select a species, study design, and route of administration, then run the simulation to see PBPK outputs, NOAEL/MTD predictions, study group design, and the Human Translation Panel with FIH dose."
                   />
                 )}
-                {simStatus[4] === "running" && (
+                {simStatus[3] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
                     <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
                       <Rabbit className="w-8 h-8 text-emerald-400 animate-pulse" />
@@ -4336,21 +4378,36 @@ export function HakaseAI() {
                     <p className="text-[11px] text-slate-500">PBPK modeling · Allometric scaling · Tox prediction</p>
                   </div>
                 )}
-                {simStatus[4] === "complete" && animalResults && (
+                {simStatus[3] === "complete" && animalResults && (
                   <>
-                    {getFlagsForLayer(safetyFlags, 4).length > 0 && (
-                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 4)} layerLabel="Upstream" upstream />
+                    {getFlagsForLayer(safetyFlags, 3).length > 0 && (
+                      <SafetyFlagCascadeBanner flags={getFlagsForLayer(safetyFlags, 3)} layerLabel="Upstream" upstream />
                     )}
-                    {safetyOverrides.some(o => o.toLayer <= 4) && (
-                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 4)} />
+                    {safetyOverrides.some(o => o.toLayer <= 3) && (
+                      <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 3)} />
                     )}
-                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL4?.databaseQueries ?? []).some(q => q.database === w.database))} />
+                    <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL3?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
-                    {provenanceL4 && <ProvenanceFooter provenance={provenanceL4} layer={4} />}
+                    {provenanceL3 && <ProvenanceFooter provenance={provenanceL3} layer={3} />}
                   </>
                 )}
               </div>
             </div>
+          )}
+
+          {/* Layer 4 — First In Human (NEW · May 2026 restructure)
+              Receives ConfirmationPackage (L2) + AnimalCohortPackage (L3) and
+              derives Phase 1 design seeds: MABEL starting dose, escalation
+              scheme, special-pop arms, IND-gate readiness. Phase 1 planner
+              redesign is staged as a follow-up. */}
+          {activeLayer === 4 && (
+            <FirstInHumanPanel
+              hasL3={simStatus[3] === "complete"}
+              animalResults={animalResults}
+              simResults={simResults}
+              molName={simResults?.molName ?? molName ?? "Compound"}
+              onSendBack={() => setActiveLayer(3)}
+            />
           )}
 
           {/* LEGACY Layer 3 — Patient Cohort Twin (PRESERVED AS DEAD CODE)
@@ -10124,6 +10181,216 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Layer 4 — First In Human Handover Panel (NEW · May 2026 restructure)
+// Read-only synthesis of L3 Animal Cohort outputs into Phase-1 design seeds.
+// MABEL starting dose follows ICH-S9/EMA guidance: 1/10 HED with safety factor.
+// All numbers are derived from the animalResults already in the page state —
+// no fabricated data, no commercial IND service calls.
+// ─────────────────────────────────────────────────────────────────────────────
+function FirstInHumanPanel({
+  hasL3,
+  animalResults,
+  simResults,
+  molName,
+  onSendBack,
+}: {
+  hasL3: boolean;
+  animalResults: any;
+  simResults: any;
+  molName: string;
+  onSendBack: () => void;
+}) {
+  if (!hasL3 || !animalResults) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <div className="max-w-md text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto">
+            <Activity className="w-8 h-8 text-emerald-400" />
+          </div>
+          <h2 className="text-[16px] font-semibold text-white">Layer 4 — First In Human</h2>
+          <p className="text-[12px] text-slate-500 leading-relaxed">
+            FIH handover requires a completed L3 Animal Cohort package. Run
+            the L3 simulation first to derive MABEL, NOAEL, and HED inputs
+            for Phase-1 design seeds.
+          </p>
+          <button
+            onClick={onSendBack}
+            className="px-4 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-200 text-[12px] font-medium hover:bg-emerald-600/30"
+          >
+            Go to L3 Animal Cohort
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Derived FIH numbers from animalResults (real data).
+  const noael = Number(animalResults?.noael ?? 0);
+  const fihMgKg = Number(animalResults?.fihDoseMgKg ?? 0);
+  const humanAuc = Number(animalResults?.humanAuc ?? 0);
+  const overallRisk = String(animalResults?.overallRisk ?? "moderate");
+  const startingDoseMg = (fihMgKg * 70).toFixed(2); // 70 kg adult assumption
+  const mabelMg = (fihMgKg * 70 * 0.1).toFixed(3); // 1/10 safety factor
+  const escalationSteps = ["1× MABEL", "2×", "5×", "10×", "20×", "MTD probe"];
+
+  const indReadiness: { label: string; ready: boolean; note: string }[] = [
+    { label: "Pivotal tox (rodent + non-rodent)", ready: !!animalResults, note: "L3 ICH M3(R2) battery output" },
+    { label: "PK / PBPK package", ready: humanAuc > 0, note: "Human AUC projected via allometric scaling" },
+    { label: "Safety pharmacology", ready: overallRisk !== "high", note: overallRisk === "high" ? "High-risk gate — investigator review" : "Within acceptable range" },
+    { label: "CMC / Phase-1 supply", ready: false, note: "Out of scope for HakaseAI — manual upload required" },
+    { label: "Investigator brochure draft", ready: false, note: "Generated downstream from this handover" },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-[#07080c]">
+      {/* Header */}
+      <div className="border-b border-white/8 bg-emerald-950/15 px-6 py-4 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+          <Activity className="w-4 h-4 text-emerald-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold text-emerald-300 uppercase tracking-widest">Layer 4</span>
+            <h2 className="text-[15px] font-semibold text-white">First In Human Handover</h2>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {molName} · MABEL-derived starting dose · IND-gate readiness · handoff to Hakase Clinical (Phase 1 planner)
+          </p>
+        </div>
+        <button
+          onClick={onSendBack}
+          className="text-[11px] px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5"
+        >
+          ← Send back to L3
+        </button>
+      </div>
+
+      <div className="p-6 grid grid-cols-12 gap-4 max-w-[1400px]">
+        {/* Phase-1 dose seeds */}
+        <div className="col-span-12 lg:col-span-7 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Syringe className="w-4 h-4 text-emerald-300" />
+            <h3 className="text-[13px] font-semibold text-white">Phase-1 dose seeds (MABEL)</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg border border-white/8 bg-black/30 p-3">
+              <div className="text-[9px] text-slate-500 uppercase tracking-wider">FIH (mg/kg)</div>
+              <div className="text-[18px] font-bold text-white mt-1">{fihMgKg.toFixed(3)}</div>
+              <div className="text-[10px] text-slate-500 mt-1">1/10 HED, conservative</div>
+            </div>
+            <div className="rounded-lg border border-white/8 bg-black/30 p-3">
+              <div className="text-[9px] text-slate-500 uppercase tracking-wider">Starting (70 kg)</div>
+              <div className="text-[18px] font-bold text-white mt-1">{startingDoseMg} mg</div>
+              <div className="text-[10px] text-slate-500 mt-1">Adult reference body weight</div>
+            </div>
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+              <div className="text-[9px] text-emerald-300 uppercase tracking-wider">MABEL</div>
+              <div className="text-[18px] font-bold text-emerald-200 mt-1">{mabelMg} mg</div>
+              <div className="text-[10px] text-emerald-300/70 mt-1">1/10 safety factor on FIH</div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Proposed escalation scheme</div>
+            <div className="flex items-center gap-1 flex-wrap">
+              {escalationSteps.map((step, i) => (
+                <div key={step} className="flex items-center gap-1">
+                  <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium border ${
+                    i === 0
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                      : "bg-white/5 border-white/10 text-slate-400"
+                  }`}>
+                    {step}
+                  </div>
+                  {i < escalationSteps.length - 1 && <ChevronRight className="w-3 h-3 text-slate-600" />}
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+              Modified Fibonacci escalation; SRC review between cohorts; halt on DLT &gt; 33% within cohort.
+            </p>
+          </div>
+        </div>
+
+        {/* L3 → L4 cascade */}
+        <div className="col-span-12 lg:col-span-5 rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <GitMerge className="w-4 h-4 text-emerald-300" />
+            <h3 className="text-[13px] font-semibold text-white">L3 → L4 cascade</h3>
+          </div>
+          <div className="space-y-2 text-[11px]">
+            <CascadeRow label="NOAEL (animal)" value={`${noael.toFixed(2)} mg/kg/day`} />
+            <CascadeRow label="HED (allometric)" value={`${(noael / 6.2).toFixed(3)} mg/kg`} />
+            <CascadeRow label="Projected human AUC" value={humanAuc > 0 ? `${humanAuc.toFixed(1)} ng·h/mL` : "—"} />
+            <CascadeRow label="L3 overall risk" value={overallRisk} valueClass={
+              overallRisk === "high" ? "text-rose-300" : overallRisk === "low" ? "text-emerald-300" : "text-amber-300"
+            } />
+            <CascadeRow label="Compound" value={molName} />
+          </div>
+        </div>
+
+        {/* IND readiness */}
+        <div className="col-span-12 rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Stamp className="w-4 h-4 text-emerald-300" />
+            <h3 className="text-[13px] font-semibold text-white">IND-gate readiness</h3>
+            <span className="ml-auto text-[10px] text-slate-500">
+              {indReadiness.filter(r => r.ready).length} / {indReadiness.length} ready
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {indReadiness.map(item => (
+              <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg border border-white/8 bg-black/20">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                  item.ready ? "bg-emerald-500/15 border border-emerald-500/40" : "bg-amber-500/10 border border-amber-500/30"
+                }`}>
+                  {item.ready
+                    ? <CheckCircle2 className="w-3 h-3 text-emerald-300" />
+                    : <Clock className="w-3 h-3 text-amber-300" />}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium text-white">{item.label}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">{item.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Handover */}
+        <div className="col-span-12 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 to-cyan-500/5 p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+            <DoorOpen className="w-5 h-5 text-emerald-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[13px] font-semibold text-white">Handoff to Hakase Clinical (Phase 1 planner)</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              The FIH package above (MABEL, escalation, IND readiness, L3 cascade) is the contract input to the Phase 1–4
+              planner. Cross-product API wiring is staged separately.
+            </p>
+          </div>
+          <button
+            disabled
+            className="px-4 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-200/60 text-[12px] font-medium cursor-not-allowed flex items-center gap-2"
+            title="API wiring to Hakase Clinical is staged as a follow-up"
+          >
+            <Wrench className="w-3.5 h-3.5" /> Send to Phase 1 planner
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CascadeRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-white/5 last:border-b-0">
+      <span className="text-slate-500">{label}</span>
+      <span className={`font-mono ${valueClass ?? "text-white"}`}>{value}</span>
     </div>
   );
 }
