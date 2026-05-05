@@ -21,6 +21,13 @@
 
 export const PRECLINICAL_PACKAGE_SCHEMA_VERSION = "1.0.0" as const;
 
+// v2 (per-layer evidence blocks; in-silico + ex-vivo sub-tracks under L2
+// Confirmation; per-layer confidence + user overrides; explicit
+// pre-confirmation handoff). v1 remains the active contract consumed by
+// Phase1Planner; v2 is published alongside and migration is opt-in via
+// migrateV1ToV2(). See ./v2.ts for full design rationale.
+export * from "./v2.js";
+
 export type IsoTimestamp = string;
 
 /** Where a derived field came from. `null` when the field itself is null. */
