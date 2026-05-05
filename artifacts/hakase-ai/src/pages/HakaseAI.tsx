@@ -52,7 +52,9 @@ import {
   freezeL1EvidencePointer,
 } from "@/lib/confirmationEngine";
 import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
-import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0 } from "@workspace/preclinical-handoff";
+import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage } from "@workspace/preclinical-handoff";
+import { buildPreClinicalPackage } from "@/lib/preClinicalPackage";
+import Phase1Planner, { type Phase1PlannerHandle } from "@/components/Phase1Planner";
 import {
   computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
   getFlagsForLayer, getActiveFlags, hasReviewRequired,
@@ -4457,6 +4459,7 @@ export function HakaseAI() {
               onSendBack={() => setActiveLayer(3)}
               confirmationBlock={confirmationBlock}
               inVitroResults={inVitroResults}
+              mlAdmet={admetMl}
             />
           )}
 
@@ -10242,6 +10245,14 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
 // All numbers are derived from the animalResults already in the page state —
 // no fabricated data, no commercial IND service calls.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Layer 4 — First In Human (Phase 1 Planner, embedded · v2.0.0 PreClinicalPackage)
+// The L4 panel is now the full Hakase-Clinical Phase 1 planner, embedded with
+// the Upstream §8 import card and JSON-export entry points hidden. The
+// PreClinicalPackage that the planner consumes is built in-process from the
+// upstream simulation state (L1 in-vitro + ML ADMET + L2 confirmation + L3
+// animal cohort) — no manual JSON paste, no external API.
+// ─────────────────────────────────────────────────────────────────────────────
 function FirstInHumanPanel({
   hasL3,
   animalResults,
@@ -10250,6 +10261,7 @@ function FirstInHumanPanel({
   onSendBack,
   confirmationBlock,
   inVitroResults,
+  mlAdmet,
 }: {
   hasL3: boolean;
   animalResults: any;
@@ -10258,19 +10270,64 @@ function FirstInHumanPanel({
   onSendBack: () => void;
   confirmationBlock: ConfirmationEvidenceBlock | null;
   inVitroResults: InVitroResults | null;
+  mlAdmet: MlAdmetResult | null;
 }) {
+  const plannerHandleRef = useRef<Phase1PlannerHandle | null>(null);
+  const registerPlannerHandle = useCallback((h: Phase1PlannerHandle) => {
+    plannerHandleRef.current = h;
+  }, []);
+
+  // Build the v1 PreClinicalPackage that Phase1Planner consumes, derived from
+  // the same upstream state that produces the v2.0.0 typed package. Only emits
+  // when the L3 cascade is complete — otherwise the empty-state branch shows.
+  const pkg: PreClinicalPackage | null = useMemo(() => {
+    if (!hasL3 || !animalResults || !simResults) return null;
+    return buildPreClinicalPackage({
+      smiles: simResults.smiles ?? "",
+      inchiKey: null,
+      chemblId: null,
+      compoundName: simResults.molName ?? molName ?? null,
+      l1: simResults,
+      mlAdmet,
+      l4: animalResults,
+      l2: {
+        humanCmax: animalResults.humanCmax ?? null,
+        humanAuc: animalResults.humanAuc ?? null,
+        humanHalfLife: animalResults.humanHalfLife ?? null,
+        humanClearance: null,
+        fepDdgKcalMol: null,
+        fepUncertaintyKcalMol: null,
+      },
+      inVitroExtras: inVitroResults
+        ? {
+            hergIc50UM: inVitroResults.herg?.ic50_uM ?? null,
+            caco2Permeability: inVitroResults.permeability?.caco2Papp ?? null,
+            // PreClinicalPackage v1 contract: plasmaProteinBindingFraction is
+            // the BOUND fraction (not free). Map from boundPercent.
+            plasmaProteinBindingFraction:
+              typeof inVitroResults.plasmaProteinBinding?.boundPercent === "number"
+                ? inVitroResults.plasmaProteinBinding.boundPercent / 100
+                : null,
+            primaryTargetUniprot: null,
+            primaryTargetGeneSymbol: null,
+            primaryTargetIc50nM: inVitroResults.doseResponse?.ic50_nM ?? null,
+          }
+        : undefined,
+    });
+  }, [hasL3, animalResults, simResults, molName, mlAdmet, inVitroResults]);
+
   if (!hasL3 || !animalResults) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12 bg-[#07080c]">
         <div className="max-w-md text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto">
             <Activity className="w-8 h-8 text-emerald-400" />
           </div>
-          <h2 className="text-[16px] font-semibold text-white">Layer 4 — First In Human</h2>
+          <h2 className="text-[16px] font-semibold text-white">Layer 4 — First In Human (Phase 1 Planner)</h2>
           <p className="text-[12px] text-slate-500 leading-relaxed">
-            FIH handover requires a completed L3 Animal Cohort package. Run
-            the L3 simulation first to derive MABEL, NOAEL, and HED inputs
-            for Phase-1 design seeds.
+            The Phase 1 planner consumes a sealed §8 PreClinicalPackage built
+            from the upstream L3 Animal Cohort cascade. Run L3 first to derive
+            NOAEL, HED, MABEL, and IND-gate inputs.
           </p>
           <button
             onClick={onSendBack}
@@ -10283,79 +10340,20 @@ function FirstInHumanPanel({
     );
   }
 
-  // Derived FIH numbers from animalResults (real data).
-  const noael = Number(animalResults?.noael ?? 0);
-  const fihMgKg = Number(animalResults?.fihDoseMgKg ?? 0);
-  const humanAuc = Number(animalResults?.humanAuc ?? 0);
-  const overallRisk = String(animalResults?.overallRisk ?? "moderate");
-  // ── v2.0.0 Confirmation package consumption (§7.3) ──────────────────────
-  // When a sealed ConfirmationEvidenceBlock is available, build the typed
-  // PreClinicalPackageV2_0_0 and route Phase-1 derivation through it. This is
-  // what enables MABEL-bias when an accepted FalsifierId on the registry's
-  // bias list demands a more conservative starting dose (1/100 HED instead of
-  // 1/10 HED).
-  const v2Package: PreClinicalPackageV2_0_0 | null = useMemo(() => {
-    if (!confirmationBlock || !simResults || !animalResults) return null;
-    const compoundIdRaw = (simResults.molName ?? molName ?? "compound").replace(/\s+/g, "-").toLowerCase();
-    const l1Pointer = freezeL1EvidencePointer(compoundIdRaw, new Date().toISOString());
-    const inVitro = buildInVitroBlock(simResults, inVitroResults, l1Pointer);
-    const animalCohort = buildAnimalCohortBlock(
-      animalResults,
-      l1Pointer,
-      asEvidencePointer(`${l1Pointer}#confirmation`),
-      confirmationBlock.directive?.directiveId ?? null,
-    );
-    return buildPreClinicalPackageV2_0_0({
-      compoundIdRaw,
-      compound: {
-        smiles: simResults.smiles ?? "",
-        inchiKey: null,
-        molecularWeight: simResults.lipinski?.mw ?? null,
-        chemblId: null,
-        preferredName: simResults.molName ?? molName ?? null,
-      },
-      inVitro,
-      confirmation: confirmationBlock,
-      animalCohort,
-      overrideAuditTrail: confirmationBlock.overrides,
-      warnings: [],
-    });
-  }, [confirmationBlock, simResults, animalResults, inVitroResults, molName]);
-
-  const phase1 = v2Package ? derivePhase1Defaults(v2Package) : null;
-  const indGate = v2Package ? evaluateINDGate(v2Package) : null;
-  const mabelBias = v2Package ? shouldApplyMabelBias(v2Package) : null;
-
-  const startingDoseMg = phase1
-    ? phase1.fihStartingMg.toFixed(3)
-    : (fihMgKg * 70).toFixed(2); // 70 kg adult assumption
-  const mabelMg = phase1
-    ? phase1.mabelMg.toFixed(3)
-    : (fihMgKg * 70 * 0.1).toFixed(3); // 1/10 safety factor
-  const escalationSteps = phase1?.escalationSteps ?? ["1× MABEL", "2×", "5×", "10×", "20×", "MTD probe"];
-
-  const indReadiness: { label: string; ready: boolean; note: string }[] = [
-    { label: "Pivotal tox (rodent + non-rodent)", ready: !!animalResults, note: "L3 ICH M3(R2) battery output" },
-    { label: "PK / PBPK package", ready: humanAuc > 0, note: "Human AUC projected via allometric scaling" },
-    { label: "Safety pharmacology", ready: overallRisk !== "high", note: overallRisk === "high" ? "High-risk gate — investigator review" : "Within acceptable range" },
-    { label: "CMC / Phase-1 supply", ready: false, note: "Out of scope for HakaseAI — manual upload required" },
-    { label: "Investigator brochure draft", ready: false, note: "Generated downstream from this handover" },
-  ];
-
   return (
-    <div className="flex-1 overflow-y-auto bg-[#07080c]">
-      {/* Header */}
-      <div className="border-b border-white/8 bg-emerald-950/15 px-6 py-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#07080c]">
+      <div className="border-b border-white/8 bg-emerald-950/15 px-6 py-3 flex items-center gap-3 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
           <Activity className="w-4 h-4 text-emerald-300" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold text-emerald-300 uppercase tracking-widest">Layer 4</span>
-            <h2 className="text-[15px] font-semibold text-white">First In Human Handover</h2>
+            <h2 className="text-[14px] font-semibold text-white">First In Human · Phase 1 Planner</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 border border-violet-500/30 text-violet-200 font-mono">v2.0.0 §8</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            {molName} · MABEL-derived starting dose · IND-gate readiness · handoff to Hakase Clinical (Phase 1 planner)
+          <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+            {molName} · package auto-fed from L3 Animal Cohort · MABEL / HED / IND-gate consumed internally
           </p>
         </div>
         <button
@@ -10366,190 +10364,25 @@ function FirstInHumanPanel({
         </button>
       </div>
 
-      <div className="p-6 grid grid-cols-12 gap-4 max-w-[1400px]">
-        {/* Phase-1 dose seeds */}
-        <div className="col-span-12 lg:col-span-7 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Syringe className="w-4 h-4 text-emerald-300" />
-            <h3 className="text-[13px] font-semibold text-white">Phase-1 dose seeds (MABEL)</h3>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-white/8 bg-black/30 p-3">
-              <div className="text-[9px] text-slate-500 uppercase tracking-wider">FIH (mg/kg)</div>
-              <div className="text-[18px] font-bold text-white mt-1">{fihMgKg.toFixed(3)}</div>
-              <div className="text-[10px] text-slate-500 mt-1">1/10 HED, conservative</div>
-            </div>
-            <div className="rounded-lg border border-white/8 bg-black/30 p-3">
-              <div className="text-[9px] text-slate-500 uppercase tracking-wider">Starting (70 kg)</div>
-              <div className="text-[18px] font-bold text-white mt-1">{startingDoseMg} mg</div>
-              <div className="text-[10px] text-slate-500 mt-1">Adult reference body weight</div>
-            </div>
-            <div className={`rounded-lg border p-3 ${mabelBias?.apply ? "border-amber-500/40 bg-amber-500/10" : "border-emerald-500/30 bg-emerald-500/10"}`}>
-              <div className={`text-[9px] uppercase tracking-wider ${mabelBias?.apply ? "text-amber-300" : "text-emerald-300"}`}>
-                MABEL{mabelBias?.apply ? " (BIASED 1/100)" : ""}
-              </div>
-              <div className={`text-[18px] font-bold mt-1 ${mabelBias?.apply ? "text-amber-200" : "text-emerald-200"}`}>
-                {mabelMg} mg
-              </div>
-              <div className={`text-[10px] mt-1 ${mabelBias?.apply ? "text-amber-300/70" : "text-emerald-300/70"}`}>
-                {phase1?.mabelDerivation ?? "1/10 safety factor on FIH"}
-              </div>
-            </div>
-          </div>
-
-          {/* v2.0.0 MABEL-bias provenance card — surfaced when the L2 confirmation
-              package contains an accepted FalsifierId with mabelBiasRequired:true. */}
-          {mabelBias?.apply && confirmationBlock && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-                <span className="text-[11px] font-semibold text-amber-200">MABEL bias applied — Phase 1 starting dose reduced 10×</span>
-              </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                Accepted FalsifierId on the v2.0.0 confirmation package mandates conservative
-                FIH per registry policy. The bias propagates through the typed PreClinicalPackage
-                and overrides the legacy 1/10 HED default.
-              </p>
-              <div className="space-y-1.5">
-                {confirmationBlock.overrides
-                  .filter((o) => o.falsifierAccepted && mabelBias.acceptedFalsifiers.includes(o.falsifierAccepted))
-                  .map((o) => (
-                    <div key={o.overrideId} className="rounded bg-black/30 border border-amber-500/20 px-2 py-1.5 text-[10px]">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-amber-300">{o.falsifierAccepted}</span>
-                        <span className="text-slate-500 font-mono">{o.overrideId}</span>
-                      </div>
-                      <div className="text-slate-400 mt-0.5">cite {o.authorityCitation} · actor {o.actor} · {o.role}</div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* v2.0.0 IND-gate readiness summary (typed package). */}
-          {indGate && (
-            <div className={`rounded-lg border p-3 text-[11px] ${
-              indGate.decision === "go"
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : indGate.decision === "conditional-go"
-                  ? "border-amber-500/30 bg-amber-500/5"
-                  : "border-rose-500/30 bg-rose-500/5"
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className={`font-semibold ${
-                  indGate.decision === "go"
-                    ? "text-emerald-200"
-                    : indGate.decision === "conditional-go"
-                      ? "text-amber-200"
-                      : "text-rose-200"
-                }`}>
-                  IND gate: {indGate.decision.toUpperCase()}
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono">{v2Package?.schemaVersion}</span>
-              </div>
-              {indGate.reasons.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-[10px] text-slate-400">
-                  {indGate.reasons.map((r) => <li key={r}>· {r}</li>)}
-                </ul>
-              )}
-              {indGate.decision === "conditional-go" && indGate.conditions.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-[10px] text-amber-300">
-                  {indGate.conditions.map((c) => <li key={c}>‼ {c}</li>)}
-                </ul>
-              )}
-            </div>
-          )}
-          <div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Proposed escalation scheme</div>
-            <div className="flex items-center gap-1 flex-wrap">
-              {escalationSteps.map((step, i) => (
-                <div key={step} className="flex items-center gap-1">
-                  <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium border ${
-                    i === 0
-                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
-                      : "bg-white/5 border-white/10 text-slate-400"
-                  }`}>
-                    {step}
-                  </div>
-                  {i < escalationSteps.length - 1 && <ChevronRight className="w-3 h-3 text-slate-600" />}
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-              Modified Fibonacci escalation; SRC review between cohorts; halt on DLT &gt; 33% within cohort.
-            </p>
-          </div>
-        </div>
-
-        {/* L3 → L4 cascade */}
-        <div className="col-span-12 lg:col-span-5 rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <GitMerge className="w-4 h-4 text-emerald-300" />
-            <h3 className="text-[13px] font-semibold text-white">L3 → L4 cascade</h3>
-          </div>
-          <div className="space-y-2 text-[11px]">
-            <CascadeRow label="NOAEL (animal)" value={`${noael.toFixed(2)} mg/kg/day`} />
-            <CascadeRow label="HED (allometric)" value={`${(noael / 6.2).toFixed(3)} mg/kg`} />
-            <CascadeRow label="Projected human AUC" value={humanAuc > 0 ? `${humanAuc.toFixed(1)} ng·h/mL` : "—"} />
-            <CascadeRow label="L3 overall risk" value={overallRisk} valueClass={
-              overallRisk === "high" ? "text-rose-300" : overallRisk === "low" ? "text-emerald-300" : "text-amber-300"
-            } />
-            <CascadeRow label="Compound" value={molName} />
-          </div>
-        </div>
-
-        {/* IND readiness */}
-        <div className="col-span-12 rounded-xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <Stamp className="w-4 h-4 text-emerald-300" />
-            <h3 className="text-[13px] font-semibold text-white">IND-gate readiness</h3>
-            <span className="ml-auto text-[10px] text-slate-500">
-              {indReadiness.filter(r => r.ready).length} / {indReadiness.length} ready
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {indReadiness.map(item => (
-              <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg border border-white/8 bg-black/20">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                  item.ready ? "bg-emerald-500/15 border border-emerald-500/40" : "bg-amber-500/10 border border-amber-500/30"
-                }`}>
-                  {item.ready
-                    ? <CheckCircle2 className="w-3 h-3 text-emerald-300" />
-                    : <Clock className="w-3 h-3 text-amber-300" />}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-white">{item.label}</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">{item.note}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Handover */}
-        <div className="col-span-12 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 to-cyan-500/5 p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-            <DoorOpen className="w-5 h-5 text-emerald-300" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[13px] font-semibold text-white">Handoff to Hakase Clinical (Phase 1 planner)</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              The FIH package above (MABEL, escalation, IND readiness, L3 cascade) is the contract input to the Phase 1–4
-              planner. Cross-product API wiring is staged separately.
-            </p>
-          </div>
-          <button
-            disabled
-            className="px-4 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-200/60 text-[12px] font-medium cursor-not-allowed flex items-center gap-2"
-            title="API wiring to Hakase Clinical is staged as a follow-up"
-          >
-            <Wrench className="w-3.5 h-3.5" /> Send to Phase 1 planner
-          </button>
-        </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <Phase1Planner
+          embedded
+          pkg={pkg}
+          importError={null}
+          onPackageReady={() => {
+            /* embedded: package is owned upstream by the L3 cascade */
+          }}
+          onImportError={() => {
+            /* embedded: no import path is exposed */
+          }}
+          registerHandle={registerPlannerHandle}
+          jumpToApiSignal={0}
+        />
       </div>
     </div>
   );
 }
+
 
 function CascadeRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
