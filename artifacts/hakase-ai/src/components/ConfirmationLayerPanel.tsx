@@ -126,6 +126,9 @@ export function ConfirmationLayerPanel({
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [openSection, setOpenSection] = useState<"directive" | "exvivo" | "joints" | "overrides" | null>("directive");
+  // Collapsed by default — the dashboard uses very little vertical space.
+  // Users expand to access the full directive / measurements / seal flow.
+  const [expanded, setExpanded] = useState<boolean>(false);
 
   const l1Pointer: EvidencePointer = useMemo(
     () => freezeL1EvidencePointer(compoundIdRaw, new Date().toISOString()),
@@ -322,33 +325,83 @@ export function ConfirmationLayerPanel({
           ? { label: "FAILED", color: "rose" }
           : null;
 
+  // ── Compact summary chips (always visible in collapsed mode) ─────────────
+  const summary = {
+    directive: directive ? "emitted" : "not emitted",
+    measurementsFilled: measurements.filter((m) => m.observedValue != null).length,
+    measurementsTotal: measurements.length,
+    triggers: pendingTriggers.length,
+    unhandled: unhandledTriggers.length,
+    overrides: overrides.length,
+  };
+
   return (
-    <div className="border-b border-white/8 bg-[#0a0d14] px-5 py-4 space-y-3">
-      {/* Header strip */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-          <Workflow className="w-4 h-4 text-cyan-300" />
+    <div className="border-b border-white/8 bg-[#0a0d14]">
+      {/* Compact one-line header — click to expand the full v2.0.0 workflow */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-5 py-2 flex items-center gap-3 hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
+          <Workflow className="w-3 h-3 text-cyan-300" />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">v2.0.0 Confirmation</span>
-            <h3 className="text-[13px] font-semibold text-white">
-              In-silico ↔ Ex-vivo typed reconciliation
-            </h3>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Directive-bound ex-vivo · falsifier registry {FALSIFIER_REGISTRY.version} · gate policy{" "}
-            <span className="font-mono text-slate-400">{policy.policyId}@{policy.policyVersion}</span>
-          </p>
+        <span className="text-[10px] font-bold tracking-widest text-cyan-300 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/25 shrink-0">
+          V2.0.0
+        </span>
+        <span className="text-[12px] font-semibold text-white shrink-0">Confirmation</span>
+        {/* Inline status chips */}
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 min-w-0 overflow-hidden">
+          <span className="text-slate-600">·</span>
+          <span>
+            Directive <span className={directive ? "text-cyan-300" : "text-slate-500"}>{summary.directive}</span>
+          </span>
+          <span className="text-slate-600">·</span>
+          <span>
+            Ex-vivo <span className="text-slate-300 font-mono">{summary.measurementsFilled}/{summary.measurementsTotal}</span>
+          </span>
+          {summary.triggers > 0 && (
+            <>
+              <span className="text-slate-600">·</span>
+              <span className={summary.unhandled > 0 ? "text-amber-300" : "text-emerald-300"}>
+                {summary.triggers} falsifier{summary.triggers > 1 ? "s" : ""}
+                {summary.unhandled > 0 ? ` (${summary.unhandled} unhandled)` : " accepted"}
+              </span>
+            </>
+          )}
+          {summary.overrides > 0 && (
+            <>
+              <span className="text-slate-600">·</span>
+              <span className="text-violet-300">{summary.overrides} override{summary.overrides > 1 ? "s" : ""}</span>
+            </>
+          )}
         </div>
-        {sealedStatus && (
-          <div
-            className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider border bg-${sealedStatus.color}-500/10 border-${sealedStatus.color}-500/40 text-${sealedStatus.color}-300`}
-          >
-            BLOCK {sealedStatus.label}
-          </div>
-        )}
-      </div>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {sealedStatus && (
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border bg-${sealedStatus.color}-500/10 border-${sealedStatus.color}-500/40 text-${sealedStatus.color}-300`}
+            >
+              {sealedStatus.label}
+            </span>
+          )}
+          <span className="text-[10px] text-slate-500 hidden md:inline">
+            {expanded ? "Hide details" : "Open"}
+          </span>
+          {expanded ? (
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {!expanded && null}
+      {expanded && (
+      <div className="px-5 pb-4 pt-1 space-y-3">
+        <p className="text-[10px] text-slate-500">
+          Directive-bound ex-vivo · falsifier registry {FALSIFIER_REGISTRY.version} · gate policy{" "}
+          <span className="font-mono text-slate-400">{policy.policyId}@{policy.policyVersion}</span>
+        </p>
 
       {/* Step 1 — Directive */}
       <Section
@@ -600,6 +653,8 @@ export function ConfirmationLayerPanel({
           )}
         </div>
       </Section>
+      </div>
+      )}
     </div>
   );
 }
