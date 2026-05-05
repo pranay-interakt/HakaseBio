@@ -90,3 +90,9 @@ id = "zGp7fz4_l8-l-cMsL1eMz"
 uri = "file://artifacts/hakase-ai/docs/layer-2-in-silico-and-layer-3-ex-vivo.md"
 type = "text"
 title = "L2 In-Silico & L3 Ex-Vivo — Current State Reference"
+
+[[outputs]]
+id = "WiEaEB1B3Kab1AlltYZk8"
+uri = "file://artifacts/hakase-ai/docs/layer-2-confirmation.md"
+type = "text"
+title = "Layer 2 — In Silico Confirmation Layer (Comprehensive Spec)"
