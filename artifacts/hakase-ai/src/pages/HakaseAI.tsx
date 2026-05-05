@@ -44,6 +44,15 @@ import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
 import { evaluateCascadeGate, recordCascadeOverride, type CascadeOverrideRecord } from "@/lib/cascadeGate";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
+import { ConfirmationLayerPanel, HKB_2461_SEED, type WorkedExampleSeed } from "@/components/ConfirmationLayerPanel";
+import {
+  buildAnimalCohortBlock,
+  buildInVitroBlock,
+  buildPreClinicalPackageV2_0_0,
+  freezeL1EvidencePointer,
+} from "@/lib/confirmationEngine";
+import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
+import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0 } from "@workspace/preclinical-handoff";
 import {
   computeLayer1Flags, computeLayer2Flags, computeLayer3Flags,
   getFlagsForLayer, getActiveFlags, hasReviewRequired,
@@ -100,7 +109,7 @@ import {
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
   TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
   Cpu, ShieldAlert, GitMerge, Stamp, DoorOpen, Wrench, Syringe,
-  Sun, Moon
+  Sun, Moon, Workflow
 } from "lucide-react";
 // 4-Layer Pre-Clinical Architecture (April 2026 redesign).
 // L1 In Vitro → L2 In Silico → L3 Ex Vivo → L4 Animal Cohort.
@@ -138,6 +147,9 @@ export function HakaseAI() {
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
   // L2 Confirmation hosts two sub-tracks: in-silico (existing scaffold) and ex-vivo (existing scaffold).
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
+  // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
+  const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
+  const [workedExampleSeed, setWorkedExampleSeed] = useState<WorkedExampleSeed | null>(null);
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
     2: "idle",
@@ -2164,6 +2176,19 @@ export function HakaseAI() {
                     <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure in vitro structure and simulation parameters</p>
+                  {/* v2.0.0 worked-example loader — primes the L2 ConfirmationLayerPanel with
+                      the HKB-2461 BSEP-inhibition scenario from spec §9.6 so the directive →
+                      falsifier → override → MABEL-bias path can be demonstrated end-to-end. */}
+                  <button
+                    onClick={() => {
+                      setWorkedExampleSeed(HKB_2461_SEED);
+                      setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
+                      setMolName("HKB-2461");
+                    }}
+                    className="mt-3 w-full text-[11px] px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 flex items-center justify-center gap-1.5"
+                  >
+                    <Workflow className="w-3 h-3" /> Load HKB-2461 worked example (BSEP falsifier → MABEL bias)
+                  </button>
                 </div>
 
                 <div className="p-5 space-y-5">
@@ -4061,6 +4086,19 @@ export function HakaseAI() {
                   </button>
                 </div>
               </div>
+              {/* v2.0.0 Confirmation orchestrator — directive emission, falsifier
+                  check, override authoring, joint output synthesis. Sits above
+                  the existing in-silico / ex-vivo sub-track scaffolds. */}
+              <ConfirmationLayerPanel
+                compoundIdRaw={(simResults?.molName ?? molName ?? "compound").replace(/\s+/g, "-").toLowerCase()}
+                l1={simResults}
+                inVitro={inVitroResults}
+                onConfirmationBlockReady={(b) => {
+                  setConfirmationBlock(b);
+                  setSimStatus(prev => ({ ...prev, 2: "complete" }));
+                }}
+                workedExampleSeed={workedExampleSeed}
+              />
               {/* Active sub-track */}
               <div className="flex-1 overflow-hidden flex flex-col">
                 {confirmationSubTrack === "insilico" ? (
@@ -4407,6 +4445,8 @@ export function HakaseAI() {
               simResults={simResults}
               molName={simResults?.molName ?? molName ?? "Compound"}
               onSendBack={() => setActiveLayer(3)}
+              confirmationBlock={confirmationBlock}
+              inVitroResults={inVitroResults}
             />
           )}
 
@@ -10198,12 +10238,16 @@ function FirstInHumanPanel({
   simResults,
   molName,
   onSendBack,
+  confirmationBlock,
+  inVitroResults,
 }: {
   hasL3: boolean;
   animalResults: any;
   simResults: any;
   molName: string;
   onSendBack: () => void;
+  confirmationBlock: ConfirmationEvidenceBlock | null;
+  inVitroResults: InVitroResults | null;
 }) {
   if (!hasL3 || !animalResults) {
     return (
@@ -10234,9 +10278,51 @@ function FirstInHumanPanel({
   const fihMgKg = Number(animalResults?.fihDoseMgKg ?? 0);
   const humanAuc = Number(animalResults?.humanAuc ?? 0);
   const overallRisk = String(animalResults?.overallRisk ?? "moderate");
-  const startingDoseMg = (fihMgKg * 70).toFixed(2); // 70 kg adult assumption
-  const mabelMg = (fihMgKg * 70 * 0.1).toFixed(3); // 1/10 safety factor
-  const escalationSteps = ["1× MABEL", "2×", "5×", "10×", "20×", "MTD probe"];
+  // ── v2.0.0 Confirmation package consumption (§7.3) ──────────────────────
+  // When a sealed ConfirmationEvidenceBlock is available, build the typed
+  // PreClinicalPackageV2_0_0 and route Phase-1 derivation through it. This is
+  // what enables MABEL-bias when an accepted FalsifierId on the registry's
+  // bias list demands a more conservative starting dose (1/100 HED instead of
+  // 1/10 HED).
+  const v2Package: PreClinicalPackageV2_0_0 | null = useMemo(() => {
+    if (!confirmationBlock || !simResults || !animalResults) return null;
+    const compoundIdRaw = (simResults.molName ?? molName ?? "compound").replace(/\s+/g, "-").toLowerCase();
+    const l1Pointer = freezeL1EvidencePointer(compoundIdRaw, new Date().toISOString());
+    const inVitro = buildInVitroBlock(simResults, inVitroResults, l1Pointer);
+    const animalCohort = buildAnimalCohortBlock(
+      animalResults,
+      l1Pointer,
+      asEvidencePointer(`${l1Pointer}#confirmation`),
+      confirmationBlock.directive?.directiveId ?? null,
+    );
+    return buildPreClinicalPackageV2_0_0({
+      compoundIdRaw,
+      compound: {
+        smiles: simResults.smiles ?? "",
+        inchiKey: null,
+        molecularWeight: simResults.lipinski?.mw ?? null,
+        chemblId: null,
+        preferredName: simResults.molName ?? molName ?? null,
+      },
+      inVitro,
+      confirmation: confirmationBlock,
+      animalCohort,
+      overrideAuditTrail: confirmationBlock.overrides,
+      warnings: [],
+    });
+  }, [confirmationBlock, simResults, animalResults, inVitroResults, molName]);
+
+  const phase1 = v2Package ? derivePhase1Defaults(v2Package) : null;
+  const indGate = v2Package ? evaluateINDGate(v2Package) : null;
+  const mabelBias = v2Package ? shouldApplyMabelBias(v2Package) : null;
+
+  const startingDoseMg = phase1
+    ? phase1.fihStartingMg.toFixed(3)
+    : (fihMgKg * 70).toFixed(2); // 70 kg adult assumption
+  const mabelMg = phase1
+    ? phase1.mabelMg.toFixed(3)
+    : (fihMgKg * 70 * 0.1).toFixed(3); // 1/10 safety factor
+  const escalationSteps = phase1?.escalationSteps ?? ["1× MABEL", "2×", "5×", "10×", "20×", "MTD probe"];
 
   const indReadiness: { label: string; ready: boolean; note: string }[] = [
     { label: "Pivotal tox (rodent + non-rodent)", ready: !!animalResults, note: "L3 ICH M3(R2) battery output" },
@@ -10288,12 +10374,81 @@ function FirstInHumanPanel({
               <div className="text-[18px] font-bold text-white mt-1">{startingDoseMg} mg</div>
               <div className="text-[10px] text-slate-500 mt-1">Adult reference body weight</div>
             </div>
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <div className="text-[9px] text-emerald-300 uppercase tracking-wider">MABEL</div>
-              <div className="text-[18px] font-bold text-emerald-200 mt-1">{mabelMg} mg</div>
-              <div className="text-[10px] text-emerald-300/70 mt-1">1/10 safety factor on FIH</div>
+            <div className={`rounded-lg border p-3 ${mabelBias?.apply ? "border-amber-500/40 bg-amber-500/10" : "border-emerald-500/30 bg-emerald-500/10"}`}>
+              <div className={`text-[9px] uppercase tracking-wider ${mabelBias?.apply ? "text-amber-300" : "text-emerald-300"}`}>
+                MABEL{mabelBias?.apply ? " (BIASED 1/100)" : ""}
+              </div>
+              <div className={`text-[18px] font-bold mt-1 ${mabelBias?.apply ? "text-amber-200" : "text-emerald-200"}`}>
+                {mabelMg} mg
+              </div>
+              <div className={`text-[10px] mt-1 ${mabelBias?.apply ? "text-amber-300/70" : "text-emerald-300/70"}`}>
+                {phase1?.mabelDerivation ?? "1/10 safety factor on FIH"}
+              </div>
             </div>
           </div>
+
+          {/* v2.0.0 MABEL-bias provenance card — surfaced when the L2 confirmation
+              package contains an accepted FalsifierId with mabelBiasRequired:true. */}
+          {mabelBias?.apply && confirmationBlock && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.06] p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                <span className="text-[11px] font-semibold text-amber-200">MABEL bias applied — Phase 1 starting dose reduced 10×</span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                Accepted FalsifierId on the v2.0.0 confirmation package mandates conservative
+                FIH per registry policy. The bias propagates through the typed PreClinicalPackage
+                and overrides the legacy 1/10 HED default.
+              </p>
+              <div className="space-y-1.5">
+                {confirmationBlock.overrides
+                  .filter((o) => o.falsifierAccepted && mabelBias.acceptedFalsifiers.includes(o.falsifierAccepted))
+                  .map((o) => (
+                    <div key={o.overrideId} className="rounded bg-black/30 border border-amber-500/20 px-2 py-1.5 text-[10px]">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-amber-300">{o.falsifierAccepted}</span>
+                        <span className="text-slate-500 font-mono">{o.overrideId}</span>
+                      </div>
+                      <div className="text-slate-400 mt-0.5">cite {o.authorityCitation} · actor {o.actor} · {o.role}</div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* v2.0.0 IND-gate readiness summary (typed package). */}
+          {indGate && (
+            <div className={`rounded-lg border p-3 text-[11px] ${
+              indGate.decision === "go"
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : indGate.decision === "conditional-go"
+                  ? "border-amber-500/30 bg-amber-500/5"
+                  : "border-rose-500/30 bg-rose-500/5"
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`font-semibold ${
+                  indGate.decision === "go"
+                    ? "text-emerald-200"
+                    : indGate.decision === "conditional-go"
+                      ? "text-amber-200"
+                      : "text-rose-200"
+                }`}>
+                  IND gate: {indGate.decision.toUpperCase()}
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">{v2Package?.schemaVersion}</span>
+              </div>
+              {indGate.reasons.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-[10px] text-slate-400">
+                  {indGate.reasons.map((r) => <li key={r}>· {r}</li>)}
+                </ul>
+              )}
+              {indGate.decision === "conditional-go" && indGate.conditions.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-[10px] text-amber-300">
+                  {indGate.conditions.map((c) => <li key={c}>‼ {c}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
           <div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Proposed escalation scheme</div>
             <div className="flex items-center gap-1 flex-wrap">

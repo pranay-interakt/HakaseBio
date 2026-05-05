@@ -28,6 +28,14 @@ export const PRECLINICAL_PACKAGE_SCHEMA_VERSION = "1.0.0" as const;
 // migrateV1ToV2(). See ./v2.ts for full design rationale.
 export * from "./v2.js";
 
+// v2.0.0 (Confirmation Architecture Specification — May 2026). Adds typed
+// PreConfirmationDirective contract, FalsifierId registry, GatePolicySnapshot,
+// OverrideRecord with authority chain, CategoricalExemption, JointOutput
+// agree/disagree/partial/mlGap discriminator, RepairPath, write-time
+// invariant validators (§6). See ./v2_0_0.ts for full design rationale.
+export * from "./v2_0_0.js";
+export * from "./falsifierRegistry.js";
+
 export type IsoTimestamp = string;
 
 /** Where a derived field came from. `null` when the field itself is null. */
