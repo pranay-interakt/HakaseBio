@@ -669,7 +669,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
 
       {/* ── RIGHT OUTPUT / DOCUMENTATION PANE ──────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
 
           {/* Header */}
           <div className="flex items-start gap-3">
