@@ -4118,7 +4118,7 @@ export function HakaseAI() {
                     layer1Ready={simStatus[1] === "complete"}
                     simResults={simResults}
                     inVitroResults={inVitroResults}
-                    onContinue={() => setActiveLayer(3)}
+                    onContinue={() => setConfirmationSubTrack("exvivo")}
                     onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
                   />
                 ) : (
