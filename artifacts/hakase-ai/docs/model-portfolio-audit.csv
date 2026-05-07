@@ -1,0 +1,45 @@
+Model,Layer,Category,SheetStatus,IntegrationState,BackendRefs,FrontendRefs,EvidenceFiles
+ChemBERTa-2,Cross-Layer / L1,Foundation Embedding,In Roadmap (P0),documented-only,0,1,artifacts/hakase-ai/src/pages/Story.tsx
+MolFormer,Cross-Layer / L1,Foundation Embedding,In Roadmap,documented-only,0,1,artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx
+Uni-Mol,Cross-Layer / L2,Foundation Embedding (3D),In Roadmap,documented-only,0,1,artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx
+MolBERT,Cross-Layer / L1,Foundation Embedding,In Roadmap,not-wired,0,0,
+MolEncoder,L1 In-Vitro,Foundation Embedding,NEW (2026 research),not-wired,0,0,
+NatureLM,Cross-Layer,Multi-domain Foundation,NEW (2026 research),not-wired,0,0,
+Liquid AI / Insilico Foundation Model,Cross-Layer,Multi-domain Foundation,NEW (2026 research),not-wired,0,0,
+ADMET-AI,L2 Confirmation,ADMET Prediction,In Roadmap (P0),live,31,39,artifacts/ai-service/main.py; artifacts/ai-service/models/admet_ml.py; artifacts/ai-service/models/cardiotox.py; artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx; artifacts/hakase-ai/src/components/MlAdmetCard.tsx; artifacts/hakase-ai/src/lib/aiService.ts; artifacts/hakase-ai/src/lib/l2Pipeline.ts; artifacts/hakase-ai/src/lib/preClinicalPackage.ts; artifacts/hakase-ai/src/pages/HakaseAI.tsx
+ADMETlab 3.0,L2 Confirmation,ADMET Prediction,In Roadmap (P2),not-wired,0,0,
+Chemprop,L2 Confirmation,ADMET Prediction (custom),In Roadmap,live,4,6,artifacts/ai-service/main.py; artifacts/ai-service/models/admet_ml.py; artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx; artifacts/hakase-ai/src/components/MlAdmetCard.tsx; artifacts/hakase-ai/src/pages/HakaseAI.tsx
+MapLight + GNN,L2 Confirmation,ADMET Prediction,In Roadmap,not-wired,0,0,
+MSformer-ADMET,L2 Confirmation,ADMET Prediction,NEW (2026 research),not-wired,0,0,
+MTAN-ADMET,L2 Confirmation,ADMET Prediction,NEW (2026 research),not-wired,0,0,
+ADMET Predictor 13,L2 Confirmation,ADMET Prediction (commercial),NEW (2026 research),not-wired,0,0,
+AI-PBPK Platform,L2 Confirmation,PBPK / PK Prediction,NEW (2026 research),not-wired,0,0,
+ML-PBPK / PBPK-ML,L2 Confirmation,PBPK / PK Prediction,NEW (2026 research),not-wired,0,0,
+DeepTox,L2 Confirmation,Toxicity (Tox21),In Roadmap (P2),not-wired,0,0,
+CardioTox,L2 Confirmation,Cardiac Safety (hERG),In Roadmap (P1),live,32,39,artifacts/ai-service/main.py; artifacts/ai-service/models/binding_ml.py; artifacts/ai-service/models/cardiotox.py; artifacts/ai-service/models/dili_ml.py; artifacts/ai-service/models/protein_ml.py; artifacts/ai-service/models/solubility_ml.py; artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx; artifacts/hakase-ai/src/components/MlAdmetCard.tsx; artifacts/hakase-ai/src/lib/aiService.ts; artifacts/hakase-ai/src/lib/l2Pipeline.ts; artifacts/hakase-ai/src/pages/HakaseAI.tsx
+BayeshERG,L2 Confirmation,Cardiac Safety (hERG),NEW (2026 research),not-wired,0,0,
+VitroBert,L2 Confirmation,Hepatotoxicity (DILI),NEW (2026 research),not-wired,0,0,
+HepatoToxicity Portal (HTP),L2 Confirmation,Hepatotoxicity,NEW (2026 research),not-wired,0,0,
+CYPreact,L2 Confirmation,CYP Inhibition,In Roadmap,not-wired,0,0,
+CYP-Pro,L2 Confirmation,CYP Inhibition + Substrate,NEW (2026 research),not-wired,0,0,
+MuMCyp_Net,L2 Confirmation,CYP Inhibition,NEW (2026 research),not-wired,0,0,
+NeuToxPred 2.0,L2 Confirmation,Neurotoxicity,In Roadmap,not-wired,0,0,
+Multitask Learning (MTL) Permeability,L2 Confirmation,Permeability / Efflux,NEW (2026 research),not-wired,0,0,
+DeepLiver Activity,L2 Confirmation,Hepatic clearance / activity,NEW (2026 research),not-wired,0,0,
+DeepDTA,L2 Confirmation / L1,Binding Affinity,In Roadmap (P1),live,47,53,artifacts/ai-service/main.py; artifacts/ai-service/models/binding_ml.py; artifacts/ai-service/models/binding_ml_data.py; artifacts/hakase-ai/src/components/Layer2InSilicoScaffold.tsx; artifacts/hakase-ai/src/lib/aiService.ts; artifacts/hakase-ai/src/lib/l2Pipeline.ts; artifacts/hakase-ai/src/pages/HakaseAI.tsx
+BALM,L2 Confirmation,Binding Affinity (LM),In Roadmap,not-wired,0,0,
+OnionNet-2,L2 Confirmation,Binding Affinity (3D),In Roadmap,not-wired,0,0,
+IGN,L2 Confirmation,Binding Affinity (3D),In Roadmap,not-wired,0,0,
+PIDGINv4,L1 / L2,Target Prediction,In Roadmap (P1),not-wired,0,0,
+DTIAM,L1 / L2,Drug-Target Interaction,In Roadmap,not-wired,0,0,
+ChEMBL Multitask,L1 / L2,Target Prediction (multi),In Roadmap,not-wired,0,0,
+RAscore,L1 / L2,Synthetic Accessibility,In Roadmap (P3),not-wired,0,0,
+GASA,L1 / L2,Synthetic Accessibility,In Roadmap,not-wired,0,0,
+DeepDDI,L2 / Phase 1,Drug-Drug Interaction,In Roadmap (P3),not-wired,0,0,
+MUFFIN,L2 / Phase 1,Drug-Drug Interaction,In Roadmap,not-wired,0,0,
+OPLE (Off-Target),L2 Confirmation,Off-Target ID,NEW (2026 research),not-wired,0,0,
+AICMET,Phase 1 Planning,Dose-Response Forecasting,NEW (2026 research),not-wired,0,0,
+GPT Dose-Response Models,Phase 1 Planning,Dose-Response Sim,NEW (2026 research),not-wired,0,0,
+Translational PKPD Framework,L3 Animal Cohort,Translational PK/PD,NEW (2026 research),not-wired,0,0,
+metaDRP,Cross-Layer (GatePolicy),Few-shot Adaptation,NEW (2026 research),not-wired,0,0,
+ONNX Runtime Web,Cross-Layer (Tier 2),Inference Runtime,In Roadmap (P3),not-wired,0,0,
