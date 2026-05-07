@@ -100,11 +100,11 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: true,
   },
   {
-    n: 6, name: "Cascade integration + L3→L4 envelope", wired: "stub-with-manual",
-    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L4 Amber Curator. No data entry — runs whenever any Stage 1–5 result exists.",
+    n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "stub-with-manual",
+    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L3 Animal Cohort's Amber Curator. No data entry — runs whenever any Stage 1–5 result exists.",
     engines: [
       { name: "lib/exVivoSurrogate.ts (orchestrator)", note: "per-readout ReadoutBlock<V> envelope; mixed-tier envelopes are normal" },
-      { name: "L3→L4 envelope (Amber Curator gate)",   note: "canSignLoadBearing requires kind:'pass' — t-user maps to prediction_only" },
+      { name: "L2 Ex-Vivo → L3 envelope (Amber Curator gate)", note: "canSignLoadBearing requires kind:'pass' — t-user maps to prediction_only" },
     ],
     pendingReason: "Always runnable as soon as any Stage 1–5 has a result.",
     acceptsManualEntry: true,
@@ -239,7 +239,7 @@ const L3_MODALITIES = [
       { name: "HCMI (NCI / ATCC)",          note: "~700 next-gen cancer models with paired matched-normal genomics" },
       { name: "Hubrecht HUB Organoid Biobank", note: "largest non-cancer + cancer biobank globally; HUB Foundation MTA" },
       { name: "ATCC organoid lines",         note: "Commercial MTA (~$2–6k / line)" },
-      { name: "Cellosaurus (organoid records)", note: "~5K entries, CC-BY 4.0 — every L3 row should carry a CVCL accession" },
+      { name: "Cellosaurus (organoid records)", note: "~5K entries, CC-BY 4.0 — every L2 Ex-Vivo row should carry a CVCL accession" },
     ],
   },
   {
@@ -328,17 +328,23 @@ function StageCard({
               <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
             )}
           </div>
-          <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{stage.detail}</div>
+          <details className="mt-0.5 group">
+            <summary className="cursor-pointer list-none text-[10px] text-slate-500 hover:text-slate-300 select-none inline-flex items-center gap-1">
+              <span className="text-slate-600 group-open:rotate-90 transition-transform inline-block w-2">▸</span>
+              <span>What this stage does &amp; toolchain</span>
+            </summary>
+            <div className="text-[10px] text-slate-500 leading-relaxed mt-1.5">{stage.detail}</div>
+            <div className="space-y-1 mt-1.5">
+              {stage.engines.map(e => (
+                <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
+                  <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
+                  <span className="text-slate-300 font-medium">{e.name}</span>
+                  {e.note && <span className="text-slate-500">— {e.note}</span>}
+                </div>
+              ))}
+            </div>
+          </details>
         </div>
-      </div>
-      <div className="pl-8 space-y-1">
-        {stage.engines.map(e => (
-          <div key={e.name} className="flex items-baseline gap-2 text-[10px]">
-            <CircleDot className="w-2 h-2 text-slate-600 shrink-0 translate-y-0.5" />
-            <span className="text-slate-300 font-medium">{e.name}</span>
-            {e.note && <span className="text-slate-500">— {e.note}</span>}
-          </div>
-        ))}
       </div>
       {canAutoRun && (
         <div className="pl-8 mt-2.5 flex items-center gap-2">
@@ -405,13 +411,13 @@ function L3InputParamsCard({
     <section className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Sliders className="w-3.5 h-3.5 text-amber-400" />
-        <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L3 Input Parameters</span>
+        <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L2 Ex-Vivo Input Parameters</span>
         <span className="ml-auto text-[9px] text-slate-500 italic">applied to Stage 1 (L2 chain auto-rerun)</span>
       </div>
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-slate-300">Target receptor occupancy (drives L2 dose → L3 Cu)</span>
+          <span className="text-slate-300">Target receptor occupancy (drives L2 dose → tissue Cu)</span>
           <span className="text-amber-300 font-mono">{(occ * 100).toFixed(0)}% (Cmax,u = {(occ / Math.max(1e-3, 1 - occ)).toFixed(2)}× Ki)</span>
         </div>
         <input
@@ -1405,7 +1411,7 @@ export function Layer3ExVivoScaffold({
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
                   ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stages 3–6 accept Manual Entry tagged source: user-provided."
-                  : "Run L1 In Vitro first to enable L3."}
+                  : "Run L1 In Vitro first to enable L2 Ex-Vivo."}
               </p>
             </div>
           </div>
@@ -1435,7 +1441,7 @@ export function Layer3ExVivoScaffold({
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Atom className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L3 Pipeline (Spec v1.1 §3 + §10)</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Ex-Vivo Pipeline (Spec v1.1 §3 + §10)</span>
             </div>
             <div className="space-y-2">
               {L3_STAGES.map(s => {
@@ -1477,7 +1483,7 @@ export function Layer3ExVivoScaffold({
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline…</>
-              : <><Play className="w-4 h-4" />Run L3 Pipeline (S1 + derived S5 + envelope S6)</>}
+              : <><Play className="w-4 h-4" />Run L2 Ex-Vivo Pipeline (S1 + derived S5 + envelope S6)</>}
           </button>
 
           {(results.s1?.status === "complete" || results.s2?.status === "complete" || results.s6?.status === "complete") && (
@@ -1486,14 +1492,14 @@ export function Layer3ExVivoScaffold({
               onClick={copyHandoff}
               className="w-full h-9 rounded-lg gap-2 text-[12px] flex items-center justify-center border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15 text-amber-300"
             >
-              {copied ? <><Check className="w-4 h-4" /> Copied L3 handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L3 handoff JSON (with provenance)</>}
+              {copied ? <><Check className="w-4 h-4" /> Copied L2 Ex-Vivo handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L2 Ex-Vivo handoff JSON (with provenance)</>}
             </button>
           )}
 
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Microscope className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L3 Modality Reference (T2 / T3 — opt-in)</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Ex-Vivo Modality Reference (T2 / T3 — opt-in)</span>
             </div>
             <div className="space-y-2">
               {L3_MODALITIES.map(m => (
@@ -1527,14 +1533,14 @@ export function Layer3ExVivoScaffold({
 
       {/* ── RIGHT OUTPUT / DOCUMENTATION PANE ──────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
 
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
               <Microscope className="w-5 h-5 text-amber-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-[18px] font-semibold text-white">L3 — Ex Vivo · T0 In-Silico Surrogate</h2>
+              <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
                 Stages 1–2 wired (in-house ML). Stages 3–6 accept Manual Entry tagged source: user-provided
@@ -1547,9 +1553,9 @@ export function Layer3ExVivoScaffold({
           {!results.s1 && !results.s2 && !results.s3 && !results.s4 && !results.s5 && !results.s6 && (
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-6 text-center">
               <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
-              <p className="text-[13px] text-slate-300 mb-1">Ready to run L3 pipeline</p>
+              <p className="text-[13px] text-slate-300 mb-1">Ready to run L2 Ex-Vivo pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stages 1–2 (computed) and/or fill any of Stages 3–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L3 Pipeline</span> to assemble the envelope.
+                Run Stages 1–2 (computed) and/or fill any of Stages 3–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to assemble the envelope.
               </p>
             </div>
           )}
@@ -1748,12 +1754,12 @@ export function Layer3ExVivoScaffold({
           {results.s6?.status === "complete" && (() => {
             const v = results.s6.result;
             return (
-              <ResultShell stage={6} name="L3 cascade integration + L3→L4 envelope" icon={Shield} status="complete">
+              <ResultShell stage={6} name="Cascade integration + L2 Ex-Vivo → L3 envelope" icon={Shield} status="complete">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
                   <div className="text-slate-500">Envelope kind</div>
                   <div className="text-cyan-300 font-mono text-right">{v.envelopeKind}</div>
                   <div className="text-slate-500">Load-bearing readouts</div>
-                  <div className="text-cyan-300 font-mono text-right">{v.loadBearingCount} (canSignLoadBearing requires kind:"pass" — none of L3 qualifies)</div>
+                  <div className="text-cyan-300 font-mono text-right">{v.loadBearingCount} (canSignLoadBearing requires kind:"pass" — none of L2 Ex-Vivo qualifies)</div>
                 </div>
                 <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden">
                   <div className="grid grid-cols-[40px_1fr_70px_110px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
@@ -1771,7 +1777,7 @@ export function Layer3ExVivoScaffold({
                   ))}
                 </div>
                 <div className="text-[10px] text-amber-300/80 italic leading-relaxed">
-                  Mixed-tier envelopes are normal per Spec v1.1 §2.3. L4 Amber Curator's <span className="font-mono">canSignLoadBearing</span> compile-time gate refuses to sign load-bearing claims based on prediction_only / user-provided readouts.
+                  Mixed-tier envelopes are normal per Spec v1.1 §2.3. L3 Amber Curator's <span className="font-mono">canSignLoadBearing</span> compile-time gate refuses to sign load-bearing claims based on prediction_only / user-provided readouts.
                 </div>
               </ResultShell>
             );
@@ -1802,12 +1808,12 @@ export function Layer3ExVivoScaffold({
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-[13px] font-semibold text-white">L3 → L4 Envelope (per-readout tier)</h3>
+              <h3 className="text-[13px] font-semibold text-white">L2 Ex-Vivo → L3 Envelope (per-readout tier)</h3>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
               Each readout carries its own tier badge (<span className="font-mono">t0</span> in-house ML, <span className="font-mono">t-user</span> manual entry,
               <span className="font-mono"> n/a</span> not_applicable, <span className="font-mono">pending</span> not yet filled). Mixed-tier envelopes are normal.
-              Amber Curator at L4 refuses to sign load-bearing claims unless a readout is <span className="font-mono">kind: "pass"</span> — user-provided values always
+              Amber Curator at L3 refuses to sign load-bearing claims unless a readout is <span className="font-mono">kind: "pass"</span> — user-provided values always
               map to <span className="font-mono">prediction_only</span>, never to <span className="font-mono">pass</span>.
             </p>
           </div>
