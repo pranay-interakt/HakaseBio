@@ -3777,7 +3777,7 @@ export function HakaseAI() {
                             data-testid="cascade-override-button"
                             className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 hover:bg-rose-500/25 text-[10px] font-semibold transition-colors"
                           >
-                            Override & advance to L2
+                            Override & advance to L3
                           </button>
                         )}
                         {!passed && !overridden && simResults && overrideFormOpen && (
