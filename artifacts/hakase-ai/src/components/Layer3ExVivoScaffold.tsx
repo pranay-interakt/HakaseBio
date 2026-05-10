@@ -102,10 +102,10 @@ const L3_STAGES: StageDef[] = [
   },
   {
     n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "in-house",
-    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L3 Animal Cohort's Amber Curator. Auto-runs whenever any Stage 1–5 result exists — no data entry, no manual form.",
+    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (tier ∈ {t0, t-user, pending, n/a}; cascadeKind ∈ {pass, fail, prediction_only, not_applicable}) consumed by L3 Animal Cohort's Amber Curator. Auto-runs whenever any Stage 1–5 result exists — no data entry, no manual form.",
     engines: [
-      { name: "lib/exVivoSurrogate.ts (orchestrator)", note: "per-readout ReadoutBlock<V> envelope; mixed-tier envelopes are normal" },
-      { name: "L2 Ex-Vivo → L3 envelope (Amber Curator gate)", note: "canSignLoadBearing requires kind:'pass' — t-user maps to prediction_only" },
+      { name: "Stage6PerReadout assembly (this file)", note: "inline orchestration — emits Stage6PerReadout[] with per-stage {tier, cascadeKind}; mixed-tier envelopes are normal" },
+      { name: "lib/cascadeFlagState.ts → canSignLoadBearing", note: "Amber Curator predicate consumed downstream by L3 — requires cascadeKind:'pass'; t-user / t0 surrogate map to prediction_only" },
     ],
     acceptsManualEntry: false,
   },

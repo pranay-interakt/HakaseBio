@@ -155,6 +155,71 @@ Layer 2 confirms or falsifies L1 using physics simulations + ML. Mostly server-s
 
 ---
 
+## Layer 2 Ex-Vivo — T0 In-Silico Surrogate (Confirmation sub-track)
+
+The L2 Ex-Vivo sub-track is the *organoid-style* arm of Layer 2 confirmation: a **T0 in-silico surrogate** for ex-vivo readouts (DILI, tissue selectivity, single-cell expression, oncology cell-line viability, biomarker pattern, permeability) that runs *before* any wet ex-vivo work is commissioned. It is **not** Layer 3 (animal cohort) — it lives inside L2 and feeds L3's Amber Curator with a typed envelope. Source: `src/components/Layer3ExVivoScaffold.tsx` (orchestration is inline, around the `Stage6PerReadout` assembly), with the load-bearing predicate in `src/lib/cascadeFlagState.ts` and the gate logic in `src/lib/cascadeGate.ts`. Naming note: the file is called `Layer3ExVivoScaffold` for historical reasons; the surface and docs both refer to it as **L2 Ex-Vivo**.
+
+### Stages
+
+| Stage | Name | What it does | Wired |
+|---|---|---|---|
+| **0** | L1 + L2 ingest | Pulls the frozen L1 `SimResults` and L2 In-Silico chain into a single `L2InputParams` block. | in-house |
+| **1** | Tissue-selectivity matrix + transporter flags | Self-computes the L2 dose projection (`computeL2DoseProjection`) + PBPK from L1 outputs to surface tissue-by-tissue concentration / occupancy / transporter risk. | in-house |
+| **2** | DILI binary classifier (browser/ai-service) | Predicts hepatotoxicity probability — distinct from L1's categorical DILI flag; this is the L2-grade binary head. | ai-service |
+| **3** | Single-cell expression aggregation | Calls the AI service `Drug2cell` aggregator over the **Tabula Sapiens** atlas (Parquet snapshot) to surface tissue-/cell-type-resolved target expression. | ai-service |
+| **4** | Patient-line projection (oncology only) | DepMap PRISM 24Q2 + Chemprop-style GBM → expected IC50 across cancer cell lines. **Not yet wired** — manual-entry only today; non-oncology compounds map to `not_applicable`. | stub-with-manual |
+| **5** | Biomarker proxy + permeability projection | Deterministic rule table (`lib/biomarkerProxy.ts`) maps Stage 2 mechanism flags → expected biomarker pattern (mito → GLDH; cholestatic → ALP/bilirubin; hepatocellular → ALT, miR-122; immune → eosinophilia priors). Permeability auto-pulled from L1 Caco-2 (`lib/permeabilityProjection.ts`). | in-house |
+| **6** | Cascade integration → L3 envelope | Pure orchestration over Stages 1–5; emits the per-readout `Stage6PerReadout[]` envelope (each row carries `{stage, name, tier, cascadeKind}`) that L3's Amber Curator consumes downstream. | in-house |
+
+### Concepts and contract terms
+
+| Term | Meaning | Where it shows up |
+|---|---|---|
+| **T0 in-silico surrogate** | A pre-wet "tier-0" prediction of an ex-vivo readout, used to decide whether wet ex-vivo work is worth commissioning. By construction never load-bearing — surrogate readouts always emit with `cascadeKind: "prediction_only"` (or `"not_applicable"` if out of scope). | Whole L2 Ex-Vivo sub-track. |
+| **L2 Ex-Vivo → L3 envelope** | The typed contract Stage 6 emits: a `Stage6PerReadout[]` array, one row per Stage 1–5 readout, each carrying `{stage, name, tier, cascadeKind}`. Boundary-handed to L3 (the Amber Curator predicate is evaluated by L3, not by Stage 6 itself). | Assembled inline in `Layer3ExVivoScaffold.tsx`; consumed downstream by L3. |
+| **Amber Curator** | The L3-side gate that decides which L2 Ex-Vivo readouts may be cited as load-bearing in animal-cohort design. Refuses anything whose `cascadeKind` is not `"pass"`. | L3 boundary; predicate lives in `lib/cascadeFlagState.ts`. |
+| **`canSignLoadBearing`** | The boolean predicate that enforces the Amber Curator rule: returns `true` only when `cascadeKind === "pass"` (i.e. wet-anchored). | `lib/cascadeFlagState.ts`. |
+| **Load-bearing readout** | A readout whose value an IND-supporting decision (NOAEL, MABEL, dose escalation) directly depends on. T0 / user-provided readouts are by construction *non-load-bearing* — `loadBearingCount` for the surrogate envelope is always 0. | Spec v1.1 §2.3. |
+| **Tier** (`ReadoutTier`) | The *provenance tier* of each readout, independent of pass/fail. Enum: `"t0"` (pure surrogate / ML), `"t-user"` (user-supplied manual entry), `"pending"` (wet result expected but not yet in), `"n/a"` (stage didn't run). | `Layer3ExVivoScaffold.tsx`; Stage 6 tier badges. |
+| **Cascade kind** (`cascadeKind`) | What L3 may *do* with the readout. Enum: `"pass"` (wet-anchored, load-bearing eligible), `"fail"` (active falsifier hit), `"prediction_only"` (surrogate or t-user), `"not_applicable"` (explicitly out of scope, e.g. oncology test on a non-oncology compound). Distinct from tier — a single readout has both. | Stage 6 envelope; Amber Curator gate input. |
+| **Mixed-tier envelope** | An envelope where different readouts carry different tiers — **this is the normal case**, not an error. | Spec v1.1 §2.3. |
+| **`Stage6PerReadout`** | The per-row interface shape: `{ stage, name, tier: ReadoutTier, cascadeKind }`. The Stage 6 envelope is `Stage6PerReadout[]`. | `Layer3ExVivoScaffold.tsx` (around line 200). |
+| **`source` (provenance string)** | A separate field on each Stage 1–5 result describing *where the value came from*. Enum used in this sub-track: `"ml"`, `"user-provided"`, `"derived-from-stage-2"`, `"orchestration"`. **Distinct from `cascadeKind`** — `source` is a provenance label; `cascadeKind` is what L3 may do with the value. | Stage 1–5 result objects; manual-entry forms tag with `source: "user-provided"`. |
+
+### Engines and external resources
+
+| Tool / dataset | What it is | Where used |
+|---|---|---|
+| **Drug2cell** | Open Targets methodology for projecting drug effects onto single-cell expression atlases. | Stage 3. |
+| **Tabula Sapiens** | A whole-body single-cell transcriptomic atlas of healthy human donors (~500k cells, 24 tissues). Loaded as an aggregated Parquet snapshot in the AI service. | Stage 3 backing data. |
+| **DepMap PRISM 24Q2** | Broad Institute's cancer cell-line viability screen (~500 lines × ~5,000 compounds). | Stage 4 (when wired). |
+| **Caco-2 (re-use)** | L1's Caco-2 permeability bin is surfaced directly into Stage 5's permeability tile — no recomputation. | Stage 5 permeability. |
+| **MDR1-MDCK / PET** | Optional sources for an explicit brain Kp,uu override; never imputed. | Stage 5 brain Kp,uu opt-in. |
+| **`lib/biomarkerProxy.ts`** | In-house deterministic rule table mapping mechanism flags → biomarker pattern (Antoine 2013 / DILIN / Wang 2009 / Andrade 2019). | Stage 5. |
+| **`lib/permeabilityProjection.ts`** | In-house surfacing of L1 Caco-2 + brain Kp,uu override gate. | Stage 5. |
+
+### Pharmacology concepts specific to the ex-vivo sub-track
+
+| Term | Meaning | Why it matters |
+|---|---|---|
+| **Brain Kp,uu** | Unbound brain-to-plasma partition coefficient — the *free* drug concentration ratio across the BBB. | Required for any CNS claim. We never impute it; users supply it from MDR1-MDCK or PET. |
+| **Transporter confidence floor** | A minimum confidence threshold below which transporter risk flags (P-gp, BCRP, OATP) are suppressed from the Stage 1 selectivity matrix. | Avoids over-flagging when transporter assay coverage is sparse. |
+| **GLDH** | Glutamate dehydrogenase — mitochondrial liver injury biomarker. | Stage 5 mito-mechanism readout. |
+| **miR-122** | Liver-specific microRNA; sensitive hepatocellular injury marker. | Stage 5 hepatocellular readout. |
+| **ALP / bilirubin** | Alkaline phosphatase / bile pigment — cholestatic injury markers. | Stage 5 cholestatic readout. |
+| **ALT** | Alanine aminotransferase — classic hepatocellular injury marker. | Stage 5 hepatocellular readout. |
+| **DILIN** | Drug-Induced Liver Injury Network — NIH consortium that catalogued idiosyncratic DILI cases. | Reference for Stage 5 biomarker rule table. |
+
+### Spec references
+
+| Reference | What it says |
+|---|---|
+| **Spec v1.1 §2.3** | Mixed-tier envelopes are the normal case; the Amber Curator gate (not envelope homogeneity) enforces IND-grade integrity. |
+| **Spec v1.1 §3.6** | Biomarker proxy rule sources: Antoine 2013, DILIN, Wang 2009, Andrade 2019. |
+| **Spec v1.1 Appendix B** | Manual Entry policy — values entered manually carry `source: user-provided` and downgrade cascade kind to `prediction_only`. |
+
+---
+
 ## Layer 3 — Animal Cohort
 
 Layer 3 simulates an animal study (rodent / non-rodent) using the L2 directive.
@@ -244,4 +309,4 @@ A FastAPI server (`artifacts/ai-service`) that wraps every model that's too heav
 
 ## How the pieces connect (one-paragraph version)
 
-A user types a **SMILES**. The browser uses **RDKit-JS** to derive properties → **L1** scores ADMET, picks a target (**UniProt ID**), estimates Ki/Kd → emits an `InVitroPackage`. **L2** ingests that, locks it with an **EvidencePointer**, then calls the **AI service**: ESM-2 for druggability, AutoDock Vina against an RCSB **PDB** for docking, ADMET-AI + a binding GBM for ML cross-checks, a hERG Random Forest for cardiac risk, optionally **TIES FEP** on **RunPod** for refined ΔΔG. The browser then runs **PBPK** (RK4 ODE) and a **Hill** PD model to get Cmax/AUC and **receptor occupancy**, computes **safety margins**, and assembles a `PreConfirmationDirective` with **Falsifiers** drawn from the registry. **L3** consumes that directive to simulate an animal **cohort**, returning **NOAEL**, allometric **HED**, and PK/PD distributions packaged as a `PreClinicalPackage`. **L4** takes the package straight into the embedded **Phase 1 Planner**, which derives **MABEL**/NOAEL-anchored starting doses, an SAD/MAD escalation, and pre-registered **stopping rules** for the **IND**. Every step is **HAIOps**-logged and tied back to its `EvidencePointer`, so any later failure can be traced to the exact upstream prediction that allowed it.
+A user types a **SMILES**. The browser uses **RDKit-JS** to derive properties → **L1** scores ADMET, picks a target (**UniProt ID**), estimates Ki/Kd → emits an `InVitroPackage`. **L2 In-Silico** ingests that, locks it with an **EvidencePointer**, then calls the **AI service**: ESM-2 for target druggability, AutoDock Vina against an RCSB **PDB** for docking, ADMET-AI + a binding GBM for ML cross-checks, a hERG Random Forest for cardiac risk, optionally **TIES FEP** on **RunPod** for refined ΔΔG. The browser then runs **PBPK** (RK4 ODE) and a **Hill** PD model to get Cmax/AUC and **receptor occupancy**, computes **safety margins**, and assembles a `PreConfirmationDirective` with **Falsifiers** drawn from the registry. In parallel, **L2 Ex-Vivo** runs the **T0 in-silico surrogate** — DILI binary, **Drug2cell** over **Tabula Sapiens** for cell-type expression, biomarker rule table, permeability projection — and emits a `Stage6PerReadout[]` envelope evaluated downstream by L3's **Amber Curator** so no surrogate value is ever cited as load-bearing. **L3** consumes both directives to simulate an animal **cohort**, returning **NOAEL**, allometric **HED**, and PK/PD distributions packaged as a `PreClinicalPackage`. **L4** takes the package straight into the embedded **Phase 1 Planner**, which derives **MABEL**/NOAEL-anchored starting doses, an SAD/MAD escalation, and pre-registered **stopping rules** for the **IND**. Every step is **HAIOps**-logged and tied back to its `EvidencePointer`, so any later failure can be traced to the exact upstream prediction that allowed it.
