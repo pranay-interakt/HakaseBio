@@ -522,7 +522,8 @@ export function HakaseAI() {
     if (molProps?.isValid && smiles.trim()) {
       uniprotManual.current = false;
       molNameManual.current = false;
-      setUniprotAutoMode(true);
+      // Do NOT enable auto-mode here — analyzing a molecule should populate
+      // suggestion chips, not silently write a UniProt ID into the field.
       setUniprotId("");
       setChemblSuggestions([]);
       setProteinInfo(null);
@@ -591,10 +592,17 @@ export function HakaseAI() {
   }, [chemblSuggestions, heuristicSuggestions]);
 
   // ── Auto-sync top target suggestion → UniProt field ───────────────────────
+  // Per project no-preload policy: auto-mode starts OFF. The Target UniProt ID
+  // field stays empty until the user explicitly clicks a suggestion chip,
+  // types an accession, or opts into auto-mode via the "↺ Auto-match" button.
+  // The suggestion chips below the field remain visible and clickable so the
+  // user can still see what the molecule's pharmacophore implies — they just
+  // don't get silently written into the input.
   const uniprotManual = useRef(false);
-  const [uniprotAutoMode, setUniprotAutoMode] = useState(true);
+  const [uniprotAutoMode, setUniprotAutoMode] = useState(false);
 
   useEffect(() => {
+    if (!uniprotAutoMode) return;
     if (uniprotManual.current) return;
     const top = targetSuggestions[0];
     if (!top) return;
@@ -1785,10 +1793,10 @@ export function HakaseAI() {
   }, [apiSource, apiCompoundId]);
 
   const handleNewProject = useCallback(() => {
-    // Allow molecule → target auto-sync again
+    // Reset manual flags but leave auto-mode OFF (no-preload policy).
     uniprotManual.current = false;
     molNameManual.current = false;
-    setUniprotAutoMode(true);
+    setUniprotAutoMode(false);
     setChemblCompoundName(null);
     setChemblCompoundId(null);
     // Reset molecule / compound — clear to empty (no pre-loaded defaults).
