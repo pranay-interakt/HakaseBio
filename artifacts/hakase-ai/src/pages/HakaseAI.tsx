@@ -1878,6 +1878,43 @@ export function HakaseAI() {
                 {i < 3 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
                 )}
+                {/* IVIVE handoff chip — sits between L2 Confirmation and L3
+                    Animal Cohort. NOT a layer; it's the L2→L3 output/sign-off
+                    page exposed as a re-visitable step. Cyan→amber gradient
+                    mirrors the gate page header. Disabled until L1 has run
+                    (matches the page's hard-block logic). */}
+                {layer === 2 && (() => {
+                  const ivieAvailable = simStatus[1] === "complete";
+                  const ivieActive = iviveHandoffOpen;
+                  return (
+                    <>
+                      <button
+                        onClick={() => { if (ivieAvailable) setIviveHandoffOpen(true); }}
+                        disabled={!ivieAvailable}
+                        title={ivieAvailable
+                          ? "IVIVE Output / L2 → L3 Handoff — review evidence and sign off before Animal Cohort"
+                          : "Run L1 In Vitro first to unlock IVIVE handoff"}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 border ${
+                          ivieActive
+                            ? "bg-gradient-to-r from-cyan-600/25 to-amber-600/25 border-cyan-400/50 text-cyan-200"
+                            : ivieAvailable
+                            ? "text-slate-400 hover:bg-white/5 border-transparent cursor-pointer"
+                            : "text-slate-600 border-transparent cursor-not-allowed"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                          ivieActive
+                            ? "border-cyan-400 text-cyan-300 bg-cyan-400/10"
+                            : "border-slate-600 text-slate-500"
+                        }`}>
+                          <Microscope className="w-3 h-3" />
+                        </div>
+                        IVIVE
+                      </button>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
+                    </>
+                  );
+                })()}
               </div>
             );
           })}
