@@ -11,11 +11,11 @@
  *   6. Emit ConfirmationEvidenceBlock — write-time invariant validated.
  *
  * The panel never modifies the existing sub-track scaffolds; it adds a
- * structured rail above them. When `worked-example` mode is loaded, all six
- * steps prefill from the HKB-2461 scenario in spec §9.6.
+ * structured rail above them. The panel always starts blank — the user
+ * fills directive → measurements → overrides themselves.
  */
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -63,8 +63,6 @@ import {
   l1ConfidenceByClass,
   type ExVivoMeasurement,
 } from "@/lib/confirmationEngine";
-// buildInSilicoEvidenceFromL1 is also used inside the worked-example path
-// to emit nulls when ML signal is absent (anti-fabrication §6.4).
 import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
 
@@ -74,17 +72,6 @@ interface Props {
   inVitro: InVitroResults | null;
   /** Captured by parent; passed back down on emit so L3 can reference it. */
   onConfirmationBlockReady: (block: ConfirmationEvidenceBlock) => void;
-  /** Optional pre-loaded scenario from "Load worked example" button. */
-  workedExampleSeed?: WorkedExampleSeed | null;
-}
-
-export interface WorkedExampleSeed {
-  exVivoMeasurements: ExVivoMeasurement[];
-  acceptFalsifierIds: FalsifierId[];
-  overrideReason: string;
-  actor: string;
-  role: Role;
-  authorityCitation: string;
 }
 
 const DEFAULT_MEASUREMENTS: ExVivoMeasurement[] = [
@@ -100,7 +87,6 @@ export function ConfirmationLayerPanel({
   l1,
   inVitro,
   onConfirmationBlockReady,
-  workedExampleSeed,
 }: Props) {
   // ── Local state — represents the live drafting workflow ──────────────────
   const [policy] = useState<GatePolicySnapshot>(() => defaultGatePolicy());
@@ -148,71 +134,6 @@ export function ConfirmationLayerPanel({
       }),
     [l1, policy],
   );
-
-  // ── Worked-example loader ────────────────────────────────────────────────
-  useEffect(() => {
-    if (!workedExampleSeed || !l1) return;
-    setMeasurements(workedExampleSeed.exVivoMeasurements);
-    // Auto-emit directive
-    // Anti-fabrication: predictions sourced from real upstream signal only.
-    // The worked example uses L1 in-silico evidence pointers from buildInSilicoEvidenceFromL1.
-    const inSilico = buildInSilicoEvidenceFromL1(l1Pointer, null, l1);
-    const findPred = (dom: string) =>
-      inSilico.find((e) => e.predictionDomain === dom)?.predictedValue ?? null;
-    const d = emitDirective({
-      compoundIdRaw,
-      l1Pointer,
-      predictedClearanceMlMinKg: findPred("clearance_fractions"),
-      predictedCyp3a4Ic50uM: findPred("cyp_transporter"),
-      predictedHergIc50uM: inVitro?.herg?.ic50_uM ?? findPred("herg_pbpk"),
-      doseRangeMgKg: { min: 0.01, max: 5 },
-    });
-    setDirective(d);
-    // Falsifier check
-    const exVivoRecs = buildExVivoEvidence(workedExampleSeed.exVivoMeasurements, d.directiveId, l1Pointer);
-    const triggers = checkFalsifiers(exVivoRecs, d);
-    setPendingTriggers(triggers);
-    // Pre-stage the overrides per the seed. The worked example narrative
-    // (HKB-2461) requires the program lead to accept BOTH gates so the seal
-    // path can demonstrate MABEL-bias propagation:
-    //   • inSilicoGate — mock L1 evidence is sub-threshold without a full ML
-    //     pipeline; the override cites the SOP allowing the program to proceed
-    //     on measured ex-vivo evidence in lieu of the missing in-silico panel.
-    //   • exVivoGate    — accepts the registered falsifier
-    //     (FX-OFFTARGET-BSEP-INHIB) and sets MABEL-bias downstream.
-    const stagedOverrides: OverrideRecord[] = [];
-    stagedOverrides.push(
-      buildOverride({
-        overrideKind: "inSilicoGate",
-        actor: workedExampleSeed.actor,
-        role: workedExampleSeed.role,
-        authorityCitationPolicy: workedExampleSeed.authorityCitation,
-        reason:
-          "L1 in-silico evidence below confidence threshold; proceed on measured ex-vivo evidence per worked-example seed.",
-        falsifierAccepted: null,
-        l1Pointer,
-        l1FieldsCited: ["primaryTargetIc50nM"],
-      }),
-    );
-    if (workedExampleSeed.acceptFalsifierIds.length > 0) {
-      const fid = workedExampleSeed.acceptFalsifierIds[0];
-      stagedOverrides.push(
-        buildOverride({
-          overrideKind: "exVivoGate",
-          actor: workedExampleSeed.actor,
-          role: workedExampleSeed.role,
-          authorityCitationPolicy: workedExampleSeed.authorityCitation,
-          reason: workedExampleSeed.overrideReason,
-          falsifierAccepted: fid,
-          l1Pointer,
-          l1FieldsCited: ["hergIc50UM", "primaryTargetIc50nM"],
-        }),
-      );
-      setOverrideDraft((d) => ({ ...d, falsifierId: fid }));
-    }
-    setOverrides(stagedOverrides);
-    setOpenSection("joints");
-  }, [workedExampleSeed, l1, compoundIdRaw, l1Pointer]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const handleEmitDirective = () => {
@@ -740,20 +661,3 @@ function JointOutputCard({ domain, jo }: { domain: string; jo: JointOutput<Predi
   );
 }
 
-// ── Worked example seed for HKB-2461 (spec §9.6) ────────────────────────────
-
-export const HKB_2461_SEED: WorkedExampleSeed = {
-  exVivoMeasurements: [
-    { assayId: "primary_hepatocyte_clearance", observedValue: 14, unit: "mL/min/kg" },
-    { assayId: "cyp3a4_inhibition_ic50", observedValue: 9, unit: "µM" },
-    { assayId: "bsep_inhibition", observedValue: 12, unit: "µM" },
-    { assayId: "herg_patch_clamp", observedValue: 22, unit: "µM" },
-    { assayId: "primary_cellular_dose_response", observedValue: 18, unit: "fold" },
-  ],
-  acceptFalsifierIds: ["FX-OFFTARGET-BSEP-INHIB" as FalsifierId],
-  overrideReason:
-    "BSEP IC50 of 12 µM is consistent with the program's reference compound class; daily exposure margin remains >50× projected human Cmax. Accepting falsifier with MABEL-bias guardrail per SOP-PCS-007.",
-  actor: "j.satoh@akthealth.example",
-  role: "PreClinicalSafetyReviewer",
-  authorityCitation: "AKTHealth-SOP-PCS-007#§3.4",
-};

@@ -44,7 +44,7 @@ import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
 import { evaluateCascadeGate, recordCascadeOverride, type CascadeOverrideRecord } from "@/lib/cascadeGate";
 import { runInVitroSimulation, type InVitroResults } from "@/lib/inVitroSim";
-import { ConfirmationLayerPanel, HKB_2461_SEED, type WorkedExampleSeed } from "@/components/ConfirmationLayerPanel";
+import { ConfirmationLayerPanel } from "@/components/ConfirmationLayerPanel";
 import {
   buildAnimalCohortBlock,
   buildInVitroBlock,
@@ -151,7 +151,6 @@ export function HakaseAI() {
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
   // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
   const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
-  const [workedExampleSeed, setWorkedExampleSeed] = useState<WorkedExampleSeed | null>(null);
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
     2: "idle",
@@ -2183,19 +2182,6 @@ export function HakaseAI() {
                     <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure in vitro structure and simulation parameters</p>
-                  {/* v2.0.0 worked-example loader — primes the L2 ConfirmationLayerPanel with
-                      the HKB-2461 BSEP-inhibition scenario from spec §9.6 so the directive →
-                      falsifier → override → MABEL-bias path can be demonstrated end-to-end. */}
-                  <button
-                    onClick={() => {
-                      setWorkedExampleSeed(HKB_2461_SEED);
-                      setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
-                      setMolName("HKB-2461");
-                    }}
-                    className="mt-3 w-full text-[11px] px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 flex items-center justify-center gap-1.5"
-                  >
-                    <Workflow className="w-3 h-3" /> Load HKB-2461 worked example (BSEP falsifier → MABEL bias)
-                  </button>
                 </div>
 
                 <div className="p-5 space-y-5">
@@ -4109,7 +4095,6 @@ export function HakaseAI() {
                   setConfirmationBlock(b);
                   setSimStatus(prev => ({ ...prev, 2: "complete" }));
                 }}
-                workedExampleSeed={workedExampleSeed}
               />
               {/* Active sub-track */}
               <div className="flex-1 overflow-hidden flex flex-col">
