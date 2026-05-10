@@ -102,3 +102,9 @@ id = "DBuhtmbbrQyqg2I8ZReht"
 uri = "file://artifacts/hakase-ai/docs/glossary.md"
 type = "text"
 title = "HakaseAI Glossary — Every Term, Acronym, and Connection"
+
+[[outputs]]
+id = "_zg3hJaGFIcs1Jc2oYsQr"
+uri = "file://artifacts/hakase-ai/docs/LAYERS_REFERENCE.md"
+type = "text"
+title = "HakaseAI BioDigital Twin — Layers Reference"
