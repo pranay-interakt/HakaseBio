@@ -267,7 +267,7 @@ const L3_MODALITIES = [
   },
 ] as const;
 
-/* ─── Visual helpers (mirror L2 scaffold pattern, amber accent) ───────────── */
+/* ─── Visual helpers (mirror L2 scaffold pattern, teal accent) ───────────── */
 
 function wiredBadge(w: WiredKind): { text: string; cls: string } {
   switch (w) {
@@ -306,13 +306,13 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
         <span className="text-[11px] text-slate-300">{label}</span>
         {source && <span className="text-[9px] text-slate-600 uppercase tracking-wider">{source}</span>}
       </div>
-      <span className={value === "—" ? "text-slate-600 text-[11px] font-mono" : "text-amber-300 text-[11px] font-mono"}>{value}</span>
+      <span className={value === "—" ? "text-slate-600 text-[11px] font-mono" : "text-teal-300 text-[11px] font-mono"}>{value}</span>
     </div>
   );
 }
 
 function StageCard({
-  stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason, children,
+  stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason, errorReason, children,
 }: {
   stage: StageDef;
   status: StageStatus;
@@ -321,6 +321,7 @@ function StageCard({
   onRun: () => void;
   runDisabled: boolean;
   runDisabledReason?: string;
+  errorReason?: string;
   children?: React.ReactNode;
 }) {
   const wb = wiredBadge(stage.wired);
@@ -328,7 +329,7 @@ function StageCard({
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
       <div className="flex items-start gap-2.5 mb-2">
-        <div className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
+        <div className="w-6 h-6 rounded-md bg-teal-500/10 border border-teal-500/25 text-teal-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
           {stage.n}
         </div>
         <div className="flex-1 min-w-0">
@@ -366,7 +367,7 @@ function StageCard({
             title={runDisabled ? runDisabledReason : `Run Stage ${stage.n}`}
             className={`text-[10px] font-semibold px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors ${
               !runDisabled && !busy
-                ? "bg-amber-600/30 hover:bg-amber-500/40 text-amber-200 border border-amber-500/40 cursor-pointer"
+                ? "bg-teal-600/30 hover:bg-teal-500/40 text-teal-200 border border-teal-500/40 cursor-pointer"
                 : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
             }`}
           >
@@ -376,6 +377,11 @@ function StageCard({
           </button>
           {runDisabled && runDisabledReason && (
             <span className="text-[9px] text-slate-500 italic">{runDisabledReason}</span>
+          )}
+          {!runDisabled && status === "error" && errorReason && (
+            <span className="text-[9px] text-rose-300 italic leading-snug" title={errorReason}>
+              {errorReason.length > 140 ? errorReason.slice(0, 140) + "…" : errorReason}
+            </span>
           )}
         </div>
       )}
@@ -389,16 +395,16 @@ function ResultShell({ stage, name, icon: Icon, status, reason, children }: {
   status: StageStatus; reason?: string; children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.04] p-4 space-y-3">
+    <div className="rounded-xl border border-teal-500/30 bg-teal-500/[0.04] p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Icon className="w-4 h-4 text-amber-300" />
+        <Icon className="w-4 h-4 text-teal-300" />
         <h3 className="text-[13px] font-semibold text-white">Stage {stage} — {name}</h3>
         <span className={`ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${statusBadgeClass(status)}`}>{status}</span>
       </div>
       {reason && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/8 p-2.5 flex items-start gap-2">
-          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-          <span className="text-[10px] text-amber-200 leading-relaxed">{reason}</span>
+        <div className="rounded-lg border border-teal-500/30 bg-teal-500/8 p-2.5 flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
+          <span className="text-[10px] text-teal-200 leading-relaxed">{reason}</span>
         </div>
       )}
       {children}
@@ -419,9 +425,9 @@ function L3InputParamsCard({
   const tcf = params.transporterConfidenceFloor;
   const ic50_nM = simResults?.binding.primaryIC50;
   return (
-    <section className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-4 space-y-4">
+    <section className="rounded-xl border border-teal-500/25 bg-teal-500/[0.04] p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <Sliders className="w-3.5 h-3.5 text-amber-400" />
+        <Sliders className="w-3.5 h-3.5 text-teal-400" />
         <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L2 Ex-Vivo Input Parameters</span>
         <span className="ml-auto text-[9px] text-slate-500 italic">applied to Stage 1 (L2 chain auto-rerun)</span>
       </div>
@@ -429,12 +435,12 @@ function L3InputParamsCard({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-slate-300">Target receptor occupancy (drives L2 dose → tissue Cu)</span>
-          <span className="text-amber-300 font-mono">{(occ * 100).toFixed(0)}% (Cmax,u = {(occ / Math.max(1e-3, 1 - occ)).toFixed(2)}× Ki)</span>
+          <span className="text-teal-300 font-mono">{(occ * 100).toFixed(0)}% (Cmax,u = {(occ / Math.max(1e-3, 1 - occ)).toFixed(2)}× Ki)</span>
         </div>
         <input
           type="range" min={0.5} max={0.95} step={0.05} value={occ}
           onChange={e => setParams({ ...params, l2: { ...params.l2, targetOccupancy: parseFloat(e.target.value) } })}
-          className="w-full accent-amber-400"
+          className="w-full accent-teal-400"
         />
         <div className="flex justify-between text-[9px] text-slate-600">
           <span>50% (1×Ki)</span><span>75% (3×Ki)</span><span>95% (19×Ki)</span>
@@ -447,7 +453,7 @@ function L3InputParamsCard({
           <input
             type="number" min={1} max={250} step={1} value={bw}
             onChange={e => setParams({ ...params, l2: { ...params.l2, bodyWeightKg: parseFloat(e.target.value) } })}
-            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-amber-200 font-mono focus:outline-none focus:border-amber-500/50"
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-teal-200 font-mono focus:outline-none focus:border-teal-500/50"
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -455,7 +461,7 @@ function L3InputParamsCard({
           <select
             value={route}
             onChange={e => setParams({ ...params, l2: { ...params.l2, route: e.target.value as "oral" | "iv" } })}
-            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-amber-200 focus:outline-none focus:border-amber-500/50"
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-teal-200 focus:outline-none focus:border-teal-500/50"
           >
             <option value="oral">Oral (PO)</option>
             <option value="iv">IV (F=1)</option>
@@ -466,7 +472,7 @@ function L3InputParamsCard({
           <select
             value={dpd}
             onChange={e => setParams({ ...params, l2: { ...params.l2, dosesPerDay: parseInt(e.target.value, 10) } })}
-            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-amber-200 focus:outline-none focus:border-amber-500/50"
+            className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-teal-200 focus:outline-none focus:border-teal-500/50"
           >
             <option value={1}>QD (1×)</option>
             <option value={2}>BID (2×)</option>
@@ -483,9 +489,9 @@ function L3InputParamsCard({
             <input
               type="range" min={0} max={0.9} step={0.05} value={tcf}
               onChange={e => setParams({ ...params, transporterConfidenceFloor: parseFloat(e.target.value) })}
-              className="flex-1 accent-amber-400"
+              className="flex-1 accent-teal-400"
             />
-            <span className="text-amber-300 font-mono text-[11px] w-10 text-right">{tcf.toFixed(2)}</span>
+            <span className="text-teal-300 font-mono text-[11px] w-10 text-right">{tcf.toFixed(2)}</span>
           </div>
           <span className="text-[9px] text-slate-600 italic">flags below this confidence are suppressed (still computed)</span>
         </label>
@@ -518,7 +524,7 @@ function L3InputParamsCard({
                 const v = e.target.value;
                 setParams({ ...params, ic50_nM_override: v === "" ? undefined : parseFloat(v) });
               }}
-              className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-amber-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-amber-500/50"
+              className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-teal-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-teal-500/50"
             />
           </label>
           {[
@@ -537,7 +543,7 @@ function L3InputParamsCard({
                   const v = e.target.value;
                   setParams({ ...params, l2: { ...params.l2, [k]: v === "" ? undefined : parseFloat(v) } });
                 }}
-                className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-amber-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-amber-500/50"
+                className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-teal-200 font-mono placeholder:text-slate-600 placeholder:text-[10px] placeholder:italic focus:outline-none focus:border-teal-500/50"
               />
             </label>
           ))}
@@ -569,12 +575,12 @@ function ManualToggle({
       <div className="flex items-center gap-3 text-[10px]">
         <span className="text-slate-500 uppercase tracking-wider">Source:</span>
         <label className="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" checked={!enabled} onChange={() => setEnabled(false)} className="accent-amber-400" />
-          <span className={!enabled ? "text-amber-300" : "text-slate-500"}>{mlLabel}</span>
+          <input type="radio" checked={!enabled} onChange={() => setEnabled(false)} className="accent-teal-400" />
+          <span className={!enabled ? "text-teal-300" : "text-slate-500"}>{mlLabel}</span>
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
-          <input type="radio" checked={enabled} onChange={() => setEnabled(true)} className="accent-amber-400" />
-          <span className={enabled ? "text-amber-300" : "text-slate-500"}>Manual entry</span>
+          <input type="radio" checked={enabled} onChange={() => setEnabled(true)} className="accent-teal-400" />
+          <span className={enabled ? "text-teal-300" : "text-slate-500"}>Manual entry</span>
         </label>
       </div>
       {hasResult && (
@@ -770,7 +776,7 @@ function Stage4ManualForm({ onSave }: { onSave: (r: Stage4ManualResult) => void 
         </>
       )}
       {mode === "non-oncology-na" && (
-        <div className="text-[10px] text-amber-200/80 italic leading-relaxed">
+        <div className="text-[10px] text-teal-200/80 italic leading-relaxed">
           Non-oncology compound — patient-line projection is out of domain by design (HCMI + DepMap PRISM are oncology-only).
           This readout will be marked <span className="font-mono">kind: "not_applicable"</span> in the cascade envelope.
         </div>
@@ -877,11 +883,11 @@ function TissueMatrixBlock({ matrix }: { matrix: TissueSelectivityMatrix }) {
       <div className="text-[10px] text-slate-400 leading-relaxed space-y-1">
         <div>
           <span className="text-slate-500">Provenance:</span>{" "}
-          gene <span className="text-amber-300">{matrix.geneSymbol}</span> ·{" "}
-          dataset <span className="text-amber-300">{matrix.gtexDatasetId}</span> ·{" "}
-          IC50 <span className="text-amber-300">{matrix.ic50_uM.toFixed(4)} µM</span> ·{" "}
-          Cu_plasma <span className="text-amber-300">{matrix.Cu_plasma_uM.toFixed(4)} µM</span> ·{" "}
-          Cmax_total <span className="text-amber-300">{matrix.cmax_total_uM.toFixed(3)} µM</span>
+          gene <span className="text-teal-300">{matrix.geneSymbol}</span> ·{" "}
+          dataset <span className="text-teal-300">{matrix.gtexDatasetId}</span> ·{" "}
+          IC50 <span className="text-teal-300">{matrix.ic50_uM.toFixed(4)} µM</span> ·{" "}
+          Cu_plasma <span className="text-teal-300">{matrix.Cu_plasma_uM.toFixed(4)} µM</span> ·{" "}
+          Cmax_total <span className="text-teal-300">{matrix.cmax_total_uM.toFixed(3)} µM</span>
         </div>
         <div className="text-amber-300/90">
           ⚠ Cu_tissue ≈ Cu_plasma assumed (Rowland-Tözer steady-state). Per-organ PBPK
@@ -913,7 +919,7 @@ function TissueMatrixBlock({ matrix }: { matrix: TissueSelectivityMatrix }) {
               <div className="text-right font-mono text-slate-300">{r.targetExpressionTpm.toFixed(2)}</div>
               <div className="text-right font-mono text-slate-400">{r.predictedCu_uM.toExponential(1)}</div>
               <div className="text-right"><MarginCell ratio={r.marginRatio} /></div>
-              <div className="text-right font-mono text-amber-300">{r.onTargetScore.toFixed(3)}</div>
+              <div className="text-right font-mono text-teal-300">{r.onTargetScore.toFixed(3)}</div>
               <div className="flex justify-center"><ConfidencePill c={r.confidence} /></div>
             </div>
           ))}
@@ -922,14 +928,14 @@ function TissueMatrixBlock({ matrix }: { matrix: TissueSelectivityMatrix }) {
       {sortedRows.length > 12 && (
         <button
           onClick={() => setShowAll(s => !s)}
-          className="w-full text-center text-[10px] text-slate-400 hover:text-amber-300 py-1"
+          className="w-full text-center text-[10px] text-slate-400 hover:text-teal-300 py-1"
         >
           {showAll ? "Collapse" : `Show all ${sortedRows.length} tissues`}
         </button>
       )}
       <div className="grid grid-cols-2 gap-2 text-[10px]">
-        <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-2">
-          <div className="text-amber-300 uppercase tracking-wider font-semibold mb-1">Top on-target tissues</div>
+        <div className="rounded-md border border-teal-500/20 bg-teal-500/5 p-2">
+          <div className="text-teal-300 uppercase tracking-wider font-semibold mb-1">Top on-target tissues</div>
           {matrix.topOnTargetTissues.map((r: TissueSelectivityRow) => (
             <div key={r.tissueId} className="flex justify-between text-slate-300">
               <span>{r.tissueName}</span>
@@ -981,7 +987,7 @@ function TransporterFlagsBlock({ flags, floor }: { flags: TransporterFlagsResult
                     ? <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-white/10 bg-white/[0.02] text-slate-500">below conf. floor</span>
                     : <>
                         {f.substrate && (
-                          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">substrate</span>
+                          <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-teal-500/40 bg-teal-500/10 text-teal-300">substrate</span>
                         )}
                         {f.inhibitor && (
                           <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300">inhibitor</span>
@@ -1391,7 +1397,7 @@ export function Layer3ExVivoScaffold({
                 const v = (r as StageResultBlock<Stage2Result> & { status: "complete" }).result;
                 if (v.kind === "ml") {
                   const p = v.prediction;
-                  return <>DILI-ML prob = <span className="text-violet-300 font-mono">{p.dili_probability != null ? p.dili_probability.toFixed(3) : "—"}</span> · class <span className="text-violet-300">{p.risk_class ?? "—"}</span> · severity hint <span className="text-slate-400 italic">{p.severity_hint ?? "—"}</span> <span className="text-amber-400/70">(mechanisms not predicted — fill Manual Entry to unlock Stage 5)</span></>;
+                  return <>DILI-ML prob = <span className="text-violet-300 font-mono">{p.dili_probability != null ? p.dili_probability.toFixed(3) : "—"}</span> · class <span className="text-violet-300">{p.risk_class ?? "—"}</span> · severity hint <span className="text-slate-400 italic">{p.severity_hint ?? "—"}</span> <span className="text-teal-400/70">(mechanisms not predicted — fill Manual Entry to unlock Stage 5)</span></>;
                 }
                 return <>severity = <span className="text-cyan-300">{v.severity}</span>; mechanisms: {Object.entries(v.mechanisms).filter(([_, on]) => on).map(([k]) => k).join(", ") || "none"}; cite: <span className="text-slate-400 italic">{v.citation}</span></>;
               })()}
@@ -1411,7 +1417,7 @@ export function Layer3ExVivoScaffold({
                   return <>panel n=<span className="text-violet-300 font-mono">{v.prediction.n_cell_lines_total}</span> · median IC50 <span className="text-violet-300 font-mono">{med != null ? med.toFixed(3) : "—"}</span> µM · top {top?.cell_line_name ?? "—"} <span className="text-slate-400 italic">(DepMap PRISM 24Q2)</span></>;
                 }
                 return v.mode === "non-oncology-na"
-                  ? <>marked <span className="font-mono text-amber-300">not_applicable</span> · non-oncology compound</>
+                  ? <>marked <span className="font-mono text-teal-300">not_applicable</span> · non-oncology compound</>
                   : <>{v.rows.length} cell-line{v.rows.length === 1 ? "" : "s"} (DepMap PRISM rows)</>;
               })()}
               {n === 5 && (() => {
@@ -1458,7 +1464,7 @@ export function Layer3ExVivoScaffold({
       <div className="w-[480px] border-r border-white/8 overflow-y-auto flex flex-col">
         <div className="p-5 border-b border-white/8">
           <div className="flex items-center gap-2 mb-1">
-            <Microscope className="w-4 h-4 text-amber-400" />
+            <Microscope className="w-4 h-4 text-teal-400" />
             <h2 className="text-[15px] font-semibold text-white">L2 · Ex-Vivo sub-track</h2>
             <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
               {wiredCount}/6 wired · {acceptsManualCount} manual
@@ -1497,7 +1503,7 @@ export function Layer3ExVivoScaffold({
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L1 Inputs</span>
-              <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${hasL1 ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" : "border-amber-500/30 bg-amber-500/8 text-amber-400/80"}`}>
+              <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${hasL1 ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" : "border-teal-500/30 bg-teal-500/8 text-teal-400/80"}`}>
                 {hasL1 ? "Live" : "Pending"}
               </span>
             </div>
@@ -1539,6 +1545,7 @@ export function Layer3ExVivoScaffold({
                     onRun={() => runStageHandler(s.n)}
                     runDisabled={runDisabled}
                     runDisabledReason={runDisabledReason}
+                    errorReason={status === "error" ? (r as any)?.reason : undefined}
                   >
                     {(s.n === 2 || s.n === 3 || s.n === 4 || s.n === 5) && renderManualChildren(s.n as 2 | 3 | 4 | 5)}
                   </StageCard>
@@ -1553,7 +1560,7 @@ export function Layer3ExVivoScaffold({
             onClick={runFull}
             className={`w-full font-semibold h-11 rounded-lg gap-2 text-[13px] flex items-center justify-center transition-colors ${
               hasL1 && !pipelineRunning
-                ? "bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
+                ? "bg-teal-600 hover:bg-teal-500 text-white cursor-pointer"
                 : "bg-slate-700/40 border border-slate-600/40 text-slate-500 cursor-not-allowed"
             }`}
             title={hasL1 ? "Run Stage 1, derive Stage 5 from Stage 2 if present, and orchestrate Stage 6" : "Awaiting L1 In Vitro completion"}
@@ -1567,7 +1574,7 @@ export function Layer3ExVivoScaffold({
             <button
               type="button"
               onClick={copyHandoff}
-              className="w-full h-9 rounded-lg gap-2 text-[12px] flex items-center justify-center border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15 text-amber-300"
+              className="w-full h-9 rounded-lg gap-2 text-[12px] flex items-center justify-center border border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/15 text-teal-300"
             >
               {copied ? <><Check className="w-4 h-4" /> Copied L2 Ex-Vivo handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L2 Ex-Vivo handoff JSON (with provenance)</>}
             </button>
@@ -1582,11 +1589,11 @@ export function Layer3ExVivoScaffold({
               {L3_MODALITIES.map(m => (
                 <div key={m.name} className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
                   <div className="flex items-start gap-2 mb-1.5">
-                    <Microscope className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <Microscope className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-[12px] font-semibold text-white">{m.name}</div>
-                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-300/80">T2/T3 opt-in</span>
+                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-teal-500/30 bg-teal-500/8 text-teal-300/80">T2/T3 opt-in</span>
                       </div>
                       <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{m.summary}</div>
                     </div>
@@ -1613,8 +1620,8 @@ export function Layer3ExVivoScaffold({
         <div className="w-full space-y-5">
 
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <Microscope className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center shrink-0">
+              <Microscope className="w-5 h-5 text-teal-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
@@ -1629,10 +1636,10 @@ export function Layer3ExVivoScaffold({
           {/* Idle */}
           {!results.s1 && !results.s2 && !results.s3 && !results.s4 && !results.s5 && !results.s6 && (
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-6 text-center">
-              <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
+              <Microscope className="w-10 h-10 text-teal-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L2 Ex-Vivo pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stages 1–5 individually (Stage 1 in-house, Stages 2/3/4 ai-service, Stage 5 auto-derived) or click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to chain them and emit the Stage 6 envelope. Manual Entry on Stages 2–5 overrides any ML output. Non-oncology compounds: use Stage 4 Manual Entry's not_applicable mode.
+                Run Stages 1–5 individually (Stage 1 in-house, Stages 2/3/4 ai-service, Stage 5 auto-derived) or click <span className="text-teal-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to chain them and emit the Stage 6 envelope. Manual Entry on Stages 2–5 overrides any ML output. Non-oncology compounds: use Stage 4 Manual Entry's not_applicable mode.
               </p>
             </div>
           )}
@@ -1641,7 +1648,7 @@ export function Layer3ExVivoScaffold({
           {results.s1?.status === "running" && (
             <ResultShell stage={1} name="Tissue selectivity + transporter flags" icon={FlaskConical} status="running">
               <div className="flex items-center gap-2 text-[11px] text-slate-300">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
                 Computing L2 dose projection + PBPK + GTEx fetch…
               </div>
             </ResultShell>
@@ -1687,7 +1694,7 @@ export function Layer3ExVivoScaffold({
                     <div className="text-slate-500">Source</div>
                     <div className="text-violet-300 font-mono text-right">ml</div>
                   </div>
-                  <div className="text-[10px] text-amber-300/80 italic">
+                  <div className="text-[10px] text-teal-300/80 italic">
                     Binary classifier only — 5-class severity + mechanism flags (mito / BSEP / ROS / immune)
                     are NOT predicted. Stage 5 biomarker derivation requires Manual Entry to be filled.
                   </div>
@@ -1756,7 +1763,7 @@ export function Layer3ExVivoScaffold({
                       </div>
                     ))}
                   </div>
-                  <div className="text-[10px] text-amber-300/80 italic mt-2">Cascade flag: prediction_only · expression × affinity score, NOT a measured organoid IC50. Wet anchor (T2/T3) required for IND-supporting claims.</div>
+                  <div className="text-[10px] text-teal-300/80 italic mt-2">Cascade flag: prediction_only · expression × affinity score, NOT a measured organoid IC50. Wet anchor (T2/T3) required for IND-supporting claims.</div>
                 </ResultShell>
               );
             }
@@ -1833,7 +1840,7 @@ export function Layer3ExVivoScaffold({
                       ))}
                     </div>
                   )}
-                  <div className="text-[10px] text-amber-300/80 italic mt-2">
+                  <div className="text-[10px] text-teal-300/80 italic mt-2">
                     Cascade flag: prediction_only · in-house projection of L1 IC50 conditioned on per-cell-line essentiality + expression, NOT a measured PRISM IC50 for this compound.
                     Wet PRISM measurement (T2/T3) required for IND-supporting claims.
                   </div>
@@ -1843,7 +1850,7 @@ export function Layer3ExVivoScaffold({
             return (
               <ResultShell stage={4} name="Patient-line projection (user-provided)" icon={FlaskConical} status="complete">
                 {v.mode === "non-oncology-na" ? (
-                  <div className="text-[11px] text-amber-200">
+                  <div className="text-[11px] text-teal-200">
                     Marked <span className="font-mono">kind: "not_applicable"</span> — non-oncology compound, patient-line projection out of domain by design.
                   </div>
                 ) : (
@@ -1905,7 +1912,7 @@ export function Layer3ExVivoScaffold({
                   </div>
                   {v.perReadoutTiers.map(t => (
                     <div key={t.stage} className="grid grid-cols-[40px_1fr_70px_110px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
-                      <div className="font-mono text-amber-300">{t.stage}</div>
+                      <div className="font-mono text-teal-300">{t.stage}</div>
                       <div className="text-slate-200 truncate">{t.name}</div>
                       <div className="flex justify-center">
                         <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-semibold ${tierBadgeClass(t.tier)}`}>{t.tier}</span>
@@ -1914,7 +1921,7 @@ export function Layer3ExVivoScaffold({
                     </div>
                   ))}
                 </div>
-                <div className="text-[10px] text-amber-300/80 italic leading-relaxed">
+                <div className="text-[10px] text-teal-300/80 italic leading-relaxed">
                   Mixed-tier envelopes are normal per Spec v1.1 §2.3. L3 Amber Curator's <span className="font-mono">canSignLoadBearing</span> compile-time gate refuses to sign load-bearing claims based on prediction_only / user-provided readouts.
                 </div>
               </ResultShell>
@@ -1934,10 +1941,10 @@ export function Layer3ExVivoScaffold({
             </p>
           </div>
 
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
-            <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-3 flex items-start gap-2.5">
+            <FileText className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              <span className="font-semibold text-amber-300">Build status:</span> Stages 1, 5 in-house (tissue selectivity + biomarker rule table); Stage 6 auto-orchestrates the per-readout envelope.
+              <span className="font-semibold text-teal-300">Build status:</span> Stages 1, 5 in-house (tissue selectivity + biomarker rule table); Stage 6 auto-orchestrates the per-readout envelope.
               Stage 2 ai-service (DILI binary classifier). Stage 3 ai-service (Drug2cell + Tabula Sapiens v2; atlas Parquet required). Stage 4 ai-service (DepMap PRISM 24Q2 patient-line projection; snapshot Parquet required, oncology-only — non-oncology compounds use Manual Entry's not_applicable mode).
               Manual Entry remains available for Stages 2–5. Premium tier (DrugBank integration) will additionally back Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
@@ -1947,7 +1954,7 @@ export function Layer3ExVivoScaffold({
             <button
               type="button"
               onClick={onContinue}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[12px] font-semibold transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[12px] font-semibold transition-colors"
             >
               <ArrowRight className="w-4 h-4" />
               Continue to L3 Animal Cohort
