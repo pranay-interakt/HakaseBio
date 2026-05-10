@@ -4422,6 +4422,7 @@ export function HakaseAI() {
                       <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 3)} />
                     )}
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL3?.databaseQueries ?? []).some(q => q.database === w.database))} />
+                    <L2ConfirmationInputsPanel block={confirmationBlock} />
                     <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
                     {provenanceL3 && <ProvenanceFooter provenance={provenanceL3} layer={3} />}
                   </>
@@ -7567,6 +7568,113 @@ type AiReport = {
   goNogoRationale?: string;
   nextSteps?: string[];
 };
+
+// ── L2 Confirmation Inputs Panel (mirrors the L1 INPUTS panel from L2 scaffold) ─
+// Surfaces the L2 Confirmation evidence that *should* feed the L3 Animal Cohort
+// sim. Today the cohort sim consumes only L1 ADMET — direct propagation of these
+// L2-confirmed values into the cohort math is a follow-up step. Showing them
+// here makes the gap visible per the no-fake-data policy.
+
+function L2ConfirmationInputRow({ label, source, value, dim }: { label: string; source?: string; value: string; dim?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-white/5 py-1.5">
+      <div className="flex flex-col">
+        <span className="text-[11px] text-slate-300">{label}</span>
+        {source && <span className="text-[9px] text-slate-600 uppercase tracking-wider">{source}</span>}
+      </div>
+      <span className={(dim || value === "—") ? "text-slate-600 text-[11px] font-mono" : "text-cyan-300 text-[11px] font-mono"}>{value}</span>
+    </div>
+  );
+}
+
+function L2ConfirmationInputsPanel({ block }: { block: ConfirmationEvidenceBlock | null }) {
+  const status: "passed" | "overridden" | "failed" | "pending" = block?.gateStatus ?? "pending";
+  const pillClasses =
+    status === "passed"     ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" :
+    status === "overridden" ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80" :
+    status === "failed"     ? "border-red-500/30 bg-red-500/8 text-red-400/80" :
+                              "border-amber-500/30 bg-amber-500/8 text-amber-400/80";
+  const pillLabel =
+    status === "passed"     ? "Live" :
+    status === "overridden" ? "Overridden" :
+    status === "failed"     ? "Failed" :
+                              "Pending";
+
+  // Aggregated values (only meaningful when block exists; otherwise render "—")
+  const inSilicoCount = block?.inSilico.evidence.length ?? null;
+  const exVivoCount   = block?.exVivo.evidence.length ?? null;
+  const falsifierCount = block ? block.inSilico.evidence.filter(r => r.falsified).length : null;
+  const overrideCount = block?.overrides.length ?? 0;
+
+  // CYP/transporter joint
+  const cyp = block?.jointOutputs.cypTransporter;
+  const cypInhibitorCount = cyp ? Object.values(cyp.perEnzyme).filter(s => s && s.inhibitionIc50uM != null).length : null;
+  const transporterFlagCount = cyp ? cyp.transporterPanel.filter(t => t.inhibitionIc50uM != null).length : null;
+
+  // Clearance fractions joint
+  const cl = block?.jointOutputs.clearanceFractions;
+  const clStr = cl && (cl.hepatic != null || cl.renal != null || cl.biliary != null)
+    ? [
+        cl.hepatic != null ? `Hep ${(cl.hepatic * 100).toFixed(0)}%` : null,
+        cl.renal   != null ? `Ren ${(cl.renal   * 100).toFixed(0)}%` : null,
+        cl.biliary != null ? `Bil ${(cl.biliary * 100).toFixed(0)}%` : null,
+      ].filter(Boolean).join(" · ")
+    : "—";
+
+  // Dose-response, off-target, hERG-PBPK joint outputs
+  const fmtJoint = (jo: { status: string; synthesisedValue: number | null; unit: string } | undefined): string => {
+    if (!jo) return "—";
+    const v = jo.synthesisedValue != null ? `${jo.synthesisedValue.toFixed(2)} ${jo.unit}` : "no value";
+    return `${jo.status} · ${v}`;
+  };
+  const drStr   = fmtJoint(block?.jointOutputs.doseResponse);
+  const offStr  = fmtJoint(block?.jointOutputs.offTarget);
+  const hergStr = fmtJoint(block?.jointOutputs.hergPbpkProjection);
+
+  // Average joint confidence across the five joint outputs
+  const jointConfidence = block ? (() => {
+    const jos = [
+      block.jointOutputs.cypTransporter,
+      block.jointOutputs.clearanceFractions,
+      block.jointOutputs.offTarget,
+      block.jointOutputs.doseResponse,
+      block.jointOutputs.hergPbpkProjection,
+    ];
+    const confidences = jos.map(j => j.jointConfidence).filter(c => typeof c === "number");
+    if (confidences.length === 0) return null;
+    return confidences.reduce((a, b) => a + b, 0) / confidences.length;
+  })() : null;
+
+  return (
+    <section className="mx-4 mt-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Database className="w-3.5 h-3.5 text-slate-500" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Confirmation Inputs</span>
+        <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${pillClasses}`}>
+          {pillLabel}
+        </span>
+      </div>
+      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+        <L2ConfirmationInputRow label="Confirmation verdict"     source="L2 / cascade gate"            value={block ? block.gateStatus : "—"} dim={!block} />
+        <L2ConfirmationInputRow label="In-silico evidence"       source="L2 / pipeline records"        value={inSilicoCount != null ? `${inSilicoCount} record${inSilicoCount === 1 ? "" : "s"}` : "—"} />
+        <L2ConfirmationInputRow label="Ex-vivo evidence"         source="L2 / measured assays"         value={exVivoCount != null ? `${exVivoCount} record${exVivoCount === 1 ? "" : "s"}` : "—"} />
+        <L2ConfirmationInputRow label="CYP joint signals"        source="L2 joint / cyp + transporter" value={cyp ? `${cypInhibitorCount} CYP · ${transporterFlagCount} txp` : "—"} />
+        <L2ConfirmationInputRow label="Clearance fractions"      source="L2 joint / clearance"         value={clStr} dim={clStr === "—"} />
+        <L2ConfirmationInputRow label="Dose-response joint"      source="L2 joint / dose_response"     value={drStr}   dim={drStr === "—"} />
+        <L2ConfirmationInputRow label="Off-target joint"         source="L2 joint / off_target"        value={offStr}  dim={offStr === "—"} />
+        <L2ConfirmationInputRow label="hERG-PBPK joint"          source="L2 joint / herg_pbpk"         value={hergStr} dim={hergStr === "—"} />
+        <L2ConfirmationInputRow label="Falsifiers triggered"     source="L2 / falsifier registry"      value={falsifierCount != null ? `${falsifierCount}` : "—"} />
+        <L2ConfirmationInputRow label="Overrides applied"        source="L2 / override log"            value={block ? `${overrideCount}` : "—"} />
+        <L2ConfirmationInputRow label="Joint confidence (avg)"   source="L2 / synthesis"               value={jointConfidence != null ? `${(jointConfidence * 100).toFixed(0)}%` : "—"} />
+      </div>
+      <p className="text-[9px] text-slate-500 mt-2 leading-relaxed px-1">
+        {block
+          ? "Surfaced for traceability. The L3 cohort sim currently consumes only L1 ADMET — direct propagation of these L2-confirmed values (Kd, PBPK CL, measured permeability, joint outputs) into NOAEL / safety-margin / FIH math is the next step."
+          : "L2 Confirmation has not been run for this compound. Cohort projections below come from L1 ADMET + allometric scaling only — no L2-confirmed evidence is being applied."}
+      </p>
+    </section>
+  );
+}
 
 // ── Layer 2 Animal Cohort Results ─────────────────────────────────────────────
 
