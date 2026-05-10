@@ -1,0 +1,12 @@
+**/__pycache__/
+**/*.pyc
+.git
+.gitignore
+*.md
+!README.md
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+work/
+output/
+*.log
