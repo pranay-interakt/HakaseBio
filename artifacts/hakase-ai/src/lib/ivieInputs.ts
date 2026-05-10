@@ -167,6 +167,19 @@ export function autoFillIvieEstimates(
   };
 }
 
+/** True iff ANY cell in the inputs has a finite numeric value (measured OR estimated).
+ *  Used by downstream panels to decide whether IVIVE substrate exists at all,
+ *  versus rendering "—" for the no-data case. */
+export function hasAnyIvieData(inputs: IvieWetLabInputs): boolean {
+  for (const kind of ["fuPlasma", "fuMic", "bpRatio"] as const) {
+    for (const sp of IVIE_SPECIES) {
+      const c = inputs[kind][sp];
+      if (c && typeof c.value === "number" && Number.isFinite(c.value)) return true;
+    }
+  }
+  return false;
+}
+
 /** True iff ANY cell in the inputs is provenance==="estimated". */
 export function hasEstimatedCells(inputs: IvieWetLabInputs): boolean {
   for (const kind of ["fuPlasma", "fuMic", "bpRatio"] as const) {

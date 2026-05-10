@@ -123,6 +123,9 @@ import {
   bootstrapIvieInputs, useIvieInputsAutosave,
 } from "@/components/IvieInputsPanel";
 import { IvieOutputHandoffPage, type IvieHandoffSignOff } from "@/components/IvieOutputHandoffPage";
+import {
+  assessIvieTier, deriveSubstrateMode, hasEstimatedCells, hasAnyIvieData,
+} from "@/lib/ivieInputs";
 
 type Layer = 1 | 2 | 3 | 4;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
@@ -4203,6 +4206,146 @@ export function HakaseAI() {
                 </div>
 
                 <div className="flex-1 p-5 space-y-6">
+                  {/* ── Upstream Inputs (L1 / L2 / IVIVE) ─────────────────────
+                      Mirrors the "L1 INPUTS" confirmation panel from L2 so the
+                      user can see exactly which upstream evidence the Animal
+                      Cohort is inheriting. All three sub-sections render a
+                      Pending chip when the corresponding upstream step has not
+                      yet been completed — no values are fabricated. */}
+                  {(() => {
+                    const ivieHasData = hasAnyIvieData(ivieInputs);
+                    const tierA = ivieHasData ? assessIvieTier(ivieInputs) : null;
+                    const substrateMode = ivieHasData ? deriveSubstrateMode(ivieInputs) : null;
+                    const anyAuto = hasEstimatedCells(ivieInputs);
+                    const Row = ({ label, value, source }: { label: string; value: string; source?: string }) => (
+                      <div className="flex items-center justify-between gap-3 border-b border-white/5 py-1.5 last:border-b-0">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] text-slate-300">{label}</span>
+                          {source && <span className="text-[9px] text-slate-600 uppercase tracking-wider">{source}</span>}
+                        </div>
+                        <span className={value === "—" ? "text-slate-600 text-[11px] font-mono shrink-0" : "text-cyan-300 text-[11px] font-mono shrink-0 text-right"}>{value}</span>
+                      </div>
+                    );
+                    return (
+                      <section className="space-y-4">
+                        {/* L1 inputs */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Database className="w-3.5 h-3.5 text-violet-400" />
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L1 In-Vitro Inputs</span>
+                            <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${simResults ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" : "border-amber-500/30 bg-amber-500/8 text-amber-400/80"}`}>
+                              {simResults ? "Live" : "Pending"}
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-violet-500/15 bg-violet-500/[0.03] px-3 py-1">
+                            <Row label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
+                            <Row label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
+                            <Row label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
+                            <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? simResults.binding.primaryKi.toFixed(1) : "—"} />
+                            <Row label="Plasma fu (%)"       source="L1 PPB sim"                 value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
+                            <Row label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
+                            <Row label="L1 Go / No-Go"       source="L1 cascade gate"            value={simResults ? simResults.goNogo : "—"} />
+                          </div>
+                        </div>
+
+                        {/* L2 confirmation */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <FlaskConical className="w-3.5 h-3.5 text-cyan-400" />
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Confirmation</span>
+                            <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                              confirmationBlock?.gateStatus === "passed"     ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80"
+                              : confirmationBlock?.gateStatus === "overridden" ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80"
+                              : confirmationBlock?.gateStatus === "failed"     ? "border-rose-500/30 bg-rose-500/8 text-rose-400/80"
+                              : "border-slate-500/30 bg-slate-500/8 text-slate-400/80"
+                            }`}>
+                              {confirmationBlock ? confirmationBlock.gateStatus.toUpperCase() : "Unsealed"}
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
+                            <Row label="Sealed at"      source="L2 confirmation engine" value={confirmationBlock?.emittedAt ?? "—"} />
+                            <Row label="Engine"         source="emitterEngine"          value={confirmationBlock?.emitterEngine ?? "—"} />
+                            <Row label="Ex-Vivo mode"   source="exVivoEntryMode"        value={confirmationBlock?.exVivoEntryMode ? String(confirmationBlock.exVivoEntryMode) : "—"} />
+                            <Row label="Overrides"      source="L2 audit trail"         value={confirmationBlock ? String(confirmationBlock.overrides?.length ?? 0) : "—"} />
+                          </div>
+                        </div>
+
+                        {/* IVIVE substrate */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Beaker className="w-3.5 h-3.5 text-cyan-400" />
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IVIVE Substrate</span>
+                            {tierA && (
+                              <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                                tierA.tier === "Premium"      ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80"
+                                : tierA.tier === "Standard"   ? "border-cyan-500/30 bg-cyan-500/8 text-cyan-400/80"
+                                : tierA.tier === "Minimum"    ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80"
+                                : "border-rose-500/30 bg-rose-500/8 text-rose-400/80"
+                              }`}>
+                                {tierA.tier}
+                              </span>
+                            )}
+                            {ivieHasData && anyAuto && (
+                              <span
+                                title="One or more IVIVE cells are literature midpoints, not CRO measurements."
+                                className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
+                              >
+                                {substrateMode === "mixed" ? "Mixed" : "Auto"}
+                              </span>
+                            )}
+                            {!ivieHasData && (
+                              <span className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/8 text-amber-400/80">
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
+                            <Row label="Cross-species rule" source="measured fu_p + B/P, human + ≥1 preclinical"
+                                 value={tierA ? (tierA.crossSpeciesRuleSatisfied ? "MET" : "UNMET") : "—"} />
+                            <Row label="Substrate mode"     source="current ivieInputs provenance"
+                                 value={
+                                   substrateMode === "measured"       ? "Measured (CRO)"
+                                   : substrateMode === "auto-estimated" ? "Auto (literature)"
+                                   : substrateMode === "mixed"          ? "Mixed"
+                                   : "—"
+                                 } />
+                            <Row label="Completion"         source="cells filled / total"
+                                 value={tierA ? `${(tierA.completionFraction * 100).toFixed(0)}%` : "—"} />
+                            <Row label="Sign-off"           source="L2 → L3 handoff"
+                                 value={iviveHandoffSignOff
+                                   ? `${iviveHandoffSignOff.enteredBy} (${iviveHandoffSignOff.role})`
+                                   : "Not yet signed"} />
+                            {iviveHandoffSignOff && (
+                              <>
+                                <Row label="Signed at"          source="ISO 8601"        value={iviveHandoffSignOff.signedAt} />
+                                <Row label="Sign-off substrate" source="captured at sign-off"
+                                     value={iviveHandoffSignOff.substrateMode === "measured" ? "Measured (CRO)"
+                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "Auto (literature)"
+                                          : "Mixed"} />
+                              </>
+                            )}
+                          </div>
+                          {ivieHasData && anyAuto && (
+                            <p className="mt-1.5 px-1 text-[10px] text-orange-300/90 leading-relaxed">
+                              ⚠ L3 study design + L4 FIH dose will be tagged{" "}
+                              <span className="font-semibold">"estimated substrate"</span> in the audit trail
+                              and cannot be used for IND submission without re-running on measured CRO data.
+                            </p>
+                          )}
+                          {iviveHandoffSignOff && substrateMode && iviveHandoffSignOff.substrateMode !== substrateMode && (
+                            <p className="mt-1.5 px-1 text-[10px] text-amber-300/90 leading-relaxed">
+                              ⚠ Sign-off captured substrate mode{" "}
+                              <span className="font-mono font-semibold">{iviveHandoffSignOff.substrateMode}</span>,
+                              but current IVIVE inputs are now{" "}
+                              <span className="font-mono font-semibold">{substrateMode}</span>.
+                              Re-run the L2 → L3 handoff to refresh the audit trail before signing FIH dose.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })()}
+
                   {/* L2 Recommendations — dynamic, at top */}
                   {(() => {
                     const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
