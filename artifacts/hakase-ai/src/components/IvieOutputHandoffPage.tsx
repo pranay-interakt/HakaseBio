@@ -25,6 +25,8 @@ import {
 } from "@/lib/ivieInputs";
 import { IvieInputsPanel } from "@/components/IvieInputsPanel";
 import type { ConfirmationEvidenceBlock } from "@workspace/preclinical-handoff";
+import type { InVitroResults } from "@/lib/inVitroSim";
+import type { L2DoseProjection } from "@/lib/l2DoseProjection";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,14 @@ interface SimResultsLike {
   goNogo?: "GO" | "NO-GO" | string;
 }
 
+/** Format a number to a fixed number of decimals; render `—` for null/NaN/∞.
+ *  Strict no-fabrication: missing inputs render an em-dash, never zero. */
+function fmt(v: number | null | undefined, digits = 2, suffix = ""): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v !== "number" || !isFinite(v)) return "—";
+  return v.toFixed(digits) + (suffix ? ` ${suffix}` : "");
+}
+
 interface SafetyFlagLike {
   id?: string;
   message?: string;
@@ -59,7 +69,14 @@ interface Props {
    *  L2 → L3 handoff (was previously inside the L2 Confirmation page). */
   onIvieInputsChange: (next: IvieWetLabInputs) => void;
   simResults: SimResultsLike | null;
+  /** Full L1 In-Vitro evidence (potency / fu / hERG / CL_int) — surfaced
+   *  in the L1 IVIVE Output card. Null when L1 has not been run. */
+  inVitroResults?: InVitroResults | null;
   confirmationBlock: ConfirmationEvidenceBlock | null;
+  /** L2 first-pass dose projection (target Cmax, predicted dose, margins,
+   *  verdict). Surfaced in the L2 IVIVE Dose Projection card. Null when
+   *  L2 In-Silico has not yet emitted a projection. */
+  l2Projection?: L2DoseProjection | null;
   safetyFlags: SafetyFlagLike[];
   /** Returns to the L2 Confirmation tab. */
   onBack: () => void;
@@ -221,7 +238,7 @@ function fmtCell(v: number | null | undefined): string {
 }
 
 export function IvieOutputHandoffPage({
-  ivieInputs, onIvieInputsChange, simResults, confirmationBlock, safetyFlags, onBack, onProceed,
+  ivieInputs, onIvieInputsChange, simResults, inVitroResults = null, confirmationBlock, l2Projection = null, safetyFlags, onBack, onProceed,
 }: Props) {
   const tierA = useMemo(() => assessIvieTier(ivieInputs), [ivieInputs]);
   const substrateMode = useMemo(() => deriveSubstrateMode(ivieInputs), [ivieInputs]);
@@ -319,6 +336,51 @@ export function IvieOutputHandoffPage({
                 ? <>Compound <span className="font-mono text-violet-200">{simResults.molName ?? "—"}</span> completed L1.</>
                 : <span className="text-slate-500">L1 has not been run.</span>}
             </div>
+
+            {/* ── L1 IVIVE Output — wet-lab numerics consumed by IVIVE ───── */}
+            {inVitroResults ? (
+              <div className="mt-3 pt-3 border-t border-violet-500/15">
+                <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
+                  L1 IVIVE Output (consumed by L2 dose projection)
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
+                  <div>
+                    <span className="text-slate-500">Target IC₅₀: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.doseResponse.ic50_nM, 1, "nM")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Plasma fu: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.plasmaProteinBinding.fuPercent, 2, "%")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Caco-2 Pₐₚₚ: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.permeability.caco2Papp, 1, "×10⁻⁶ cm/s")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Microsomal CL_int: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.metabolicStability.microsomalCLint, 1, "µL/min/mg")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">hERG IC₅₀: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.herg.ic50_uM, 2, "µM")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">In-vitro score: </span>
+                    <span className="font-mono text-violet-100">{fmt(inVitroResults.inVitroScore, 0)}</span>
+                    <span className="text-slate-500"> · risk </span>
+                    <span className={
+                      inVitroResults.overallRisk === "Low"      ? "text-emerald-300" :
+                      inVitroResults.overallRisk === "Moderate" ? "text-amber-300"   :
+                                                                  "text-rose-300"
+                    }>{inVitroResults.overallRisk}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-violet-500/15 text-[11px] text-slate-500 italic">
+                No L1 IVIVE numerics available — run L1 In-Vitro to populate.
+              </div>
+            )}
           </div>
 
           {/* L2 Confirmation */}
@@ -362,6 +424,92 @@ export function IvieOutputHandoffPage({
                 <span className="font-mono">{confirmationBlock?.exVivoEntryMode ? String(confirmationBlock.exVivoEntryMode) : "—"}</span>
               </div>
             </div>
+
+            {/* ── L2 IVIVE Dose Projection — first-pass PK + margins ───────── */}
+            {l2Projection ? (
+              <div className="mt-3 pt-3 border-t border-cyan-500/15">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-semibold">
+                    L2 IVIVE Dose Projection
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                    l2Projection.verdict === "GO"     ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40" :
+                    l2Projection.verdict === "WATCH"  ? "bg-amber-500/15 text-amber-300 border-amber-500/40"      :
+                                                        "bg-rose-500/15 text-rose-300 border-rose-500/40"
+                  }`}>
+                    {l2Projection.verdict}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
+                  <div>
+                    <span className="text-slate-500">Target Cmax,u: </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.targetCmaxUnbound_nM, 1, "nM")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Target Cmax,total: </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.targetCmaxTotal_nM, 1, "nM")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">fu (used): </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.fu_fraction * 100, 2, "%")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Vd: </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.Vd_L_per_kg, 2, "L/kg")}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">F (oral): </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.F_oral, 2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Hepatic CL: </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.hepaticCL_mL_min_kg, 2, "mL/min/kg")}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500">Predicted dose: </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.predictedDose_mg_per_kg, 3, "mg/kg")}</span>
+                    <span className="text-slate-500"> · </span>
+                    <span className="font-mono text-cyan-100">{fmt(l2Projection.predictedDose_mg_per_day, 2, "mg/day")}</span>
+                  </div>
+                </div>
+
+                {/* Therapeutic-index margins */}
+                {l2Projection.margins.length > 0 && (
+                  <div className="mt-2.5">
+                    <div className="text-[10px] uppercase tracking-wider text-cyan-300/70 font-semibold mb-1">
+                      Therapeutic-Index Margins
+                    </div>
+                    <ul className="space-y-1">
+                      {l2Projection.margins.map((m, i) => {
+                        const tint =
+                          m.tier === "SAFE"    ? "text-emerald-300" :
+                          m.tier === "CAUTION" ? "text-amber-300"   :
+                          m.tier === "RISK"    ? "text-rose-300"    :
+                                                 "text-slate-400";
+                        return (
+                          <li key={i} className="text-[11px] flex items-center justify-between gap-2">
+                            <span className="text-slate-300 truncate">{m.label}</span>
+                            <span className="font-mono shrink-0">
+                              <span className={tint}>{fmt(m.ratio, 1, "×")}</span>
+                              <span className="text-slate-500"> ({m.tier})</span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Confidence banner */}
+                <div className="mt-2 text-[10px] text-amber-300/80 italic">
+                  Confidence: {l2Projection.confidence} — first-pass projection, not a substitute for PBPK.
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-cyan-500/15 text-[11px] text-slate-500 italic">
+                No L2 IVIVE dose projection emitted yet — run L2 In-Silico (step 8) to populate.
+              </div>
+            )}
           </div>
 
           {/* IVIVE wet-lab substrate — editable here (moved out of L2 Confirmation

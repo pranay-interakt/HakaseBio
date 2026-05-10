@@ -4159,7 +4159,9 @@ export function HakaseAI() {
               ivieInputs={ivieInputs}
               onIvieInputsChange={setIvieInputs}
               simResults={simResults}
+              inVitroResults={inVitroResults}
               confirmationBlock={confirmationBlock}
+              l2Projection={l2Projection}
               safetyFlags={safetyFlags}
               onBack={() => setIviveHandoffOpen(false)}
               onProceed={(signOff) => {
