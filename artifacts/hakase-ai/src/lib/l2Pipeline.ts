@@ -161,7 +161,15 @@ export function runStage0(sim: SimResults, iv: InVitroResults): StageResult<Stag
   };
 }
 
-// ── Stage 1 — Structure prep + protein druggability ─────────────────────────
+// ── Stage 1 — Target druggability ────────────────────────────────────────────
+// Protein druggability via ESM-2 RF on the L1 UniProt target.
+// The `rdkit_descriptors`, `rule_of_5`, `veber_pass` fields below are
+// PASSIVELY COPIED from the frozen L1 SimResults — they are NOT recomputed.
+// RDKit-JS is deterministic by construction, so a "L1 vs L2 ligand
+// disagreement" falsifier could never fire on real evidence; per the v2.0.0
+// falsifier criterion (machine-checkable AND meaningful) it is not in the
+// FALSIFIER_REGISTRY. Integrity of the L1→L2 handoff is enforced by the
+// EvidencePointer minted in Stage 0 (`evt://l1/<sha256>`), not here.
 export interface Stage1Result {
   rdkit_descriptors: {
     mw:        number;
@@ -207,7 +215,7 @@ export async function runStage1(sim: SimResults): Promise<StageResult<Stage1Resu
       };
     } catch (e: any) {
       return {
-        stage: 1, name: "Structure prep + druggability",
+        stage: 1, name: "Target druggability",
         status: "error",
         reason: `Protein druggability call failed: ${e?.message ?? e}`,
         ranAt: new Date().toISOString(),
@@ -217,7 +225,7 @@ export async function runStage1(sim: SimResults): Promise<StageResult<Stage1Resu
   }
 
   return {
-    stage: 1, name: "Structure prep + druggability",
+    stage: 1, name: "Target druggability",
     status: "wired",
     ranAt:  new Date().toISOString(),
     durationMs: performance.now() - t0,

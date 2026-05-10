@@ -42,12 +42,12 @@ const L2_STAGES: StageDef[] = [
     ],
   },
   {
-    n: 1, name: "Structure prep + protein druggability", wired: "ai-service",
-    detail: "RDKit descriptors + Lipinski/Veber rule checks (browser-side). Protein druggability via ESM-embedded random-forest classifier on the L1 UniProt target.",
+    n: 1, name: "Target druggability", wired: "ai-service",
+    detail: "Protein druggability via ESM-embedded random-forest classifier on the L1 UniProt target. L1 ligand descriptors (MW, logP, TPSA, QED, SA, RoF, Veber) are passively surfaced for at-a-glance context — they are not recomputed (RDKit-JS is deterministic; integrity is enforced by the L1 EvidencePointer frozen in Stage 0, not by a fake re-derivation falsifier).",
     engines: [
-      { name: "RDKit-JS",  note: "browser — descriptors, RoF, Veber" },
       { name: "ai-service /predict/protein-ml",   note: "ESM2 embedding → druggability classifier" },
-      { name: "fpocket / P2Rank",    note: "OOS — pocket detection requires PDB + GPU" },
+      { name: "L1 ligand context (passive)",      note: "MW/logP/TPSA/QED/SA/RoF/Veber re-rendered from L1 SimResults; not recomputed" },
+      { name: "fpocket / P2Rank",                 note: "OOS — pocket detection requires PDB + GPU" },
     ],
   },
   {
@@ -699,16 +699,16 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
             </ResultShell>
           )}
 
-          {/* Stage 1 — Druggability */}
+          {/* Stage 1 — Target druggability */}
           {results.s1 && (
-            <ResultShell stage={1} name="Structure prep + druggability" icon={FlaskConical} status={results.s1.status} reason={results.s1.reason}>
+            <ResultShell stage={1} name="Target druggability" icon={FlaskConical} status={results.s1.status} reason={results.s1.reason}>
               {results.s1.result && (() => {
                 const r = results.s1.result;
                 return (
                   <>
                     <div className="grid grid-cols-2 gap-3 text-[11px]">
-                      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">RDKit descriptors</div>
+                      <div className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5 space-y-1" title="Passively rendered from the frozen L1 SimResults — these values are not recomputed by Stage 1. Integrity is enforced by the L1 EvidencePointer (Stage 0), not by a re-derivation check.">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">L1 ligand context · passive</div>
                         <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
                           <span className="text-slate-500">MW</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.mw.toFixed(0)}</span>
                           <span className="text-slate-500">LogP</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.logP.toFixed(2)}</span>

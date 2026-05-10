@@ -101,14 +101,13 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: true,
   },
   {
-    n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "stub-with-manual",
-    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L3 Animal Cohort's Amber Curator. No data entry — runs whenever any Stage 1–5 result exists.",
+    n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "in-house",
+    detail: "Pure orchestration over Stages 1–5. Builds the per-readout tier envelope (t0 / t-user / pending / not_applicable) consumed by L3 Animal Cohort's Amber Curator. Auto-runs whenever any Stage 1–5 result exists — no data entry, no manual form.",
     engines: [
       { name: "lib/exVivoSurrogate.ts (orchestrator)", note: "per-readout ReadoutBlock<V> envelope; mixed-tier envelopes are normal" },
       { name: "L2 Ex-Vivo → L3 envelope (Amber Curator gate)", note: "canSignLoadBearing requires kind:'pass' — t-user maps to prediction_only" },
     ],
-    pendingReason: "Always runnable as soon as any Stage 1–5 has a result.",
-    acceptsManualEntry: true,
+    acceptsManualEntry: false,
   },
 ];
 
@@ -1388,7 +1387,7 @@ export function Layer3ExVivoScaffold({
             </span>
           </div>
           <p className="text-[12px] text-slate-500">
-            T0 in-silico surrogate · Stages 1, 2, 5 in-house · Stage 3 ai-service (Drug2cell + Tabula Sapiens) · Stages 4 + 6 accept Manual Entry per Spec v1.1 Appendix B
+            T0 in-silico surrogate · Stages 1, 2, 5, 6 in-house · Stage 3 ai-service (Drug2cell + Tabula Sapiens) · Stage 4 accepts Manual Entry per Spec v1.1 Appendix B
           </p>
         </div>
 
@@ -1406,7 +1405,7 @@ export function Layer3ExVivoScaffold({
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
-                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stages 4 + 6 accept Manual Entry tagged source: user-provided."
+                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stage 6 auto-orchestrates the per-readout envelope. Stage 4 accepts Manual Entry tagged source: user-provided."
                   : "Run L1 In Vitro first to enable L2 Ex-Vivo."}
               </p>
             </div>
@@ -1539,7 +1538,7 @@ export function Layer3ExVivoScaffold({
               <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
-                Stages 1, 2, 5 in-house · Stage 3 ai-service. Stages 4 + 6 accept Manual Entry tagged source: user-provided
+                Stages 1, 2, 5, 6 in-house · Stage 3 ai-service. Stage 4 accepts Manual Entry tagged source: user-provided
                 (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
               </p>
             </div>
@@ -1820,7 +1819,7 @@ export function Layer3ExVivoScaffold({
             <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
               <span className="font-semibold text-amber-300">Build status:</span> Stages 1, 2, 5 in-house (tissue selectivity + DILI binary classifier + biomarker rule table).
-              Stage 3 ai-service (Drug2cell + Tabula Sapiens; atlas Parquet required). Stages 4 + 6 accept Manual Entry to keep the cascade non-empty for known compounds.
+              Stage 3 ai-service (Drug2cell + Tabula Sapiens; atlas Parquet required). Stage 6 auto-orchestrates the per-readout envelope. Stage 4 accepts Manual Entry to keep the cascade non-empty for known compounds.
               Premium tier (DrugBank integration) will replace Manual Entry for Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
           </div>

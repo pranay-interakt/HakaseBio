@@ -20,7 +20,7 @@ L2 runs as a **10-stage staged pipeline**. Stages 0–4 and 6–9 run client-sid
 
 ```
 Stage 0 — Ingest L1 Outputs                  (instant, browser)
-Stage 1 — Structure Prep + Druggability      (~1s, browser + AI service)
+Stage 1 — Target Druggability                 (~1s, AI service; ligand fields passive from L1)
 Stage 2 — Docking (AutoDock Vina)            (~30s–10min, AI service)
 Stage 3 — ML Affinity + ADMET-AI cross-check (~5s, AI service)
 Stage 4 — Selectivity + Cardiotox ML         (~3s, AI service)
@@ -55,24 +55,22 @@ Stage 0 freezes the handoff from Layer 1. It reads the in-memory L1 state (`simR
 
 ---
 
-## Stage 1 — Structure Prep + Protein Druggability
+## Stage 1 — Target Druggability
 
 **Source**: `l2Pipeline.ts → runStage1()`, `ai-service/models/protein_ml.py`
 
-Stage 1 has two halves:
+Stage 1 does one piece of meaningful work: **target druggability scoring**. The target UniProt sequence is fetched from UniProt and passed through a frozen **ESM-2** (Evolutionary Scale Modeling, Lin et al. 2022) language model in the AI service. The pooled embedding feeds a logistic head trained on a curated druggable/non-druggable protein set; the output is `druggability_probability ∈ [0,1]` and a class label.
 
-**Ligand half (browser, RDKit-JS):** recomputes a clean canonical SMILES, runs Lipinski Rule-of-5 and Veber filters, and recomputes QED (Quantitative Estimate of Drug-likeness, Bickerton 2012) and SA-score (Ertl & Schuffenhauer synthetic accessibility). This is intentionally a *re-derivation* of L1 numbers — any disagreement with L1 is itself a falsifier.
-
-**Protein half (Python):** the target UniProt sequence is fetched from UniProt and passed through a frozen **ESM-2** (Evolutionary Scale Modeling, Lin et al. 2022) language model in the AI service. The pooled embedding feeds a logistic head trained on a curated druggable/non-druggable protein set; the output is `druggability_probability ∈ [0,1]` and a class label.
+**L1 ligand context (passive render, no work):** the right-pane tile shows L1's MW, logP, TPSA, QED, SA-score, Lipinski Rule-of-5 status, and Veber status — but these are **passively copied from the frozen L1 `SimResults`**, not recomputed. RDKit-JS is deterministic by construction, so an "L1 vs L2 ligand re-derivation" falsifier could never fire on real evidence. Per the v2.0.0 falsifier criterion (*pre-registered, machine-checkable, AND able to fire on real evidence*), no such falsifier exists in the `FALSIFIER_REGISTRY`. Integrity of the L1→L2 ligand handoff is enforced upstream by the **L1 EvidencePointer** minted in Stage 0 (`evt://l1/<sha256>`), which cryptographically binds every downstream stage to the exact L1 run that produced the SMILES + descriptors.
 
 | Database / model | Use |
 |---|---|
-| **RDKit-JS** (WASM, in-browser) | Descriptors, QED, SA, Lipinski/Veber |
 | **UniProt REST** (`proteinApi.ts`) | Reference sequence for the target |
 | **ESM-2** (Meta AI, frozen weights) | Protein representation |
 | **Druggability classifier** (logistic head over ESM-2) | Binary druggable probability |
+| **L1 `SimResults` (passive)** | Ligand descriptors carried over for at-a-glance context — not recomputed |
 
-**Result object**: `Stage1Result` — `{ qed, saScore, lipinskiPasses, veberPasses, druggabilityProb, druggabilityClass }`.
+**Result object**: `Stage1Result` — `{ protein: { uniprot, druggability_probability, druggability_class, source }, rdkit_descriptors, rule_of_5, veber_pass }`. The `rdkit_descriptors` / `rule_of_5` / `veber_pass` fields are L1-pinned values surfaced for UI density; the only Stage 1 computation is `protein.*`.
 
 ---
 
