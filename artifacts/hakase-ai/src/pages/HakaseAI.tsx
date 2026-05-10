@@ -2796,7 +2796,7 @@ export function HakaseAI() {
                               return (
                                 <button
                                   key={sugg.uniprotId}
-                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); handleProteinFetch(sugg.uniprotId); }}
+                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); /* No auto-fetch — user clicks Fetch explicitly (no-preload policy) */ }}
                                   className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
                                 >
                                   {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
@@ -2923,7 +2923,7 @@ export function HakaseAI() {
                                             setPdbStructure(null);
                                             setProteinInfo(null);
                                             setProteinError(null);
-                                            handleProteinFetch(sugg.uniprotId);
+                                            // No auto-fetch — user clicks Fetch explicitly (no-preload policy)
                                           }}
                                           className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/35 transition-all"
                                         >
@@ -3064,7 +3064,7 @@ export function HakaseAI() {
                                                     setUniprotAutoMode(false);
                                                     setUniprotId(sugg.uniprotId);
                                                     setPdbId(pid);
-                                                    handleProteinFetch(sugg.uniprotId);
+                                                    // No auto-fetch — user clicks Fetch explicitly (no-preload policy)
                                                   }}
                                                   className="px-1 py-px rounded bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/40 text-[8px] font-mono transition-colors"
                                                   title={`Load PDB ${pid}`}
