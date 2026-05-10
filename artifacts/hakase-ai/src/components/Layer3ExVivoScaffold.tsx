@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
+import { deriveBiomarkers } from "@/lib/biomarkerProxy";
+import { projectPermeability } from "@/lib/permeabilityProjection";
 import type { L2InputParams } from "@/lib/l2DoseProjection";
 import {
   computeTissueSelectivityMatrix,
@@ -89,14 +91,13 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: true,
   },
   {
-    n: 5, name: "DILI biomarker proxy + permeability", wired: "stub-with-manual",
+    n: 5, name: "DILI biomarker proxy + permeability", wired: "in-house",
     detail: "Deterministic mapping from Stage 2 mechanism flags to expected biomarker pattern (mito → GLDH; cholestatic → ALP/bilirubin; hepatocellular → ALT, miR-122; immune → eosinophilia priors). Permeability auto-pulled from L1 Caco-2. Manual override for brain Kp,uu when MDR1-MDCK or PET data is available.",
     engines: [
-      { name: "lib/biomarkerProxy.ts (deterministic)", note: "rule table per spec §3.6 — Antoine 2013 / Wang 2009 / Andrade 2019" },
-      { name: "lib/permeabilityProjection.ts",         note: "L1 Caco-2 surfacing; brain Kp,uu manual override available" },
-      { name: "Manual entry (this build)",             note: "biomarker override + brain Kp,uu measured value (optional)" },
+      { name: "lib/biomarkerProxy.ts",         note: "in-house rule table per spec §3.6 — Antoine 2013 / DILIN / Wang 2009 / Andrade 2019" },
+      { name: "lib/permeabilityProjection.ts", note: "L1 Caco-2 surfacing; brain Kp,uu opt-in override (MDR1-MDCK or PET) — no imputed CNS values" },
     ],
-    pendingReason: "Auto-runs deterministically once Stage 2 is filled; biomarker rule table is in-house. Manual override available for measured brain Kp,uu.",
+    pendingReason: "Auto-runs deterministically once Stage 2 Manual Entry is filled (mechanism flags required). Optional brain Kp,uu override available.",
     acceptsManualEntry: true,
   },
   {
@@ -984,30 +985,13 @@ function deriveStage5FromStage2(
   l1: InVitroResults,
   brainKpUu_override?: number,
 ): Stage5Result {
-  const biomarkers: Stage5BiomarkerEntry[] = [];
-  if (s2.mechanisms.mitochondrial) {
-    biomarkers.push({ name: "GLDH (glutamate dehydrogenase)", rationale: "Mitochondrial damage marker · Antoine 2013" });
-  }
-  if (s2.mechanisms.bsep) {
-    biomarkers.push({ name: "ALP (alkaline phosphatase)", rationale: "Cholestatic pattern from BSEP inhibition · DILIN classification" });
-    biomarkers.push({ name: "Total bilirubin",            rationale: "Cholestatic pattern · Hy's Law triad component" });
-  }
-  if (s2.mechanisms.ros) {
-    biomarkers.push({ name: "ALT (alanine aminotransferase)", rationale: "Hepatocellular damage from oxidative stress" });
-    biomarkers.push({ name: "miR-122",                        rationale: "Early hepatocellular biomarker · Wang 2009 / Starkey Lewis 2011" });
-  }
-  if (s2.mechanisms.immune) {
-    biomarkers.push({ name: "Eosinophil count",       rationale: "Immune-mediated DILI prior · Andrade 2019" });
-    biomarkers.push({ name: "ALT + IgE elevation",     rationale: "Hypersensitivity reaction marker" });
-  }
-  if (biomarkers.length === 0) {
-    biomarkers.push({ name: "Routine LFT panel",      rationale: "No DILI mechanism flagged — ALT/AST/ALP routine monitoring only" });
-  }
+  const biomarkers = deriveBiomarkers(s2.mechanisms);
+  const perm = projectPermeability(l1, brainKpUu_override);
   return {
     source: brainKpUu_override !== undefined ? "user-provided" : "derived-from-stage-2",
     biomarkers,
-    brainKpUu_override,
-    caco2Papp_x10minus6: l1.permeability.caco2Papp,
+    brainKpUu_override: perm.brainKpUu_override,
+    caco2Papp_x10minus6: perm.caco2Papp_x10minus6,
     enteredAt: new Date().toISOString(),
   };
 }
@@ -1392,7 +1376,7 @@ export function Layer3ExVivoScaffold({
             </span>
           </div>
           <p className="text-[12px] text-slate-500">
-            T0 in-silico surrogate · Stages 1–2 wired (in-house ML) · Stages 3–6 accept Manual Entry per Spec v1.1 Appendix B
+            T0 in-silico surrogate · Stages 1, 2, 5 in-house · Stage 3 ai-service (Drug2cell + Tabula Sapiens) · Stages 4 + 6 accept Manual Entry per Spec v1.1 Appendix B
           </p>
         </div>
 
@@ -1410,7 +1394,7 @@ export function Layer3ExVivoScaffold({
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
-                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stages 3–6 accept Manual Entry tagged source: user-provided."
+                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stages 4 + 6 accept Manual Entry tagged source: user-provided."
                   : "Run L1 In Vitro first to enable L2 Ex-Vivo."}
               </p>
             </div>
@@ -1543,7 +1527,7 @@ export function Layer3ExVivoScaffold({
               <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
-                Stages 1–2 wired (in-house ML). Stages 3–6 accept Manual Entry tagged source: user-provided
+                Stages 1, 2, 5 in-house · Stage 3 ai-service. Stages 4 + 6 accept Manual Entry tagged source: user-provided
                 (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
               </p>
             </div>
@@ -1555,7 +1539,7 @@ export function Layer3ExVivoScaffold({
               <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L2 Ex-Vivo pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stages 1–2 (computed) and/or fill any of Stages 3–6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to assemble the envelope.
+                Run Stages 1, 2, 3, 5 (computed) and/or fill Stages 4 + 6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to assemble the envelope.
               </p>
             </div>
           )}
@@ -1821,8 +1805,8 @@ export function Layer3ExVivoScaffold({
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
             <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              <span className="font-semibold text-amber-300">Build status:</span> Stages 1–2 wired (in-house ML — tissue selectivity + DILI binary classifier).
-              Stages 3–6 accept Manual Entry to keep the cascade non-empty for known compounds.
+              <span className="font-semibold text-amber-300">Build status:</span> Stages 1, 2, 5 in-house (tissue selectivity + DILI binary classifier + biomarker rule table).
+              Stage 3 ai-service (Drug2cell + Tabula Sapiens; atlas Parquet required). Stages 4 + 6 accept Manual Entry to keep the cascade non-empty for known compounds.
               Premium tier (DrugBank integration) will replace Manual Entry for Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
           </div>
