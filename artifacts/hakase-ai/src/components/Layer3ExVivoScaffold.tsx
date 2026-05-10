@@ -1477,27 +1477,11 @@ export function Layer3ExVivoScaffold({
 
         <div className="flex-1 p-5 space-y-6">
 
-          <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${
-            hasL1 ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/25 bg-amber-500/5"
-          }`}>
-            {hasL1
-              ? <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              : <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
-            <div className="flex-1">
-              <div className={`text-[11px] font-semibold ${hasL1 ? "text-emerald-300" : "text-amber-300"}`}>
-                {hasL1
-                  ? (layer2Ready
-                      ? "L1 + L2 prerequisites met — ready to run L3 Ex-Vivo stages below"
-                      : "L1 ready — L2 chain auto-reruns on Stage 1 click; then L3 stages unlock")
-                  : "Awaiting L1 In Vitro completion"}
-              </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                {hasL1
-                  ? "L3 stages have not run yet — click each stage's Run button below. Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 4 calls the ai-service DepMap PRISM 24Q2 patient-line projection (snapshot Parquet required; non-oncology compounds use Manual Entry's not_applicable mode). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stage 6 auto-orchestrates the per-readout envelope. Stages 2–5 also accept Manual Entry tagged source: user-provided."
-                  : "Run L1 In Vitro first to enable L3 Ex-Vivo."}
-              </p>
-            </div>
-          </div>
+          {/* Prerequisite/status banner removed per user request (May 2026).
+              The per-stage Run buttons + lock icons already convey readiness;
+              the long descriptive paragraph was redundant with the section
+              header above. State (`hasL1`, `layer2Ready`) is still consumed
+              elsewhere in this scaffold to gate Run buttons. */}
 
           <section>
             <div className="flex items-center gap-2 mb-3">
