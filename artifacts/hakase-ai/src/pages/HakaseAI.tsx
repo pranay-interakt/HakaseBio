@@ -1938,8 +1938,9 @@ export function HakaseAI() {
         </div>
       </header>
 
-      {/* Simulation Status Bar */}
-      {(simStatus[activeLayer] === "running") && (
+      {/* Simulation Status Bar — suppressed while the IVIVE handoff page is
+          open so its own footer (Back / Proceed) is the only progression UI. */}
+      {!iviveHandoffOpen && (simStatus[activeLayer] === "running") && (
         <div className="h-10 bg-violet-900/30 border-b border-violet-500/20 flex items-center px-6 gap-4 shrink-0">
           <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
           <span className="text-[12px] text-violet-300 font-medium">
@@ -1955,7 +1956,7 @@ export function HakaseAI() {
         </div>
       )}
 
-      {simStatus[activeLayer] === "complete" && (
+      {!iviveHandoffOpen && simStatus[activeLayer] === "complete" && (
         <div className="bg-emerald-900/20 border-b border-emerald-500/20 shrink-0">
           <div className="h-10 flex items-center px-6 gap-3">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -2214,7 +2215,7 @@ export function HakaseAI() {
         <main className="flex-1 flex flex-col overflow-hidden">
 
           {/* Layer 1 — In Vitro Digital Twin */}
-          {activeLayer === 1 && (
+          {activeLayer === 1 && !iviveHandoffOpen && (
             <div className="flex-1 flex overflow-hidden">
               {/* Input Panel */}
               <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col">
@@ -4190,7 +4191,7 @@ export function HakaseAI() {
               then moved from slot 4 → slot 3 in May 2026 restructure)
               Same simulation logic — only the slot index moved. ICH M3(R2)
               battery, GLP-grade, hands off to L4 First In Human downstream. */}
-          {activeLayer === 3 && (
+          {activeLayer === 3 && !iviveHandoffOpen && (
             <div className="flex-1 flex overflow-hidden">
               <div className="w-[460px] border-r border-white/8 overflow-y-auto flex flex-col">
                 <div className="p-5 border-b border-white/8">
@@ -4511,7 +4512,7 @@ export function HakaseAI() {
               derives Phase 1 design seeds: MABEL starting dose, escalation
               scheme, special-pop arms, IND-gate readiness. Phase 1 planner
               redesign is staged as a follow-up. */}
-          {activeLayer === 4 && (
+          {activeLayer === 4 && !iviveHandoffOpen && (
             <FirstInHumanPanel
               hasL3={simStatus[3] === "complete"}
               animalResults={animalResults}
