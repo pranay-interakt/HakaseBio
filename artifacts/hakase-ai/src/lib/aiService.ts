@@ -548,6 +548,142 @@ export async function predictCellTypeAggregation(
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// L3 Stage 4 — Patient-line projection (DepMap PRISM 24Q2, oncology only)
+// ---------------------------------------------------------------------------
+
+export interface PatientLineCellLine {
+  depmap_id: string;
+  cell_line_name: string;
+  primary_disease: string;
+  lineage: string;
+  essentiality_chronos: number;
+  expression_log2_tpm: number;
+  modifier: number | null;
+  predicted_IC50_uM: number | null;
+  category: "highly_sensitive" | "sensitive" | "near_baseline" | "resistant" | "resistant_no_target";
+}
+
+export interface PatientLineDistribution {
+  n: number;
+  median_uM: number | null;
+  p10_uM: number | null;
+  p90_uM: number | null;
+  min_uM: number | null;
+  max_uM: number | null;
+}
+
+export interface PatientLineLineageRollup {
+  lineage: string;
+  n_cell_lines: number;
+  median_predicted_IC50_uM: number;
+  n_highly_sensitive: number;
+  n_sensitive: number;
+  n_near_baseline: number;
+  n_resistant: number;
+}
+
+export interface PatientLinePrediction {
+  query_gene_symbol: string;
+  l1_ic50_nM: number;
+  alpha: number;
+  indication_keyword: string | null;
+  n_cell_lines_total: number;
+  n_resistant_no_target: number;
+  distribution: PatientLineDistribution;
+  top_sensitive_lines: PatientLineCellLine[];
+  bottom_resistant_lines: PatientLineCellLine[];
+  per_lineage: PatientLineLineageRollup[];
+}
+
+export interface PatientLineModelInfo {
+  engine: string;
+  method: string;
+  scope_caveat: string;
+  snapshot: {
+    name: string;
+    release?: string;
+    preparation_date?: string;
+    n_cell_lines?: string;
+    n_target_genes?: string;
+    n_oncology_lineages?: string;
+    notebook_version?: string;
+    loaded_at?: string;
+  };
+  license: string;
+}
+
+export type PatientLineResult =
+  | {
+      source: "ml";
+      ml_available: true;
+      prediction: PatientLinePrediction;
+      model_info: PatientLineModelInfo;
+    }
+  | {
+      source: "data-not-provisioned";
+      ml_available: false;
+      error: string;
+      snapshot_path?: string;
+      remediation?: string;
+    }
+  | {
+      source: "out-of-domain";
+      ml_available: boolean;
+      error: string;
+      targets_out_of_domain?: string[];
+      model_info?: { engine: string; snapshot: string };
+    }
+  | {
+      source: "input-error";
+      ml_available: false;
+      error: string;
+    };
+
+export interface PatientLineRequestOptions {
+  indicationKeyword?: string;
+  alpha?: number;
+  topN?: number;
+}
+
+export async function predictPatientLine(
+  targetGeneSymbol: string,
+  l1Ic50_nM: number,
+  oncology: boolean,
+  opts: PatientLineRequestOptions = {},
+): Promise<PatientLineResult> {
+  const res = await fetch(`${API_BASE}/patient-line`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      target_gene_symbol: targetGeneSymbol,
+      l1_ic50_nM: l1Ic50_nM,
+      oncology,
+      indication_keyword: opts.indicationKeyword ?? null,
+      alpha: opts.alpha ?? 1.0,
+      top_n: opts.topN ?? 25,
+    }),
+  });
+  // 503 → data-not-provisioned envelope; 400 → out-of-domain or input-error envelope.
+  if (res.status === 503 || res.status === 400) {
+    const body = await res.json().catch(() => null);
+    const detail = body?.detail ?? body;
+    if (detail && typeof detail === "object" && "source" in detail) {
+      return detail as PatientLineResult;
+    }
+    return {
+      source: res.status === 503 ? "data-not-provisioned" : "input-error",
+      ml_available: false,
+      error: typeof detail === "string" ? detail : "Patient-line projection unavailable.",
+    };
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "AI service error" }));
+    throw new Error(err.detail ?? err.error ?? "Patient-line projection failed");
+  }
+  return res.json();
+}
+
 export interface DiliMlResult {
   smiles: string;
   source: "ml" | "fallback";

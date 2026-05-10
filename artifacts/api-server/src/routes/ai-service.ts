@@ -245,6 +245,20 @@ router.post("/ai/celltype-aggregation", async (req, res) => {
   }
 });
 
+router.post("/ai/patient-line", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/patient-line`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 router.get("/ai/models/status", async (_req, res) => {
   try {
     const resp = await fetch(`${AI_SERVICE_URL}/models/status`);

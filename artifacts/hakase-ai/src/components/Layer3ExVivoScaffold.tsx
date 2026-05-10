@@ -20,7 +20,10 @@ import {
   type TransporterFlagsResult,
   type TransporterChannel,
 } from "@/lib/transporterFlags";
-import { predictDiliMl, predictCellTypeAggregation, predictProtein, type DiliMlResult } from "@/lib/aiService";
+import {
+  predictDiliMl, predictCellTypeAggregation, predictProtein, predictPatientLine,
+  type DiliMlResult, type PatientLinePrediction, type PatientLineModelInfo,
+} from "@/lib/aiService";
 
 interface Layer3ExVivoScaffoldProps {
   layer2Ready: boolean;
@@ -31,7 +34,7 @@ interface Layer3ExVivoScaffoldProps {
 
 /* ─── Stage definitions (per Spec v1.1 §3 + §10 + Appendix B) ─────────────── */
 
-type WiredKind = "in-house" | "ml-service" | "external-data" | "stub-with-manual";
+type WiredKind = "in-house" | "ml-service" | "external-data";
 
 type StageStatus = "ready" | "running" | "complete" | "error" | "out-of-scope-yet";
 
@@ -41,9 +44,9 @@ type StageDef = {
   detail: string;
   wired: WiredKind;
   engines: { name: string; note: string }[];
-  /** When wired = "stub-with-manual": short reason shown above the manual-entry option. */
+  /** Optional reason copy rendered above any manual-entry path; kept optional for future pending stages. */
   pendingReason?: string;
-  /** True for stages 2–6: ML model is not yet wired but a Manual Entry path is available. */
+  /** True for stages whose schema also accepts a Manual Entry path (currently 2, 3, 4, 5). Stage 6 is pure orchestration. */
   acceptsManualEntry: boolean;
 };
 
@@ -79,15 +82,14 @@ const L3_STAGES: StageDef[] = [
     acceptsManualEntry: true,
   },
   {
-    n: 4, name: "Patient-line projection (oncology only)", wired: "stub-with-manual",
-    detail: "Predicted IC50 distribution across patient-line genomics from HCMI catalogue + DepMap PRISM, conditioned on indication + target gene. Manual entry accepts already-measured DepMap PRISM IC50 rows, or marks the readout as not_applicable when the compound is non-oncology.",
+    n: 4, name: "Patient-line projection (oncology only)", wired: "ml-service",
+    detail: "Per-cell-line projection of the L1 IC50 across the DepMap PRISM 24Q2 oncology panel, conditioned on per-cell-line target essentiality (Chronos CRISPR) + expression (CCLE log2 TPM). Deterministic in-house formula — predicted_IC50_uM(cell) = L1_IC50_uM × 2^(α · chronos), with `expression < 1.0 log2(TPM+1)` cell lines marked resistant_no_target. NOT a trained Chemprop GBM (the v2 spec pass downgraded that earlier overclaim). Snapshot Parquet preprocessed off-platform via colab_notebooks/prepare_depmap_prism.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for measured DepMap PRISM IC50 rows or to mark a non-oncology compound as not_applicable.",
     engines: [
-      { name: "lib/patientLineProjection.ts",   note: "TO BUILD — null when out-of-domain (non-oncology)" },
-      { name: "HCMI (NCI / ATCC)",              note: "~700 next-gen cancer models with paired matched-normal genomics" },
-      { name: "DepMap PRISM",                   note: "6,000 cmpds × 2,000 cell lines IC50 — labelled-proxy with explicit '2D not organoid' tag" },
-      { name: "Manual entry (this build)",      note: "DepMap accession + measured IC50 rows, OR explicit non-oncology not_applicable" },
+      { name: "ai-service /predict/patient-line", note: "in-house deterministic projection; HTTP 503 + data-not-provisioned when snapshot Parquet absent — NO synthetic fallback" },
+      { name: "DepMap PRISM 24Q2 (Broad)",        note: "Preprocessed off-platform → depmap_prism_aggregated.parquet (per-cell-line target essentiality + expression for the prepared target set); pinned by release tag" },
+      { name: "HCMI (NCI / ATCC)",                note: "~700 next-gen cancer models with paired matched-normal genomics — reference catalogue for downstream T2 wet-anchor selection" },
+      { name: "Manual entry (this build)",        note: "DepMap accession + measured IC50 rows, OR explicit non-oncology not_applicable" },
     ],
-    pendingReason: "HCMI + DepMap snapshots pending DVC ingest (spec §3.5, ETA 5–7 d, oncology only).",
     acceptsManualEntry: true,
   },
   {
@@ -178,11 +180,22 @@ type Stage3Result = Stage3MlResult | Stage3ManualResult;
 interface Stage4ManualRow { depmapId: string; ic50_uM: number; citation: string; }
 
 interface Stage4ManualResult {
+  kind: "manual";
   source: "user-provided";
   mode: "oncology-rows" | "non-oncology-na";
   rows: Stage4ManualRow[];
   enteredAt: string;
 }
+
+interface Stage4MlResult {
+  kind: "ml";
+  source: "ml";
+  prediction: PatientLinePrediction;
+  modelInfo: PatientLineModelInfo;
+  enteredAt: string;
+}
+
+type Stage4Result = Stage4ManualResult | Stage4MlResult;
 
 interface Stage5BiomarkerEntry { name: string; rationale: string; }
 
@@ -264,8 +277,6 @@ function wiredBadge(w: WiredKind): { text: string; cls: string } {
       return { text: "ai-service", cls: "border-violet-500/30 bg-violet-500/8 text-violet-300" };
     case "external-data":
       return { text: "external data", cls: "border-cyan-500/30 bg-cyan-500/8 text-cyan-300" };
-    case "stub-with-manual":
-      return { text: "stub · manual ok", cls: "border-amber-500/30 bg-amber-500/8 text-amber-300" };
   }
 }
 
@@ -313,7 +324,7 @@ function StageCard({
   children?: React.ReactNode;
 }) {
   const wb = wiredBadge(stage.wired);
-  const canAutoRun = stage.wired === "in-house" || stage.wired === "ml-service" || stage.n === 5 || stage.n === 6;
+  const canAutoRun = stage.wired === "in-house" || stage.wired === "ml-service";
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
       <div className="flex items-start gap-2.5 mb-2">
@@ -542,7 +553,7 @@ function mlLabelForStage(n: number): string {
   switch (n) {
     case 2: return "ML model · ai-service (DILI binary classifier)";
     case 3: return "ML model · ai-service (Drug2cell + Tabula Sapiens)";
-    case 4: return "ML model (not yet wired — DepMap PRISM pending)";
+    case 4: return "ML model · ai-service (DepMap PRISM 24Q2 patient-line projection)";
     case 5: return "Auto-derive · in-house rule table (needs Stage 2 mechanisms)";
     default: return "ML model";
   }
@@ -767,6 +778,7 @@ function Stage4ManualForm({ onSave }: { onSave: (r: Stage4ManualResult) => void 
       <button
         type="button" disabled={!valid}
         onClick={() => onSave({
+          kind: "manual",
           source: "user-provided", mode,
           rows: mode === "oncology-rows" ? validRows.map(r => ({ ...r, depmapId: r.depmapId.toUpperCase() })) : [],
           enteredAt: new Date().toISOString(),
@@ -1024,7 +1036,7 @@ interface PipelineResults {
   s1?: StageResultBlock<Stage1Result>;
   s2?: StageResultBlock<Stage2Result>;
   s3?: StageResultBlock<Stage3Result>;
-  s4?: StageResultBlock<Stage4ManualResult>;
+  s4?: StageResultBlock<Stage4Result>;
   s5?: StageResultBlock<Stage5Result>;
   s6?: StageResultBlock<Stage6Result>;
 }
@@ -1061,11 +1073,13 @@ function buildStage6Envelope(results: PipelineResults): Stage6Result {
     tiers.push({ stage: 3, name: def3.name, tier: "pending", cascadeKind: "not_applicable" });
   }
 
-  // Stage 4 special: non-oncology mode → not_applicable
+  // Stage 4: ML projection → t0; Manual oncology rows → t-user; Manual non-oncology N/A → n/a.
   const s4 = results.s4;
   const def4 = L3_STAGES.find(s => s.n === 4)!;
   if (s4?.status === "complete") {
-    if (s4.result.mode === "non-oncology-na") {
+    if (s4.result.kind === "ml") {
+      tiers.push({ stage: 4, name: def4.name, tier: "t0", cascadeKind: "prediction_only" });
+    } else if (s4.result.mode === "non-oncology-na") {
       tiers.push({ stage: 4, name: def4.name, tier: "n/a", cascadeKind: "not_applicable" });
     } else {
       tiers.push({ stage: 4, name: def4.name, tier: "t-user", cascadeKind: "prediction_only" });
@@ -1182,6 +1196,59 @@ export function Layer3ExVivoScaffold({
     setOne("s6", { status: "complete", result: buildStage6Envelope(results) });
   };
 
+  const runStage4Ml = async () => {
+    if (!simResults?.uniprotId) {
+      setOne("s4", { status: "error", reason: "Stage 4 ML needs an L1 UniProt target — no gene to project against the DepMap PRISM 24Q2 oncology panel." });
+      return;
+    }
+    if (!simResults.binding?.primaryIC50 || !isFinite(simResults.binding.primaryIC50) || simResults.binding.primaryIC50 <= 0) {
+      setOne("s4", { status: "error", reason: "Stage 4 ML needs a positive L1 IC50 (nM) — projection conditions on the surrogate IC50." });
+      return;
+    }
+    setBusyStage(4);
+    setOne("s4", { status: "running" });
+    try {
+      // Resolve HUGO gene symbol from UniProt — refuses to silently substitute the accession.
+      const protein = await predictProtein(simResults.uniprotId);
+      const geneSymbol = (protein?.gene_name ?? "").toString().trim().toUpperCase();
+      if (!geneSymbol) {
+        setOne("s4", { status: "error", reason: `Stage 4 ML needs a HUGO gene symbol; UniProt ${simResults.uniprotId} returned no gene_name.` });
+        return;
+      }
+      // Caller asserts oncology=true via the ML toggle; non-oncology compounds use Manual Entry's not_applicable mode.
+      const r = await predictPatientLine(geneSymbol, simResults.binding.primaryIC50, true);
+      if (r.source === "data-not-provisioned") {
+        setOne("s4", { status: "error", reason: r.error + (r.remediation ? ` — ${r.remediation}` : "") });
+        return;
+      }
+      if (r.source === "out-of-domain") {
+        const oodGenes = r.targets_out_of_domain && r.targets_out_of_domain.length > 0
+          ? ` (out-of-domain: ${r.targets_out_of_domain.join(", ")})`
+          : "";
+        setOne("s4", { status: "error", reason: `${r.error}${oodGenes}` });
+        return;
+      }
+      if (r.source === "input-error") {
+        setOne("s4", { status: "error", reason: r.error });
+        return;
+      }
+      setOne("s4", {
+        status: "complete",
+        result: {
+          kind: "ml",
+          source: "ml",
+          prediction: r.prediction,
+          modelInfo: r.model_info,
+          enteredAt: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      setOne("s4", { status: "error", reason: err?.message ?? String(err) });
+    } finally {
+      setBusyStage(null);
+    }
+  };
+
   const runStage3Ml = async () => {
     if (!simResults?.uniprotId) {
       setOne("s3", { status: "error", reason: "Stage 3 ML needs an L1 UniProt target — no gene to score against the Tabula Sapiens v2 atlas." });
@@ -1233,9 +1300,9 @@ export function Layer3ExVivoScaffold({
     if (n === 1) return runStage1();
     if (n === 2) return runStage2Ml();
     if (n === 3) return runStage3Ml();
+    if (n === 4) return runStage4Ml();
     if (n === 5) return runStage5();
     if (n === 6) return runStage6();
-    // Stage 4: must use Manual Entry form to populate
   };
 
   const runFull = async () => {
@@ -1244,10 +1311,12 @@ export function Layer3ExVivoScaffold({
     try {
       await runStage1();
       await runStage2Ml();
-      // Stage 3 ML auto-runs if an L1 UniProt + gene symbol is available;
-      // it gracefully no-ops with an error block when the atlas Parquet is not provisioned yet.
+      // Stage 3 + Stage 4 ML both auto-run when an L1 UniProt is present; they each
+      // gracefully surface a `data-not-provisioned` error block when their respective
+      // off-platform Parquet snapshot isn't loaded yet — never a synthetic fallback.
       if (simResults?.uniprotId) {
         await runStage3Ml();
+        await runStage4Ml();
       }
       // Stage 5 only auto-derives if Stage 2 manual entry already exists
       // (ML-only S2 does NOT carry mechanism flags — Manual Entry is required).
@@ -1284,7 +1353,11 @@ export function Layer3ExVivoScaffold({
         s1: results.s1?.status === "complete" ? "in-house-ml" : "pending",
         s2: results.s2?.status === "complete" ? (results.s2.result.kind === "ml" ? "ml-binary-classifier" : "user-provided") : "pending",
         s3: results.s3?.status === "complete" ? (results.s3.result.kind === "ml" ? "ml-celltype-aggregation" : "user-provided") : "pending",
-        s4: results.s4?.status === "complete" ? (results.s4.result.mode === "non-oncology-na" ? "not-applicable" : "user-provided") : "pending",
+        s4: results.s4?.status === "complete"
+          ? (results.s4.result.kind === "ml"
+              ? "ml-patient-line-projection"
+              : (results.s4.result.mode === "non-oncology-na" ? "not-applicable" : "user-provided"))
+          : "pending",
         s5: results.s5?.status === "complete" ? results.s5.result.source : "pending",
         s6: results.s6?.status === "complete" ? "orchestration" : "pending",
       },
@@ -1331,7 +1404,12 @@ export function Layer3ExVivoScaffold({
                 return <>{v.organoidCvcl} · IC50 {v.measuredIc50_uM.toFixed(3)} µM · {v.assayFormat} · cite: <span className="text-slate-400 italic">{v.citation}</span></>;
               })()}
               {n === 4 && (() => {
-                const v = (r as StageResultBlock<Stage4ManualResult> & { status: "complete" }).result;
+                const v = (r as StageResultBlock<Stage4Result> & { status: "complete" }).result;
+                if (v.kind === "ml") {
+                  const top = v.prediction.top_sensitive_lines[0];
+                  const med = v.prediction.distribution.median_uM;
+                  return <>panel n=<span className="text-violet-300 font-mono">{v.prediction.n_cell_lines_total}</span> · median IC50 <span className="text-violet-300 font-mono">{med != null ? med.toFixed(3) : "—"}</span> µM · top {top?.cell_line_name ?? "—"} <span className="text-slate-400 italic">(DepMap PRISM 24Q2)</span></>;
+                }
                 return v.mode === "non-oncology-na"
                   ? <>marked <span className="font-mono text-amber-300">not_applicable</span> · non-oncology compound</>
                   : <>{v.rows.length} cell-line{v.rows.length === 1 ? "" : "s"} (DepMap PRISM rows)</>;
@@ -1387,7 +1465,7 @@ export function Layer3ExVivoScaffold({
             </span>
           </div>
           <p className="text-[12px] text-slate-500">
-            T0 in-silico surrogate · Stages 1, 2, 5, 6 in-house · Stage 3 ai-service (Drug2cell + Tabula Sapiens) · Stage 4 accepts Manual Entry per Spec v1.1 Appendix B
+            T0 in-silico surrogate · Stages 1, 5, 6 in-house · Stages 2, 3, 4 ai-service (DILI-ML · Drug2cell + Tabula Sapiens · DepMap PRISM 24Q2 patient-line) · Manual Entry available for Stages 2–5 per Spec v1.1 Appendix B
           </p>
         </div>
 
@@ -1405,7 +1483,7 @@ export function Layer3ExVivoScaffold({
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                 {hasL1
-                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stage 6 auto-orchestrates the per-readout envelope. Stage 4 accepts Manual Entry tagged source: user-provided."
+                  ? "Stage 1 self-computes the L2 dose projection + PBPK from L1 outputs. Stage 2 runs the DILI-ML binary classifier. Stage 3 calls the ai-service Drug2cell + Tabula Sapiens endpoint (atlas Parquet required). Stage 4 calls the ai-service DepMap PRISM 24Q2 patient-line projection (snapshot Parquet required; non-oncology compounds use Manual Entry's not_applicable mode). Stage 5 derives biomarkers + permeability deterministically from Stage 2 + L1. Stage 6 auto-orchestrates the per-readout envelope. Stages 2–5 also accept Manual Entry tagged source: user-provided."
                   : "Run L1 In Vitro first to enable L2 Ex-Vivo."}
               </p>
             </div>
@@ -1478,7 +1556,7 @@ export function Layer3ExVivoScaffold({
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline…</>
-              : <><Play className="w-4 h-4" />Run L2 Ex-Vivo Pipeline (S1 + derived S5 + envelope S6)</>}
+              : <><Play className="w-4 h-4" />Run L2 Ex-Vivo Pipeline (S1 → S2/S3/S4 ai-service → S5 derived → S6 envelope)</>}
           </button>
 
           {(results.s1?.status === "complete" || results.s2?.status === "complete" || results.s6?.status === "complete") && (
@@ -1538,7 +1616,7 @@ export function Layer3ExVivoScaffold({
               <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
                 Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
-                Stages 1, 2, 5, 6 in-house · Stage 3 ai-service. Stage 4 accepts Manual Entry tagged source: user-provided
+                Stages 1, 5, 6 in-house · Stages 2, 3, 4 ai-service (DILI-ML · Drug2cell + Tabula Sapiens · DepMap PRISM 24Q2). Stages 2–5 also accept Manual Entry tagged source: user-provided
                 (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
               </p>
             </div>
@@ -1550,7 +1628,7 @@ export function Layer3ExVivoScaffold({
               <Microscope className="w-10 h-10 text-amber-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L2 Ex-Vivo pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stages 1, 2, 3, 5 (computed) and/or fill Stages 4 + 6 via Manual Entry, then click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to assemble the envelope.
+                Run Stages 1–5 individually (Stage 1 in-house, Stages 2/3/4 ai-service, Stage 5 auto-derived) or click <span className="text-amber-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to chain them and emit the Stage 6 envelope. Manual Entry on Stages 2–5 overrides any ML output. Non-oncology compounds: use Stage 4 Manual Entry's not_applicable mode.
               </p>
             </div>
           )}
@@ -1694,9 +1772,70 @@ export function Layer3ExVivoScaffold({
             );
           })()}
 
-          {/* Stage 4 result */}
+          {/* Stage 4 result — ML (DepMap PRISM 24Q2 projection) or Manual oncology rows / non-oncology N/A */}
           {results.s4?.status === "complete" && (() => {
             const v = results.s4.result;
+            if (v.kind === "ml") {
+              const p = v.prediction;
+              const top = p.top_sensitive_lines.slice(0, 8);
+              const lineages = p.per_lineage.slice(0, 6);
+              const dist = p.distribution;
+              return (
+                <ResultShell stage={4} name="Patient-line projection (DepMap PRISM 24Q2)" icon={FlaskConical} status="complete">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mb-2">
+                    <div className="text-slate-500">Snapshot</div>
+                    <div className="text-violet-300 font-mono text-right">{v.modelInfo.snapshot.name}{v.modelInfo.snapshot.release ? ` ${v.modelInfo.snapshot.release}` : ""}</div>
+                    <div className="text-slate-500">Query gene · L1 IC50</div>
+                    <div className="text-violet-300 font-mono text-right">{p.query_gene_symbol} · {p.l1_ic50_nM.toFixed(1)} nM</div>
+                    <div className="text-slate-500">Panel size</div>
+                    <div className="text-violet-300 font-mono text-right">n = {p.n_cell_lines_total} · {p.n_resistant_no_target} resistant_no_target</div>
+                    <div className="text-slate-500">Predicted IC50 distribution</div>
+                    <div className="text-violet-300 font-mono text-right">
+                      median {dist.median_uM != null ? dist.median_uM.toFixed(3) : "—"} µM · p10 {dist.p10_uM != null ? dist.p10_uM.toFixed(3) : "—"} · p90 {dist.p90_uM != null ? dist.p90_uM.toFixed(3) : "—"}
+                    </div>
+                    <div className="text-slate-500">Alpha · weighting</div>
+                    <div className="text-slate-300 text-right">α = {p.alpha.toFixed(2)} · 2^(α · chronos)</div>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden mb-2">
+                    <div className="grid grid-cols-[100px_1fr_70px_60px_60px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                      <div>DepMap ID</div><div>Cell line · disease</div><div className="text-right">Pred IC50</div><div className="text-right">Chronos</div><div className="text-right">log2 TPM</div>
+                    </div>
+                    {top.map(r => (
+                      <div key={r.depmap_id} className="grid grid-cols-[100px_1fr_70px_60px_60px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                        <div className="font-mono text-violet-300">{r.depmap_id}</div>
+                        <div className="text-violet-200 truncate" title={`${r.cell_line_name} · ${r.primary_disease}`}>
+                          {r.cell_line_name} <span className="text-slate-500">· {r.primary_disease}</span>
+                        </div>
+                        <div className="text-right font-mono text-violet-300">{r.predicted_IC50_uM != null ? r.predicted_IC50_uM.toFixed(3) : "—"}</div>
+                        <div className="text-right font-mono text-slate-300">{r.essentiality_chronos.toFixed(2)}</div>
+                        <div className="text-right font-mono text-slate-300">{r.expression_log2_tpm.toFixed(1)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {lineages.length > 0 && (
+                    <div className="rounded-lg border border-white/8 bg-black/30 overflow-hidden">
+                      <div className="grid grid-cols-[1fr_70px_60px_60px_60px_60px] text-[10px] uppercase tracking-wider text-slate-500 px-2.5 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                        <div>Lineage</div><div className="text-right">Median</div><div className="text-right">HiSens</div><div className="text-right">Sens</div><div className="text-right">Near</div><div className="text-right">Resist</div>
+                      </div>
+                      {lineages.map(L => (
+                        <div key={L.lineage} className="grid grid-cols-[1fr_70px_60px_60px_60px_60px] items-center px-2.5 py-1.5 text-[11px] border-b border-white/5 last:border-b-0">
+                          <div className="text-violet-200">{L.lineage} <span className="text-slate-500">· n={L.n_cell_lines}</span></div>
+                          <div className="text-right font-mono text-violet-300">{L.median_predicted_IC50_uM.toFixed(3)}</div>
+                          <div className="text-right font-mono text-emerald-300">{L.n_highly_sensitive}</div>
+                          <div className="text-right font-mono text-emerald-300/80">{L.n_sensitive}</div>
+                          <div className="text-right font-mono text-slate-300">{L.n_near_baseline}</div>
+                          <div className="text-right font-mono text-rose-300">{L.n_resistant}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-amber-300/80 italic mt-2">
+                    Cascade flag: prediction_only · in-house projection of L1 IC50 conditioned on per-cell-line essentiality + expression, NOT a measured PRISM IC50 for this compound.
+                    Wet PRISM measurement (T2/T3) required for IND-supporting claims.
+                  </div>
+                </ResultShell>
+              );
+            }
             return (
               <ResultShell stage={4} name="Patient-line projection (user-provided)" icon={FlaskConical} status="complete">
                 {v.mode === "non-oncology-na" ? (
@@ -1778,30 +1917,6 @@ export function Layer3ExVivoScaffold({
             );
           })()}
 
-          {/* Pending stubs — only Stage 4 is genuinely manual-only.
-              Stages 2 + 3 surface their own running/error/complete blocks via the ML path.
-              Stages 5 + 6 auto-run (in-house rule table / orchestration) and surface their own
-              result blocks once executed — no out-of-scope card needed. */}
-          {([4] as const).map(n => {
-            const key = (`s${n}` as keyof PipelineResults);
-            const r = results[key];
-            if (r) return null;
-            const def = L3_STAGES.find(s => s.n === n)!;
-            return (
-              <ResultShell
-                key={n} stage={n} name={def.name}
-                icon={FlaskConical}
-                status="out-of-scope-yet"
-                reason={def.pendingReason}
-              >
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Use <span className="text-cyan-300 font-semibold">Manual Entry</span> on the left panel to populate this readout from DepMap PRISM rows, or mark it <span className="font-mono">not_applicable</span> for non-oncology compounds.
-                  Cascade kind will be <span className="font-mono">prediction_only</span> with source <span className="font-mono">user-provided</span> — wet anchoring (T2/T3) still required for IND-supporting claims.
-                </p>
-              </ResultShell>
-            );
-          })}
-
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight className="w-4 h-4 text-emerald-400" />
@@ -1818,9 +1933,9 @@ export function Layer3ExVivoScaffold({
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 flex items-start gap-2.5">
             <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              <span className="font-semibold text-amber-300">Build status:</span> Stages 1, 2, 5 in-house (tissue selectivity + DILI binary classifier + biomarker rule table).
-              Stage 3 ai-service (Drug2cell + Tabula Sapiens; atlas Parquet required). Stage 6 auto-orchestrates the per-readout envelope. Stage 4 accepts Manual Entry to keep the cascade non-empty for known compounds.
-              Premium tier (DrugBank integration) will replace Manual Entry for Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
+              <span className="font-semibold text-amber-300">Build status:</span> Stages 1, 5 in-house (tissue selectivity + biomarker rule table); Stage 6 auto-orchestrates the per-readout envelope.
+              Stage 2 ai-service (DILI binary classifier). Stage 3 ai-service (Drug2cell + Tabula Sapiens v2; atlas Parquet required). Stage 4 ai-service (DepMap PRISM 24Q2 patient-line projection; snapshot Parquet required, oncology-only — non-oncology compounds use Manual Entry's not_applicable mode).
+              Manual Entry remains available for Stages 2–5. Premium tier (DrugBank integration) will additionally back Stages 2 + 4 + 5 with API-served structured pharmacology / ADRs / DDIs.
             </p>
           </div>
 
