@@ -1,0 +1,23 @@
+name: fep
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - openmm=8.1.1
+  - cuda-version=12.1
+  - openff-toolkit=0.16.*
+  - openff-forcefields=2024.*
+  - openmmforcefields=0.13.*
+  - pdbfixer=1.9
+  - rdkit=2024.03.*
+  - mdanalysis=2.7.*
+  - ambertools=23.*
+  - pymbar=4.0.*
+  - smina
+  - openbabel=3.1.*
+  - numpy<2
+  - scipy
+  - pandas
+  - pyyaml
+  - tqdm
+  - pip
