@@ -58,6 +58,11 @@ from models.celltype_aggregation import (
     is_ready as celltype_aggregation_status,
     warmup as celltype_aggregation_warmup,
 )
+from models.patient_line import (
+    predict_patient_line,
+    is_ready as patient_line_status,
+    warmup as patient_line_warmup,
+)
 from models import docking_vina
 from models import fep_runpod
 
@@ -125,6 +130,7 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=binding_ml_warmup, name="binding-ml-prewarm", daemon=True).start()
     threading.Thread(target=dili_ml_warmup, name="dili-ml-prewarm", daemon=True).start()
     threading.Thread(target=celltype_aggregation_warmup, name="celltype-aggregation-prewarm", daemon=True).start()
+    threading.Thread(target=patient_line_warmup, name="patient-line-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -276,6 +282,49 @@ def api_predict_celltype_aggregation(req: CellTypeAggregationRequest):
     return sanitized
 
 
+class PatientLineRequest(BaseModel):
+    target_gene_symbol: str
+    l1_ic50_nM: float
+    oncology: bool
+    indication_keyword: str | None = None
+    alpha: float = 1.0
+    top_n: int = 25
+
+
+@app.post("/predict/patient-line")
+def api_predict_patient_line(req: PatientLineRequest):
+    """Layer 3 Stage 4 — Patient-line projection across DepMap PRISM 24Q2 oncology panel.
+
+    Snapshot Parquet must be provisioned via colab_notebooks/prepare_depmap_prism.ipynb
+    before this endpoint can succeed. When the Parquet is missing the endpoint returns
+    HTTP 503 with `source = "data-not-provisioned"` and a remediation hint — there is
+    NO synthetic fallback (project-wide policy: NO fake data, NO silent fallbacks).
+
+    Non-oncology callers (oncology=False) get HTTP 400 with `source = "out-of-domain"` —
+    they should mark Stage 4 as not_applicable via the Manual Entry path instead.
+    """
+    try:
+        result = predict_patient_line(
+            target_gene_symbol=req.target_gene_symbol,
+            l1_ic50_nM=req.l1_ic50_nM,
+            oncology=req.oncology,
+            indication_keyword=req.indication_keyword,
+            alpha=req.alpha,
+            top_n=req.top_n,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PatientLine projection failed: {type(e).__name__}: {e}")
+
+    sanitized = sanitize(result)
+    if sanitized.get("source") == "data-not-provisioned":
+        raise HTTPException(status_code=503, detail=sanitized)
+    if sanitized.get("source") == "out-of-domain":
+        raise HTTPException(status_code=400, detail=sanitized)
+    if sanitized.get("source") == "input-error":
+        raise HTTPException(status_code=400, detail=sanitized)
+    return sanitized
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -287,6 +336,7 @@ def api_models_status():
         "solubility_ml": solubility_ml_status(),
         "binding_ml": binding_ml_status(),
         "celltype_aggregation": celltype_aggregation_status(),
+        "patient_line": patient_line_status(),
     }
 
 
@@ -301,6 +351,7 @@ def api_models_warmup():
         "solubility_ml": solubility_ml_warmup(),
         "binding_ml": binding_ml_warmup(),
         "celltype_aggregation": celltype_aggregation_warmup(),
+        "patient_line": patient_line_warmup(),
     }
 
 
