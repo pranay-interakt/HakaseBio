@@ -1,7 +1,9 @@
 // ── EPA ECOTOX Database Integration ──────────────────────────────────────
 // Ecotoxicology data for chemicals across species
 // REST API: https://cfpub.epa.gov/ecotox/
-// Note: ECOTOX web services have limited CORS support — graceful fallback
+// Policy: NO synthetic fallbacks. If the live API is unavailable, status
+// "unavailable"|"error" is returned with empty studies[]; downstream code
+// must treat the source as missing — never substitute reference values.
 
 export interface ECOTOXResult {
   casrn:       string;
@@ -22,18 +24,6 @@ export interface ECOTOXStudy {
   route:       string;
   reference:   string;
 }
-
-// ECOTOX Quick Look — curated reference data for common compound classes
-// Used as fallback when live API unavailable
-const ECOTOX_REFERENCE_NOAEC: Record<string, number> = {
-  "kinase_inhibitor":  50,   // mg/kg/day — class average
-  "nsaid":             30,
-  "antibiotic":        100,
-  "antifungal":        25,
-  "antiviral":         75,
-  "statin":            10,
-  "default":           50,
-};
 
 export async function fetchEcotox(casrn: string, chemicalName?: string): Promise<ECOTOXResult> {
   const base: ECOTOXResult = {

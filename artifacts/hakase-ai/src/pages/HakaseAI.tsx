@@ -7836,23 +7836,21 @@ function GracefulDegradationBanner({ warnings }: { warnings: DatabaseQueryRecord
     <div className="mx-4 mt-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
         <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0" />
-        <span className="text-[11px] font-semibold text-yellow-300">Database Degradation Notice</span>
+        <span className="text-[11px] font-semibold text-yellow-300">External Validation Sources Unavailable</span>
         <span className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{warnings.length} source{warnings.length > 1 ? "s" : ""}</span>
       </div>
       <div className="space-y-1.5">
         {warnings.map((w, i) => (
           <div key={i} className="flex items-center gap-2 text-[10px]">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${w.status === "failed" ? "bg-red-400" : "bg-yellow-400"}`} />
+            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400" />
             <span className="text-slate-300 font-medium">{w.database}</span>
-            <span className={`${w.status === "failed" ? "text-red-400" : "text-yellow-400"}`}>
-              {w.status === "failed" ? "unavailable" : "stale cache"}
-            </span>
+            <span className="text-red-400">unavailable</span>
             {w.staleness && <span className="text-slate-500 italic">— {w.staleness}</span>}
           </div>
         ))}
       </div>
       <div className="text-[9px] text-slate-500 mt-2 leading-relaxed">
-        Results may be based on cached or fallback reference data. Re-run when connectivity is restored for full fidelity.
+        Cross-reference validation against these external databases could not be performed. Animal-cohort projections shown below come from the upstream allometric simulation only — no substitute or cached values have been injected. Re-run when connectivity is restored to obtain measured-vs-predicted fold-error and confidence calibration.
       </div>
     </div>
   );
