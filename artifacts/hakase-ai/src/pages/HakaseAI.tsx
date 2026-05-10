@@ -1885,20 +1885,9 @@ export function HakaseAI() {
 
         {/* Right nav actions */}
         <div className="flex items-center gap-2 min-w-[220px] justify-end">
-          <button
-            onClick={() => setDemoOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/15 border border-amber-500/30 text-amber-300 hover:bg-amber-600/25 transition-colors text-[11px] font-semibold"
-          >
-            <Play className="w-3.5 h-3.5" /> Demo
-          </button>
-          <button
-            onClick={() => { setFullAiOpen(true); if (!aiReport && !aiLoading) runAiAnalysis(); }}
-            disabled={!simResults}
-            id="demo-full-ai-report"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
-          >
-            <Sparkles className="w-3.5 h-3.5" /> Full AI Report
-          </button>
+          {/* Demo + Full AI Report buttons hidden per user request (May 2026).
+              Underlying state (demoOpen, fullAiOpen, aiReport, runAiAnalysis)
+              and overlays are preserved so they can be re-mounted later. */}
           <button
             onClick={() => setLightMode(lm => !lm)}
             title={lightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
