@@ -132,7 +132,36 @@ L1 emits a `SimResults` object (`src/lib/admet.ts`) and an `InVitroResults` obje
 
 > **Goal.** Reconcile L1 in-silico predictions against ex-vivo measurements, run a structured falsifier check, allow authorised overrides, and **seal** a `ConfirmationEvidenceBlock` that L3 and L4 can cite.
 >
-> **Layout.** L2 is split into two parallel sub-tracks (toggled via pill buttons) plus a compact **Confirmation Orchestrator** strip rendered above them.
+> **Layout.** L2 is split into two parallel sub-tracks (toggled via pill buttons) plus a compact **Confirmation Orchestrator** strip rendered above them. Above both sits the **IVIVE Wet-Lab Inputs** panel (orchestrator-level — both sub-tracks consume it).
+
+### 2.0 IVIVE Wet-Lab Inputs (`IvieInputsPanel.tsx`, `lib/ivieInputs.ts`)
+
+> **Goal.** Capture the cross-species measurements required by the IVIVE math (well-stirred liver model + species-translation calibration) before any L2 sub-track runs. Per the IVIVE Input Scoping doc, this block closes the single largest defensibility gap (the "cross-species rule").
+
+**Captured measurements** (per species: human, mouse, rat, dog, monkey)
+
+| Measurement | Range | Why IVIVE needs it |
+|---|---|---|
+| `fu_p` (plasma) | (0, 1] | Required by well-stirred liver model and Cmax,total ↔ Cmax,unbound conversion |
+| `fu_mic` (microsomal) | (0, 1] | Obach 1999 correction — the #1 reason published IVIVE diverges from observed CL |
+| `B/P` (blood-to-plasma) | (0, 10] | Converts plasma CL → blood CL (Q_h is a blood flow) |
+
+Each cell carries its own `assayMethod` and `notes` provenance fields. The matrix persists to `localStorage` under `hakase.ivieInputs.v1`.
+
+**Tier ladder** (matches the founding-partner offer in the scoping doc)
+
+| Tier | Requires |
+|---|---|
+| Insufficient | (nothing — fu_p human still empty) |
+| **Minimum** | fu_p (human) |
+| **Standard** *(default scope)* | + fu_p (mouse) + fu_p (rat) + B/P (human + ≥1 preclinical) |
+| **Premium** | + fu_mic (human + ≥1 preclinical) |
+
+**Cross-species rule.** Satisfied iff **fu_p AND B/P** each have human + ≥1 preclinical species value. The panel renders an amber call-out when unmet — the IVIVE Calibration panel (P1, follow-on) will block the "evidence-based L3 study design" badge until the rule is satisfied.
+
+**Wiring into the engine.** `Layer2InSilicoScaffold` merges human values into the L2 params right before invoking `runStage8` / `runFullPipeline` via `mergeIvie(params)`. Precedence: explicit form override > IVIVE measured value > L1 fallback. `l2DoseProjection.scaleHepaticCL` accepts `{ fuMic, bpRatio }` opts and applies the corrections (Obach 1999 fu_mic correction; plasma → blood CL conversion). When values are absent the legacy heuristic path is preserved unchanged — **no synthetic defaults**.
+
+**Anti-fabrication.** Empty cells render `—`, not zero. Out-of-range values are rejected (the cell is set to `null` and the error is shown inline). Validation is range-strict per measurement.
 
 ### 2.1 Sub-Track A: In-Silico (`Layer2InSilicoScaffold.tsx`)
 

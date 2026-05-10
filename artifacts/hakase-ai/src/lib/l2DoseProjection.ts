@@ -53,9 +53,20 @@ export interface L2InputParams {
   FOverride?: number;
   /** Override hepatic CL in mL/min/kg — bypass well-stirred liver model. */
   CLOverride?: number;
+
+  // ── IVIVE wet-lab inputs (P0 — cross-species foundation) ────────────────
+  // These are *measured* values the biotech brings from their CRO. When
+  // supplied, they replace the corresponding L1/heuristic value AND are
+  // recorded in the projection's assumption strings for evidence trail.
+  // null/undefined means "not measured" — the engine falls back to L1.
+
+  /** Human fu_mic — applies Obach 1999 correction to microsomal CL_int. */
+  fuMicHuman?: number;
+  /** Human B/P ratio — used to convert plasma CL to blood CL. */
+  bpRatioHuman?: number;
 }
 
-const DEFAULTS: Required<Omit<L2InputParams, "fuOverride" | "VdOverride" | "FOverride" | "CLOverride">> = {
+const DEFAULTS: Required<Omit<L2InputParams, "fuOverride" | "VdOverride" | "FOverride" | "CLOverride" | "fuMicHuman" | "bpRatioHuman">> = {
   targetOccupancy: DEFAULT_TARGET_OCCUPANCY,
   bodyWeightKg:    HUMAN_BODY_WEIGHT_KG,
   route:           "oral",
@@ -143,22 +154,42 @@ function estimateF(caco2Papp: number): { F: number; assumption: string } {
   };
 }
 
-/** Hepatic CL from microsomal CLint via well-stirred liver model. */
+/**
+ * Hepatic CL from microsomal CLint via well-stirred liver model.
+ * Optional fu_mic correction (Obach 1999) and B/P conversion (plasma → blood
+ * CL) are applied when the IVIVE wet-lab inputs supply them — otherwise the
+ * legacy heuristic path is preserved.
+ */
 function scaleHepaticCL(
   microsomalCLint_uL_min_mg: number,
   fu: number,
+  opts: { fuMic?: number; bpRatio?: number } = {},
 ): { CL: number; assumption: string } {
+  // Optional fu_mic correction: CLint_corrected = CLint / fu_mic
+  const fuMicValid = typeof opts.fuMic === "number" && isFinite(opts.fuMic) && opts.fuMic > 0 && opts.fuMic <= 1;
+  const CLintRaw = microsomalCLint_uL_min_mg;
+  const CLintForScale = fuMicValid ? CLintRaw / (opts.fuMic as number) : CLintRaw;
+
   // Scale microsomal CLint to whole-liver in vivo (mL/min/kg)
   const CLintScaled =
-    (microsomalCLint_uL_min_mg / 1000) *  // µL/min/mg → mL/min/mg
+    (CLintForScale / 1000) *               // µL/min/mg → mL/min/mg
     MPPGL *                                // × mg microsomal protein / g liver
     LIVER_WEIGHT_G_PER_KG;                 // × g liver / kg body weight
-  // Well-stirred model
+
+  // Well-stirred model (plasma CL)
   const Qh = HUMAN_HEPATIC_BLOOD_FLOW_ML_MIN_KG;
-  const CL = (Qh * fu * CLintScaled) / (Qh + fu * CLintScaled);
+  const CL_plasma = (Qh * fu * CLintScaled) / (Qh + fu * CLintScaled);
+
+  // Optional B/P conversion: plasma CL → blood CL
+  const bpValid = typeof opts.bpRatio === "number" && isFinite(opts.bpRatio) && opts.bpRatio > 0 && opts.bpRatio <= 10;
+  const CL = bpValid ? CL_plasma / (opts.bpRatio as number) : CL_plasma;
+
+  const fuMicNote = fuMicValid ? `, fu_mic=${(opts.fuMic as number).toFixed(2)} (Obach 1999 correction applied)` : "";
+  const bpNote    = bpValid    ? `, B/P=${(opts.bpRatio as number).toFixed(2)} (plasma CL → blood CL)` : "";
+
   return {
     CL,
-    assumption: `Well-stirred liver model: CLint(microsomal) ${microsomalCLint_uL_min_mg.toFixed(0)} µL/min/mg → in-vivo CL ${CL.toFixed(1)} mL/min/kg (MPPGL=45, liver=25.7 g/kg, Q_h=20 mL/min/kg, fu=${fu.toFixed(2)}).`,
+    assumption: `Well-stirred liver model: CLint(microsomal) ${CLintRaw.toFixed(0)} µL/min/mg → in-vivo CL ${CL.toFixed(1)} mL/min/kg (MPPGL=45, liver=25.7 g/kg, Q_h=20 mL/min/kg, fu=${fu.toFixed(2)}${fuMicNote}${bpNote}).`,
   };
 }
 
@@ -277,7 +308,23 @@ export function computeL2DoseProjection(
     CL = params.CLOverride as number;
     CLNote = `Hepatic CL ${CL.toFixed(1)} mL/min/kg — user override (well-stirred liver model bypassed).`;
   } else if (fuValid) {
-    const r = scaleHepaticCL(clint, fu); CL = r.CL; CLNote = r.assumption;
+    // Validate IVIVE wet-lab inputs (passed only when supplied; otherwise the
+    // legacy heuristic path is preserved with no synthetic defaults).
+    const fuMicSupplied = supplied(params.fuMicHuman);
+    const fuMicValid = fuMicSupplied && (params.fuMicHuman as number) > 0 && (params.fuMicHuman as number) <= 1;
+    if (fuMicSupplied && !fuMicValid) {
+      overrideWarnings.push(`fu_mic ${params.fuMicHuman} rejected — must be in (0, 1]. Microsomal binding correction not applied.`);
+    }
+    const bpSupplied = supplied(params.bpRatioHuman);
+    const bpValid = bpSupplied && (params.bpRatioHuman as number) > 0 && (params.bpRatioHuman as number) <= 10;
+    if (bpSupplied && !bpValid) {
+      overrideWarnings.push(`B/P ${params.bpRatioHuman} rejected — must be in (0, 10]. Plasma-to-blood CL conversion not applied.`);
+    }
+    const r = scaleHepaticCL(clint, fu, {
+      fuMic:   fuMicValid ? (params.fuMicHuman as number)   : undefined,
+      bpRatio: bpValid    ? (params.bpRatioHuman as number) : undefined,
+    });
+    CL = r.CL; CLNote = r.assumption;
   } else {
     CL = NaN;
     CLNote = `Hepatic CL not computed — invalid plasma fu (fuPercent=${fuPct}); well-stirred liver model requires fu and no valid override given.`;

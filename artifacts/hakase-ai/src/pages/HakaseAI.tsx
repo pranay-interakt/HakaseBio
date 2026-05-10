@@ -119,6 +119,9 @@ import {
 import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
 import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
 import { Layer3ExVivoScaffold } from "@/components/Layer3ExVivoScaffold";
+import {
+  IvieInputsPanel, bootstrapIvieInputs, useIvieInputsAutosave,
+} from "@/components/IvieInputsPanel";
 
 type Layer = 1 | 2 | 3 | 4;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
@@ -149,6 +152,9 @@ export function HakaseAI() {
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
   // L2 Confirmation hosts two sub-tracks: in-silico (existing scaffold) and ex-vivo (existing scaffold).
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
+  // P0 IVIVE wet-lab inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
+  const [ivieInputs, setIvieInputs] = useState(bootstrapIvieInputs);
+  useIvieInputsAutosave(ivieInputs);
   // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
   const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
   // Monotonically-increasing signal — incremented by the L3 "block not sealed"
@@ -4101,6 +4107,14 @@ export function HakaseAI() {
                 }}
                 forceExpandSignal={confirmationExpandSignal}
               />
+              {/* P0 IVIVE wet-lab inputs (cross-species fu_p, fu_mic, B/P).
+                  Sits orchestrator-level above the In-Silico/Ex-Vivo sub-tracks
+                  because both consume it (and the eventual IVIVE Calibration
+                  panel pulls from it too). */}
+              <IvieInputsPanel
+                value={ivieInputs}
+                onChange={setIvieInputs}
+              />
               {/* Active sub-track */}
               <div className="flex-1 overflow-hidden flex flex-col">
                 {confirmationSubTrack === "insilico" ? (
@@ -4108,6 +4122,7 @@ export function HakaseAI() {
                     layer1Ready={simStatus[1] === "complete"}
                     simResults={simResults}
                     inVitroResults={inVitroResults}
+                    ivieInputs={ivieInputs}
                     onContinue={() => setConfirmationSubTrack("exvivo")}
                     onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
                   />

@@ -8,6 +8,10 @@ import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
 import type { L2DoseProjection, MarginTier, L2InputParams } from "@/lib/l2DoseProjection";
 import {
+  humanFuPlasma, humanFuMic, humanBpRatio,
+  type IvieWetLabInputs,
+} from "@/lib/ivieInputs";
+import {
   runFullPipeline, runStage0, runStage1, runStage2Docking, runStage3, runStage4,
   runStage5, runStage5Fep, runStage6, runStage7, runStage8, runStage9,
   type PipelineResults, type StageResult, type StageStatus,
@@ -18,6 +22,10 @@ interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
   simResults: SimResults | null;
   inVitroResults: InVitroResults | null;
+  /** P0 IVIVE wet-lab inputs (cross-species fu_p, fu_mic, B/P).
+   *  When supplied, human values are merged into the L2 params right before
+   *  invoking the pipeline — form overrides still win. */
+  ivieInputs?: IvieWetLabInputs;
   onContinue: () => void;
   onComplete?: () => void;
 }
@@ -417,7 +425,26 @@ function MiniLineChart({ data, xKey, yKey, color, height = 80 }: {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, onContinue, onComplete }: Layer2InSilicoScaffoldProps) {
+export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, ivieInputs, onContinue, onComplete }: Layer2InSilicoScaffoldProps) {
+  // Merge IVIVE wet-lab inputs into L2 params at run-time.
+  // Precedence: explicit form override > IVIVE measured value > L1 fallback.
+  const mergeIvie = (p: L2InputParams): L2InputParams => {
+    if (!ivieInputs) return p;
+    const out: L2InputParams = { ...p };
+    if (out.fuOverride === undefined) {
+      const fp = humanFuPlasma(ivieInputs);
+      if (fp !== null) out.fuOverride = fp;
+    }
+    if (out.fuMicHuman === undefined) {
+      const fm = humanFuMic(ivieInputs);
+      if (fm !== null) out.fuMicHuman = fm;
+    }
+    if (out.bpRatioHuman === undefined) {
+      const bp = humanBpRatio(ivieInputs);
+      if (bp !== null) out.bpRatioHuman = bp;
+    }
+    return out;
+  };
   const hasL1 = !!simResults && !!inVitroResults;
 
   const [params, setParams] = useState<L2InputParams>({
@@ -518,7 +545,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
           break;
         }
         case 8: {
-          const r = runStage8(simResults, inVitroResults, params);
+          const r = runStage8(simResults, inVitroResults, mergeIvie(params));
           setOne("s8", r);
           if (r.status === "wired") onComplete?.();
           break;
@@ -535,7 +562,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
     setPipelineRunning(true);
     setResults({});
     try {
-      const out = await runFullPipeline(simResults, inVitroResults, params, n => setBusyStage(n));
+      const out = await runFullPipeline(simResults, inVitroResults, mergeIvie(params), n => setBusyStage(n));
       setResults(out);
       if (out.s8?.status === "wired") onComplete?.();
     } finally {
