@@ -120,8 +120,9 @@ import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
 import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
 import { Layer3ExVivoScaffold } from "@/components/Layer3ExVivoScaffold";
 import {
-  IvieInputsPanel, bootstrapIvieInputs, useIvieInputsAutosave,
+  bootstrapIvieInputs, useIvieInputsAutosave,
 } from "@/components/IvieInputsPanel";
+import { IvieOutputHandoffPage, type IvieHandoffSignOff } from "@/components/IvieOutputHandoffPage";
 
 type Layer = 1 | 2 | 3 | 4;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
@@ -155,6 +156,11 @@ export function HakaseAI() {
   // P0 IVIVE wet-lab inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
   const [ivieInputs, setIvieInputs] = useState(bootstrapIvieInputs);
   useIvieInputsAutosave(ivieInputs);
+  // L2 → L3 handoff gate. When true, the IVIVE Output / Animal Cohort Handoff
+  // page intercepts the layer area instead of jumping straight to L3.
+  const [iviveHandoffOpen, setIviveHandoffOpen] = useState(false);
+  // Last sign-off captured by the handoff page (consumed for L3 audit trail).
+  const [iviveHandoffSignOff, setIviveHandoffSignOff] = useState<IvieHandoffSignOff | null>(null);
   // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
   const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
   // Monotonically-increasing signal — incremented by the L3 "block not sealed"
@@ -4049,7 +4055,25 @@ export function HakaseAI() {
               Reconciles in-silico predictions and ex-vivo measurements into a
               single ConfirmationPackage before animal cohort design. The two
               existing scaffolds (in-silico, ex-vivo) live here as sub-tracks. */}
-          {activeLayer === 2 && (
+          {/* L2 → L3 IVIVE Output / Animal Cohort Handoff gate.
+              When open, intercepts the layer area regardless of activeLayer
+              and forces a sign-off pass before L3 can be entered. */}
+          {iviveHandoffOpen && (
+            <IvieOutputHandoffPage
+              ivieInputs={ivieInputs}
+              onIvieInputsChange={setIvieInputs}
+              simResults={simResults}
+              confirmationBlock={confirmationBlock}
+              safetyFlags={safetyFlags}
+              onBack={() => setIviveHandoffOpen(false)}
+              onProceed={(signOff) => {
+                setIviveHandoffSignOff(signOff);
+                setIviveHandoffOpen(false);
+                setActiveLayer(3);
+              }}
+            />
+          )}
+          {activeLayer === 2 && !iviveHandoffOpen && (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Confirmation framing header */}
               <div className="border-b border-white/8 bg-cyan-950/15 px-5 py-3 flex items-center gap-3 shrink-0">
@@ -4107,14 +4131,12 @@ export function HakaseAI() {
                 }}
                 forceExpandSignal={confirmationExpandSignal}
               />
-              {/* P0 IVIVE wet-lab inputs (cross-species fu_p, fu_mic, B/P).
-                  Sits orchestrator-level above the In-Silico/Ex-Vivo sub-tracks
-                  because both consume it (and the eventual IVIVE Calibration
-                  panel pulls from it too). */}
-              <IvieInputsPanel
-                value={ivieInputs}
-                onChange={setIvieInputs}
-              />
+              {/* IVIVE Wet-Lab Inputs panel was relocated to the L2 → L3
+                  IVIVE Output / Animal Cohort Handoff page (May 2026). The
+                  substrate now lives at the handoff because that's where it
+                  gates progression to L3. L2 In-Silico still reads whatever
+                  values exist in the shared `ivieInputs` state — re-running
+                  L2 after editing on the handoff applies them to projection. */}
               {/* Active sub-track */}
               <div className="flex-1 overflow-hidden flex flex-col">
                 {confirmationSubTrack === "insilico" ? (
@@ -4131,7 +4153,7 @@ export function HakaseAI() {
                     layer2Ready={simStatus[2] === "complete"}
                     simResults={simResults}
                     inVitroResults={inVitroResults}
-                    onContinue={() => setActiveLayer(3)}
+                    onContinue={() => setIviveHandoffOpen(true)}
                   />
                 )}
               </div>
