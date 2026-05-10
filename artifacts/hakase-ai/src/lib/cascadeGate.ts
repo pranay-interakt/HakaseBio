@@ -1,9 +1,11 @@
 /**
- * L1 → L2 Cascade Gate
+ * L1 → L3 Cascade Gate
  *
  * Decides whether the auto-cascade ("Cascade" diagen mode) is permitted to push
- * Layer 1 results forward into Layer 2 animal study configuration WITHOUT
- * stage-gate human review.
+ * Layer 1 results forward into Layer 3 animal study configuration WITHOUT
+ * stage-gate human review. (Layer 2 is Confirmation — In-Silico ↔ Ex-Vivo —
+ * which has its own confirmation engine; this gate governs the direct L1 →
+ * Animal Cohort auto-derivation path under the May 2026 4-layer restructure.)
  *
  * This file intentionally lives outside `safetyFlags.ts` (per repo conventions)
  * and contains only product-policy rules: it does not modify the underlying
@@ -189,7 +191,7 @@ export function evaluateCascadeGate(
   } else {
     const safetyBlocked = blockedBy.filter((k) => SAFETY_KEYS.includes(k as SafetyKey));
     if (safetyBlocked.length > 0) {
-      reason = `Safety-critical outputs are heuristic-only (${safetyBlocked.join(", ")}). Human reviewer must sign off before advancing to Layer 2 — animal study configuration cannot be auto-derived from these signals.`;
+      reason = `Safety-critical outputs are heuristic-only (${safetyBlocked.join(", ")}). Human reviewer must sign off before advancing to Layer 3 — animal study configuration cannot be auto-derived from these signals.`;
     } else {
       reason = `Average non-safety data quality (${avgNonSafetyScore.toFixed(2)}) below threshold ${NON_SAFETY_MIN_AVG}. Stage-gate review required.`;
     }
