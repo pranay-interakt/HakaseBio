@@ -54,6 +54,7 @@ import {
 import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
 import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage } from "@workspace/preclinical-handoff";
 import type { L2DoseProjection } from "@/lib/l2DoseProjection";
+import { makeL2CacheKey, loadCachedL2, saveCachedL2 } from "@/lib/l2ConfirmationCache";
 import { buildPreClinicalPackage } from "@/lib/preClinicalPackage";
 import Phase1Planner, { type Phase1PlannerHandle } from "@/components/Phase1Planner";
 import {
@@ -249,11 +250,58 @@ export function HakaseAI() {
   const [dropoutOpen, setDropoutOpen] = useState(false);
 
   // Layer 1 state
-  const [smiles, setSmiles] = useState("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
-  const [activatedSmiles, setActivatedSmiles] = useState("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
-  const [molName, setMolName] = useState("Ibuprofen-Analog-001");
-  const [uniprotId, setUniprotId] = useState("P00533");
-  const [pdbId, setPdbId] = useState("4HJO");
+  // Defaults are intentionally EMPTY — no compound is pre-loaded on mount or
+  // refresh, so the user always starts with a clean slate. Auto-fetch effects
+  // (ChEMBL lookup, UniProt sync, PDB structure) all gate on validity, so
+  // empty SMILES short-circuits them. Re-entering a previously analyzed
+  // compound rehydrates L2 Confirmation data from localStorage cache (see
+  // `l2ConfirmationCache` effects below).
+  const [smiles, setSmiles] = useState("");
+  const [activatedSmiles, setActivatedSmiles] = useState("");
+  const [molName, setMolName] = useState("");
+  const [uniprotId, setUniprotId] = useState("");
+  const [pdbId, setPdbId] = useState("");
+
+  // ── L2 Confirmation cache ─────────────────────────────────────────────────
+  // Persist sealed L2 ConfirmationBlock + L2DoseProjection in localStorage,
+  // keyed by (activatedSmiles + uniprotId). Re-entering a previously analyzed
+  // compound rehydrates the L2 panel instantly without re-running the pipeline.
+  // Per project policy this is REAL prior evidence (a sealed ConfirmationBlock
+  // — never synthetic). A different compound key clears in-memory L2 state.
+  //
+  // Cross-key contamination guard: `lastLoadedKeyRef` tracks the key that the
+  // current in-memory (block, projection) belongs to. The save effect refuses
+  // to persist unless the live key matches that ref AND we have a sealed
+  // ConfirmationBlock — otherwise an old compound's evidence could be written
+  // under the new compound's key during the brief window before the load
+  // effect's clear takes effect.
+  const lastLoadedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = makeL2CacheKey(activatedSmiles, uniprotId);
+    if (!key) {
+      lastLoadedKeyRef.current = null;
+      setConfirmationBlock(null);
+      setL2Projection(null);
+      return;
+    }
+    const hit = loadCachedL2(key);
+    lastLoadedKeyRef.current = key;
+    if (hit) {
+      setConfirmationBlock(hit.block);
+      setL2Projection(hit.projection);
+    } else {
+      setConfirmationBlock(null);
+      setL2Projection(null);
+    }
+  }, [activatedSmiles, uniprotId]);
+  useEffect(() => {
+    const key = makeL2CacheKey(activatedSmiles, uniprotId);
+    if (!key) return;
+    // Only persist real, sealed L2 evidence belonging to the active key.
+    if (lastLoadedKeyRef.current !== key) return;
+    if (!confirmationBlock) return;
+    saveCachedL2(key, confirmationBlock, l2Projection);
+  }, [confirmationBlock, l2Projection, activatedSmiles, uniprotId]);
   const [proteinInfo, setProteinInfo] = useState<ProteinInfo | null>(null);
   const [proteinLoading, setProteinLoading] = useState(false);
   const [proteinError, setProteinError] = useState<string | null>(null);
@@ -1743,12 +1791,12 @@ export function HakaseAI() {
     setUniprotAutoMode(true);
     setChemblCompoundName(null);
     setChemblCompoundId(null);
-    // Reset molecule / compound
-    setSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
-    setActivatedSmiles("CC(C)Cc1ccc(cc1)C(C)C(=O)O");
-    setMolName("New-Compound-001");
-    setUniprotId("P00533");
-    setPdbId("4HJO");
+    // Reset molecule / compound — clear to empty (no pre-loaded defaults).
+    setSmiles("");
+    setActivatedSmiles("");
+    setMolName("");
+    setUniprotId("");
+    setPdbId("");
     setProteinInfo(null);
     setPdbStructure(null);
     // Reset all simulation results
