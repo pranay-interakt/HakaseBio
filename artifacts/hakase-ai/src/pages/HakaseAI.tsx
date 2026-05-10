@@ -4275,20 +4275,10 @@ export function HakaseAI() {
                           <div className="flex items-center gap-2 mb-2">
                             <Beaker className="w-3.5 h-3.5 text-cyan-400" />
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IVIVE Substrate</span>
-                            {tierA && (
-                              <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
-                                tierA.tier === "Premium"      ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80"
-                                : tierA.tier === "Standard"   ? "border-cyan-500/30 bg-cyan-500/8 text-cyan-400/80"
-                                : tierA.tier === "Minimum"    ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80"
-                                : "border-rose-500/30 bg-rose-500/8 text-rose-400/80"
-                              }`}>
-                                {tierA.tier}
-                              </span>
-                            )}
                             {ivieHasData && anyAuto && (
                               <span
                                 title="One or more IVIVE cells are literature midpoints, not CRO measurements."
-                                className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
+                                className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
                               >
                                 {substrateMode === "mixed" ? "Mixed" : "Auto"}
                               </span>

@@ -114,9 +114,6 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
       <div className="rounded-md border border-cyan-500/20 bg-cyan-500/[0.04] px-3 py-2 flex items-center gap-3">
         <Beaker className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
         <span className="text-[11px] font-semibold text-slate-300">IVIVE wet-lab inputs</span>
-        <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${tierStyle.cls}`}>
-          {tierStyle.label}
-        </span>
         <span className="text-[10px] text-slate-500">
           {Math.round(assessment.completionFraction * 100)}% complete · {assessment.crossSpeciesRuleSatisfied ? "cross-species rule satisfied" : "cross-species rule not satisfied"}
         </span>
@@ -139,9 +136,6 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
         <div className="min-w-0 text-left">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">IVIVE Wet-Lab Inputs</span>
-            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${tierStyle.cls}`}>
-              {tierStyle.label}
-            </span>
             {assessment.crossSpeciesRuleSatisfied ? (
               <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
                 <CheckCircle2 className="w-2.5 h-2.5" /> cross-species rule

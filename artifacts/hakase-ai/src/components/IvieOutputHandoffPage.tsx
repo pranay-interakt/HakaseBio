@@ -279,9 +279,6 @@ export function IvieOutputHandoffPage({
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded border ${TIER_TINT[tierA.tier]}`}>
-              IVIVE · {tierA.tier}
-            </span>
             {blocks.length === 0 ? (
               <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 flex items-center gap-1.5">
                 <ShieldCheck className="w-3 h-3" /> No hard blocks
