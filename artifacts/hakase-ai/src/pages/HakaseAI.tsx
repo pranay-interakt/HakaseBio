@@ -53,6 +53,7 @@ import {
 } from "@/lib/confirmationEngine";
 import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
 import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage } from "@workspace/preclinical-handoff";
+import type { L2DoseProjection } from "@/lib/l2DoseProjection";
 import { buildPreClinicalPackage } from "@/lib/preClinicalPackage";
 import Phase1Planner, { type Phase1PlannerHandle } from "@/components/Phase1Planner";
 import {
@@ -166,6 +167,11 @@ export function HakaseAI() {
   const [iviveHandoffSignOff, setIviveHandoffSignOff] = useState<IvieHandoffSignOff | null>(null);
   // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
   const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
+  // L2 IVIVE dose projection — last successful Stage 8 result from Layer2InSilicoScaffold.
+  // Surfaces the actual IVIVE outputs (Cmax target, Vd, F, hepatic CL, predicted dose,
+  // margins, verdict) to the L3 upstream-inputs panel so the user can see the
+  // values being fed into allometric scaling. null until L2 In-Silico Stage 8 wires.
+  const [l2Projection, setL2Projection] = useState<L2DoseProjection | null>(null);
   // Monotonically-increasing signal — incremented by the L3 "block not sealed"
   // call-out's "Open seal flow" button. Drives ConfirmationLayerPanel to
   // force-expand when the user lands back on L2.
@@ -1227,6 +1233,8 @@ export function HakaseAI() {
     setAnimalResults(null);
     setCohortResults(null);
     setTrialResults(null);
+    setConfirmationBlock(null);
+    setL2Projection(null);
     setExtBindingDB(null); setExtChEMBL(null); setExtToxCast(null); setExtClinTrials(null);
     setExtOpenTargets(null); setExtString(null); setExtKEGG(null);
     setExtReactome(null); setExtPharmGKB(null); setExtDisGeNET(null);
@@ -1750,6 +1758,8 @@ export function HakaseAI() {
     setCohortResults(null);
     setTrialResults(null);
     setProcovaResults(null);
+    setConfirmationBlock(null);
+    setL2Projection(null);
     setExtBindingDB(null); setExtChEMBL(null); setExtToxCast(null); setExtClinTrials(null);
     setExtOpenTargets(null); setExtString(null); setExtKEGG(null);
     setExtReactome(null); setExtPharmGKB(null); setExtDisGeNET(null);
@@ -4177,6 +4187,7 @@ export function HakaseAI() {
                     ivieInputs={ivieInputs}
                     onContinue={() => setConfirmationSubTrack("exvivo")}
                     onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                    onProjectionReady={setL2Projection}
                   />
                 ) : (
                   <Layer3ExVivoScaffold
@@ -4248,7 +4259,7 @@ export function HakaseAI() {
                           </div>
                         </div>
 
-                        {/* L2 confirmation */}
+                        {/* L2 confirmation — sealed-block metadata + joint outputs */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <FlaskConical className="w-3.5 h-3.5 text-cyan-400" />
@@ -4265,9 +4276,105 @@ export function HakaseAI() {
                           <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
                             <Row label="Sealed at"      source="L2 confirmation engine" value={confirmationBlock?.emittedAt ?? "—"} />
                             <Row label="Engine"         source="emitterEngine"          value={confirmationBlock?.emitterEngine ?? "—"} />
-                            <Row label="Ex-Vivo mode"   source="exVivoEntryMode"        value={confirmationBlock?.exVivoEntryMode ? String(confirmationBlock.exVivoEntryMode) : "—"} />
+                            <Row label="Ex-Vivo mode"   source="exVivoEntryMode"
+                                 value={(() => {
+                                   const m = confirmationBlock?.exVivoEntryMode;
+                                   if (!m) return "—";
+                                   if (m.kind === "consumedDirective") return `Consumed directive · ${m.directiveId}`;
+                                   if (m.kind === "notApplicable")     return `Not applicable · ${m.exemption.exemptionId} (${m.exemption.compoundClass})`;
+                                   if (m.kind === "overrideSkipped")   return `Override skipped · ${m.override.reason}`;
+                                   return "—";
+                                 })()} />
                             <Row label="Overrides"      source="L2 audit trail"         value={confirmationBlock ? String(confirmationBlock.overrides?.length ?? 0) : "—"} />
+                            {confirmationBlock?.jointOutputs && (
+                              <>
+                                <Row label="CYP / transporter joint" source="jointOutputs.cypTransporter"
+                                     value={`${confirmationBlock.jointOutputs.cypTransporter.status.toUpperCase()} · conf ${confirmationBlock.jointOutputs.cypTransporter.jointConfidence.toFixed(2)}`} />
+                                <Row label="Clearance fractions"     source="jointOutputs.clearanceFractions (hep / ren / bil)"
+                                     value={(() => {
+                                       const cf = confirmationBlock.jointOutputs.clearanceFractions;
+                                       const fmt = (v: number | null) => v === null ? "—" : v.toFixed(2);
+                                       return `${fmt(cf.hepatic)} / ${fmt(cf.renal)} / ${fmt(cf.biliary)}`;
+                                     })()} />
+                                <Row label="Off-target joint"        source="jointOutputs.offTarget"
+                                     value={`${confirmationBlock.jointOutputs.offTarget.status.toUpperCase()} · conf ${confirmationBlock.jointOutputs.offTarget.jointConfidence.toFixed(2)}`} />
+                                <Row label="hERG-PBPK joint"         source="jointOutputs.hergPbpkProjection"
+                                     value={`${confirmationBlock.jointOutputs.hergPbpkProjection.status.toUpperCase()} · conf ${confirmationBlock.jointOutputs.hergPbpkProjection.jointConfidence.toFixed(2)}`} />
+                              </>
+                            )}
                           </div>
+                          {!confirmationBlock && (
+                            <p className="mt-1.5 px-1 text-[10px] text-slate-500/80 leading-relaxed italic">
+                              L2 Confirmation block not yet sealed. Run the L2 Confirmation engine
+                              (In-Silico ↔ Ex-Vivo) and seal the joint-output package to populate
+                              the audit trail and the joint-output rows above.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* L2 IVIVE Dose Projection — values fed into L3 Animal allometric scaling */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 IVIVE Dose Projection</span>
+                            <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                              !l2Projection                  ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80"
+                              : l2Projection.verdict === "GO"    ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80"
+                              : l2Projection.verdict === "WATCH" ? "border-amber-500/30 bg-amber-500/8 text-amber-400/80"
+                              : "border-rose-500/30 bg-rose-500/8 text-rose-400/80"
+                            }`}>
+                              {l2Projection ? l2Projection.verdict : "Pending"}
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
+                            {(() => {
+                              // Finite-guarded formatter — L2DoseProjection can produce NaN
+                              // for derived numerics when fu / CL_int / etc. are invalid
+                              // (see l2DoseProjection.ts). Per project policy we render "—"
+                              // rather than letting NaN reach the user.
+                              const fmt = (v: number | null | undefined, suffix: string, digits = 2): string =>
+                                (v === null || v === undefined || !isFinite(v)) ? "—" : `${v.toFixed(digits)}${suffix}`;
+                              return (
+                                <>
+                                  <Row label="Target Cmax,u"        source="receptor occupancy → unbound"
+                                       value={l2Projection ? `${fmt(l2Projection.targetCmaxUnbound_nM, " nM")} (@ ${(l2Projection.targetOccupancy * 100).toFixed(0)}% occ)` : "—"} />
+                                  <Row label="Target Cmax,total"    source="Cmax,u / fu"
+                                       value={l2Projection ? fmt(l2Projection.targetCmaxTotal_nM, " nM") : "—"} />
+                                  <Row label="Plasma fu"            source="L1 PPB · IVIVE override"
+                                       value={l2Projection ? fmt(l2Projection.fu_fraction * 100, "%") : "—"} />
+                                  <Row label="Vd"                   source="Vd_assumption"
+                                       value={l2Projection ? fmt(l2Projection.Vd_L_per_kg, " L/kg") : "—"} />
+                                  <Row label="F (oral)"             source="F_assumption"
+                                       value={l2Projection ? fmt(l2Projection.F_oral, "") : "—"} />
+                                  <Row label="Hepatic CL"           source="well-stirred + Obach fu_mic"
+                                       value={l2Projection ? fmt(l2Projection.hepaticCL_mL_min_kg, " mL/min/kg") : "—"} />
+                                  <Row label="Predicted dose"       source="dose for target Cmax,u"
+                                       value={l2Projection ? `${fmt(l2Projection.predictedDose_mg_per_kg, " mg/kg", 3)} · ${fmt(l2Projection.predictedDose_mg_per_day, " mg/day", 1)}` : "—"} />
+                                  <Row label="Margins (TI panel)"   source="hERG / off-target / DDI"
+                                       value={l2Projection ? `${l2Projection.margins.length} computed` : "—"} />
+                                  {l2Projection && l2Projection.warnings.length > 0 && (
+                                    <Row label="Warnings"           source="L2 projection engine"
+                                         value={`${l2Projection.warnings.length}`} />
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                          {!l2Projection && (
+                            <p className="mt-1.5 px-1 text-[10px] text-slate-500/80 leading-relaxed italic">
+                              L2 In-Silico Stage 8 (Therapeutic-Index ranking) has not produced a
+                              dose projection yet. These are the IVIVE outputs L3 Animal Cohort will
+                              inherit for allometric scaling. Run the L2 In-Silico pipeline to
+                              populate.
+                            </p>
+                          )}
+                          {l2Projection && (
+                            <p className="mt-1.5 px-1 text-[10px] text-slate-500/80 leading-relaxed">
+                              <span className="text-cyan-400/80 font-semibold">L2 → L3:</span> these
+                              values feed the rabbit / rodent allometric scaler. Vd is held per-kg,
+                              CL is body-weight-scaled, F is route-adjusted at L3.
+                            </p>
+                          )}
                         </div>
 
                         {/* IVIVE substrate */}
@@ -4277,10 +4384,10 @@ export function HakaseAI() {
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IVIVE Substrate</span>
                             {ivieHasData && anyAuto && (
                               <span
-                                title="One or more IVIVE cells are literature midpoints, not CRO measurements."
+                                title="One or more IVIVE values are literature midpoints (auto-filled from species defaults), not measured CRO data. See the 'Substrate mode' row below for the exact breakdown."
                                 className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
                               >
-                                {substrateMode === "mixed" ? "Mixed" : "Auto"}
+                                Auto-filled
                               </span>
                             )}
                             {!ivieHasData && (
@@ -4295,8 +4402,8 @@ export function HakaseAI() {
                             <Row label="Substrate mode"     source="current ivieInputs provenance"
                                  value={
                                    substrateMode === "measured"       ? "Measured (CRO)"
-                                   : substrateMode === "auto-estimated" ? "Auto (literature)"
-                                   : substrateMode === "mixed"          ? "Mixed"
+                                   : substrateMode === "auto-estimated" ? "All auto-filled (literature)"
+                                   : substrateMode === "mixed"          ? "Partial auto (some CRO, some literature)"
                                    : "—"
                                  } />
                             <Row label="Completion"         source="cells filled / total"
@@ -4310,8 +4417,8 @@ export function HakaseAI() {
                                 <Row label="Signed at"          source="ISO 8601"        value={iviveHandoffSignOff.signedAt} />
                                 <Row label="Sign-off substrate" source="captured at sign-off"
                                      value={iviveHandoffSignOff.substrateMode === "measured" ? "Measured (CRO)"
-                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "Auto (literature)"
-                                          : "Mixed"} />
+                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "All auto-filled (literature)"
+                                          : "Partial auto (some CRO, some literature)"} />
                               </>
                             )}
                           </div>

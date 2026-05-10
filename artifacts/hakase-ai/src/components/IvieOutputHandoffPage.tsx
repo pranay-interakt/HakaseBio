@@ -385,10 +385,14 @@ export function IvieOutputHandoffPage({
                 {/* Substrate mode chip — visible whenever any cell is auto. */}
                 {substrateMode !== "measured" && (
                   <span
-                    title="One or more IVIVE cells are literature midpoints, not CRO measurements. Sign-off will record this in the audit trail."
+                    title={
+                      substrateMode === "auto-estimated"
+                        ? "All IVIVE values are literature midpoints (auto-filled from species defaults). No CRO measurements provided. Sign-off will record this in the audit trail."
+                        : "Some IVIVE values are CRO-measured and some are literature midpoints (auto-filled). Sign-off will record the breakdown in the audit trail."
+                    }
                     className="px-2 py-0.5 rounded text-[10px] font-bold border bg-orange-500/15 text-orange-300 border-orange-500/40"
                   >
-                    {substrateMode === "auto-estimated" ? "AUTO-SUBSTRATE" : "MIXED SUBSTRATE"}
+                    AUTO-FILLED VALUES
                   </span>
                 )}
                 <span className="text-[10px] text-slate-500">

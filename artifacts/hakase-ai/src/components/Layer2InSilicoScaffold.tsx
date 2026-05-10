@@ -28,6 +28,11 @@ interface Layer2InSilicoScaffoldProps {
   ivieInputs?: IvieWetLabInputs;
   onContinue: () => void;
   onComplete?: () => void;
+  /** Fires whenever Stage 8 (L2 Dose Projection) finishes wiring — surfaces
+   *  the IVIVE outputs (Cmax target, Vd, F, hepatic CL, predicted dose,
+   *  margins, verdict) to the parent so downstream layers (L3 Animal Cohort)
+   *  can display the values that will be fed into allometric scaling. */
+  onProjectionReady?: (proj: L2DoseProjection) => void;
 }
 
 // ── Stage definitions (text from architecture doc §4.3, paraphrased) ────────
@@ -425,7 +430,7 @@ function MiniLineChart({ data, xKey, yKey, color, height = 80 }: {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, ivieInputs, onContinue, onComplete }: Layer2InSilicoScaffoldProps) {
+export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, ivieInputs, onContinue, onComplete, onProjectionReady }: Layer2InSilicoScaffoldProps) {
   // Merge IVIVE wet-lab inputs into L2 params at run-time.
   // Precedence: explicit form override > IVIVE measured value > L1 fallback.
   const mergeIvie = (p: L2InputParams): L2InputParams => {
@@ -547,7 +552,10 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         case 8: {
           const r = runStage8(simResults, inVitroResults, mergeIvie(params));
           setOne("s8", r);
-          if (r.status === "wired") onComplete?.();
+          if (r.status === "wired") {
+            onComplete?.();
+            if (r.result) onProjectionReady?.(r.result);
+          }
           break;
         }
         case 9: setOne("s9", runStage9(simResults, results.s8?.result, results.s6?.result, params, results.s5?.result)); break;
@@ -564,7 +572,10 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
     try {
       const out = await runFullPipeline(simResults, inVitroResults, mergeIvie(params), n => setBusyStage(n));
       setResults(out);
-      if (out.s8?.status === "wired") onComplete?.();
+      if (out.s8?.status === "wired") {
+        onComplete?.();
+        if (out.s8.result) onProjectionReady?.(out.s8.result);
+      }
     } finally {
       setPipelineRunning(false);
       setBusyStage(null);
