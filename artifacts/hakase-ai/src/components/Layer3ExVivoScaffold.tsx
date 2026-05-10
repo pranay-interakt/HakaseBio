@@ -537,18 +537,30 @@ function L3InputParamsCard({
   );
 }
 
+/* ─── Per-stage "what does the ML radio mean here?" labels ────────────────── */
+
+function mlLabelForStage(n: number): string {
+  switch (n) {
+    case 2: return "ML model · ai-service (DILI binary classifier)";
+    case 3: return "ML model · ai-service (Drug2cell + Tabula Sapiens)";
+    case 4: return "ML model (not yet wired — DepMap PRISM pending)";
+    case 5: return "Auto-derive · in-house rule table (needs Stage 2 mechanisms)";
+    default: return "ML model";
+  }
+}
+
 /* ─── Manual-entry form components ────────────────────────────────────────── */
 
 function ManualToggle({
-  enabled, setEnabled, hasResult, onClear,
-}: { enabled: boolean; setEnabled: (v: boolean) => void; hasResult: boolean; onClear: () => void; }) {
+  enabled, setEnabled, hasResult, onClear, mlLabel = "ML model (not yet wired)",
+}: { enabled: boolean; setEnabled: (v: boolean) => void; hasResult: boolean; onClear: () => void; mlLabel?: string; }) {
   return (
     <div className="pl-8 mt-2.5 flex items-center gap-3 flex-wrap">
       <div className="flex items-center gap-3 text-[10px]">
         <span className="text-slate-500 uppercase tracking-wider">Source:</span>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input type="radio" checked={!enabled} onChange={() => setEnabled(false)} className="accent-amber-400" />
-          <span className={!enabled ? "text-amber-300" : "text-slate-500"}>ML model (not yet wired)</span>
+          <span className={!enabled ? "text-amber-300" : "text-slate-500"}>{mlLabel}</span>
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input type="radio" checked={enabled} onChange={() => setEnabled(true)} className="accent-amber-400" />
@@ -1331,14 +1343,14 @@ export function Layer3ExVivoScaffold({
               })()}
             </div>
           </div>
-          <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult onClear={onClear} />
+          <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult onClear={onClear} mlLabel={mlLabelForStage(n)} />
         </div>
       );
     }
 
     return (
       <>
-        <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult={false} onClear={onClear} />
+        <ManualToggle enabled={enabled} setEnabled={setEnabled} hasResult={false} onClear={onClear} mlLabel={mlLabelForStage(n)} />
         {enabled && n === 2 && <Stage2ManualForm onSave={r => setOne("s2", { status: "complete", result: r })} />}
         {enabled && n === 3 && <Stage3ManualForm onSave={r => setOne("s3", { status: "complete", result: r })} />}
         {enabled && n === 4 && <Stage4ManualForm onSave={r => setOne("s4", { status: "complete", result: r })} />}
@@ -1767,9 +1779,11 @@ export function Layer3ExVivoScaffold({
             );
           })()}
 
-          {/* Pending stubs — only for stages NOT wired to ML (4, 5, 6).
-              Stages 2 + 3 surface their own running/error/complete blocks via the ML path. */}
-          {([4, 5, 6] as const).map(n => {
+          {/* Pending stubs — only Stage 4 is genuinely manual-only.
+              Stages 2 + 3 surface their own running/error/complete blocks via the ML path.
+              Stages 5 + 6 auto-run (in-house rule table / orchestration) and surface their own
+              result blocks once executed — no out-of-scope card needed. */}
+          {([4] as const).map(n => {
             const key = (`s${n}` as keyof PipelineResults);
             const r = results[key];
             if (r) return null;
@@ -1777,12 +1791,12 @@ export function Layer3ExVivoScaffold({
             return (
               <ResultShell
                 key={n} stage={n} name={def.name}
-                icon={n === 4 ? FlaskConical : n === 5 ? Activity : ServerCrash}
+                icon={FlaskConical}
                 status="out-of-scope-yet"
                 reason={def.pendingReason}
               >
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Use <span className="text-cyan-300 font-semibold">Manual Entry</span> on the left panel to populate this readout from FDA label / DILIrank / CRO panel data.
+                  Use <span className="text-cyan-300 font-semibold">Manual Entry</span> on the left panel to populate this readout from DepMap PRISM rows, or mark it <span className="font-mono">not_applicable</span> for non-oncology compounds.
                   Cascade kind will be <span className="font-mono">prediction_only</span> with source <span className="font-mono">user-provided</span> — wet anchoring (T2/T3) still required for IND-supporting claims.
                 </p>
               </ResultShell>
