@@ -55,13 +55,31 @@ export const IVIE_MEASUREMENT_HELP: Record<IvieMeasurement, string> = {
   bpRatio:  "Whole-blood-to-plasma concentration ratio. Typical: 0.5–2.5. Required by well-stirred liver model for hepatic clearance.",
 };
 
+/**
+ * Provenance of a cell value.
+ *   - "measured":  user-supplied (typed in, from CRO).
+ *   - "estimated": filled by the auto-populate path with a literature midpoint.
+ *
+ * Estimated cells DO NOT satisfy the cross-species rule (which is what the
+ * "best-guess" gate watches), but they DO populate the math so downstream
+ * panels can run. The L2→L3 handoff requires an explicit "auto-substrate"
+ * acknowledgment + sign-off before progression — this is enforced UI-side in
+ * `IvieOutputHandoffPage`. The audit trail records substrate mode in the
+ * `IvieHandoffSignOff` payload.
+ */
+export type IvieProvenance = "measured" | "estimated";
+
 export interface IvieCell {
-  /** null = not measured. Never auto-fill. */
+  /** null = not provided. */
   value: number | null;
   /** Free-text assay method, e.g. "Equilibrium dialysis, 37°C, 4h, 1 mg/mL HLM". */
   assayMethod: string;
   /** Free-text notes (lot, source, deviations). */
   notes: string;
+  /** Where this value came from. Defaults to "measured" for back-compat. */
+  provenance?: IvieProvenance;
+  /** Optional source identifier for estimates (e.g. "literature_midpoint_v1"). */
+  estimateSource?: string;
 }
 
 export type IvieMatrix = Record<IvieSpecies, IvieCell>;
@@ -79,7 +97,108 @@ export interface IvieWetLabInputs {
 const IVIE_SCHEMA_VERSION = "1.0.0";
 
 export function emptyIvieCell(): IvieCell {
-  return { value: null, assayMethod: "", notes: "" };
+  return { value: null, assayMethod: "", notes: "", provenance: "measured" };
+}
+
+// ─── Literature midpoint estimates (auto-populate substrate) ─────────────────
+//
+// These are openly generic placeholders intended to UNBLOCK demo / preview
+// flows when real CRO data is not yet in hand. Every cell filled from this
+// table is tagged `provenance: "estimated"` and rendered with an "AUTO" pill;
+// the cross-species rule does NOT count estimated cells. Using these values
+// in a sealed run requires explicit acknowledgment + sign-off captured in the
+// `IvieHandoffSignOff` payload (substrateMode field).
+//
+// Anchors: Lombardo et al. 2018 (fu_p drug-class medians), Smith et al. 2010
+// (PPB review), Obach 1999 (fu_mic 1 mg/mL convention). These are "typical
+// drug" midpoints — not species-calibrated for any particular compound.
+export const IVIE_ESTIMATE_SOURCE = "literature_midpoint_v1";
+
+const IVIE_LITERATURE_MIDPOINT: Record<IvieMeasurement, Record<IvieSpecies, number>> = {
+  fuPlasma: { human: 0.20, mouse: 0.15, rat: 0.18, dog: 0.25, monkey: 0.20 },
+  fuMic:    { human: 0.80, mouse: 0.80, rat: 0.80, dog: 0.85, monkey: 0.80 },
+  bpRatio:  { human: 1.00, mouse: 1.00, rat: 0.90, dog: 1.00, monkey: 1.00 },
+};
+
+/** Returns the literature midpoint for (kind, sp), or null if no entry. */
+export function getIvieEstimate(kind: IvieMeasurement, sp: IvieSpecies): number | null {
+  const v = IVIE_LITERATURE_MIDPOINT[kind]?.[sp];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Auto-fills empty preclinical cells with literature midpoints. Does NOT
+ * overwrite cells that already have a measured value (provenance defaults to
+ * "measured"). Human cells are ALSO auto-filled when empty so the math has a
+ * substrate, but they're flagged "estimated" exactly like preclinical cells.
+ *
+ * Pass `{ scope: "preclinicalOnly" }` to leave human cells untouched.
+ */
+export function autoFillIvieEstimates(
+  inputs: IvieWetLabInputs,
+  opts: { scope?: "all" | "preclinicalOnly" } = {},
+): IvieWetLabInputs {
+  const scope = opts.scope ?? "all";
+  const fillMatrix = (kind: IvieMeasurement, m: IvieMatrix): IvieMatrix => {
+    const next = { ...m } as IvieMatrix;
+    for (const sp of IVIE_SPECIES) {
+      if (scope === "preclinicalOnly" && sp === "human") continue;
+      const cell = next[sp];
+      // Only fill empty cells — never overwrite a measured value.
+      if (cell && typeof cell.value === "number" && Number.isFinite(cell.value)) continue;
+      const est = getIvieEstimate(kind, sp);
+      if (est === null) continue;
+      next[sp] = {
+        value: est,
+        assayMethod: cell?.assayMethod || "AUTO — literature midpoint (not species-calibrated)",
+        notes: cell?.notes || "",
+        provenance: "estimated",
+        estimateSource: IVIE_ESTIMATE_SOURCE,
+      };
+    }
+    return next;
+  };
+  return {
+    ...inputs,
+    fuPlasma: fillMatrix("fuPlasma", inputs.fuPlasma),
+    fuMic:    fillMatrix("fuMic",    inputs.fuMic),
+    bpRatio:  fillMatrix("bpRatio",  inputs.bpRatio),
+    enteredAt: new Date().toISOString(),
+  };
+}
+
+/** True iff ANY cell in the inputs is provenance==="estimated". */
+export function hasEstimatedCells(inputs: IvieWetLabInputs): boolean {
+  for (const kind of ["fuPlasma", "fuMic", "bpRatio"] as const) {
+    for (const sp of IVIE_SPECIES) {
+      if (inputs[kind][sp]?.provenance === "estimated"
+          && typeof inputs[kind][sp]?.value === "number") return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Substrate mode for the audit trail. Captured in the L2→L3 handoff sign-off
+ * so downstream consumers (L3 study design, L4 FIH) can tag derived outputs
+ * with the right confidence band.
+ */
+export type IvieSubstrateMode = "measured" | "auto-estimated" | "mixed";
+
+export function deriveSubstrateMode(inputs: IvieWetLabInputs): IvieSubstrateMode {
+  let anyMeasured = false;
+  let anyEstimated = false;
+  for (const kind of ["fuPlasma", "fuMic", "bpRatio"] as const) {
+    for (const sp of IVIE_SPECIES) {
+      const c = inputs[kind][sp];
+      if (!c || typeof c.value !== "number" || !Number.isFinite(c.value)) continue;
+      if (c.provenance === "estimated") anyEstimated = true;
+      else anyMeasured = true;
+    }
+  }
+  if (anyMeasured && anyEstimated) return "mixed";
+  if (anyEstimated) return "auto-estimated";
+  return "measured"; // includes the all-empty case (no estimates in play)
 }
 
 export function emptyIvieMatrix(): IvieMatrix {
@@ -130,8 +249,13 @@ export type IvieTier = "Insufficient" | "Minimum" | "Standard" | "Premium";
 
 export interface IvieTierAssessment {
   tier: IvieTier;
-  /** True iff the cross-species rule is satisfied for fu_p AND B/P. */
+  /** True iff the cross-species rule is satisfied for fu_p AND B/P
+   *  by MEASURED values only. This is the real defensibility flag. */
   crossSpeciesRuleSatisfied: boolean;
+  /** True iff the cross-species rule would be satisfied counting estimated
+   *  cells too. When true but `crossSpeciesRuleSatisfied` is false, the
+   *  handoff page can offer auto-substrate sign-off as a soft path forward. */
+  crossSpeciesRuleSatisfiedWithEstimates: boolean;
   haveFuPlasmaHuman: boolean;
   haveFuMicHuman: boolean;
   haveBpHuman: boolean;
@@ -151,8 +275,21 @@ function hasValue(cell: IvieCell | undefined): boolean {
   return !!cell && typeof cell.value === "number" && Number.isFinite(cell.value);
 }
 
+/** Like hasValue, but ONLY counts cells whose provenance is "measured".
+ *  This is what the cross-species defensibility rule actually watches. */
+function hasMeasuredValue(cell: IvieCell | undefined): boolean {
+  if (!hasValue(cell)) return false;
+  // Default provenance is "measured" (back-compat for cells written before
+  // the provenance field existed). Only "estimated" disqualifies.
+  return cell!.provenance !== "estimated";
+}
+
 function preclinicalWith(matrix: IvieMatrix): IvieSpecies[] {
   return IVIE_PRECLINICAL_SPECIES.filter((sp) => hasValue(matrix[sp]));
+}
+
+function preclinicalWithMeasured(matrix: IvieMatrix): IvieSpecies[] {
+  return IVIE_PRECLINICAL_SPECIES.filter((sp) => hasMeasuredValue(matrix[sp]));
 }
 
 export function assessIvieTier(inputs: IvieWetLabInputs): IvieTierAssessment {
@@ -182,7 +319,21 @@ export function assessIvieTier(inputs: IvieWetLabInputs): IvieTierAssessment {
 
   // Cross-species rule (the doc's defensibility test): both fu_p AND B/P need
   // human + ≥1 preclinical. (fu_mic is premium.)
+  //
+  // The defensibility rule requires MEASURED values — estimated cells (auto-
+  // populated literature midpoints) do NOT satisfy it. We expose two flags:
+  //   • `crossSpeciesRuleSatisfied`           — measured-only (the real rule).
+  //   • `crossSpeciesRuleSatisfiedWithEstimates` — true if estimates close the gap.
+  // The handoff page treats the with-estimates form as a soft warn requiring
+  // explicit auto-substrate sign-off.
+  const haveFuPlasmaHumanMeasured = hasMeasuredValue(inputs.fuPlasma.human);
+  const haveBpHumanMeasured       = hasMeasuredValue(inputs.bpRatio.human);
+  const preFuPmeasured = preclinicalWithMeasured(inputs.fuPlasma);
+  const preBpMeasured  = preclinicalWithMeasured(inputs.bpRatio);
   const crossSpeciesRuleSatisfied =
+    haveFuPlasmaHumanMeasured && preFuPmeasured.length >= 1 &&
+    haveBpHumanMeasured       && preBpMeasured.length  >= 1;
+  const crossSpeciesRuleSatisfiedWithEstimates =
     haveFuPlasmaHuman && preFuP.length >= 1 &&
     haveBpHuman       && preBp.length  >= 1;
 
@@ -207,6 +358,7 @@ export function assessIvieTier(inputs: IvieWetLabInputs): IvieTierAssessment {
   return {
     tier,
     crossSpeciesRuleSatisfied,
+    crossSpeciesRuleSatisfiedWithEstimates,
     haveFuPlasmaHuman,
     haveFuMicHuman,
     haveBpHuman,
@@ -264,10 +416,18 @@ function decodeCell(kind: IvieMeasurement, raw: unknown): IvieCell {
   if (typeof r.value === "number" && Number.isFinite(r.value)) {
     if (validateIvieValue(kind, r.value).ok) value = r.value;
   }
+  // Provenance: only accept the two known string literals. Anything else
+  // (including missing) defaults to "measured" — back-compat for cells
+  // written before the field existed (those were always user-typed).
+  const provenance: IvieProvenance =
+    r.provenance === "estimated" ? "estimated" : "measured";
+  const estimateSource = typeof r.estimateSource === "string" ? r.estimateSource : undefined;
   return {
     value,
     assayMethod: typeof r.assayMethod === "string" ? r.assayMethod : "",
     notes:       typeof r.notes       === "string" ? r.notes       : "",
+    provenance,
+    ...(provenance === "estimated" && estimateSource ? { estimateSource } : {}),
   };
 }
 

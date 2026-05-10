@@ -17,13 +17,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Beaker, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2,
-  Info, Save, RefreshCw,
+  Info, Save, RefreshCw, Wand2,
 } from "lucide-react";
 
 import {
   IVIE_SPECIES, IVIE_PRECLINICAL_SPECIES, IVIE_SPECIES_LABEL,
   IVIE_MEASUREMENT_LABEL, IVIE_MEASUREMENT_UNIT, IVIE_MEASUREMENT_HELP,
   emptyIvieWetLabInputs, validateIvieValue, assessIvieTier,
+  autoFillIvieEstimates, hasEstimatedCells,
   saveIvieWetLabInputs, loadIvieWetLabInputs,
   type IvieWetLabInputs, type IvieSpecies, type IvieMeasurement, type IvieTier,
 } from "@/lib/ivieInputs";
@@ -54,7 +55,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
 
   const assessment = useMemo(() => assessIvieTier(value), [value]);
 
-  function update(measurement: IvieMeasurement, sp: IvieSpecies, patch: Partial<{ value: number | null; assayMethod: string; notes: string }>) {
+  function update(measurement: IvieMeasurement, sp: IvieSpecies, patch: Partial<IvieWetLabInputs[IvieMeasurement][IvieSpecies]>) {
     const next: IvieWetLabInputs = {
       ...value,
       [measurement]: { ...value[measurement], [sp]: { ...value[measurement][sp], ...patch } },
@@ -66,7 +67,8 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
   function handleValueInput(measurement: IvieMeasurement, sp: IvieSpecies, raw: string) {
     const cellKey = `${measurement}:${sp}`;
     if (raw.trim() === "") {
-      update(measurement, sp, { value: null });
+      // Clearing a cell also clears any provenance — back to a true empty.
+      update(measurement, sp, { value: null, provenance: "measured", estimateSource: undefined });
       setCellErrors((e) => ({ ...e, [cellKey]: { error: null } }));
       return;
     }
@@ -79,11 +81,18 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
     if (!v.ok) {
       setCellErrors((e) => ({ ...e, [cellKey]: { error: v.reason ?? "invalid" } }));
       // Still write null so the panel stays honest about not having a value
-      update(measurement, sp, { value: null });
+      update(measurement, sp, { value: null, provenance: "measured", estimateSource: undefined });
       return;
     }
     setCellErrors((e) => ({ ...e, [cellKey]: { error: null } }));
-    update(measurement, sp, { value: num });
+    // Any user-typed value flips the cell back to "measured" — even if the
+    // panel had previously auto-populated it. This is how an estimate is
+    // upgraded once real CRO data arrives.
+    update(measurement, sp, { value: num, provenance: "measured", estimateSource: undefined });
+  }
+
+  function handleAutoFill() {
+    onChange(autoFillIvieEstimates(value));
   }
 
   function handleSave() {
@@ -169,35 +178,6 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
             </div>
           )}
 
-          {/* Tier ladder */}
-          <div className="rounded-md border border-white/8 bg-white/[0.02] px-3 py-2 text-[11px]">
-            <div className="text-slate-400 font-semibold mb-1 flex items-center gap-1.5">
-              <Info className="w-3 h-3 text-slate-500" />
-              Tier ladder
-            </div>
-            <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <li className={`rounded-sm border px-2 py-1 ${assessment.tier === "Minimum" || assessment.tier === "Standard" || assessment.tier === "Premium" ? "border-amber-500/30 bg-amber-500/[0.06]" : "border-white/8"}`}>
-                <div className="text-amber-300 font-semibold text-[10px] uppercase tracking-wider">Minimum</div>
-                <div className="text-slate-400 text-[10px]">fu_p (human) only</div>
-              </li>
-              <li className={`rounded-sm border px-2 py-1 ${assessment.tier === "Standard" || assessment.tier === "Premium" ? "border-cyan-500/30 bg-cyan-500/[0.06]" : "border-white/8"}`}>
-                <div className="text-cyan-300 font-semibold text-[10px] uppercase tracking-wider">Standard</div>
-                <div className="text-slate-400 text-[10px]">+ fu_p mouse&rat, B/P human + 1 preclinical</div>
-              </li>
-              <li className={`rounded-sm border px-2 py-1 ${assessment.tier === "Premium" ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-white/8"}`}>
-                <div className="text-emerald-300 font-semibold text-[10px] uppercase tracking-wider">Premium</div>
-                <div className="text-slate-400 text-[10px]">+ fu_mic human + ≥1 preclinical</div>
-              </li>
-            </ul>
-            {assessment.missingForNextTier.length > 0 && tierStyle.helpFor && (
-              <div className="mt-2 pt-2 border-t border-white/8 text-[10px] text-slate-400">
-                <span className="text-slate-500">To reach </span>
-                <span className="text-slate-300 font-semibold">{tierStyle.helpFor}</span>
-                <span className="text-slate-500">, add: </span>
-                <span className="text-slate-300">{assessment.missingForNextTier.join(" · ")}</span>
-              </div>
-            )}
-          </div>
 
           {/* Measurement tabs */}
           <div className="flex items-center gap-1 border-b border-white/8">
@@ -240,6 +220,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
                   const err = cellErrors[cellKey]?.error;
                   const isHuman = sp === "human";
                   const isPre = IVIE_PRECLINICAL_SPECIES.includes(sp);
+                  const isEstimated = cell.value !== null && cell.provenance === "estimated";
                   return (
                     <tr key={sp} className={`border-t border-white/5 ${idx % 2 === 0 ? "bg-white/[0.01]" : ""}`}>
                       <td className="px-3 py-1.5">
@@ -248,19 +229,36 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
                         {isPre   && <span className="ml-1 text-[9px] uppercase text-slate-500">preclinical</span>}
                       </td>
                       <td className="px-3 py-1.5">
-                        <input
-                          type="number"
-                          step="0.001"
-                          min={0}
-                          inputMode="decimal"
-                          defaultValue={cell.value === null ? "" : String(cell.value)}
-                          placeholder="—"
-                          onBlur={(e) => handleValueInput(activeMeasurement, sp, e.target.value)}
-                          data-testid={`ivie-value-${activeMeasurement}-${sp}`}
-                          className={`w-full bg-slate-900/50 border rounded px-2 py-1 text-[11px] text-slate-100 focus:outline-none focus:border-cyan-400 ${
-                            err ? "border-rose-500/60" : "border-white/10"
-                          }`}
-                        />
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            // key forces React to remount the input when the
+                            // cell value changes externally (e.g. via Auto-fill),
+                            // so `defaultValue` reflects the new value instead
+                            // of the stale uncontrolled value.
+                            key={`${cell.value ?? "_"}:${cell.provenance ?? "measured"}`}
+                            type="number"
+                            step="0.001"
+                            min={0}
+                            inputMode="decimal"
+                            defaultValue={cell.value === null ? "" : String(cell.value)}
+                            placeholder="—"
+                            onBlur={(e) => handleValueInput(activeMeasurement, sp, e.target.value)}
+                            data-testid={`ivie-value-${activeMeasurement}-${sp}`}
+                            className={`flex-1 bg-slate-900/50 border rounded px-2 py-1 text-[11px] focus:outline-none focus:border-cyan-400 ${
+                              err ? "border-rose-500/60"
+                              : isEstimated ? "border-orange-500/40 text-orange-200"
+                              : "border-white/10 text-slate-100"
+                            }`}
+                          />
+                          {isEstimated && (
+                            <span
+                              title="Auto-populated literature midpoint — replace with measured value when CRO data is in."
+                              className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
+                            >
+                              AUTO
+                            </span>
+                          )}
+                        </div>
                         {err && <div className="text-[9px] text-rose-400 mt-0.5">{err}</div>}
                       </td>
                       <td className="px-3 py-1.5">
@@ -290,6 +288,21 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
             </table>
           </div>
 
+          {/* Auto-fill notice — only when at least one cell is currently AUTO. */}
+          {hasEstimatedCells(value) && (
+            <div className="rounded-md border border-orange-500/30 bg-orange-500/[0.06] px-3 py-2 flex items-start gap-2">
+              <Wand2 className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 text-[11px] text-orange-200/95 leading-snug">
+                <span className="font-semibold">Auto-substrate active.</span>{" "}
+                One or more cells use literature midpoints (orange "AUTO" pill). The
+                cross-species rule still reads as <span className="font-semibold">UNMET</span> —
+                estimates do not count as evidence. Type any cell to upgrade it to
+                a measured value, or proceed via the L2 → L3 handoff which will
+                require an explicit auto-substrate sign-off.
+              </div>
+            </div>
+          )}
+
           {/* Footer actions */}
           <div className="flex items-center gap-3 pt-1">
             <input
@@ -300,6 +313,14 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
               data-testid="ivie-entered-by"
               className="flex-1 bg-slate-900/50 border border-white/10 rounded px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400"
             />
+            <button
+              onClick={handleAutoFill}
+              data-testid="ivie-auto-fill"
+              title="Fill empty cells with literature midpoints (tagged AUTO; never overwrites measured values)"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-100 text-[11px] font-semibold transition-colors"
+            >
+              <Wand2 className="w-3 h-3" /> Auto-fill empty cells
+            </button>
             <button
               onClick={handleSave}
               data-testid="ivie-save"

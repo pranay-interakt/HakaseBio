@@ -20,8 +20,8 @@ import {
   CheckCircle2, XCircle, Info,
 } from "lucide-react";
 import {
-  IVIE_PRECLINICAL_SPECIES, assessIvieTier,
-  type IvieWetLabInputs, type IvieTier,
+  IVIE_PRECLINICAL_SPECIES, assessIvieTier, deriveSubstrateMode, hasEstimatedCells,
+  type IvieWetLabInputs, type IvieTier, type IvieSubstrateMode,
 } from "@/lib/ivieInputs";
 import { IvieInputsPanel } from "@/components/IvieInputsPanel";
 import type { ConfirmationEvidenceBlock } from "@workspace/preclinical-handoff";
@@ -34,6 +34,11 @@ export interface IvieHandoffSignOff {
   justification: string;
   acknowledgedAlerts: string[];
   signedAt: string; // ISO
+  /** Substrate mode at the moment of sign-off — captured for the audit
+   *  trail so L3 study design + L4 FIH can tag derived outputs with the
+   *  correct confidence band. "auto-estimated" or "mixed" implies the
+   *  user explicitly acknowledged proceeding on literature midpoints. */
+  substrateMode: IvieSubstrateMode;
 }
 
 interface SimResultsLike {
@@ -129,13 +134,28 @@ function buildAlerts(
       detail: `${confirmationBlock.overrides?.length ?? 0} override(s) recorded. L3 will cite this Confirmation block.`,
     });
   }
+  // Cross-species rule logic now branches on substrate mode:
+  //   • Measured rule satisfied → no alert.
+  //   • Estimated cells close the gap → "auto-substrate acknowledgment" warn
+  //     (the user MUST tick the box that they're proceeding on literature
+  //     midpoints; the substrate mode is captured in the sign-off payload).
+  //   • Neither satisfies → original "cross-species rule unmet" warn.
   if (!tierA.crossSpeciesRuleSatisfied && tierA.tier !== "Insufficient") {
-    alerts.push({
-      id: "ivie-cross-species",
-      level: "warn",
-      title: "Cross-species rule unmet",
-      detail: "fu_p AND B/P each need human + ≥1 preclinical species. Without it the species translation in L3 is a best guess, not an evidence-based design.",
-    });
+    if (tierA.crossSpeciesRuleSatisfiedWithEstimates && hasEstimatedCells(ivieInputs)) {
+      alerts.push({
+        id: "ivie-auto-substrate",
+        level: "warn",
+        title: "Auto-substrate in use — measured cross-species data missing",
+        detail: "One or more cells are literature midpoints (AUTO), not CRO measurements. Acknowledge that L3 study design + L4 FIH dose will be tagged 'estimated substrate' in the audit trail and cannot be used for IND submission without re-running on measured data.",
+      });
+    } else {
+      alerts.push({
+        id: "ivie-cross-species",
+        level: "warn",
+        title: "Cross-species rule unmet",
+        detail: "fu_p AND B/P each need human + ≥1 preclinical species. Without it the species translation in L3 is a best guess, not an evidence-based design. Tip: use 'Auto-fill empty cells' below if you need to proceed without CRO data — it will require explicit acknowledgment.",
+      });
+    }
   }
   if (tierA.tier === "Minimum") {
     alerts.push({
@@ -204,6 +224,7 @@ export function IvieOutputHandoffPage({
   ivieInputs, onIvieInputsChange, simResults, confirmationBlock, safetyFlags, onBack, onProceed,
 }: Props) {
   const tierA = useMemo(() => assessIvieTier(ivieInputs), [ivieInputs]);
+  const substrateMode = useMemo(() => deriveSubstrateMode(ivieInputs), [ivieInputs]);
   const alerts = useMemo(
     () => buildAlerts(ivieInputs, simResults, confirmationBlock, safetyFlags),
     [ivieInputs, simResults, confirmationBlock, safetyFlags],
@@ -228,6 +249,7 @@ export function IvieOutputHandoffPage({
       justification: justification.trim(),
       acknowledgedAlerts: Object.entries(acked).filter(([, v]) => v).map(([k]) => k),
       signedAt: new Date().toISOString(),
+      substrateMode,
     });
   };
 
@@ -363,6 +385,15 @@ export function IvieOutputHandoffPage({
                 }`}>
                   Cross-species rule: {tierA.crossSpeciesRuleSatisfied ? "MET" : "UNMET"}
                 </span>
+                {/* Substrate mode chip — visible whenever any cell is auto. */}
+                {substrateMode !== "measured" && (
+                  <span
+                    title="One or more IVIVE cells are literature midpoints, not CRO measurements. Sign-off will record this in the audit trail."
+                    className="px-2 py-0.5 rounded text-[10px] font-bold border bg-orange-500/15 text-orange-300 border-orange-500/40"
+                  >
+                    {substrateMode === "auto-estimated" ? "AUTO-SUBSTRATE" : "MIXED SUBSTRATE"}
+                  </span>
+                )}
                 <span className="text-[10px] text-slate-500">
                   {(tierA.completionFraction * 100).toFixed(0)}% complete
                 </span>
