@@ -15,7 +15,7 @@
  * fills directive → measurements → overrides themselves.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -72,6 +72,10 @@ interface Props {
   inVitro: InVitroResults | null;
   /** Captured by parent; passed back down on emit so L3 can reference it. */
   onConfirmationBlockReady: (block: ConfirmationEvidenceBlock) => void;
+  /** Monotonically-increasing counter; each increment force-expands the panel.
+   *  Used by the L3 → L2 "block not sealed" call-out so the seal flow is
+   *  visible the moment the user lands back on L2. */
+  forceExpandSignal?: number;
 }
 
 const DEFAULT_MEASUREMENTS: ExVivoMeasurement[] = [
@@ -87,6 +91,7 @@ export function ConfirmationLayerPanel({
   l1,
   inVitro,
   onConfirmationBlockReady,
+  forceExpandSignal,
 }: Props) {
   // ── Local state — represents the live drafting workflow ──────────────────
   const [policy] = useState<GatePolicySnapshot>(() => defaultGatePolicy());
@@ -115,6 +120,16 @@ export function ConfirmationLayerPanel({
   // Collapsed by default — the dashboard uses very little vertical space.
   // Users expand to access the full directive / measurements / seal flow.
   const [expanded, setExpanded] = useState<boolean>(false);
+
+  // External force-expand: any change to `forceExpandSignal` (incl. first
+  // non-zero value) opens the orchestrator. Triggered by the L3
+  // L2ConfirmationInputsPanel "Open seal flow" button.
+  useEffect(() => {
+    if (forceExpandSignal != null && forceExpandSignal > 0) {
+      setExpanded(true);
+      setOpenSection("directive");
+    }
+  }, [forceExpandSignal]);
 
   const l1Pointer: EvidencePointer = useMemo(
     () => freezeL1EvidencePointer(compoundIdRaw, new Date().toISOString()),

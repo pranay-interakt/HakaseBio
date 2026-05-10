@@ -151,6 +151,10 @@ export function HakaseAI() {
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
   // v2.0.0 Confirmation block — sealed by ConfirmationLayerPanel and read by L4.
   const [confirmationBlock, setConfirmationBlock] = useState<ConfirmationEvidenceBlock | null>(null);
+  // Monotonically-increasing signal — incremented by the L3 "block not sealed"
+  // call-out's "Open seal flow" button. Drives ConfirmationLayerPanel to
+  // force-expand when the user lands back on L2.
+  const [confirmationExpandSignal, setConfirmationExpandSignal] = useState<number>(0);
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
     2: "idle",
@@ -4095,6 +4099,7 @@ export function HakaseAI() {
                   setConfirmationBlock(b);
                   setSimStatus(prev => ({ ...prev, 2: "complete" }));
                 }}
+                forceExpandSignal={confirmationExpandSignal}
               />
               {/* Active sub-track */}
               <div className="flex-1 overflow-hidden flex flex-col">
@@ -4422,7 +4427,14 @@ export function HakaseAI() {
                       <OverrideBanner overrides={safetyOverrides.filter(o => o.toLayer <= 3)} />
                     )}
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL3?.databaseQueries ?? []).some(q => q.database === w.database))} />
-                    <L2ConfirmationInputsPanel block={confirmationBlock} />
+                    <L2ConfirmationInputsPanel
+                      block={confirmationBlock}
+                      l2SubTrackComplete={simStatus[2] === "complete"}
+                      onJumpToSeal={() => {
+                        setActiveLayer(2);
+                        setConfirmationExpandSignal(s => s + 1);
+                      }}
+                    />
                     <Layer2AnimalResults ar={animalResults} molName={simResults?.molName ?? "Compound"} />
                     {provenanceL3 && <ProvenanceFooter provenance={provenanceL3} layer={3} />}
                   </>
@@ -7587,7 +7599,15 @@ function L2ConfirmationInputRow({ label, source, value, dim }: { label: string; 
   );
 }
 
-function L2ConfirmationInputsPanel({ block }: { block: ConfirmationEvidenceBlock | null }) {
+function L2ConfirmationInputsPanel({
+  block,
+  l2SubTrackComplete,
+  onJumpToSeal,
+}: {
+  block: ConfirmationEvidenceBlock | null;
+  l2SubTrackComplete?: boolean;
+  onJumpToSeal?: () => void;
+}) {
   const status: "passed" | "overridden" | "failed" | "pending" = block?.gateStatus ?? "pending";
   const pillClasses =
     status === "passed"     ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" :
@@ -7645,6 +7665,11 @@ function L2ConfirmationInputsPanel({ block }: { block: ConfirmationEvidenceBlock
     return confidences.reduce((a, b) => a + b, 0) / confidences.length;
   })() : null;
 
+  // Call-out: L2 sub-track has run but the orchestrator block was never sealed
+  // (the user ran in-silico/ex-vivo scaffolds but didn't click "Seal
+  // ConfirmationEvidenceBlock"). Surface this and offer a one-click jump back.
+  const showUnsealedCallout = !block && !!l2SubTrackComplete;
+
   return (
     <section className="mx-4 mt-3">
       <div className="flex items-center gap-2 mb-3">
@@ -7654,6 +7679,29 @@ function L2ConfirmationInputsPanel({ block }: { block: ConfirmationEvidenceBlock
           {pillLabel}
         </span>
       </div>
+      {showUnsealedCallout && (
+        <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 flex items-start gap-2.5">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold text-amber-200">L2 Confirmation block not sealed</div>
+            <p className="text-[10px] text-amber-200/70 mt-0.5 leading-snug">
+              The L2 In-Silico / Ex-Vivo sub-tracks have run, but no <span className="font-mono">ConfirmationEvidenceBlock</span> was sealed.
+              Joint outputs (CYP, clearance, dose-response, off-target, hERG-PBPK) and falsifier triggers are not available
+              to L3 until a reviewer emits a directive, enters ex-vivo measurements, and seals the block.
+            </p>
+          </div>
+          {onJumpToSeal && (
+            <button
+              onClick={onJumpToSeal}
+              data-testid="jump-to-seal-confirmation"
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 text-[10px] font-semibold transition-colors"
+            >
+              <Lock className="w-3 h-3" /> Open seal flow
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
       <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
         <L2ConfirmationInputRow label="Confirmation verdict"     source="L2 / cascade gate"            value={block ? block.gateStatus : "—"} dim={!block} />
         <L2ConfirmationInputRow label="In-silico evidence"       source="L2 / pipeline records"        value={inSilicoCount != null ? `${inSilicoCount} record${inSilicoCount === 1 ? "" : "s"}` : "—"} />
