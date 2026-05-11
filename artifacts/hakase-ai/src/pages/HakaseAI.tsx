@@ -1450,7 +1450,9 @@ export function HakaseAI() {
     // is Ex Vivo (a scaffold panel — see render dispatch below).
     // (HIDE_PATIENT_TRIAL_LAYERS=true keeps this dead — slot 3 is now Animal.)
     if (!HIDE_PATIENT_TRIAL_LAYERS && false && activeLayer === 3) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+      // Dead code (HIDE_PATIENT_TRIAL_LAYERS=true keeps `false &&` unreachable);
+      // non-null assertions satisfy TS without affecting runtime behaviour.
+      const layer1 = simResults ?? runAdmetSimulation(molProps!, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1469,14 +1471,14 @@ export function HakaseAI() {
       });
 
       const [faersSettled, pdSettled] = await fetchPromise;
-      const faersResult = faersSettled.status === "fulfilled" ? faersSettled.value : undefined;
-      const pdParams    = pdSettled.status === "fulfilled"    ? pdSettled.value    : undefined;
+      const faersResult = faersSettled.status === "fulfilled" ? (faersSettled as { value: unknown }).value as Awaited<ReturnType<typeof fetchFAERSSignals>> : undefined;
+      const pdParams    = pdSettled.status === "fulfilled"    ? (pdSettled    as { value: unknown }).value as Awaited<ReturnType<typeof fetchPDParameters>>  : undefined;
 
       const l2pk: L2PkOverrides | undefined = animalResults ? {
-        bioavailF:       animalResults.formulationResult.formulatedF,
-        humanHalfLifeHr: animalResults.humanHalfLife,
-        humanCmaxNgMl:   animalResults.humanCmax,
-        humanAucNgHMl:   animalResults.humanAuc,
+        bioavailF:       animalResults!.formulationResult.formulatedF,
+        humanHalfLifeHr: animalResults!.humanHalfLife,
+        humanCmaxNgMl:   animalResults!.humanCmax,
+        humanAucNgHMl:   animalResults!.humanAuc,
       } : undefined;
 
       const results = runCohortSimulation(

@@ -367,7 +367,7 @@ export function HakaseAI() {
   };
 
   const layerIcons = [FlaskConical, Users, Beaker] as const;
-  const layerLabels = ["Molecular", "Cohort", "Trial"] as const;
+  const layerLabels: string[] = ["Molecular", "Cohort", "Trial"];
   const layerColors = ["violet", "blue", "green"] as const;
 
   return (

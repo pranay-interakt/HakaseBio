@@ -248,7 +248,8 @@ export function MolViewer3D_Cinematic({ smiles, molName: propMolName }: { smiles
     const hbonds = Math.min(hbd + Math.floor(hba / 2), 8);
     // Deterministic RMSD seeded from SMILES so it's stable per molecule
     let smilesHash = 0;
-    for (let i = 0; i < smiles.length; i++) smilesHash = (smilesHash * 31 + smiles.charCodeAt(i)) >>> 0;
+    const smilesStr = smiles ?? "";
+    for (let i = 0; i < smilesStr.length; i++) smilesHash = (smilesHash * 31 + smilesStr.charCodeAt(i)) >>> 0;
     const pseudoRand = ((Math.sin(smilesHash * 9301 + 49297) * 233280) % 1 + 1) % 1;
     const rmsdVal = 0.30 + pseudoRand * 0.65;
     return {

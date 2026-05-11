@@ -421,7 +421,7 @@ Phase 1 strategy synthesis. Includes:
 
 ### 4.3 Handoff: L4 → Hakase Clinical
 
-L4 emits an **IND-gate readiness package** that is the boundary payload to the standalone `Hakase Clinical` artifact (`artifacts/hakase-clinical/` — Phase 1–4 Planner). This is currently a documented contract; live wiring between the two artifacts is staged.
+L4 emits an **IND-gate readiness package** as a typed boundary payload (`lib/preclinical-handoff/` v1 `PreClinicalPackage`). The Phase 1 Planner (`Phase1Planner.tsx`) is embedded directly inside the L4 `FirstInHumanPanel` and consumes that package in-process — no cross-artifact JSON paste. The previously-planned standalone `Hakase Clinical` artifact (a separate React + Vite app) has been removed; if a future deployment surface is needed, build it fresh.
 
 ---
 
@@ -541,7 +541,7 @@ artifacts/hakase-ai/src/
    │  Inputs: confirmationBlock + animalResults + simResults              │
    │  Outputs: MABEL vs HED start, escalation scheme, special-pop arms,   │
    │           IND-gate readiness                                         │
-   │  → Hakase Clinical (artifacts/hakase-clinical/) Phase 1–4 Planner    │
+   │  → Phase1Planner embedded in L4 (Phase1Planner.tsx)                  │
    └──────────────────────────────────────────────────────────────────────┘
 ```
 

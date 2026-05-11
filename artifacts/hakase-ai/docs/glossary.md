@@ -243,7 +243,7 @@ The L3 result feeds L4 as a `PreClinicalPackage` (the contract object the FIH pl
 
 ## Layer 4 — First-In-Human / Phase 1 Planner
 
-Layer 4 plans the first human trial. It now embeds the Phase 1 Planner from `hakase-clinical`.
+Layer 4 plans the first human trial. It embeds `Phase1Planner` (`src/components/Phase1Planner.tsx`), which consumes the v1 `PreClinicalPackage` from `lib/preclinical-handoff/`. (The previously-standalone `hakase-clinical` artifact that hosted this planner as its own deployable app has been removed; the planner itself still ships, embedded in L4.)
 
 | Term | Meaning | Where it shows up |
 |---|---|---|
@@ -303,7 +303,7 @@ A FastAPI server (`artifacts/ai-service`) that wraps every model that's too heav
 | **shadcn/ui** | Tailwind + Radix component recipes. | Our `components/ui/*`. |
 | **Lucide** | Icon set. | All icons. |
 | **pnpm workspace** | Monorepo package manager. | The whole `artifacts/*` layout. |
-| **Artifact** | Our term for a deployable sub-app inside the monorepo (e.g. `hakase-ai`, `hakase-clinical`, `ai-service`). | Listed in the artifact registry. |
+| **Artifact** | Our term for a deployable sub-app inside the monorepo (e.g. `hakase-ai`, `api-server`, `ai-service`). | Listed in the artifact registry. |
 
 ---
 

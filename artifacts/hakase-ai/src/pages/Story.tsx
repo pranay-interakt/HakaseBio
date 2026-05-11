@@ -434,7 +434,7 @@ export function Story() {
       <div className="border-t border-white/5 py-16 px-6 text-center">
         <p className="text-[14px] text-slate-500 mb-6">Ready to run a simulation?</p>
         <button
-          onClick={() => navigate("/login")}
+          onClick={() => { window.location.href = "/login"; }}
           className="px-8 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 transition-colors text-white font-semibold text-[15px]"
         >
           Get Started →
