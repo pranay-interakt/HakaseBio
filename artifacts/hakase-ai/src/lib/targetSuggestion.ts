@@ -805,9 +805,14 @@ export function suggestTargets(
       rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
       area:        t.area,
       color:       t.color,
+      // `source: "heuristic"` is the TargetSuggestion provenance enum (kept
+       // stable for downstream consumers that branch on chembl/chembl-similar/
+       // heuristic). The displayed *quality tier*, however, is "structural" —
+       // pharmacophore matching is a deterministic SMARTS substructure query,
+       // not a heuristic prediction.
       source:      "heuristic" as const,
-      quality:     makeQuality("heuristic", "RDKit pharmacophore catalogue", {
-        note: "Pattern match against curated 29-target catalogue — no measured binding data",
+      quality:     makeQuality("structural", "RDKit pharmacophore catalogue", {
+        note: "SMARTS substructure match against curated 29-target catalogue — defensible structural evidence, not measured binding data",
       }),
     };
   });
