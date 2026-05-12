@@ -226,6 +226,17 @@ export function computeL2DoseProjection(
   const kiMultiplier = occupancy / Math.max(1e-6, 1 - occupancy);
 
   // ── Read live L1 inputs ───────────────────────────────────────────────────
+  // RF#1 / §9 step 1: L1 binding is null when no validated UniProt is in
+  // TARGET_MAP. Dose projection without a Ki is not meaningful — refuse
+  // explicitly rather than substituting 0 or a default.
+  if (!sim.binding) {
+    throw new Error(
+      "L2 dose projection requires an L1 binding estimate (primaryKi). " +
+      "L1 returned binding=null because the target UniProt is not in the " +
+      "validated catalog — pick a curated target or wire ML binding before " +
+      "attempting dose projection.",
+    );
+  }
   const ki_nM    = sim.binding.primaryKi;
   const mw       = sim.lipinski.mw;
   const logP     = sim.lipinski.logP;

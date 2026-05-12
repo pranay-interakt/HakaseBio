@@ -423,7 +423,7 @@ function L3InputParamsCard({
   const route = params.l2.route ?? "oral";
   const dpd = params.l2.dosesPerDay ?? 1;
   const tcf = params.transporterConfidenceFloor;
-  const ic50_nM = simResults?.binding.primaryIC50;
+  const ic50_nM = simResults?.binding?.primaryIC50;
   return (
     <section className="rounded-xl border border-teal-500/25 bg-teal-500/[0.04] p-4 space-y-4">
       <div className="flex items-center gap-2">
@@ -1148,8 +1148,13 @@ export function Layer3ExVivoScaffold({
     setOne("s1", { status: "running" });
     try {
       const transporters = predictTransporterFlags(simResults.lipinski);
-      const simForRun = params.ic50_nM_override !== undefined && isFinite(params.ic50_nM_override) && params.ic50_nM_override > 0
-        ? { ...simResults, binding: { ...simResults.binding, primaryIC50: params.ic50_nM_override } }
+      // Override flow: only allowed when the base simResults already has a
+      // BindingEstimate (override mutates one field, not constructs ex
+      // nihilo). When binding is null, the override path is unreachable —
+      // the runStage1 button should be disabled upstream by the
+      // `simResults.binding == null` branch in the dose-validation effect.
+      const simForRun = params.ic50_nM_override !== undefined && isFinite(params.ic50_nM_override) && params.ic50_nM_override > 0 && simResults.binding
+        ? { ...simResults, binding: { ...simResults.binding, primaryIC50: params.ic50_nM_override } satisfies SimResults["binding"] }
         : simResults;
       const matrix = await computeTissueSelectivityMatrix({
         sim: simForRun, iv: inVitroResults, l2Params: params.l2,
@@ -1494,8 +1499,8 @@ export function Layer3ExVivoScaffold({
             <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
               <L1OutputRow label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
               <L1OutputRow label="UniProt target"      source="L1 / UniProt KB API"        value={simResults ? simResults.uniprotId : "—"} />
-              <L1OutputRow label="Target gene (display)" source="L1 binding"               value={simResults ? simResults.binding.targetName : "—"} />
-              <L1OutputRow label="L1 IC50 (nM)"        source="L1 binding · primary"        value={simResults ? simResults.binding.primaryIC50.toFixed(1) : "—"} />
+              <L1OutputRow label="Target gene (display)" source="L1 binding"               value={simResults?.binding ? simResults.binding.targetName : "—"} />
+              <L1OutputRow label="L1 IC50 (nM)"        source="L1 binding · primary"        value={simResults?.binding ? simResults.binding.primaryIC50.toFixed(1) : "—"} />
               <L1OutputRow label="Plasma fu (%)"       source="L1 PPB sim"                  value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
               <L1OutputRow label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"         value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
               <L1OutputRow label="MW · LogP · TPSA"    source="RDKit descriptors"           value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />

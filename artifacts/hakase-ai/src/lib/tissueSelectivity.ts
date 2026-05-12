@@ -185,6 +185,15 @@ export async function computeTissueSelectivityMatrix(
   const cmaxTotal_uM = mgPerL_to_uM(pbpk.cmax, sim.lipinski.mw);
   const Cu_plasma_uM = cmaxTotal_uM * fu;
 
+  // RF#1 / §9 step 1: L1 binding is null when no validated UniProt is in
+  // TARGET_MAP. Tissue selectivity needs an on-target IC50 — refuse loudly.
+  if (!sim.binding) {
+    throw new Error(
+      "Tissue-selectivity requires an L1 binding estimate. L1 returned " +
+      "binding=null because the target UniProt is not in the validated " +
+      "catalog — pick a curated target before attempting tissue selectivity.",
+    );
+  }
   // 3. Convert L1 IC50 from nM (BindingEstimate.primaryIC50 is in nM) → µM.
   const ic50_uM = sim.binding.primaryIC50 / 1000;
   if (!isFinite(ic50_uM) || ic50_uM <= 0) {
@@ -197,7 +206,7 @@ export async function computeTissueSelectivityMatrix(
   //    sim.binding.targetName is the curated gene for known TARGET_MAP entries
   //    (e.g. "EGFR"), but for unknown UniProt IDs it falls through to a label;
   //    fetchUniProt is the canonical source.
-  let geneSymbol = sim.binding.targetName;
+  let geneSymbol: string = sim.binding.targetName;
   try {
     const protein = await fetchUniProt(sim.uniprotId);
     if (protein.gene && protein.gene !== "—") geneSymbol = protein.gene;

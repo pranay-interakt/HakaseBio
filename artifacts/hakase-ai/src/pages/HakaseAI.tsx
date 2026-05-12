@@ -1455,6 +1455,20 @@ export function HakaseAI() {
         setSimProgress(Math.min(99, (tick / steps) * 100));
         if (tick >= steps) {
           clearInterval(interval2);
+          // RF#1 / §9 step 1 (code-review fix): enforce the binding
+          // precondition at the call site so the user gets an actionable
+          // banner instead of an opaque thrown error. Animal sim cannot
+          // back-calculate a therapeutic dose without an on-target IC50.
+          if (!layer1.binding) {
+            setSimProgress(0);
+            setSimStatus(prev => ({ ...prev, 4: "idle" }));
+            alert(
+              "Animal cohort simulation requires a validated on-target binding estimate.\n\n" +
+              "L1 returned binding=null because the selected UniProt is not in the validated catalog. " +
+              "Pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK) before advancing to L4 animal."
+            );
+            return;
+          }
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
           // computeLayer2Flags is named for the legacy slot index; under the
@@ -4238,6 +4252,17 @@ export function HakaseAI() {
                         ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`             : "pending"],
                         ["Toxicity",   simResults ? `${(simResults.admet.toxicity   * 100).toFixed(0)}%`             : "pending"],
                         ["Go/No-Go",   simResults ? simResults.goNogo                                                 : "pending"],
+                        // RF#7 / §9 step 12: surface the cascade-gate
+                        // evidence tier so the user sees the auto-cascade
+                        // decision (heuristic / structural / inferred / ml /
+                        // measured) and the source-quality floor that
+                        // justified it. Plain heuristics block auto-cascade.
+                        // RF#7 / §9 step 12: surface the safety-min source-
+                        // quality floor (0.5 heuristic / 0.6 structural /
+                        // 0.7 ml / 0.8 measured) so the auto-cascade decision
+                        // is interpretable. The detailed per-output tiers
+                        // live in the cascade-gate panel below.
+                        ["Cascade gate", simResults ? `safety-min ${cascadeGate.safetyMinScore.toFixed(2)} · ${cascadeGate.canAutoCascade ? "auto-cascade allowed" : "manual override required"}` : "pending"],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1">
                           <span className="text-slate-500">{k}</span>
@@ -4400,7 +4425,7 @@ export function HakaseAI() {
                       onAcknowledge={() => setHAIOpsCtx(prev => acknowledgeReview(prev))}
                     />
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL1?.databaseQueries ?? []).some(q => q.database === w.database))} />
-                    <CrossSourceConsistencyCheck simIC50_uM={inVitroResults ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
+                    <CrossSourceConsistencyCheck simIC50_uM={inVitroResults?.doseResponse.ic50_nM != null ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
                     {provenanceL1 && <ProvenanceFooter provenance={provenanceL1} layer={1} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
@@ -4583,7 +4608,7 @@ export function HakaseAI() {
                             <Row label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
                             <Row label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
                             <Row label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
-                            <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? simResults.binding.primaryKi.toFixed(1) : "—"} />
+                            <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults?.binding ? simResults.binding.primaryKi.toFixed(1) : "—"} />
                             <Row label="Plasma fu (%)"       source="L1 PPB sim"                 value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
                             <Row label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
                             <Row label="L1 Go / No-Go"       source="L1 cascade gate"            value={simResults ? simResults.goNogo : "—"} />
@@ -6977,7 +7002,9 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Key Metrics</div>
           {iv && (
             <>
-              <AiMiniBar label="IC50" value={iv.doseResponse.ic50_nM} max={1000} color={iv.doseResponse.ic50_nM < 100 ? "emerald" : iv.doseResponse.ic50_nM < 500 ? "amber" : "red"} />
+              {iv.doseResponse.ic50_nM != null
+                ? <AiMiniBar label="IC50" value={iv.doseResponse.ic50_nM} max={1000} color={iv.doseResponse.ic50_nM < 100 ? "emerald" : iv.doseResponse.ic50_nM < 500 ? "amber" : "red"} />
+                : <div className="text-[9px] text-slate-500">IC50 — no validated target</div>}
               <AiMiniBar label="Caco-2 Papp" value={iv.permeability.caco2Papp} max={60} color={iv.permeability.caco2Class === "High" ? "emerald" : iv.permeability.caco2Class === "Moderate" ? "amber" : "red"} />
               <AiMiniBar label="hERG IC50" value={iv.herg.ic50_uM} max={100} color={iv.herg.riskCategory === "Low" ? "emerald" : iv.herg.riskCategory === "Moderate" ? "amber" : "red"} />
             </>
@@ -8980,7 +9007,15 @@ function Layer1Results({
               {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Confirmation (L2)" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+              {/* RF#5 / §9 step 10: was "Confidence Score". Renamed to
+                  "Composite Heuristic Score" because the underlying number
+                  is a weighted blend of physchem heuristics (QED, SA,
+                  rule-of-5, ADMET sub-scores) — NOT a calibrated probability
+                  of clinical success. The qualifier "(heuristic blend, not
+                  calibrated)" sits inline so the demo audience cannot
+                  read it as a Bayesian posterior. */}
+              Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+              <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend, not calibrated)</span>
               <span className="text-slate-600 ml-2">HAIOps Governed</span>
             </p>
           </div>
@@ -8988,7 +9023,7 @@ function Layer1Results({
             <div className="text-[11px] text-slate-500 mb-2">Key metrics</div>
             <div className="flex gap-1.5 flex-wrap justify-end">
               {iv && [
-                { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
+                { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—" },
                 { l: "Perm", v: iv.permeability.caco2Class },
                 { l: "hERG", v: iv.herg.riskCategory },
               ].map(m => (
@@ -8999,12 +9034,16 @@ function Layer1Results({
         </div>
         <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "IC50",         val: iv ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
+            { label: "IC50",         val: iv?.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
             { label: "Caco-2",       val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
             { label: "CLint",        val: iv ? `${iv.metabolicStability.microsomalCLint.toFixed(1)} µL/min/mg` : "—", good: iv?.metabolicStability.microsomalClass !== "Unstable" },
             { label: "fu%",          val: iv ? `${iv.plasmaProteinBinding.fuPercent.toFixed(1)}%` : "—", good: (iv?.plasmaProteinBinding.fuPercent ?? 0) > 5 },
             { label: "hERG IC50",    val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
-            { label: "TI",           val: iv ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
+            // RF#12 / §9 step 11: TI is not computable when ic50_nM is null
+            // (no validated on-target). Inv simulator emits TI=0 in that
+            // case as a structural placeholder; suppress the display rather
+            // than show "0×" which reads as a real measurement.
+            { label: "TI",           val: iv?.doseResponse.ic50_nM != null ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
           ].map(({ label, val, good }) => (
             <div key={label}>
               <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
@@ -9014,12 +9053,14 @@ function Layer1Results({
         </div>
       </div>
 
-      {/* Confidence threshold warning */}
+      {/* Composite heuristic score threshold warning (was "confidence
+          threshold" — see §9 step 10). The number is a heuristic blend, not
+          a posterior probability, so the warning copy avoids "confidence". */}
       {simResults && simResults.confidence < confidenceThreshold[0] && (
         <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
           <div className="text-[10px] text-amber-300 leading-relaxed">
-            <span className="font-semibold">Below confidence threshold</span> — simulation confidence {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold.
+            <span className="font-semibold">Below composite-score threshold</span> — composite heuristic score {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold (heuristic blend of QED, SA, rule-of-5, ADMET — not a calibrated posterior).
           </div>
         </div>
       )}
@@ -9060,9 +9101,19 @@ function Layer1Results({
         <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-[12px] font-semibold text-slate-300">Dose-Response Curve</h3>
-            <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
-              {iv.doseResponse.potencyClass} Potency
-            </Badge>
+            {/* RF#12 / §9 step 11: potencyClass is nullable when ic50_nM
+                is null (no validated target). When present, surface the TA
+                convention used so the user knows whether "High" means kinase
+                <100 nM, GPCR <50 nM, etc. */}
+            {iv.doseResponse.potencyClass !== null ? (
+              <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+                {iv.doseResponse.potencyClass} Potency{iv.doseResponse.potencyConvention ? ` · ${iv.doseResponse.potencyConvention}` : ""}
+              </Badge>
+            ) : (
+              <Badge className="text-[9px] bg-white/5 text-slate-400">
+                Potency — no validated target
+              </Badge>
+            )}
           </div>
           <svg viewBox="0 0 400 200" className="w-full h-auto">
             <defs>
@@ -9091,8 +9142,12 @@ function Layer1Results({
                   {pts.map((p, i) => (
                     <circle key={i} cx={toX(p.concentration)} cy={toY(p.response)} r="2" fill="#8b5cf6" />
                   ))}
-                  <line x1={toX(iv.doseResponse.ic50_nM)} y1={20} x2={toX(iv.doseResponse.ic50_nM)} y2={180} stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" />
-                  <text x={toX(iv.doseResponse.ic50_nM)} y={16} fill="#f59e0b" fontSize="8" textAnchor="middle">IC50 = {iv.doseResponse.ic50_nM.toFixed(1)} nM</text>
+                  {iv.doseResponse.ic50_nM != null && (
+                    <>
+                      <line x1={toX(iv.doseResponse.ic50_nM)} y1={20} x2={toX(iv.doseResponse.ic50_nM)} y2={180} stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" />
+                      <text x={toX(iv.doseResponse.ic50_nM)} y={16} fill="#f59e0b" fontSize="8" textAnchor="middle">IC50 = {iv.doseResponse.ic50_nM.toFixed(1)} nM</text>
+                    </>
+                  )}
                 </>
               );
             })()}
@@ -9100,10 +9155,10 @@ function Layer1Results({
           </svg>
           <div className="grid grid-cols-4 gap-3">
             {[
-              { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
-              { l: "EC50", v: `${iv.doseResponse.ec50_nM.toFixed(1)} nM` },
-              { l: "Hill Coefficient", v: iv.doseResponse.hillCoefficient.toFixed(2) },
-              { l: "Max Inhibition", v: `${iv.doseResponse.maxInhibition.toFixed(1)}%` },
+              { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "no validated target" },
+              { l: "EC50", v: iv.doseResponse.ec50_nM != null ? `${iv.doseResponse.ec50_nM.toFixed(1)} nM` : "—" },
+              { l: "Hill Coefficient", v: iv.doseResponse.hillCoefficient != null ? iv.doseResponse.hillCoefficient.toFixed(2) : "—" },
+              { l: "Max Inhibition", v: iv.doseResponse.maxInhibition != null ? `${iv.doseResponse.maxInhibition.toFixed(1)}%` : "—" },
             ].map(m => (
               <div key={m.l} className="bg-white/5 rounded-lg p-2.5 text-center">
                 <div className="text-[9px] text-slate-500 uppercase">{m.l}</div>
@@ -9115,7 +9170,7 @@ function Layer1Results({
             <div className="text-[10px] font-semibold text-slate-400 mb-2">Cell Viability ({iv.cellViability.cellLine})</div>
             <div className="grid grid-cols-3 gap-3">
               <div><div className="text-[9px] text-slate-500">CC50</div><div className="text-[12px] font-semibold text-white">{iv.cellViability.cc50_uM.toFixed(1)} µM</div></div>
-              <div><div className="text-[9px] text-slate-500">Therapeutic Index</div><div className={`text-[12px] font-semibold ${iv.cellViability.therapeuticIndex > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.therapeuticIndex.toFixed(0)}×</div></div>
+              <div><div className="text-[9px] text-slate-500">Therapeutic Index</div>{iv.doseResponse.ic50_nM != null ? <div className={`text-[12px] font-semibold ${iv.cellViability.therapeuticIndex > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.therapeuticIndex.toFixed(0)}×</div> : <div className="text-[10px] text-slate-500 italic">no validated target</div>}</div>
               <div><div className="text-[9px] text-slate-500">Viability @10µM</div><div className={`text-[12px] font-semibold ${iv.cellViability.viabilityAt10uM > 80 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.viabilityAt10uM.toFixed(0)}%</div></div>
             </div>
           </div>
@@ -9252,8 +9307,19 @@ function Layer1Results({
                   {iv.selectivity.selectivityClass}
                 </Badge>
               </div>
-              <div className="text-[24px] font-bold text-white mb-1">{(iv.selectivity.kinaseSelectivityScore * 100).toFixed(0)}<span className="text-[12px] text-slate-400">%</span></div>
-              <div className="text-[9px] text-slate-500 mb-2">{iv.selectivity.offTargetHits} off-target hits / {iv.selectivity.totalTargetsTested} tested</div>
+              {iv.selectivity.kinaseSelectivityScore != null && iv.selectivity.totalTargetsTested != null ? (
+                <>
+                  <div className="text-[24px] font-bold text-white mb-1">{(iv.selectivity.kinaseSelectivityScore * 100).toFixed(0)}<span className="text-[12px] text-slate-400">%</span></div>
+                  <div className="text-[9px] text-slate-500 mb-2">{iv.selectivity.offTargetHits} off-target hits / {iv.selectivity.totalTargetsTested} tested</div>
+                </>
+              ) : (
+                // RF#3 / RF#4: no real off-target panel run → refuse to
+                // emit a fabricated "tested against N" denominator.
+                <>
+                  <div className="text-[14px] font-semibold text-slate-300 mb-1">—</div>
+                  <div className="text-[9px] text-slate-500 mb-2">No off-target panel run — selectivity not computable</div>
+                </>
+              )}
             </div>
           </div>
           {iv.selectivity.topOffTargets.length > 0 && (
@@ -9648,19 +9714,19 @@ function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molPr
 function BindingHeatmap({ binding, uniprotId }: { binding: BindingEstimate | null; uniprotId: string }) {
   const metrics = ["Kd (nM)", "Ki (nM)", "IC50 (nM)", "Selectivity"];
 
+  // RF#1 / §9 step 1 (code-review fix): when L1 binding is null (off-catalog
+  // UniProt) the heatmap previously rendered three hardcoded EGFR/HER2/HER3
+  // rows that read as real Kd/Ki/IC50 measurements — exactly the fake-data
+  // class the audit removes. Render an empty state instead.
   const primaryLabel = binding ? `${binding.targetName} (${uniprotId})` : "Primary Target";
-  const rows = binding
+  const rows: { label: string; vals: number[] }[] = binding
     ? [
         { label: primaryLabel, vals: [binding.primaryKd, binding.primaryKi, binding.primaryIC50, binding.selectivity] },
         ...binding.offTargets.map(o => ({
           label: o.name, vals: [o.kd, o.ki, o.ic50, o.selectivity],
         })),
       ]
-    : [
-        { label: "EGFR (P00533)", vals: [12.4,  8.9,   15.2,  4.20] },
-        { label: "HER2 (P04626)", vals: [180.3, 210.4, 195.8, 0.07] },
-        { label: "HER3 (P21860)", vals: [890.2, 1024.1, 940.5, 0.01] },
-      ];
+    : [];
 
   const getColor = (val: number, col: number) => {
     if (col === 3) return val > 2 ? "#22c55e" : val > 0.5 ? "#eab308" : "#ef4444";
@@ -9781,7 +9847,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
   const base = simResults
     ? {
         qed: simResults.qed, toxLevel,
-        binding: `${simResults.binding.primaryKd.toFixed(1)} nM`,
+        binding: simResults.binding ? `${simResults.binding.primaryKd.toFixed(1)} nM` : "no validated target",
         composite: simResults.confidence,
       }
     : { qed: 0.72, toxLevel: "Low", binding: "12.4 nM", composite: 0.81 };

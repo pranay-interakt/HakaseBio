@@ -417,6 +417,17 @@ export interface Stage3Result {
 
 export async function runStage3(sim: SimResults): Promise<StageResult<Stage3Result>> {
   const t0 = performance.now();
+  // RF#1 / §9 step 1: refuse to compute L1↔ML binding agreement when L1
+  // binding is null (no validated target). Stage 3 reports an explicit
+  // error rather than substituting a fabricated Ki = 1 nM.
+  if (!sim.binding) {
+    return {
+      stage: 3, name: "Binding & ADMET ML cross-check",
+      status: "error",
+      reason: "L1 binding=null (target UniProt not in validated catalog) — cannot compute pKi or compare to ML.",
+      ranAt: new Date().toISOString(),
+    };
+  }
   const ki_M = sim.binding.primaryKi * 1e-9;
   const l1_pKi = ki_M > 0 ? -Math.log10(ki_M) : NaN;
 
@@ -497,10 +508,12 @@ export async function runStage3(sim: SimResults): Promise<StageResult<Stage3Resu
 // ── Stage 4 — Selectivity + cardiotox ML ────────────────────────────────────
 export interface Stage4Result {
   l1_selectivity: {
-    score:               number;
-    offTargetHits:       number;
-    totalTargetsTested:  number;
-    selectivityClass:    string;
+    // RF#3 / RF#4 / §9 steps 3–4: nullable when no real off-target panel
+    // has been run (in-vitro `hasValidatedScreen` gate).
+    score:               number | null;
+    offTargetHits:       number | null;
+    totalTargetsTested:  number | null;
+    selectivityClass:    string | null;
     worstFold:           number | null;
     worstName:           string | null;
   };
@@ -554,6 +567,10 @@ export async function runStage4(sim: SimResults, iv: InVitroResults): Promise<St
     durationMs: performance.now() - t0,
     result: {
       l1_selectivity: {
+        // RF#3 / RF#4: these are null when no real off-target screen has
+        // been run (the in-vitro simulator gates them on
+        // `hasValidatedScreen=true`, which the L2 pipeline does not yet
+        // pass). Downstream consumers must treat null as "no screen run".
         score: sel.kinaseSelectivityScore,
         offTargetHits: sel.offTargetHits,
         totalTargetsTested: sel.totalTargetsTested,
@@ -733,6 +750,15 @@ export function runStage7(sim: SimResults, pk: PBPKOutput, fu: number): StageRes
       stage: 7, name: "QSP / PD coupling",
       status: "error",
       reason: "Plasma fu missing/invalid — cannot compute unbound concentration for receptor-occupancy coupling.",
+      ranAt: new Date().toISOString(),
+    };
+  }
+  // RF#1 / §9 step 1: refuse QSP/PD coupling when no L1 binding exists.
+  if (!sim.binding) {
+    return {
+      stage: 7, name: "QSP / PD coupling",
+      status: "error",
+      reason: "L1 binding=null (target UniProt not in validated catalog) — receptor-occupancy coupling needs primaryKi.",
       ranAt: new Date().toISOString(),
     };
   }

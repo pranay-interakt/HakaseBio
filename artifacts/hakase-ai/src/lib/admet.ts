@@ -1,4 +1,5 @@
 import type { MolecularProperties } from "./chemistry";
+import { detectPharmacophores } from "./chemistry";
 
 export interface AdmetScores {
   absorption:   number;
@@ -48,9 +49,24 @@ export interface SimResults {
   admet:     AdmetScores;
   toxAlerts: ToxicityAlert[];
   organs:    OrganRisk[];
-  binding:   BindingEstimate;
+  /**
+   * Binding estimate is `null` when the UniProt is not in the validated
+   * `TARGET_MAP` catalog. Consumers MUST handle null by surfacing a
+   * "no validated target" placeholder rather than silently substituting
+   * fabricated Kd/Ki/IC50 values (audit RF#1, see L1_SIMULATION_AUDIT.md §9).
+   */
+  binding:   BindingEstimate | null;
   lipinski:  LipinskiAnalysis;
   qed:       number;
+  /**
+   * Synthetic Accessibility complexity score (1=easy, 10=hard).
+   * Implements the COMPLEXITY-PENALTY portion of Ertl-Schuffenhauer 2009
+   * (J. Cheminform. 1:8) — ring complexity, stereo, sp3, macrocycle,
+   * bridgehead penalties. The full score also requires a precomputed
+   * Morgan-fragment frequency dictionary (~3 MB) which is NOT vendored
+   * here; this is therefore an UPPER-BOUND complexity estimate, never the
+   * ECFP fragment-score component. See L1_SIMULATION_AUDIT.md §9 step 8.
+   */
   saScore:   number;
   goNogo:    "GO" | "WATCH" | "NO-GO";
   confidence: number;
@@ -81,6 +97,14 @@ interface AdmetTherapeuticModifiers {
   hepatoSensitivity: number;
   cnsSensitivity: number;
   renalSensitivity: number;
+  /**
+   * @deprecated Per L1 audit RF#2 / §9 step 2: the TA-override branch of
+   * `similarDrugs` is a fabrication for off-catalog UniProts (selecting
+   * "Oncology" surfaces Erlotinib/Gefitinib/Imatinib for any molecule).
+   * Field retained on the type for back-compat with existing presets but
+   * the runtime resolver no longer reads it. Curated UniProt → drug map
+   * (`similarByTarget`) remains the only honest source.
+   */
   similarDrugsOverride: string[];
 }
 
@@ -207,7 +231,20 @@ export function runAdmetSimulation(
 
   const hergRisk    = logP > 4 && hbd < 2 && mw > 300;
   const hepatoRisk  = logP > 4.5 || mw > 550;
-  const genoRisk    = false;
+  // Genotoxicity now wired to a real Ames-relevant structural-alert scan
+  // via the existing pharmacophore engine (RF#10 / §9 step 9). Triggers on:
+  // aromatic amines (CYP1A2 N-hydroxylation → hydroxylamine/nitroso),
+  // nitro (nitroreductase → nitroso/hydroxylamine), epoxide (direct DNA
+  // alkylation), Michael acceptor (alkylation of nucleophilic DNA bases).
+  // Conservative — false positives possible; intentional for safety side.
+  const pharmAmes = detectPharmacophores(smiles);
+  const amesAlertCount = pharmAmes
+    ? (pharmAmes.aromaticAmineCount > 0 ? 1 : 0) +
+      (pharmAmes.hasNitro            ? 1 : 0) +
+      (pharmAmes.hasEpoxide          ? 1 : 0) +
+      (pharmAmes.hasMichaelAcceptor  ? 1 : 0)
+    : 0;
+  const genoRisk = amesAlertCount > 0;
   const bbbPenetrant = tpsa < 90 && mw < 450;
 
   if (hergRisk)    tox -= 0.12 * taMod.hergSensitivity;
@@ -241,9 +278,15 @@ export function runAdmetSimulation(
     });
   }
   if (genoRisk) {
+    const motifs: string[] = [];
+    if (pharmAmes?.aromaticAmineCount && pharmAmes.aromaticAmineCount > 0) motifs.push("aromatic amine");
+    if (pharmAmes?.hasNitro)           motifs.push("nitro");
+    if (pharmAmes?.hasEpoxide)         motifs.push("epoxide");
+    if (pharmAmes?.hasMichaelAcceptor) motifs.push("Michael acceptor");
     toxAlerts.push({
-      name: "Genotoxicity Alert", category: "Genotox", severity: "High",
-      detail: "Structural motif consistent with DNA-intercalating agent.",
+      name: "Ames-Relevant Structural Alert", category: "Ames",
+      severity: amesAlertCount >= 2 ? "High" : "Medium",
+      detail: `Structural motif(s) historically associated with bacterial mutagenicity: ${motifs.join(", ")}. SMARTS-level alert only — confirm with Ames assay before progression.`,
     });
   }
 
@@ -297,36 +340,44 @@ export function runAdmetSimulation(
       color: organColor(giRisk),
       alerts: tpsa > 120 ? ["Reduced oral absorption predicted"] : [],
     },
-    {
-      name: "Lung",
-      risk: clamp(jitter(0.04, 0.03, seed + 15)),
-      color: "emerald",
-      alerts: [],
-    },
+    // Lung organ risk removed (RF#5 / §9 step 5): structural noise
+    // `jitter(0.04, 0.03)` always rendering emerald is not a signal. Re-add
+    // only when an inhalation route is selected AND a real pulmonary-tox
+    // surrogate (e.g. logP > 5 + amphiphilic) is wired.
   ];
 
   // ── Binding Affinity ────────────────────────────────────────────────────
-  const targetInfo = TARGET_MAP[uniprotId] ?? {
-    name: "Unknown Target", class: "Unknown", offTargets: [], potencyRange: [10, 1000] as [number, number],
-  };
+  // RF#1 / §9 step 1: gate ALL binding output on the UniProt being in the
+  // validated TARGET_MAP catalog. Off-catalog UniProts (or no UniProt at
+  // all) get `binding = null` so the UI surfaces "no validated target"
+  // rather than fabricated Kd/Ki/IC50 against an "Unknown Target" with a
+  // hardcoded [10,1000] nM potency range.
+  const targetInfo = TARGET_MAP[uniprotId] ?? null;
+  let binding: BindingEstimate | null = null;
+  if (targetInfo) {
+    const [pMin, pMax] = targetInfo.potencyRange;
+    const drugLikenessFactor = molProps.lipinskiPass ? 0.4 : 0.7;
+    const qedFactor = (1 - qed) * 0.3;
+    const basePotency = pMin + (pMax - pMin) * (drugLikenessFactor + qedFactor);
 
-  const [pMin, pMax] = targetInfo.potencyRange;
-  const drugLikenessFactor = molProps.lipinskiPass ? 0.4 : 0.7;
-  const qedFactor = (1 - qed) * 0.3;
-  const basePotency = pMin + (pMax - pMin) * (drugLikenessFactor + qedFactor);
+    const primaryKd   = clamp(jitter(basePotency, basePotency * 0.3, seed + 20), 0.1, pMax * 2);
+    const primaryKi   = clamp(primaryKd * jitter(0.85, 0.15, seed + 21), 0.1, pMax * 2);
+    const primaryIC50 = clamp(primaryKd * jitter(1.20, 0.20, seed + 22), 0.1, pMax * 2);
+    const selectivity = clamp(jitter(3.5, 1.5, seed + 23), 0.1, 10);
 
-  const primaryKd   = clamp(jitter(basePotency, basePotency * 0.3, seed + 20), 0.1, pMax * 2);
-  const primaryKi   = clamp(primaryKd * jitter(0.85, 0.15, seed + 21), 0.1, pMax * 2);
-  const primaryIC50 = clamp(primaryKd * jitter(1.20, 0.20, seed + 22), 0.1, pMax * 2);
-  const selectivity = clamp(jitter(3.5, 1.5, seed + 23), 0.1, 10);
+    const offTargets = targetInfo.offTargets.slice(0, 2).map((name, i) => ({
+      name,
+      kd:   clamp(primaryKd   * jitter(12, 6, seed + 30 + i), 0.1, 50000),
+      ki:   clamp(primaryKi   * jitter(14, 6, seed + 31 + i), 0.1, 50000),
+      ic50: clamp(primaryIC50 * jitter(13, 5, seed + 32 + i), 0.1, 50000),
+      selectivity: clamp(jitter(0.05, 0.03, seed + 33 + i), 0.01, 0.5),
+    }));
 
-  const offTargets = targetInfo.offTargets.slice(0, 2).map((name, i) => ({
-    name,
-    kd:   clamp(primaryKd   * jitter(12, 6, seed + 30 + i), 0.1, 50000),
-    ki:   clamp(primaryKi   * jitter(14, 6, seed + 31 + i), 0.1, 50000),
-    ic50: clamp(primaryIC50 * jitter(13, 5, seed + 32 + i), 0.1, 50000),
-    selectivity: clamp(jitter(0.05, 0.03, seed + 33 + i), 0.01, 0.5),
-  }));
+    binding = {
+      primaryKd, primaryKi, primaryIC50, selectivity,
+      targetName: targetInfo.name, targetClass: targetInfo.class, offTargets,
+    };
+  }
 
   // ── Lipinski ────────────────────────────────────────────────────────────
   const lipinski: LipinskiAnalysis = {
@@ -340,11 +391,45 @@ export function runAdmetSimulation(
     rotBonds,
   };
 
-  // ── SA Score (synthetic accessibility 1=easy, 10=hard) ─────────────────
-  const saScore = parseFloat(clamp(
-    jitter(2.0 + mw / 200 + (rotBonds > 6 ? 0.5 : 0) + (hba > 6 ? 0.3 : 0), 0.8, seed + 40),
-    1, 10,
-  ).toFixed(1));
+  // ── SA Score (Ertl-Schuffenhauer 2009 complexity portion) ─────────────
+  // RF#9 / §9 step 8: replaces the prior MW-linear formula.
+  // Implements the COMPLEXITY-PENALTY component from Ertl & Schuffenhauer,
+  // J. Cheminform. 1:8 (2009): ring complexity (size + count + macro),
+  // stereo, sp3 deficit, bridgehead/spiro penalties. The published score
+  // also adds a fragment-score term derived from a precomputed Morgan-FP
+  // frequency dictionary (~1M ChEMBL-derived fragments, ~3MB pickled) —
+  // that file is NOT vendored here, so this is the complexity-only
+  // component. Documented honest approximation. See SimResults.saScore JSDoc.
+  const saScore = (() => {
+    const nAtoms = Math.max(1, molProps.heavyAtoms);
+    const nRings = molProps.numRings;
+    const nSpiro = molProps.numSpiroAtoms;
+    const nBridgeheads = molProps.numBridgeheadAtoms;
+    const nStereo = molProps.numStereoCenters;
+    const nMacro = molProps.numAliphaticRings > 0 && molProps.numHeteroatoms > 0 ? 0 : 0; // not measured directly here; count via heuristic below
+    // Macrocycle proxy: large heavy-atom count combined with a single ring
+    // is the closest signal we can derive without ring-size info from the
+    // descriptor JSON. Conservative.
+    const hasMacro = nAtoms > 24 && nRings >= 1 && nRings <= 2;
+    // sp3 complexity penalty: low Fsp3 → planar/aromatic-heavy → easier;
+    // high Fsp3 with stereocenters → genuinely complex.
+    const sp3Penalty = -Math.log10(nAtoms / (nAtoms + 1)) * (1 - molProps.fsp3) * 0.5;
+    const sizePenalty = Math.log10(nAtoms) * 0.5;
+    const stereoPenalty = nStereo === 0 ? 0 : Math.log10(nStereo + 1) * 0.5;
+    const spiroPenalty  = nSpiro === 0 ? 0 : Math.log10(nSpiro + 1) * 0.5;
+    const bridgePenalty = nBridgeheads === 0 ? 0 : Math.log10(nBridgeheads + 1) * 0.7;
+    const macroPenalty  = hasMacro ? 0.5 : 0;
+    const ringPenalty   = nRings <= 1 ? 0 : Math.log10(nRings) * 0.3;
+    const complexity =
+      1.0 + sizePenalty + sp3Penalty + stereoPenalty +
+      spiroPenalty + bridgePenalty + macroPenalty + ringPenalty;
+    // Map [1, ~6] complexity to the Ertl 1–10 scale; values below 2 are
+    // trivially synthesisable (CHO patterns), values above 6 are
+    // multi-step total-synthesis territory.
+    const sa = clamp(complexity, 1, 10);
+    void nMacro; // reserved for future ring-size-based macrocycle signal
+    return parseFloat(sa.toFixed(1));
+  })();
 
   // ── Go/No-Go ─────────────────────────────────────────────────────────────
   const highAlerts  = toxAlerts.filter(a => a.severity === "High").length;
@@ -359,7 +444,7 @@ export function runAdmetSimulation(
     recommendation = `${highAlerts > 0 ? "Critical toxicity flags" : "Multiple Lipinski violations"} indicate high attrition risk. Consider structural optimisation before advancing.`;
   } else if (violations >= 2 || !overallGood || toxAlerts.length > 1) {
     goNogo = "WATCH";
-    recommendation = "Borderline ADMET profile. Advance with close monitoring and consider analogues with improved ${violations > 0 ? 'drug-likeness' : 'safety margin'}.";
+    recommendation = `Borderline ADMET profile. Advance with close monitoring and consider analogues with improved ${violations > 0 ? "drug-likeness" : "safety margin"}.`;
   } else {
     goNogo = "GO";
     recommendation = "Favourable ADMET profile across all dimensions. Recommend advancing to Patient Cohort Simulation.";
@@ -379,25 +464,23 @@ export function runAdmetSimulation(
     P00519: ["Imatinib", "Dasatinib", "Nilotinib"],
     P15056: ["Vemurafenib", "Dabrafenib", "Encorafenib"],
   };
-  // Precedent drugs:
-  //   1. Exact UniProt match → curated approved drugs for that target.
-  //   2. Otherwise, fall back to the therapeutic-area override (curated, real
-  //      approved drugs for the area).
-  //   3. If neither matches (e.g. off-catalog UniProt + unknown TA), return an
-  //      empty list. We deliberately do NOT emit a generic kinase-inhibitor
-  //      fallback, because the consumer (RegulatoryInsightCard) cross-checks
-  //      each name against openFDA — emitting a fabricated list would either
-  //      surface fake "precedents" to the user or trigger false openFDA
-  //      lookups against unrelated drugs. Empty here means the precedent panel
-  //      should be hidden upstream.
-  const targetDrugs  = similarByTarget[uniprotId];
-  const similarDrugs = targetDrugs ?? (taMod.similarDrugsOverride.length > 0 ? taMod.similarDrugsOverride : []);
+  // Precedent drugs (RF#2 / §9 step 2): ONLY the curated UniProt → approved-
+  // drug map. The TA-override branch was removed because picking "Oncology"
+  // would surface Erlotinib/Gefitinib/Imatinib for ANY molecule (including
+  // α-tocopherol-fragment) that happened to be tagged Oncology — a
+  // demo-killer fabrication. Off-catalog UniProt → empty array, and the
+  // consumer (RegulatoryInsightCard) hides the precedent panel.
+  const similarDrugs = similarByTarget[uniprotId] ?? [];
+  // taMod is intentionally not consulted for similarDrugs anymore; the
+  // similarDrugsOverride field is retained on the type for back-compat
+  // with the preset table but is dead at this read site.
+  void taMod;
 
   return {
     admet: { absorption: abs, distribution: dist, metabolism: met, excretion: exc, toxicity: tox, overall },
     toxAlerts,
     organs,
-    binding: { primaryKd, primaryKi, primaryIC50, selectivity, targetName: targetInfo.name, targetClass: targetInfo.class, offTargets },
+    binding,
     lipinski,
     qed,
     saScore,

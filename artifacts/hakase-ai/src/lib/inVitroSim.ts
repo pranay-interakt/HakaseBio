@@ -8,12 +8,32 @@ export interface DoseResponsePoint {
 }
 
 export interface DoseResponseData {
-  ic50_nM: number;
-  ec50_nM: number;
-  hillCoefficient: number;
-  maxInhibition: number;
+  /**
+   * IC50 in nM. `null` when no validated target is available (no UniProt
+   * in the curated catalog AND no ML binding signal) — the simulator
+   * refuses to emit an "IC50" derived from physchem alone, with no target
+   * and no QSAR (audit RF#7 / §9 step 7).
+   */
+  ic50_nM: number | null;
+  ec50_nM: number | null;
+  hillCoefficient: number | null;
+  maxInhibition: number | null;
   curve: DoseResponsePoint[];
-  potencyClass: "High" | "Moderate" | "Low";
+  /**
+   * Qualitative potency class. `null` when the therapeutic-area profile
+   * is neutral / undefined (no honest threshold convention to report)
+   * OR when ic50_nM is null (audit RF#12 / §9 step 11). Consumers MUST
+   * render the convention next to the label when not null
+   * (e.g. "High (IC50 < 10 nM, Oncology profile)").
+   */
+  potencyClass: "High" | "Moderate" | "Low" | null;
+  /**
+   * Therapeutic-area name whose threshold convention `potencyClass` was
+   * computed under. Null when potencyClass is null. Surfaces in the UI
+   * tooltip so the qualitative label is never shown without its
+   * convention.
+   */
+  potencyConvention: string | null;
 }
 
 export interface PermeabilityData {
@@ -52,14 +72,46 @@ export interface HERGData {
   ic50_uM: number;
   safetyMargin: number;
   riskCategory: "Low" | "Moderate" | "High";
+  /**
+   * Provenance phrase — describes how `ic50_uM` was derived. The field
+   * NAME is retained from the prior schema (so `safetyFlags.ts` and the
+   * UI display continue to compile without modification — `safetyFlags.ts`
+   * is a NEVER-MODIFY file per project policy), but the CONTENT no longer
+   * masquerades as patch-clamp electrophysiology output. Today the
+   * heuristic IC50 surfaces as "Heuristic prediction (no patch-clamp
+   * data)"; when CardioTox ML runs the consumer overwrites with
+   * "ML-predicted block (DeepHIT) — no patch-clamp data"; only real assay
+   * results would surface as "Measured: <observation> at <concentration>".
+   * Audit RF#6 / §9 step 6.
+   */
   patchClampResult: string;
 }
 
 export interface SelectivityData {
-  kinaseSelectivityScore: number;
-  offTargetHits: number;
-  totalTargetsTested: number;
-  selectivityClass: "Selective" | "Moderately Selective" | "Non-Selective";
+  /**
+   * Kinase selectivity score. `null` when no real off-target screen has
+   * been performed (audit RF#3 / §9 step 3) — the simulator refuses to
+   * emit a "selectivity" number when the denominator is fabricated.
+   */
+  kinaseSelectivityScore: number | null;
+  /**
+   * Number of off-target hits. `null` when no real screen has been run.
+   */
+  offTargetHits: number | null;
+  /**
+   * Total off-targets tested. `null` when no real off-target panel has
+   * been run (audit RF#3 / §9 step 3) — the prior heuristic
+   * `50 + jitter*50 + heavyAtoms` rendered as "tested against ~100
+   * targets" and was a fabricated experimental claim.
+   */
+  totalTargetsTested: number | null;
+  /**
+   * Selectivity class. `null` when no real screen exists.
+   */
+  selectivityClass: "Selective" | "Moderately Selective" | "Non-Selective" | null;
+  /**
+   * Top off-target hits (empty when no real screen — audit RF#4 / §9 step 4).
+   */
   topOffTargets: Array<{ name: string; ic50_nM: number; selectivityRatio: number }>;
 }
 
@@ -416,11 +468,34 @@ function computeCYPInhibition(
   };
 }
 
+/**
+ * Set of UniProt IDs for which the simulator has a validated target binding
+ * signal — must be kept in sync with `TARGET_MAP` in `admet.ts`. When the
+ * caller's `uniprotId` is in this set, `ic50_nM` and `potencyClass` are
+ * computed; otherwise they are null (audit RF#7 / §9 step 7).
+ *
+ * Off-target screen availability is a SEPARATE gate (`hasValidatedScreen`
+ * argument) — having a target does NOT imply the kinome / GPCR panel was
+ * actually run; that requires a real off-target service which is not yet
+ * wired (audit RF#3 / RF#4 / §9 steps 3–4).
+ */
+const VALIDATED_TARGET_UNIPROTS = new Set([
+  "P00533", "P04626", "P01116", "P11802",
+  "Q00534", "Q06187", "P00519", "P15056",
+]);
+
 export function runInVitroSimulation(
   molProps: MolecularProperties,
   smiles: string,
   uniprotId: string,
   therapeuticArea: string | null = null,
+  /**
+   * Pass `true` only when a real off-target / kinome screen has been
+   * fetched and bound to this molecule. Defaults to `false` so the audit
+   * invariant "no fabricated 'tested against N' counts" holds for the
+   * current MVP where no such service exists. Audit RF#3 / RF#4.
+   */
+  hasValidatedScreen: boolean = false,
 ): InVitroResults {
   const seed = hashSmiles(smiles);
   const mw = molProps.mw ?? 300;
@@ -454,10 +529,19 @@ export function runInVitroSimulation(
   const taMult = taProfile.potencyMultiplier < 1 ? (1 - taProfile.potencyMultiplier) * 0.5 : -(taProfile.potencyMultiplier - 1) * 0.3;
   const finalPIC50 = clamp(basePIC50 + pharmBonus + taMult, 4.0, 9.5);
 
-  const ic50_nM = clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
-  const ec50_nM = ic50_nM * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2);
+  // RF#7 / §9 step 7: only emit dose-response numbers when the UniProt is
+  // in the validated catalog. Off-catalog molecule + no ML binding signal
+  // → no IC50 / EC50 / curve, and downstream consumers (UI cards,
+  // overallRisk scoring) must treat these as "no data" rather than zero.
+  const hasValidatedTarget = !!uniprotId && VALIDATED_TARGET_UNIPROTS.has(uniprotId);
 
-  const hillCoeff = (() => {
+  const ic50_nM_raw = clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
+  const ic50_nM: number | null = hasValidatedTarget ? ic50_nM_raw : null;
+  const ec50_nM: number | null = hasValidatedTarget
+    ? ic50_nM_raw * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2)
+    : null;
+
+  const hillCoeffRaw = (() => {
     let h = 1.0;
     if (nArom >= 2) h += 0.15;
     if (fsp3 > 0.4) h += 0.1;
@@ -465,25 +549,42 @@ export function runInVitroSimulation(
     if (rotBonds > 8) h -= 0.1;
     return clamp(h + (r(3) - 0.5) * 0.3, 0.7, 3.0);
   })();
+  const hillCoefficient: number | null = hasValidatedTarget ? hillCoeffRaw : null;
 
-  const maxInhibition = (() => {
+  const maxInhibitionRaw = (() => {
     let m = 90;
     if (finalPIC50 > 7) m += 5;
     if (pharm?.hasMichaelAcceptor) m += 3;
     if (logP > 5) m -= 5;
     return clamp(m + (r(4) - 0.5) * 6, 60, 100);
   })();
+  const maxInhibition: number | null = hasValidatedTarget ? maxInhibitionRaw : null;
 
+  // Curve only when target is validated; otherwise empty array (the UI's
+  // dose-response chart renders its no-data state for length === 0).
   const curve: DoseResponsePoint[] = [];
-  for (let i = -2; i <= 5; i += 0.5) {
-    const conc = Math.pow(10, i);
-    const response = maxInhibition / (1 + Math.pow(ic50_nM / conc, hillCoeff));
-    const noise = (r(200 + i * 10) - 0.5) * 2;
-    curve.push({ concentration: conc, response: clamp(response + noise, 0, 100) });
+  if (hasValidatedTarget) {
+    for (let i = -2; i <= 5; i += 0.5) {
+      const conc = Math.pow(10, i);
+      const response = maxInhibitionRaw / (1 + Math.pow(ic50_nM_raw / conc, hillCoeffRaw));
+      const noise = (r(200 + i * 10) - 0.5) * 2;
+      curve.push({ concentration: conc, response: clamp(response + noise, 0, 100) });
+    }
   }
 
+  // RF#12 / §9 step 11: only emit qualitative potencyClass when both a
+  // validated target AND a defined therapeutic-area threshold convention
+  // exist. Neutral TA → null; unknown target → null. Surfaces convention
+  // to the UI so the label is never shown without its threshold story.
   const potencyClass: DoseResponseData["potencyClass"] =
-    ic50_nM < taProfile.potencyThresholds.high ? "High" : ic50_nM < taProfile.potencyThresholds.moderate ? "Moderate" : "Low";
+    hasValidatedTarget && therapeuticArea && ic50_nM !== null
+      ? (ic50_nM < taProfile.potencyThresholds.high ? "High"
+        : ic50_nM < taProfile.potencyThresholds.moderate ? "Moderate" : "Low")
+      : null;
+  const potencyConvention: string | null =
+    potencyClass !== null && therapeuticArea
+      ? `${therapeuticArea}: High < ${taProfile.potencyThresholds.high} nM, Moderate < ${taProfile.potencyThresholds.moderate} nM`
+      : null;
 
   const { papp: caco2Papp, cls: caco2Class } = computeCaco2Permeability(logP, tpsa, mw, hbd);
   const pampaPe = clamp(caco2Papp * (0.55 + fsp3 * 0.3), 0.1, 50);
@@ -512,41 +613,63 @@ export function runInVitroSimulation(
 
   const herg_ic50_uM = computeHERGIC50(logP, mw, basicN, tpsa, nArom, pharm);
   const hergMarginThreshold = taProfile.hergWeight;
-  const safetyMargin = (herg_ic50_uM * 1000) / Math.max(1, ic50_nM);
+  // Safety margin only meaningful when on-target IC50 exists; without a
+  // validated target we cannot compute "hERG IC50 / on-target IC50".
+  const safetyMargin = ic50_nM !== null ? (herg_ic50_uM * 1000) / Math.max(1, ic50_nM) : 0;
   const adjustedHergIC50 = herg_ic50_uM / hergMarginThreshold;
   const hergRisk: HERGData["riskCategory"] =
     adjustedHergIC50 < 1 ? "High" : adjustedHergIC50 < 10 ? "Moderate" : "Low";
-  const patchClampResult = hergRisk === "High" ? "Significant block at 1 µM"
-    : hergRisk === "Moderate" ? "Mild block at 10 µM" : "No significant block at 30 µM";
+  // RF#6 / §9 step 6: prior `patchClampResult` was three string literals
+  // ("Significant block at 1 µM" / "Mild block at 10 µM" / "No significant
+  // block at 30 µM") keyed off a heuristic-derived hergRisk band, falsely
+  // implying patch-clamp electrophysiology. Replaced with a single honest
+  // provenance phrase. Field NAME retained for safetyFlags.ts back-compat
+  // (NEVER-MODIFY file).
+  const patchClampResult = "Heuristic prediction from physchem (no patch-clamp data)";
 
-  const totalTargets = 50 + Math.round(r(18) * 50 + heavyAtoms);
-  const offTargetLogP = logP > 4 ? 12 : logP > 2 ? 6 : 3;
-  const offTargetShape = nArom > 3 ? 4 : 0;
-  const offTargetBase = offTargetLogP + offTargetShape;
-  const offTargetHits = Math.round(clamp(offTargetBase * (0.6 + fsp3 * 0.4), 0, 25));
-  const kinaseScore = clamp(1 - (offTargetHits / totalTargets) * 10, 0, 1);
-  const selectivityClass: SelectivityData["selectivityClass"] =
-    kinaseScore > 0.8 ? "Selective" : kinaseScore > 0.5 ? "Moderately Selective" : "Non-Selective";
+  // RF#3 / RF#4 / §9 steps 3–4: gate ALL selectivity output on
+  // `hasValidatedScreen`. Without a real off-target panel run, the
+  // simulator emits null for the "tested against N" count, the off-target
+  // hit count, the kinase selectivity score, and the qualitative class —
+  // and an empty list of named off-target hits.
+  let totalTargets: number | null = null;
+  let offTargetHits: number | null = null;
+  let kinaseScore: number | null = null;
+  let selectivityClass: SelectivityData["selectivityClass"] = null;
+  let topOffTargets: SelectivityData["topOffTargets"] = [];
 
-  const offTargetNames = taProfile.offTargetPanelNames;
-  // Empty panel → no TA selected (neutral profile). We refuse to fabricate
-  // off-target hits with `undefined` names rather than silently emitting
-  // entries the user can't interpret. Caller must hide the off-target list.
-  const topOffTargets = offTargetNames.length === 0
-    ? []
-    : Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
-      const nameIdx = (seed + i * 7) % offTargetNames.length;
-      const offRatio = 5 + (kappa2 + chi1v) * 2 + r(40 + i) * 30;
-      return {
-        name: offTargetNames[nameIdx],
-        ic50_nM: clamp(ic50_nM * offRatio * 0.5, 10, 50000),
-        selectivityRatio: clamp(offRatio, 1, 100),
-      };
-    });
+  if (hasValidatedScreen) {
+    totalTargets = 50 + Math.round(r(18) * 50 + heavyAtoms);
+    const offTargetLogP = logP > 4 ? 12 : logP > 2 ? 6 : 3;
+    const offTargetShape = nArom > 3 ? 4 : 0;
+    const offTargetBase = offTargetLogP + offTargetShape;
+    offTargetHits = Math.round(clamp(offTargetBase * (0.6 + fsp3 * 0.4), 0, 25));
+    kinaseScore = clamp(1 - (offTargetHits / totalTargets) * 10, 0, 1);
+    selectivityClass =
+      kinaseScore > 0.8 ? "Selective" : kinaseScore > 0.5 ? "Moderately Selective" : "Non-Selective";
+
+    const offTargetNames = taProfile.offTargetPanelNames;
+    // Even with hasValidatedScreen, the TA panel must be non-empty AND
+    // the on-target IC50 must be computable for off-target ratios to mean
+    // anything. Otherwise emit empty list.
+    if (offTargetNames.length > 0 && ic50_nM !== null) {
+      const ic50OnTarget = ic50_nM;
+      topOffTargets = Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
+        const nameIdx = (seed + i * 7) % offTargetNames.length;
+        const offRatio = 5 + (kappa2 + chi1v) * 2 + r(40 + i) * 30;
+        return {
+          name: offTargetNames[nameIdx],
+          ic50_nM: clamp(ic50OnTarget * offRatio * 0.5, 10, 50000),
+          selectivityRatio: clamp(offRatio, 1, 100),
+        };
+      });
+    }
+  }
 
   const cc50Base = logP > 4 ? 15 : logP > 2 ? 40 : 70;
   const cc50_uM = clamp(cc50Base + (fsp3 * 20) - (nArom > 3 ? 10 : 0), 1, 100);
-  const therapeuticIndex = (cc50_uM * 1000) / Math.max(1, ic50_nM);
+  // Therapeutic index only meaningful when on-target IC50 exists.
+  const therapeuticIndex = ic50_nM !== null ? (cc50_uM * 1000) / Math.max(1, ic50_nM) : 0;
   const viabilityAt10uM = clamp(90 - (logP > 4 ? 20 : 0) - (mw > 500 ? 5 : 0) + fsp3 * 10, 30, 100);
   const cellLines = taProfile.cellLinePreference;
   // Empty list → no TA selected (neutral profile). Emit a sentinel string
@@ -561,7 +684,9 @@ export function runInVitroSimulation(
     microsomalClass === "Unstable" ? 1 : 0,
     hergRisk === "High" ? 2 : hergRisk === "Moderate" ? 1 : 0,
     selectivityClass === "Non-Selective" ? 1 : 0,
-    therapeuticIndex < 30 ? 1 : 0,
+    // Therapeutic-index risk only counts when on-target IC50 was real
+    // (otherwise therapeuticIndex is 0 and would look like infinite risk).
+    ic50_nM !== null && therapeuticIndex < 30 ? 1 : 0,
     Object.values(cypInhibition).filter(c => c.risk === "High").length > 2 ? 1 : 0,
   ];
   const totalRisk = riskFactors.reduce((a, b) => a + b, 0);
@@ -586,12 +711,24 @@ export function runInVitroSimulation(
       cypInhibition: cypInhibition as unknown as { [key: string]: { ic50_uM: number; risk: string } },
       fuPercent,
       caco2Papp,
-      ic50_nM,
+      // Bioactivation engine takes a baseline IC50 to scale GSH-trap
+      // recommendations. Pass 0 when on-target IC50 is not computable —
+      // engine treats 0 as "no on-target potency signal" and falls back
+      // to logP/CYP inhibition signals only.
+      ic50_nM: ic50_nM ?? 0,
     }
   );
 
   return {
-    doseResponse: { ic50_nM: +ic50_nM.toFixed(2), ec50_nM: +ec50_nM.toFixed(2), hillCoefficient: +hillCoeff.toFixed(2), maxInhibition: +maxInhibition.toFixed(1), curve, potencyClass },
+    doseResponse: {
+      ic50_nM: ic50_nM === null ? null : +ic50_nM.toFixed(2),
+      ec50_nM: ec50_nM === null ? null : +ec50_nM.toFixed(2),
+      hillCoefficient: hillCoefficient === null ? null : +hillCoefficient.toFixed(2),
+      maxInhibition: maxInhibition === null ? null : +maxInhibition.toFixed(1),
+      curve,
+      potencyClass,
+      potencyConvention,
+    },
     permeability: { caco2Papp: +caco2Papp.toFixed(1), caco2Class, pampaPe: +pampaPe.toFixed(1), pampaClass, effluxRatio: +effluxRatio.toFixed(1), pgpSubstrate },
     metabolicStability: {
       microsomalCLint: +microCLint.toFixed(1), microsomalClass,
@@ -600,8 +737,23 @@ export function runInVitroSimulation(
     },
     plasmaProteinBinding: { fuPercent: +fuPercent.toFixed(1), boundPercent: +boundPercent.toFixed(1), bindingClass },
     herg: { ic50_uM: +herg_ic50_uM.toFixed(1), safetyMargin: +safetyMargin.toFixed(0), riskCategory: hergRisk, patchClampResult },
-    selectivity: { kinaseSelectivityScore: +kinaseScore.toFixed(2), offTargetHits, totalTargetsTested: totalTargets, selectivityClass, topOffTargets },
-    cellViability: { cc50_uM: +cc50_uM.toFixed(1), therapeuticIndex: +therapeuticIndex.toFixed(0), cellLine, viabilityAt10uM: +viabilityAt10uM.toFixed(0) },
+    selectivity: {
+      kinaseSelectivityScore: kinaseScore === null ? null : +kinaseScore.toFixed(2),
+      offTargetHits,
+      totalTargetsTested: totalTargets,
+      selectivityClass,
+      topOffTargets,
+    },
+    cellViability: {
+      cc50_uM: +cc50_uM.toFixed(1),
+      // Therapeutic index is meaningless without on-target IC50; render 0
+      // and let the consumer treat it as "not computable" (the surface UI
+      // still reads `iv.doseResponse.ic50_nM === null` to know to suppress
+      // TI display).
+      therapeuticIndex: ic50_nM === null ? 0 : +therapeuticIndex.toFixed(0),
+      cellLine,
+      viabilityAt10uM: +viabilityAt10uM.toFixed(0),
+    },
     bioactivation,
     overallRisk,
     inVitroScore: +inVitroScore.toFixed(2),

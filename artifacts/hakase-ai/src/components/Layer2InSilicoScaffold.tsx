@@ -648,12 +648,12 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <L1OutputRow label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
               <L1OutputRow label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
               <L1OutputRow label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
-              <L1OutputRow label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? `${simResults.binding.primaryKi.toFixed(1)}` : "—"} />
+              <L1OutputRow label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults?.binding ? `${simResults.binding.primaryKi.toFixed(1)}` : "—"} />
               <L1OutputRow label="hERG IC50 (µM)"      source="L1 in-vitro sim"            value={inVitroResults ? `${inVitroResults.herg.ic50_uM.toFixed(2)}` : "—"} />
               <L1OutputRow label="Plasma fu (%)"       source="L1 PPB sim"                  value={inVitroResults ? `${inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2)}` : "—"} />
               <L1OutputRow label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? `${inVitroResults.permeability.caco2Papp.toFixed(1)}` : "—"} />
               <L1OutputRow label="Microsomal CLint"    source="L1 metabolic stability"      value={inVitroResults ? `${inVitroResults.metabolicStability.microsomalCLint.toFixed(0)} µL/min/mg` : "—"} />
-              <L1OutputRow label="Off-target hits"     source="L1 selectivity panel"        value={inVitroResults ? `${inVitroResults.selectivity.offTargetHits} / ${inVitroResults.selectivity.totalTargetsTested}` : "—"} />
+              <L1OutputRow label="Off-target hits"     source="L1 selectivity panel"        value={inVitroResults && inVitroResults.selectivity.offTargetHits !== null && inVitroResults.selectivity.totalTargetsTested !== null ? `${inVitroResults.selectivity.offTargetHits} / ${inVitroResults.selectivity.totalTargetsTested}` : "no off-target panel"} />
               <L1OutputRow label="L1 Go / No-Go"       source="L1 cascade gate"             value={simResults ? simResults.goNogo : "—"} />
             </div>
           </section>

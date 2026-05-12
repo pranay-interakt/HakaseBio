@@ -182,14 +182,69 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
     const numStereoCenters = Number(desc.NumAtomStereoCenters ?? 0);
     const phi = Number(desc.Phi ?? 0);
 
+    // ── QED (Bickerton 2012, Quantitative Estimate of Drug-likeness) ──────
+    // Faithful port of the published asymmetric double-sigmoid (ADS) product
+    // formulation from Bickerton et al., Nat. Chem. 4, 90–98 (2012),
+    // matching the implementation in RDKit Contrib/qed.py. Computes
+    // weighted geometric mean of 8 desirability functions over (MW, ALOGP,
+    // HBA, HBD, PSA, ROTB, AROM, ALERTS), with the published "max" weight
+    // vector. ALERTS (PAINS/Brenk substructure count) is approximated from
+    // the pharmacophore reactive-moiety counts available in this layer
+    // (Michael acceptor, epoxide, nitro, aromatic amine); the bioactivation
+    // engine still runs a fuller alert scan separately. Documented honest
+    // approximation — not a re-fit, no jitter.
     const qed = (() => {
       if (mw === 0) return 0;
-      const mwScore  = mw  <= 300 ? 1 : mw  <= 400 ? 0.9 : mw  <= 500 ? 0.75 : mw  <= 600 ? 0.5 : 0.2;
-      const logPScore = logP >= 0 && logP <= 3 ? 1 : logP <= 5 ? 0.8 : 0.3;
-      const hbdScore = hbd <= 1 ? 1 : hbd <= 3 ? 0.8 : hbd <= 5 ? 0.5 : 0.2;
-      const hbaScore = hba <= 5 ? 1 : hba <= 8 ? 0.8 : hba <= 10 ? 0.5 : 0.2;
-      const tpsaScore = tpsa <= 60 ? 1 : tpsa <= 90 ? 0.85 : tpsa <= 120 ? 0.6 : 0.3;
-      return parseFloat(((mwScore + logPScore + hbdScore + hbaScore + tpsaScore) / 5).toFixed(3));
+      const ads = (
+        x: number, a: number, b: number, c: number, d: number,
+        e: number, f: number, dxMax: number,
+      ): number => {
+        const left  = b / (1 + Math.exp(-1 * (x - c + d / 2) / e));
+        const right = 1 - 1 / (1 + Math.exp(-1 * (x - c - d / 2) / f));
+        return Math.max(1e-9, (a + left * right) / dxMax);
+      };
+      // ADS coefficients from Bickerton 2012 Supplementary Table S2,
+      // as transcribed in RDKit Contrib/qed.py.
+      const dMW    = ads(mw,   2.817, 392.575, 290.749, 2.420, 49.222, 65.371, 104.981);
+      const dALOGP = ads(logP, 3.172690585, 137.8624751, 2.534937431, 4.581497897, 0.822739154, 0.576295591, 131.3186604);
+      const dHBA   = ads(hba,  2.948620388, 160.4605972, 3.615294657, 4.435986202, 0.290141953, 1.300669958, 148.7763046);
+      const dHBD   = ads(hbd,  1.618662227, 1010.051101, 0.985094388, 0.000000000034, 0.713820843, 0.920922555, 258.1632616);
+      const dPSA   = ads(tpsa, 1.876861559, 125.2232657, 62.90773554, 87.83366614, 12.01999824, 28.51324732, 104.5686167);
+      const dROTB  = ads(rotBonds, 0.010000000, 272.4121427, 2.558379970, 1.565547684, 1.271567166, 2.758063707, 105.4420403);
+      const dAROM  = ads(numAromaticRings, 3.217788970, 957.7374108, 2.274627939, 0.000000000, 1.317690384, 0.375760881, 312.3372610);
+      // ALERTS count proxy from pharmacophore-level reactive moieties; the
+      // Bickerton paper uses the union of PAINS-A and Brenk filters
+      // (~150 SMARTS). We cover the most impactful reactive families here
+      // and leave the broader scan to bioactivationEngine; this means QED
+      // is an OPTIMISTIC bound when those broader alerts fire.
+      let alertsCount = 0;
+      try {
+        const pharm = detectPharmacophores(smiles);
+        if (pharm) {
+          alertsCount =
+            (pharm.hasMichaelAcceptor ? 1 : 0) +
+            (pharm.hasEpoxide          ? 1 : 0) +
+            (pharm.hasNitro            ? 1 : 0) +
+            (pharm.hasHydroxamicAcid   ? 1 : 0) +
+            (pharm.hasThiol            ? 1 : 0) +
+            pharm.aromaticAmineCount;
+        }
+      } catch { /* alerts default to 0 if pharmacophore probe fails */ }
+      const dALERTS = ads(alertsCount, 0.010000000, 1199.094025, -0.09002883, 0.000000000, 0.185904477, 0.875193782, 417.7253140);
+      // Bickerton "max" weight vector (Supplementary Table S3, w_max).
+      const w = { MW: 0.66, ALOGP: 0.46, HBA: 0.05, HBD: 0.61, PSA: 0.06, ROTB: 0.65, AROM: 0.48, ALERTS: 0.95 };
+      const wSum = w.MW + w.ALOGP + w.HBA + w.HBD + w.PSA + w.ROTB + w.AROM + w.ALERTS;
+      const lnSum =
+        w.MW     * Math.log(dMW)     +
+        w.ALOGP  * Math.log(dALOGP)  +
+        w.HBA    * Math.log(dHBA)    +
+        w.HBD    * Math.log(dHBD)    +
+        w.PSA    * Math.log(dPSA)    +
+        w.ROTB   * Math.log(dROTB)   +
+        w.AROM   * Math.log(dAROM)   +
+        w.ALERTS * Math.log(dALERTS);
+      const qedRaw = Math.exp(lnSum / wSum);
+      return parseFloat(Math.max(0, Math.min(1, qedRaw)).toFixed(3));
     })();
 
     const lipinskiMW   = mw   <= 500;
