@@ -358,6 +358,14 @@ export function HakaseAI() {
   const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
+  // Provenance for therapeuticArea so the UI can honestly show whether the
+  // current value was auto-predicted, manually picked, or just the literal
+  // initial default. Avoids silently presenting "Oncology" as a prediction
+  // when no inference ever ran. Source string is shown to the user.
+  const [taProvenance, setTaProvenance] = useState<{
+    kind: "default" | "auto" | "manual" | "no-match";
+    source?: string;
+  }>({ kind: "default" });
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
   const [toxOn, setToxOn] = useState(true);
@@ -602,11 +610,26 @@ export function HakaseAI() {
   const uniprotManual = useRef(false);
   const [uniprotAutoMode, setUniprotAutoMode] = useState(false);
 
+  // ── Effect 1: TA preset auto-prediction ───────────────────────────────────
+  // Predicts the therapeutic-area preset from the top target suggestion's
+  // annotated `area`. Decoupled from UniProt-ID propagation (Effect 2 below)
+  // so a manual TA selection cannot accidentally suppress UniProt auto-fill.
   useEffect(() => {
-    if (!uniprotAutoMode) return;
-    if (uniprotManual.current) return;
+    if (taProvenance.kind === "manual") return;
     const top = targetSuggestions[0];
-    if (!top) return;
+    if (!top) {
+      // No target suggestions yet — leave TA at its current value but mark
+      // provenance so the UI can show "Default" instead of pretending it's
+      // a prediction. Triggered for SMILES the catalogue can't match
+      // (e.g. antioxidants like α-tocopherol — no kinase/GPCR/NR hit).
+      if (taProvenance.kind !== "default") setTaProvenance({ kind: "default" });
+      return;
+    }
+    // Static map for ambiguous multi-area annotations. Keys are exact strings
+    // produced by targetSuggestion.ts. NOTE: "ChEMBL" intentionally NOT mapped
+    // — letting it silently coerce to Oncology violates the no-fake-data
+    // policy (ChEMBL exact-match without a curated area should fall through
+    // to the regex fallback or be marked no-match).
     const areaMap: Record<string, string> = {
       "Oncology": "Oncology", "Oncology (CML)": "Oncology", "Oncology (Prostate) / Endocrinology": "Oncology",
       "Oncology (Breast) / Endocrinology": "Oncology", "Oncology / Angiogenesis": "Oncology",
@@ -619,24 +642,48 @@ export function HakaseAI() {
       "Hematology / Autoimmune": "Immunology",
       "Infectious Disease / Immunology": "Infectious Disease",
       "Pain / Inflammation": "Immunology",
-      "ChEMBL": "Oncology",
     };
+    const sourceLabel = top.geneName ? `${top.geneName} (${top.uniprotId})` : top.uniprotId;
     const mapped = areaMap[top.area];
-    if (mapped) setTherapeuticArea(mapped);
-    else {
+    if (mapped) {
+      setTherapeuticArea(mapped);
+      setTaProvenance({ kind: "auto", source: sourceLabel });
+    } else {
       const fallback = top.area.split(/\s*[\/·]\s*/)[0].trim();
       const validAreas = ["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"];
       const match = validAreas.find(v => fallback.toLowerCase().startsWith(v.toLowerCase()));
-      if (match) setTherapeuticArea(match);
-    }
-    if (top.uniprotId !== uniprotId && isValidUniprotAccession(top.uniprotId)) {
-      setUniprotId(top.uniprotId);
-      setProteinInfo(null);
-      setProteinError(null);
-      setAlphafoldData(null);
+      if (match) {
+        setTherapeuticArea(match);
+        setTaProvenance({ kind: "auto", source: sourceLabel });
+      } else {
+        // Target found but its area string doesn't match any of the 7 valid
+        // TA presets — leave TA untouched and flag no-match. Surfaces in the
+        // UI so the user knows the current TA isn't backed by the molecule.
+        setTaProvenance({ kind: "no-match", source: `${sourceLabel} → "${top.area}"` });
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions]);
+
+  // ── Effect 2: UniProt ID auto-propagation ─────────────────────────────────
+  // Strictly gated by `uniprotAutoMode` (the explicit "Auto-match" toggle)
+  // and `uniprotManual.current` (set when the user types/picks a UniProt).
+  // Independent of TA-prediction state so a manual TA selection cannot block
+  // UniProt fill. Re-runs when the toggle flips so enabling auto-mode after
+  // suggestions arrive still triggers propagation.
+  useEffect(() => {
+    if (!uniprotAutoMode) return;
+    if (uniprotManual.current) return;
+    const top = targetSuggestions[0];
+    if (!top) return;
+    if (top.uniprotId === uniprotId) return;
+    if (!isValidUniprotAccession(top.uniprotId)) return;
+    setUniprotId(top.uniprotId);
+    setProteinInfo(null);
+    setProteinError(null);
+    setAlphafoldData(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSuggestions, uniprotAutoMode]);
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
@@ -3602,8 +3649,48 @@ export function HakaseAI() {
                         )}
                       </div>
 
-                      <FieldGroup label="Therapeutic Area Preset">
-                        <Select value={therapeuticArea} onValueChange={setTherapeuticArea}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400">Therapeutic Area Preset</span>
+                          {(() => {
+                            // Subtle provenance chip — keeps the dropdown looking
+                            // "complete" (default value always visible) while
+                            // still honestly signalling whether the value was
+                            // predicted, manually picked, or just the literal
+                            // initial default. Hover for the source.
+                            const chip = (() => {
+                              if (taProvenance.kind === "auto") return {
+                                label: "Auto", title: `Predicted from top target: ${taProvenance.source ?? "—"}`,
+                                cls: "bg-violet-500/10 border-violet-500/30 text-violet-300",
+                              };
+                              if (taProvenance.kind === "manual") return {
+                                label: "Manual", title: "Selected by user",
+                                cls: "bg-slate-500/10 border-slate-500/30 text-slate-300",
+                              };
+                              if (taProvenance.kind === "no-match") return {
+                                label: "Default", title: `No TA match for ${taProvenance.source ?? "top target"} — using initial preset`,
+                                cls: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+                              };
+                              return {
+                                label: "Default", title: "No molecule analyzed yet — using initial preset",
+                                cls: "bg-slate-500/10 border-slate-500/30 text-slate-400",
+                              };
+                            })();
+                            return (
+                              <span title={chip.title}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${chip.cls}`}>
+                                {chip.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <Select
+                          value={therapeuticArea}
+                          onValueChange={(v) => {
+                            setTherapeuticArea(v);
+                            setTaProvenance({ kind: "manual" });
+                          }}
+                        >
                           <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60">
                             <SelectValue />
                           </SelectTrigger>
@@ -3613,7 +3700,7 @@ export function HakaseAI() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </FieldGroup>
+                      </div>
                     </div>
                   </section>
 
@@ -4870,7 +4957,13 @@ export function HakaseAI() {
                     </section>
                   )}
 
-                  {/* L1 → L4 Cascade Applied (L2 / L3 are scaffolds — animal sim consumes L1 directly) */}
+                  {/* L1 → L3 Cascade banner (animal panel). The cascade *engine*
+                      currently feeds L1 in vitro outputs directly into the
+                      L3 animal sim — L2 confirmation is a parallel scaffold,
+                      not a hard gate in the data path. The user-facing
+                      "Advance to Confirmation (L2)" button on the L1 card
+                      is the recommended human review step before this
+                      banner's animal results should be trusted for L4. */}
                   <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
@@ -8799,7 +8892,7 @@ function Layer1Results({
               )}
             </div>
             <p className="text-[13px] text-white font-medium">
-              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Animal Studies" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
+              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Confirmation (L2)" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
