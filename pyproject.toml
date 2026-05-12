@@ -20,6 +20,11 @@ dependencies = [
 ]
 
 [[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
 explicit = true
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
