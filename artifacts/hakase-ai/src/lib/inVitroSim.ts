@@ -169,8 +169,25 @@ const THERAPEUTIC_AREA_PROFILES: Record<string, TherapeuticAreaProfile> = {
   },
 };
 
-function getTherapeuticProfile(therapeuticArea: string): TherapeuticAreaProfile {
-  return THERAPEUTIC_AREA_PROFILES[therapeuticArea] ?? THERAPEUTIC_AREA_PROFILES["Oncology"];
+// Identity / neutral therapeutic-area profile — used when no TA preset has
+// been selected or inferred. potencyMultiplier=1.0 means no TA-specific
+// potency adjustment; all sensitivity weights = 1.0 so toxicity scoring is
+// unbiased; no curated off-target panel and no TA-preferred cell lines (the
+// caller must hide / fall back instead of silently presenting an unrelated
+// panel). Required to keep the simulator honest for off-catalogue chemistry
+// (e.g. antioxidants like α-tocopherol) where coercing to "Oncology" would
+// fabricate kinase-style off-target panels and cell-line preferences.
+const TA_PROFILE_NEUTRAL: TherapeuticAreaProfile = {
+  potencyMultiplier: 1.0,
+  potencyThresholds: { high: 50, moderate: 500 },
+  hergWeight: 1.0, hepatoWeight: 1.0, cnsWeight: 1.0, renalWeight: 1.0, giWeight: 1.0,
+  offTargetPanelNames: [],
+  cellLinePreference: [],
+};
+
+function getTherapeuticProfile(therapeuticArea: string | null | undefined): TherapeuticAreaProfile {
+  if (!therapeuticArea) return TA_PROFILE_NEUTRAL;
+  return THERAPEUTIC_AREA_PROFILES[therapeuticArea] ?? TA_PROFILE_NEUTRAL;
 }
 
 function computeBaselinePIC50(
@@ -238,9 +255,14 @@ function computeBaselinePIC50(
 
 function computePharmacophoreBonus(
   pharm: PharmacophoreProfile | null,
-  therapeuticArea: string,
+  therapeuticArea: string | null | undefined,
 ): number {
   if (!pharm) return 0;
+  // No TA selected → no TA-specific pharmacophore bonus. We refuse to fall
+  // through to the generic "else" branch here because that branch was a
+  // proxy for kinase-style chemistry; applying it to off-catalog molecules
+  // (e.g. α-tocopherol) would silently inflate predicted potency.
+  if (!therapeuticArea) return 0;
   let bonus = 0;
 
   if (therapeuticArea === "Oncology") {
@@ -398,7 +420,7 @@ export function runInVitroSimulation(
   molProps: MolecularProperties,
   smiles: string,
   uniprotId: string,
-  therapeuticArea: string = "Oncology",
+  therapeuticArea: string | null = null,
 ): InVitroResults {
   const seed = hashSmiles(smiles);
   const mw = molProps.mw ?? 300;
@@ -507,22 +529,31 @@ export function runInVitroSimulation(
     kinaseScore > 0.8 ? "Selective" : kinaseScore > 0.5 ? "Moderately Selective" : "Non-Selective";
 
   const offTargetNames = taProfile.offTargetPanelNames;
-  const topOffTargets = Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
-    const nameIdx = (seed + i * 7) % offTargetNames.length;
-    const offRatio = 5 + (kappa2 + chi1v) * 2 + r(40 + i) * 30;
-    return {
-      name: offTargetNames[nameIdx],
-      ic50_nM: clamp(ic50_nM * offRatio * 0.5, 10, 50000),
-      selectivityRatio: clamp(offRatio, 1, 100),
-    };
-  });
+  // Empty panel → no TA selected (neutral profile). We refuse to fabricate
+  // off-target hits with `undefined` names rather than silently emitting
+  // entries the user can't interpret. Caller must hide the off-target list.
+  const topOffTargets = offTargetNames.length === 0
+    ? []
+    : Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
+      const nameIdx = (seed + i * 7) % offTargetNames.length;
+      const offRatio = 5 + (kappa2 + chi1v) * 2 + r(40 + i) * 30;
+      return {
+        name: offTargetNames[nameIdx],
+        ic50_nM: clamp(ic50_nM * offRatio * 0.5, 10, 50000),
+        selectivityRatio: clamp(offRatio, 1, 100),
+      };
+    });
 
   const cc50Base = logP > 4 ? 15 : logP > 2 ? 40 : 70;
   const cc50_uM = clamp(cc50Base + (fsp3 * 20) - (nArom > 3 ? 10 : 0), 1, 100);
   const therapeuticIndex = (cc50_uM * 1000) / Math.max(1, ic50_nM);
   const viabilityAt10uM = clamp(90 - (logP > 4 ? 20 : 0) - (mw > 500 ? 5 : 0) + fsp3 * 10, 30, 100);
   const cellLines = taProfile.cellLinePreference;
-  const cellLine = cellLines[seed % cellLines.length];
+  // Empty list → no TA selected (neutral profile). Emit a sentinel string
+  // ("—") rather than `undefined` so the type contract holds and the UI
+  // renders an honest "no preferred cell line" placeholder instead of the
+  // literal text "undefined".
+  const cellLine = cellLines.length === 0 ? "—" : cellLines[seed % cellLines.length];
 
   const riskFactors = [
     potencyClass === "Low" ? 1 : 0,

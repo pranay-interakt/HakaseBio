@@ -357,15 +357,24 @@ export function HakaseAI() {
   const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
   const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
-  const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
+  // Empty string ("") is the canonical "no therapeutic area selected" value.
+  // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
+  // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
+  // override, no TA-specific off-target panel). This prevents silent
+  // coercion to "Oncology" for off-catalog molecules like α-tocopherol.
+  const [therapeuticArea, setTherapeuticArea] = useState<string>("");
   // Provenance for therapeuticArea so the UI can honestly show whether the
-  // current value was auto-predicted, manually picked, or just the literal
-  // initial default. Avoids silently presenting "Oncology" as a prediction
-  // when no inference ever ran. Source string is shown to the user.
+  // current value was auto-predicted, manually picked, or simply not yet
+  // determined. Avoids silently presenting any preset as a prediction when
+  // no inference ever ran. Source string is shown to the user.
+  //   "none"     — initial state OR auto-prediction returned nothing usable
+  //   "auto"     — predicted from the top target's curated area
+  //   "manual"   — user picked from the dropdown
+  //   "no-match" — top target found, but its area didn't map to any preset
   const [taProvenance, setTaProvenance] = useState<{
-    kind: "default" | "auto" | "manual" | "no-match";
+    kind: "none" | "auto" | "manual" | "no-match";
     source?: string;
-  }>({ kind: "default" });
+  }>({ kind: "none" });
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
   const [toxOn, setToxOn] = useState(true);
@@ -618,11 +627,12 @@ export function HakaseAI() {
     if (taProvenance.kind === "manual") return;
     const top = targetSuggestions[0];
     if (!top) {
-      // No target suggestions yet — leave TA at its current value but mark
-      // provenance so the UI can show "Default" instead of pretending it's
-      // a prediction. Triggered for SMILES the catalogue can't match
-      // (e.g. antioxidants like α-tocopherol — no kinase/GPCR/NR hit).
-      if (taProvenance.kind !== "default") setTaProvenance({ kind: "default" });
+      // No target suggestions yet — clear TA back to "not selected" instead
+      // of leaving a stale value lingering. Triggered for SMILES the
+      // catalogue can't match (e.g. antioxidants like α-tocopherol — no
+      // kinase/GPCR/NR hit). Downstream engines treat "" as neutral.
+      if (therapeuticArea !== "") setTherapeuticArea("");
+      if (taProvenance.kind !== "none") setTaProvenance({ kind: "none" });
       return;
     }
     // Static map for ambiguous multi-area annotations. Keys are exact strings
@@ -656,9 +666,11 @@ export function HakaseAI() {
         setTherapeuticArea(match);
         setTaProvenance({ kind: "auto", source: sourceLabel });
       } else {
-        // Target found but its area string doesn't match any of the 7 valid
-        // TA presets — leave TA untouched and flag no-match. Surfaces in the
-        // UI so the user knows the current TA isn't backed by the molecule.
+        // Target found but its area string doesn't map to any of the 7
+        // valid TA presets. Clear TA to "" (not selected) so we don't show
+        // a stale preset that isn't backed by the molecule, and surface the
+        // mismatch in the provenance chip.
+        if (therapeuticArea !== "") setTherapeuticArea("");
         setTaProvenance({ kind: "no-match", source: `${sourceLabel} → "${top.area}"` });
       }
     }
@@ -3668,11 +3680,11 @@ export function HakaseAI() {
                                 cls: "bg-slate-500/10 border-slate-500/30 text-slate-300",
                               };
                               if (taProvenance.kind === "no-match") return {
-                                label: "Default", title: `No TA match for ${taProvenance.source ?? "top target"} — using initial preset`,
+                                label: "No match", title: `No TA preset matches ${taProvenance.source ?? "top target"} — pick one manually if needed`,
                                 cls: "bg-amber-500/10 border-amber-500/30 text-amber-300",
                               };
                               return {
-                                label: "Default", title: "No molecule analyzed yet — using initial preset",
+                                label: "Not predicted", title: "No therapeutic area inferred — engines run with neutral (no TA-specific) modifiers",
                                 cls: "bg-slate-500/10 border-slate-500/30 text-slate-400",
                               };
                             })();
@@ -3692,7 +3704,7 @@ export function HakaseAI() {
                           }}
                         >
                           <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60">
-                            <SelectValue />
+                            <SelectValue placeholder="— Not predicted —" />
                           </SelectTrigger>
                           <SelectContent className="bg-[#1a1d2b] border-white/10 text-white">
                             {["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"].map(a => (
@@ -6921,7 +6933,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[13px] font-bold text-white">{targetName}</div>
-              <div className="text-[9px] text-slate-500">{targetArea ?? "—"}</div>
+              <div className="text-[9px] text-slate-500">{(targetArea && targetArea.trim()) || "— Not predicted —"}</div>
             </div>
             <div className="text-right">
               <div className={`text-[14px] font-bold tabular-nums ${(targetConfidence ?? 0) >= 0.65 ? "text-emerald-400" : (targetConfidence ?? 0) >= 0.35 ? "text-amber-400" : "text-red-400"}`}>

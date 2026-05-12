@@ -122,8 +122,21 @@ const ADMET_TA_MODIFIERS: Record<string, AdmetTherapeuticModifiers> = {
   },
 };
 
-function getAdmetModifiers(therapeuticArea: string): AdmetTherapeuticModifiers {
-  return ADMET_TA_MODIFIERS[therapeuticArea] ?? ADMET_TA_MODIFIERS["Oncology"];
+// Identity / neutral modifiers — used when no TA preset is selected. Every
+// multiplier is 1.0 and every additive offset is 0.0, so the ADMET pipeline
+// produces results that depend ONLY on the molecule itself (no TA-specific
+// sensitivity weighting, no TA-specific similar-drug override). This is the
+// honest behaviour for off-catalog molecules where no therapeutic area has
+// been inferred or chosen — we must not silently coerce them to "Oncology".
+const ADMET_TA_NEUTRAL: AdmetTherapeuticModifiers = {
+  absorptionBonus: 0.0, metabolismPenalty: 0.0, toxicitySensitivity: 1.0,
+  hergSensitivity: 1.0, hepatoSensitivity: 1.0, cnsSensitivity: 1.0, renalSensitivity: 1.0,
+  similarDrugsOverride: [],
+};
+
+function getAdmetModifiers(therapeuticArea: string | null | undefined): AdmetTherapeuticModifiers {
+  if (!therapeuticArea) return ADMET_TA_NEUTRAL;
+  return ADMET_TA_MODIFIERS[therapeuticArea] ?? ADMET_TA_NEUTRAL;
 }
 
 function clamp(v: number, lo = 0, hi = 1): number {
@@ -146,7 +159,7 @@ export function runAdmetSimulation(
   smiles:       string,
   molName:      string,
   uniprotId:    string,
-  therapeuticArea: string = "Oncology",
+  therapeuticArea: string | null = null,
 ): SimResults {
   const { mw, logP, hbd, hba, tpsa, rotBonds, qed } = molProps;
   const seed = hashSmiles(smiles);
