@@ -36,12 +36,12 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   }, [mobileOpen]);
 
   const platformItems = [
-    { label: "Overview",                     sub: "What BioDigital Twin is",                   anchor: "",        route: "",            color: "violet"  },
-    { label: "Layer 1 — In Vitro",            sub: "ADMET · Binding · Go/No-Go",                anchor: "#layer1", route: "",            color: "violet"  },
-    { label: "Layer 2 — Animal Cohort",      sub: "PBPK · Formulation · FIH Dose Scaling",     anchor: "#layer2", route: "",            color: "amber"   },
-    { label: "Layer 3 — Patient Cohort",     sub: "PK/PD · Responders · Adverse events",       anchor: "#layer3", route: "",            color: "blue"    },
-    { label: "Layer 4 — Trial Digital Twin", sub: "Power · Enrollment · Adaptive · Verdict",   anchor: "#layer4", route: "",            color: "emerald" },
-    { label: "Regulatory Intelligence",      sub: "IND · FDA Designations · Timeline",         anchor: "",        route: "/regulatory", color: "blue"    },
+    { label: "Overview",                              sub: "Pre-clinical pipeline, end-to-end",                          anchor: "",        route: "",            color: "violet"  },
+    { label: "Layer 1 — In Vitro Twin",               sub: "RDKit · ADMET · Binding · Cascade Gate",                     anchor: "#layer1", route: "",            color: "violet"  },
+    { label: "Layer 2 — Confirmation Layer",          sub: "Docking · FEP · ML cross-check · PBPK · QSP/PD · Ex-Vivo",   anchor: "#layer2", route: "",            color: "blue"    },
+    { label: "Layer 3 — Animal Cohort",               sub: "Multi-species PBPK · Formulation · NOAEL · Allometric",      anchor: "#layer3", route: "",            color: "amber"   },
+    { label: "Layer 4 — First-In-Human Readiness",    sub: "MABEL · IND gate · Phase 1 Planner · Sealed Handoff",        anchor: "#layer4", route: "",            color: "emerald" },
+    { label: "Regulatory Intelligence",               sub: "IND-enabling · FDA Designations · Pre-IND meetings",         anchor: "",        route: "/regulatory", color: "blue"    },
   ];
 
   const techItems = [

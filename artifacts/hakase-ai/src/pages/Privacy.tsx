@@ -158,16 +158,17 @@ export function Privacy() {
 
           <SectionBlock id="client-side" title="Client-Side Processing">
             <p>
-              All five of HakaseAI's core simulation engines run <Highlight>entirely inside your browser</Highlight> using
-              WebAssembly and JavaScript computation:
+              The L1 In Vitro Twin runs <Highlight>entirely inside your browser</Highlight> on RDKit.js (WASM).
+              L2 / L3 / L4 run server-side, but they only ever see <Highlight>Morgan fingerprint hashes and structured evidence</Highlight> —
+              never your SMILES or molecular structures.
             </p>
             <div className="space-y-2 mt-3">
               {[
-                { name: "ADMET Engine", detail: "Lipinski rules, QED, toxicity scoring — computed from molecular descriptors you provide, processed locally" },
-                { name: "PBPK Simulator", detail: "Pharmacokinetic concentration-time profiles — calculated using NHANES statistical parameters embedded in the app" },
-                { name: "PD Model", detail: "Dose–response and target coverage curves — Emax/Hill calculations run in-browser" },
-                { name: "Virtual Patient Cohort Engine", detail: "Monte Carlo patient sampling — random number generation and parameter distributions computed client-side" },
-                { name: "Clinical Trial Simulator", detail: "Power analysis, enrollment modeling, survival curves — all statistical computation happens in your browser" },
+                { name: "L1 ADMET (Browser)", detail: "RDKit.js descriptors, Lipinski / Veber / QED / SAS, ML-augmented toxicity with confidence intervals — SMILES never transmitted" },
+                { name: "L1 Cascade Gate (Browser)", detail: "HAIOps GO / WATCH / NO-GO + sealed EvidencePointer for L2 ingestion — runs locally before any server call" },
+                { name: "L2 Confirmation (Server, fingerprints only)", detail: "ESM2 druggability, AutoDock Vina docking, opt-in FEP refinement — input is the fingerprint hash + EvidencePointer, not the structure" },
+                { name: "L3 Animal Cohort PBPK (Server)", detail: "Multi-species PBPK + allometric scaling per ICH M3(R2) — uses fingerprint-keyed PK parameters, never the SMILES" },
+                { name: "L4 Phase 1 Planner (Server)", detail: "MABEL-biased starting dose, IND gate, sealed PreClinicalPackage v2.0.0 handoff — operates on the structured L3 output, no structural data needed" },
               ].map(({ name, detail }) => (
                 <div key={name} className="flex gap-3 border border-white/6 rounded-xl px-4 py-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-[5px] flex-shrink-0" />
