@@ -43,13 +43,13 @@ const TIERS: Array<{
     name: "Insufficient",
     color: "rose",
     rule: "Less than fu_p (human)",
-    meaning: "IVIVE math cannot start. The L2 → L3 gate hard-blocks until at least the human plasma binding is on the bench.",
+    meaning: "IVIVE math cannot start. The bridge to animal-cohort design hard-blocks until at least the human plasma binding is on the bench.",
   },
   {
     name: "Minimum",
     color: "amber",
     rule: "fu_p (human)",
-    meaning: "IVIVE math runs, but cross-species extrapolation is not defended. L3 study design is allowed only with explicit sign-off acknowledging the gap.",
+    meaning: "IVIVE math runs, but cross-species extrapolation is not defended. Animal-cohort study design is allowed only with explicit sign-off acknowledging the gap.",
   },
   {
     name: "Standard",
@@ -61,12 +61,12 @@ const TIERS: Array<{
     name: "Premium",
     color: "emerald",
     rule: "Standard + fu_mic (human + ≥1 preclinical)",
-    meaning: "Full substrate for the Obach correction is present, end-to-end. This is the highest tier the ladder reports; defensibility still depends on the measured-only check that runs alongside it.",
+    meaning: "Full substrate for the Obach correction is present, end-to-end. This is the highest tier the ladder reports; defensibility still depends on the measured-only check that runs alongside it. This is the confidence band the first-in-human readiness step pulls through to MABEL.",
   },
 ];
 
 const PIPELINE_STEPS = [
-  ["1", "Receive L2 ConfirmationBlock v2.0.0", "sealed", "text-amber-300"],
+  ["1", "Receive sealed in-silico confirmation block (v2.0.0)", "sealed", "text-amber-300"],
   ["2", "Capture wet-lab matrix · 3 measurements × 5 species", "measured", "text-cyan-300"],
   ["3", "Tier assessment · Insufficient / Minimum / Standard / Premium", "derived", "text-cyan-300"],
   ["4", "Apply Obach 1999 fu_mic correction to microsomal CL_int", "physics", "text-cyan-300"],
@@ -75,7 +75,7 @@ const PIPELINE_STEPS = [
   ["7", "Cross-species rule check (measured-only)", "gate", "text-amber-300"],
   ["8", "Hard-block / soft-warn assembly", "gate", "text-amber-300"],
   ["9", "Sign-off · name + role + ack'd alerts + substrate mode", "sealed", "text-amber-300"],
-  ["10", "Release to L3 Animal Cohort", "handoff", "text-amber-300"],
+  ["10", "Release to animal cohort study design", "handoff", "text-amber-300"],
 ];
 
 const tierBadge: Record<"rose" | "amber" | "cyan" | "emerald", string> = {
@@ -101,7 +101,7 @@ export function IVIVE() {
         <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-8 pt-16 pb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/25 bg-cyan-500/8 mb-6">
             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-            <span className="text-[11px] font-semibold tracking-wider uppercase text-cyan-300">L2 → L3 Bridge · IVIVE Gate</span>
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-cyan-300">In-Silico · Ex-Vivo → Animal Cohort · IVIVE Gate</span>
           </div>
           <h1 className="text-[44px] md:text-[58px] font-black tracking-tight leading-[1.05] mb-5 max-w-3xl">
             IVIVE — the gate that decides<br/>
@@ -109,8 +109,8 @@ export function IVIVE() {
           </h1>
           <p className="text-[16px] text-slate-400 leading-relaxed max-w-3xl">
             In-vitro to in-vivo extrapolation is the single decision that transitions a compound from
-            <span className="text-cyan-300"> L2 Confirmation</span> evidence into a defensible
-            <span className="text-amber-300"> L3 Animal Cohort</span> study design. HakaseAI runs IVIVE as a
+            <span className="text-cyan-300"> in-silico and ex-vivo confirmation</span> into a defensible
+            <span className="text-amber-300"> animal cohort</span> study design. HakaseAI runs IVIVE as a
             standalone gate — wet-lab substrate in, tiered confidence assessment out, sealed sign-off required to proceed.
             This is HakaseAI's first target area: the place where most pre-clinical programmes either harden or quietly fabricate.
           </p>
@@ -136,11 +136,11 @@ export function IVIVE() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
           <div className="lg:col-span-2 space-y-4">
             <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold">Why a dedicated gate</div>
-            <h2 className="text-[28px] font-black tracking-tight text-white">L2 evidence is not the same as a defensible animal study.</h2>
+            <h2 className="text-[28px] font-black tracking-tight text-white">In-silico evidence is not the same as a defensible animal study.</h2>
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              L2 Confirmation produces docking poses, FEP refinements, ML cross-checks, and a first-pass PBPK projection.
-              None of that is enough to design an animal cohort. Translating in-vitro signal into a dose, a species, and a
-              meaningful margin requires three measurements that the L1/L2 cascade does not produce.
+              The in-silico confirmation track produces docking poses, FEP refinements, ML cross-checks, and a first-pass
+              PBPK projection. None of that is enough to design an animal cohort. Translating in-vitro signal into a dose,
+              a species, and a meaningful margin requires three measurements that the in-vitro and in-silico stages do not produce.
             </p>
             <p className="text-[14px] text-slate-400 leading-relaxed">
               Most pipelines paper over this gap with synthetic defaults — a literature midpoint here, a "typical drug"
@@ -263,24 +263,24 @@ export function IVIVE() {
         <div className="text-[10px] uppercase tracking-widest text-amber-400 font-semibold mb-2">The handoff</div>
         <h2 className="text-[28px] font-black tracking-tight text-white mb-3">Hard blocks. Soft warns. Explicit sign-off.</h2>
         <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl mb-8">
-          The L2 → L3 transition is not a button click. The IVIVE Output Handoff page surfaces every alert the gate
-          assembles, separates blocks from warnings, and captures the sign-off as a tamper-evident record consumed by
-          L3 study design and L4 First-In-Human Readiness.
+          The transition from in-silico / ex-vivo confirmation into animal-cohort design is not a button click. The IVIVE
+          Output Handoff page surfaces every alert the gate assembles, separates blocks from warnings, and captures the
+          sign-off as a tamper-evident record consumed by animal-cohort study design and first-in-human readiness.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="rounded-2xl border border-rose-500/25 bg-rose-500/5 p-5">
             <div className="text-[12px] font-bold text-rose-300 mb-2">Hard blocks · cannot be acknowledged away</div>
             <ul className="text-[12px] text-slate-400 space-y-1.5">
-              <li>• L1 In-Vitro has not been run</li>
-              <li>• L1 verdict is NO-GO</li>
+              <li>• In-vitro twin has not been run</li>
+              <li>• In-vitro verdict is NO-GO</li>
               <li>• Insufficient tier (no human fu_p)</li>
             </ul>
           </div>
           <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-5">
             <div className="text-[12px] font-bold text-amber-300 mb-2">Soft warns · require per-alert acknowledgment</div>
             <ul className="text-[12px] text-slate-400 space-y-1.5">
-              <li>• L2 ConfirmationBlock not yet sealed</li>
+              <li>• In-silico confirmation block not yet sealed</li>
               <li>• Cross-species rule met only with estimates</li>
               <li>• Substrate mode is auto-estimated or mixed</li>
               <li>• fu_mic missing (Obach correction skipped)</li>
@@ -300,8 +300,8 @@ export function IVIVE() {
 
         <div className="mt-6 rounded-xl border border-white/8 bg-white/[0.02] p-4">
           <div className="text-[11px] text-slate-500 leading-relaxed">
-            The substrate mode at sign-off propagates downstream. L3 Animal Cohort study design tags its outputs with the
-            confidence band that was sealed here, and L4 First-In-Human Readiness reads it again before MABEL projection.
+            The substrate mode at sign-off propagates downstream. Animal-cohort study design tags its outputs with the
+            confidence band that was sealed here, and first-in-human readiness reads it again before MABEL projection.
             A run sealed on auto-substrate is not silently identical to a run sealed on measured substrate — it is auditable
             as such all the way through to the IND-enabling package.
           </div>
@@ -316,11 +316,11 @@ export function IVIVE() {
             IVIVE is the place HakaseAI is hardening first.
           </h2>
           <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl">
-            L2 → L3 is where most pre-clinical programmes either get the cross-species story right or quietly accept
-            estimated substrate as if it were measured. We treat it as the keystone gate of the platform: if IVIVE is
-            not defensible, nothing downstream can be. Animal study design, NOAEL conversion, allometric HED, MABEL —
-            all of it inherits whatever the IVIVE handoff sealed. Getting this layer right is the precondition for
-            everything else HakaseAI promises.
+            The bridge from in-silico / ex-vivo confirmation into animal-cohort design is where most pre-clinical
+            programmes either get the cross-species story right or quietly accept estimated substrate as if it were
+            measured. We treat it as the keystone gate of the platform: if IVIVE is not defensible, nothing downstream
+            can be. Animal study design, NOAEL conversion, allometric HED, MABEL — all of it inherits whatever the IVIVE
+            handoff sealed. Getting this layer right is the precondition for everything else HakaseAI promises.
           </p>
         </div>
       </section>
@@ -333,15 +333,15 @@ export function IVIVE() {
             className="text-left border border-white/8 hover:border-cyan-500/30 rounded-xl p-4 bg-white/[0.015] transition-colors group"
           >
             <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-1">Upstream</div>
-            <div className="text-[14px] font-bold text-white group-hover:text-cyan-200 transition-colors">L2 Confirmation Layer</div>
-            <div className="text-[11px] text-slate-500 mt-1">10-stage in-silico pipeline + ex-vivo · ConfirmationBlock v2.0.0</div>
+            <div className="text-[14px] font-bold text-white group-hover:text-cyan-200 transition-colors">In-Silico &amp; Ex-Vivo Confirmation</div>
+            <div className="text-[11px] text-slate-500 mt-1">10-stage in-silico pipeline + ex-vivo wet-lab · sealed confirmation block</div>
           </button>
           <button
             onClick={() => { navigate("/platform"); setTimeout(() => document.querySelector("#layer3")?.scrollIntoView({ behavior: "smooth" }), 150); }}
             className="text-left border border-white/8 hover:border-amber-500/30 rounded-xl p-4 bg-white/[0.015] transition-colors group"
           >
             <div className="text-[10px] uppercase tracking-widest text-amber-400 font-semibold mb-1">Downstream</div>
-            <div className="text-[14px] font-bold text-white group-hover:text-amber-200 transition-colors">L3 Animal Cohort</div>
+            <div className="text-[14px] font-bold text-white group-hover:text-amber-200 transition-colors">Animal Cohort Studies</div>
             <div className="text-[11px] text-slate-500 mt-1">Multi-species PBPK · BCS-aware formulation · NOAEL · allometric HED</div>
           </button>
           <button
