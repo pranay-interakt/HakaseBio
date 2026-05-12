@@ -366,8 +366,19 @@ export function runAdmetSimulation(
     P00519: ["Imatinib", "Dasatinib", "Nilotinib"],
     P15056: ["Vemurafenib", "Dabrafenib", "Encorafenib"],
   };
-  const targetDrugs = similarByTarget[uniprotId];
-  const similarDrugs = targetDrugs ?? (taMod.similarDrugsOverride.length > 0 ? taMod.similarDrugsOverride : ["Erlotinib", "Gefitinib", "Imatinib"]);
+  // Precedent drugs:
+  //   1. Exact UniProt match → curated approved drugs for that target.
+  //   2. Otherwise, fall back to the therapeutic-area override (curated, real
+  //      approved drugs for the area).
+  //   3. If neither matches (e.g. off-catalog UniProt + unknown TA), return an
+  //      empty list. We deliberately do NOT emit a generic kinase-inhibitor
+  //      fallback, because the consumer (RegulatoryInsightCard) cross-checks
+  //      each name against openFDA — emitting a fabricated list would either
+  //      surface fake "precedents" to the user or trigger false openFDA
+  //      lookups against unrelated drugs. Empty here means the precedent panel
+  //      should be hidden upstream.
+  const targetDrugs  = similarByTarget[uniprotId];
+  const similarDrugs = targetDrugs ?? (taMod.similarDrugsOverride.length > 0 ? taMod.similarDrugsOverride : []);
 
   return {
     admet: { absorption: abs, distribution: dist, metabolism: met, excretion: exc, toxicity: tox, overall },

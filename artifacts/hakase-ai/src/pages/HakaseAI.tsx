@@ -7799,7 +7799,19 @@ function RegulatoryInsightCard({
   };
 
   // ── openFDA live data ─────────────────────────────────────────────────
-  const [fdaLabelData, setFdaLabelData] = useState<Record<string, boolean>>({});
+  // `fdaLabelData[drug]` carries BOTH whether openFDA actually has a label
+  // record for that generic name (`exists`) AND whether the label has a boxed
+  // warning. We need `exists` separately so the UI can hide unverified drug
+  // names entirely instead of silently displaying upstream fabrications next
+  // to a misleading "LIVE · openFDA Labels" badge.
+  //
+  // `fdaLabelStatus` distinguishes "fetch finished and openFDA has nothing"
+  // from "fetch failed (network / 429 / 5xx)" so the UI can show an honest
+  // error chip instead of falsely claiming there are no precedents.
+  type FdaLabelRow    = { exists: boolean; boxed: boolean };
+  type FdaLabelStatus = "idle" | "loading" | "success" | "error";
+  const [fdaLabelData, setFdaLabelData]     = useState<Record<string, FdaLabelRow>>({});
+  const [fdaLabelStatus, setFdaLabelStatus] = useState<FdaLabelStatus>("idle");
   const [fdaFaers, setFdaFaers]         = useState<Array<{ term: string; count: number; rate: number }>>([]);
   const [fdaTotalReports, setFdaTotalReports] = useState(0);
   const [fdaDrugs, setFdaDrugs]         = useState<Record<string, { appNumber: string; reviewType: string; approvalYear?: string }>>({});
@@ -7808,23 +7820,49 @@ function RegulatoryInsightCard({
   const drugsKey        = allSimilarDrugs.join(",");
 
   useEffect(() => {
+    setFdaLabelStatus("idle");
+    setFdaLabelData({});
     if (!drugsKey) return;
     const drugs = drugsKey.split(",").filter(Boolean);
     if (drugs.length === 0) return;
     const firstDrug = drugs[0];
 
+    // AbortController + 8s timeout so a hung openFDA call does not leave the
+    // UI stuck on "Verifying…" forever. The cleanup also guards against
+    // stale writes when drugsKey / layer change rapidly (older promises
+    // resolving after a newer effect has already started).
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 8000);
+    let cancelled    = false;
+
     if (layer === 1) {
+      setFdaLabelStatus("loading");
       Promise.all(
         drugs.slice(0, 4).map(drug => {
           const enc = encodeURIComponent(drug.toLowerCase());
-          return fetch(`https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${enc}"&limit=1`)
-            .then(r => r.ok ? r.json() : null).catch(() => null)
-            .then(data => ({ drug, boxed: !!(data?.results?.[0]?.boxed_warning) }));
+          return fetch(`https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${enc}"&limit=1`, { signal: controller.signal })
+            .then((r): Promise<{ ok: boolean; data: unknown }> | { ok: boolean; data: unknown } => {
+              // Distinguish "openFDA returned no rows" (404 from /drug/label is
+              // openFDA's no-results response) from a true transport failure.
+              if (r.status === 404) return { ok: true,  data: null };
+              if (!r.ok)            return { ok: false, data: null };
+              return r.json().then((data: unknown) => ({ ok: true, data }));
+            })
+            .then(({ ok, data }) => {
+              const row = (data as { results?: Array<{ boxed_warning?: unknown }> } | null)?.results?.[0];
+              return { drug, ok, exists: !!row, boxed: !!row?.boxed_warning };
+            })
+            .catch(() => ({ drug, ok: false, exists: false, boxed: false }));
         })
       ).then(results => {
-        const map: Record<string, boolean> = {};
-        results.forEach(({ drug, boxed }) => { map[drug] = boxed; });
+        if (cancelled) return;
+        const map: Record<string, FdaLabelRow> = {};
+        results.forEach(({ drug, exists, boxed }) => { map[drug] = { exists, boxed }; });
         setFdaLabelData(map);
+        // If every single fetch failed at the transport layer, surface an
+        // error rather than falsely reporting "no verified precedents".
+        const allFailed = results.length > 0 && results.every(r => !r.ok);
+        setFdaLabelStatus(allFailed ? "error" : "success");
       });
     }
 
@@ -7861,6 +7899,12 @@ function RegulatoryInsightCard({
         setFdaDrugs(map);
       });
     }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layer, drugsKey]);
   // ─────────────────────────────────────────────────────────────────────
@@ -7957,27 +8001,56 @@ function RegulatoryInsightCard({
             </div>
           </div>
 
-          {/* Precedent drugs — with live openFDA drug label boxed-warning badge */}
-          {sr?.similarDrugs && sr.similarDrugs.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
-                {Object.keys(fdaLabelData).length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
-                )}
+          {/* Precedent drugs — only render names that openFDA actually has a
+              label record for. The upstream `similarDrugs` list comes from a
+              curated UniProt → drug map (with a curated TA fallback), but we
+              still verify each name against openFDA before display so the
+              "LIVE" badge is truthful and so any future drift in the upstream
+              catalog (e.g. a misspelling or a withdrawn drug) does not leak
+              fabricated precedents into the regulatory panel. */}
+          {sr?.similarDrugs && sr.similarDrugs.length > 0 && (() => {
+            const verified = sr.similarDrugs.filter(d => fdaLabelData[d]?.exists);
+            // Honest status mapping:
+            //   loading → "Verifying with openFDA…", show all candidate names dimmed
+            //   error   → show all candidate names with an "openFDA unreachable" chip (do NOT claim no precedents)
+            //   success + 0 verified → show explicit "no openFDA-verified precedents" message and hide names
+            //   success + ≥1 verified → "LIVE · openFDA Labels" badge, show only verified names
+            if (fdaLabelStatus === "success" && verified.length === 0) {
+              return (
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
+                  <div className="text-[10px] text-slate-500 italic">No openFDA-verified precedent drugs in this class.</div>
+                </div>
+              );
+            }
+            const namesToShow = fdaLabelStatus === "success" ? verified : sr.similarDrugs;
+            return (
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
+                  {fdaLabelStatus === "loading" && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-slate-500/10 text-slate-400 border border-slate-500/20 font-mono">Verifying with openFDA…</span>
+                  )}
+                  {fdaLabelStatus === "error" && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">openFDA unreachable — names unverified</span>
+                  )}
+                  {fdaLabelStatus === "success" && verified.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {namesToShow.map(d => (
+                    <span key={d} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] ${fdaLabelStatus === "success" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-white/5 border-white/10 text-slate-400"}`}>
+                      {d}
+                      {fdaLabelData[d]?.boxed === true && (
+                        <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {sr.similarDrugs.map(d => (
-                  <span key={d} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300">
-                    {d}
-                    {fdaLabelData[d] === true && (
-                      <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
