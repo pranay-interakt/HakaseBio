@@ -41,6 +41,13 @@ All six models are trained ML, not rule-based. Each one was deliberately built t
 * All training corpora are public / CC-BY 4.0 (TDC, Delaney) or curated literature pairs documented in `*_data.py` files.
 * The cascade gate (`lib/cascadeGate.ts`) tags real-ML outputs as tier `ml` (0.7) — strictly higher than `heuristic` (0.5) or `structural` (0.6), strictly lower than `enriched` (0.8) or `experimental` (0.9, ChEMBL exact match).
 
+**Open ML-pipeline gaps (audit-acknowledged, tracked for closure).**
+* **Applicability domain is not surfaced.** None of the six models currently emits an `in_distribution_band: high|medium|low` flag next to its prediction. For α-tocopherol-fragment (a vitamin E fragment well outside any of these training corpora) the user still sees a numeric DILI / hERG / solubility score on the same surface as an in-distribution kinase scaffold. Required closure: surface **Tanimoto-to-nearest-training-neighbour** for the four Morgan-FP RFs (CardioTox, Solubility-ML, DILI-ML, Binding-ML drug side) and **ensemble disagreement / softmax entropy** for ADMET-AI's Chemprop ensemble; render as a coloured AD chip beside every value.
+* **Sample sizes need to be loud, not buried.** Binding-ML (~125 pairs) and Protein-ML (~80 + ~80) are tiny by ML standards; CardioTox (n=655) and DILI-ML (n=475) are small. Every paired card must surface **held-out test ROC-AUC / RMSE next to the model name**, not just `inference_time_ms`. CardioTox already reports 5-fold CV ROC-AUC mean ± std (`MlAdmetCard.tsx` L491-505) — generalise this contract to the other five.
+* **Consensus rule is defined in code but not in docs.** The hERG paired-card "Aligned / Divergent / Consensus" badge is computed in `MlAdmetCard.tsx` L367-394 from an `orderMap` over qualitative classes: same class → **Consensus**, one band apart → **Aligned**, two or more bands apart → **Divergent**. Document this rule in the audit and the UI tooltip; do not let it be local lore.
+* **DILI-ML cascade rule needs an explicit invariant.** DILI-ML is binary-only (probability + qualitative class). The cascade gate uses it as an L1 hepatic override and as L3 Stage 2 input. Required invariant (must be enforced by a unit test): **the gate may scale probability from a DILI-ML signal but must NEVER escalate severity, mechanism, or 5-class label.** Severity / mechanism / mitochondrial / BSEP / ROS / immune flags require a manual reviewer gate before animal advancement.
+* **`KEY_ENDPOINTS` filtering is undocumented.** ADMET-AI v2 returns ~104 numeric values per molecule; the UI's "All ML Endpoints by Bucket" panel renders only the curated `KEY_ENDPOINTS` subset defined in `models/admet_ml.py`. A researcher asking "what about LD50_Zhu / Half_Life_Obach / Lipophilicity_AstraZeneca?" should find a one-line answer in this audit, not have to grep the Python. Required closure: append the full discarded-endpoint list and the inclusion criterion to §0.5 row 1.
+
 **What sections §1–§9 below audit (and what they don't).** The remaining sections audit only pipelines 1–2 (`admet.ts` and `inVitroSim.ts`) — the heuristic engines. Read them as "here is what the rule-based side does and where its numbers stop being defensible". Do **not** read them as "here is what the dashboard does", because the dashboard also shows the real-ML pipeline above on the same screen, and the rule-based numbers are increasingly displayed *paired* with their ML counterparts (with an honest Δ badge) precisely so the user can see when the heuristic disagrees with the trained model.
 
 ---
@@ -261,15 +268,20 @@ Notes column for each output is honest ("LogP rules of thumb; no species differe
 
 ### ❌ RED FLAGS (numbers presented as data but not data)
 
-1. **`genoRisk = false` (admet.ts L197)** — Genotoxicity alert never fires.
-2. **`Lung organ risk = jitter(0.04, 0.03, seed+15)` always emerald (admet.ts L289)** — structurally meaningless noise.
-3. **`saScore` (admet.ts L331)** — labelled SA score, is a custom MW-linear formula, not Ertl-Schuffenhauer.
-4. **`qed` (chemistry.ts L185)** — labelled QED, is a custom 5-component approximation, not Bickerton.
-5. **Binding Kd/Ki/IC50 for off-catalog UniProt or no UniProt (admet.ts L295-308)** — falls through to `potencyRange [10,1000]` and emits numeric values labelled "Unknown Target".
-6. **`similarDrugs` literal fallback `["Erlotinib","Gefitinib","Imatinib"]` (admet.ts L370)** — three EGFR inhibitors returned as "similar" to any off-catalog molecule.
-7. **`topOffTargets` (inVitroSim.ts L510)** — returns 5 named TA-specific kinase/GPCR targets with fabricated IC50s, regardless of whether the molecule actually screens against them.
-8. **`patchClampResult` strings (inVitroSim.ts L497)** — "Significant block at 1 µM" is a hardcoded label, not the output of any patch-clamp simulation.
-9. **`InVitroResults.doseResponse.ic50_nM` for off-catalog molecules** — emits an IC50 from physchem alone, with no target and no QSAR/docking. Surfaces as "IC50: X nM" badge.
+> **Severity ranking.** RF#1 (off-catalog binding Kd) and RF#2 (similarDrugs EGFR fallback) and RF#3 (totalTargetsTested ~100) and RF#4 (topOffTargets named hits) are **demo-killers**: a regulator or partnered biotech running α-tocopherol-fragment live would see "vitamin E fragment hits PIM1 at 47 nM, tested against 87 targets, similar to Erlotinib" and the conversation ends. RF#5–#9 are visceral but contained. RF#10–#12 are labelling / calibration problems. The §9 cleanup order below uses this ranking, not LOC.
+
+1. **Binding Kd/Ki/IC50 for off-catalog UniProt or no UniProt (admet.ts L309-329)** — falls through to `potencyRange [10,1000]` for any UniProt not in `TARGET_MAP` (8 hardcoded entries) and emits numeric Kd/Ki/IC50 values labelled "Unknown Target". Off-targets inherit the same fabrication via the empty `targetInfo.offTargets` array.
+2. **`similarDrugs` literal fallback (admet.ts L373-394)** — when neither the UniProt is in `similarByTarget` (7 hardcoded targets) nor the TA preset has a `similarDrugsOverride`, the function now correctly returns `[]` (recently fixed); but the **TA-override branch itself is a fallback** — picking Oncology surfaces Erlotinib/Gefitinib/Imatinib for any molecule, including α-tocopherol-fragment under "Oncology". Consumer (`RegulatoryInsightCard`) cross-checks each name against openFDA, so a fabricated list either surfaces fake "precedents" or triggers false openFDA lookups against unrelated drugs.
+3. **`selectivity.totalTargetsTested = 50 + jitter*50 + heavyAtoms` (inVitroSim.ts L522)** — renders as "tested against ~100 targets" in the Selectivity card. This is a **fabricated experimental claim**, equivalent severity to RF#4. You cannot emit a "tested against N" count when N actual screens were run = 0. Same drum: any "tested against" / "screened in" copy must be gated on a real screen.
+4. **`selectivity.topOffTargets` (inVitroSim.ts L535-545)** — returns up to 5 named TA-specific kinase/GPCR targets with fabricated IC50s and selectivity ratios, regardless of whether the molecule actually screens against them. Empty-panel guard is in place for neutral TA but Oncology → "molecule X hits ABL1 at 47 nM" with zero supporting data.
+5. **`Lung organ risk = jitter(0.04, 0.03, seed+15)` always emerald (admet.ts L300-305)** — structurally meaningless noise; should be omitted unless inhalation route or pulmonary-toxicity signal exists.
+6. **`patchClampResult` hardcoded strings (inVitroSim.ts L519-520)** — "Significant block at 1 µM" / "Mild block at 10 µM" / "No significant block at 30 µM" are three string literals keyed off a heuristic-derived `hergRisk` band. Same severity class as the others: presents as electrophysiology output, is not.
+7. **`InVitroResults.doseResponse.ic50_nM` for off-catalog molecules (inVitroSim.ts L485-486 + dose-response synthesis upstream)** — emits an IC50 from physchem alone, with no target and no QSAR/docking. Surfaces as "IC50: X nM" badge in the Dose-Response card.
+8. **`saScore` (admet.ts L344)** — labelled "Synthetic Accessibility", is a custom MW-linear formula `2.0 + mw/200 + …`, not the Ertl-Schuffenhauer 2009 fragment-contribution score the label implies.
+9. **`qed` (chemistry.ts L185)** — labelled "QED" (Quantitative Estimate of Drug-likeness), is a custom 5-component RoF-style approximation, not the Bickerton 2012 ADS-product implementation the label implies.
+10. **`genoRisk = false` (admet.ts L210)** — Genotoxicity alert is hardwired off; the L243-248 alert is dead code that never fires. Either delete (cheapest) or — preferred — wire to a real Ames-style SMARTS panel via the existing `bioactivationEngine.ts` pattern (aromatic amines, nitroso, epoxides, alkylating Michael acceptors). Replacing dead code with a working structural screen is a stronger fix than deletion and is a few hours of work.
+11. **`confidence` is calibration-free (admet.ts L368-370)** — rendered as "Confidence Score: 78%". The formula is `overall * 0.6 + (1 − violations·0.12) * 0.25 + alerts-bonus`. This is a weighted heuristic sum with no probabilistic calibration; rendering it as a percentage implies a Brier-/log-loss-validated probability that does not exist. Re-label as "Composite heuristic score (0–100)" or replace with a bootstrap-over-jitter estimate with held-out Brier-score validation.
+12. **`potencyClass` ("High / Moderate / Low") under TA = Default (inVitroSim.ts L485-486)** — TA-conditional thresholds via `taProfile.potencyThresholds`, but under the neutral / Default profile (the case α-tocopherol-fragment will hit) the threshold convention is undefined and the "High potency" label is meaningless. Always show the convention next to the label ("High = IC50 < 10 nM under Oncology profile") and refuse to emit the label under the neutral profile, OR fall back to a published universal convention (e.g., Hopkins/Groom 2002).
 
 ### 🟡 DEFENSIBLE HEURISTIC (tier should be visible, but rule itself is OK)
 
@@ -311,17 +323,95 @@ Run this molecule with TA = whatever you previously had selected. The provenance
 
 ---
 
-## 9. Recommended cleanup order (smallest blast radius first)
+## 9. Recommended cleanup order (by demo embarrassment, not LOC)
 
-1. **Delete dead `genoRisk` block** or wire to a real Ames/SMARTS scan (admet.ts L197, L230-235).
-2. **Drop the Lung organ entirely** or make it conditional on inhalation route only (admet.ts L287-292).
-3. **Empty `similarDrugs` fallback** instead of returning Erlotinib/Gefitinib/Imatinib (admet.ts L370).
-4. **Gate binding output on `TARGET_MAP[uniprotId]` hit** — return `null` and surface "no target affinity available" in the UI when not in catalog (admet.ts L296).
-5. **Gate `topOffTargets` on real off-target screen** — only emit when a kinome/GPCR panel has actually been fetched (inVitroSim.ts L510-518).
-6. **Re-label `saScore` and `qed`** as "MW-linear approximation" / "RoF-style approximation" or compute the real ones.
-7. **Remove `patchClampResult` hardcoded strings** in favor of just the IC50 number with a "predicted, not measured" tag (inVitroSim.ts L497).
-8. **Surface cascade-gate `tier` and `note`** on every heuristic value in the main L1 panels (not only in the gate tile) so the user sees provenance per number, not only at gate-evaluation time.
+> **Reordering rationale.** The previous version of this section was engineer-friendly (smallest change first). That ordering optimised for blast radius, not for what would actually do the most damage in front of a regulator or partnered biotech. The α-tocopherol-fragment live-demo failure modes are the demo-killers (RF#1–#4); the labelling problems (RF#8–#9, RF#11–#12) and dead code (RF#10) come last. Each step references the RED FLAG it closes.
+
+1. **Gate binding output on `TARGET_MAP[uniprotId]` hit (closes RF#1).** Return `binding: null` (typed as `BindingEstimate | null`) when the UniProt is not in the catalog. Update the `SimResults.binding` type, every consumer in `HakaseAI.tsx`, and surface an honest "no target affinity available — UniProt not in validated catalog" banner. **Highest priority.**
+2. **Remove the TA-override branch from `similarDrugs` (closes RF#2).** Keep only the curated UniProt → approved-drug map. Off-catalog UniProt + any TA → `[]` and the consumer hides the precedent panel. Avoids both the demo embarrassment and the spurious openFDA lookups against unrelated drug names.
+3. **Gate `selectivity.totalTargetsTested` on a real screen (closes RF#3).** Only emit when an actual off-target panel has been fetched. Otherwise omit the field (or surface as `null` with a "no off-target screen run" tag). Type-level: change `totalTargetsTested: number` to `totalTargetsTested: number | null` so the UI cannot accidentally render `0` as "0 targets tested" instead of "no screen".
+4. **Gate `selectivity.topOffTargets` on a real off-target screen (closes RF#4).** Only emit when a kinome/GPCR panel has actually been run. Tighten the existing empty-panel guard to require `realScreenAvailable === true` rather than just non-empty TA panel names.
+5. **Drop the Lung organ entirely (closes RF#5)** — or make it conditional on inhalation route + a real pulmonary-toxicity signal (no inhalation route in the current MVP, so deletion is the honest move).
+6. **Replace `patchClampResult` hardcoded strings with a "predicted, not measured" tag (closes RF#6).** Surface only the numeric `herg_ic50_uM` plus a `tier: "heuristic"` chip; remove the three string literals.
+7. **Gate `doseResponse.ic50_nM` on a target+QSAR signal (closes RF#7).** When neither a `TARGET_MAP` UniProt nor an ML binding prediction is available, omit the IC50 (or null it) and let the dose-response card render its no-data state.
+8. **Cheap win: vendor real QED + SA score (closes RF#8 + RF#9 in one stroke).** Port the published reference implementations — Bickerton 2012 ADS-product QED (~150 LOC) and Ertl-Schuffenhauer 2009 fragment-contribution SA score (~150 LOC). Mechanical translations of openly available code; both endpoints already have heuristic placeholders so the consumer surfaces are already wired. Eliminates two red flags without changing any UI contract.
+9. **Cheap win: wire `genoRisk` to real Ames-style SMARTS via `bioactivationEngine.ts` (closes RF#10).** Add an Ames-leaning fragment panel (aromatic amines, nitroso, epoxides, alkylating Michael acceptors) to the existing engine; replace `const genoRisk = false` with `const genoRisk = bioactivationEngine.amesAlertCount(smiles) > 0`. Stronger fix than deletion — converts dead code into a working structural screen — and reuses an existing engine pattern.
+10. **Re-label `confidence` (closes RF#11).** Rename the rendered field from "Confidence Score" to "Composite Heuristic Score (0–100)" until a Brier-validated probability replaces it. One-line UI change; eliminates the calibration-implication red flag immediately.
+11. **Always show the `potencyClass` convention or refuse to emit under neutral TA (closes RF#12).** Either render "High (IC50 < 10 nM, Oncology convention)" or skip the qualitative label under the neutral profile and show only the numeric IC50.
+12. **Surface cascade-gate `tier` and `note` on every heuristic value in the main L1 panels** (not only in the gate tile) so the user sees provenance per number, not only at gate-evaluation time. This is the bridge to §10's write-time invariant — the manual version of the typed-envelope contract.
 
 ---
 
-*Generated 2026-05-12. Cross-references: `lib/admet.ts`, `lib/inVitroSim.ts`, `lib/chemistry.ts`, `lib/cascadeGate.ts`, `lib/bioactivationEngine.ts`, `pages/HakaseAI.tsx` L4215-4266 (cascade preview + recommendations), L8870-8930 (Go/No-Go header + key metrics).*
+## 10. Architectural framing (audit hints, made explicit)
+
+The nine-then-twelve red-flag list is symptomatic. The underlying issue is that L1 has **no write-time invariant against fabrication**. The cascade gate carries the right concept (`tier`, `note`) but it is enforced at *evaluation* time, in one file, against in-memory values that were already produced. The ML pipeline already carries the correct envelope (`source: "ml" | "fallback"`). Three architectural changes promote this to the system level:
+
+### 10.1 Promote anti-fabrication to a write-time invariant
+
+Today: a number is computed in `admet.ts`, lands in `SimResults` as `number`, flows to `HakaseAI.tsx`, renders as a value. Provenance is reconstructed downstream by the cascade gate. This is the same defect class as un-typed null handling — by the time you discover the value is heuristic, it's been rendered.
+
+Required: **every numeric L1 output carries `{ value, source, note?, citation?, ad_band? }` at the type level** — same shape ML pipeline already uses. `source ∈ "experimental" | "ml" | "structural" | "heuristic" | "unavailable"`. The TypeScript compiler refuses to render a bare `number` in any L1 panel; the renderer must consume the envelope. Demote the cascade gate from value-tagger to envelope-aggregator.
+
+This is the v2.0.0 Confirmation contract pattern, applied one layer up. Once in place, every RF in §7 becomes a type error rather than a code-review finding.
+
+### 10.2 Unify the two Go/No-Go authorities
+
+`inVitroResults.overallRisk` (inVitroSim.ts L568-570) and `simResults.goNogo` (admet.ts L354-366) can disagree on the same molecule and the audit currently notes this without resolving it. The user can be shown "GO" by one pipeline and "WATCH" by the other on the same screen.
+
+Required: **the cascade gate is the sole gate.** Demote `inVitroResults.overallRisk` and `simResults.goNogo` to inputs of the cascade gate, not display-rendered authorities. The Go/No-Go badge in the dashboard header reads exclusively from `cascadeGate.evaluate(...)`. Other two values may still appear inside their own panels as component scores, but never as the verdict.
+
+### 10.3 Wire cascade-gate notes into the HAIOps Gate Service
+
+Per the locked-in contract decisions from May 6: the **module owns falsifier definitions, HAIOps owns registry / dispatch / audit**. Today the cascade-gate `note` strings ("Pharmacophore + jitter from hardcoded potency range", "LogP rules of thumb; no species differences", etc.) are de-facto falsifier definitions buried in one file — local lore.
+
+Required: **register every cascade-gate note with HAIOps as a falsifier**, addressable by `(layer, axis, tier)` so they're auditable and dispatchable system-wide. Cross-link from the HAIOps spec when written; the gate-service and L1-provenance docs are sibling artifacts.
+
+---
+
+## 11. Machine-enforce the audit (α-tocopherol-fragment fixture suite)
+
+Stop relying on manual cross-checks. Promote the §8 checklist to a **fixture-based regression suite** under `artifacts/hakase-ai/src/lib/__tests__/l1_provenance_fixtures.test.ts`. The fixture panel is a small set of molecules selected to be *unambiguously off-catalog*:
+
+| Fixture | SMILES (sketch) | Why included |
+|---|---|---|
+| α-tocopherol-fragment | chromanol head | Real failure mode; vitamin E surrogate |
+| Glucose | sugar (hexose) | No protein target; carb scaffold |
+| Palmitic acid | C15H31COOH | Fatty acid; no kinase / GPCR relevance |
+| Hexafluoroethane | C2F6 | Noble-gas-like inert solvent surrogate |
+| Caffeine | trimethylxanthine | In-distribution physchem control (negative) |
+
+For each fixture, the suite asserts (snapshot + invariants):
+
+* `simResults.binding === null` for off-catalog UniProt fixtures (RF#1).
+* `simResults.similarDrugs.length === 0` for off-catalog × non-curated TA (RF#2).
+* `inVitroResults.selectivity.totalTargetsTested === null` and `topOffTargets.length === 0` (RF#3, RF#4).
+* `simResults.organs.find(o => o.name === "Lung")` is undefined (RF#5).
+* `inVitroResults.herg.patchClampResult` is undefined (RF#6).
+* `inVitroResults.doseResponse.ic50_nM === null` for off-target fixtures (RF#7).
+* For caffeine (positive control): values render normally; the suite catches accidental over-suppression.
+
+The suite runs on every PR. The audit then stops being a recurring manual diff and becomes an executable invariant.
+
+---
+
+## 12. L1 → L2 handoff typing (block heuristic propagation)
+
+This audit is L1-only and explicitly says so. Before the L2 (Confirmation) and L3 (Animal Cohort) audits land, **type the L1→L2 handoff** so the L2 consumer can refuse heuristic-only inputs on safety-critical paths.
+
+Without this, every L1 fabrication propagates into the Confirmation layer's animal-advancement decision, and the L1 cascade gate's `tier: "heuristic"` tag buys the safety case nothing downstream. Concretely:
+
+* The L1→L2 boundary type must require `source: "experimental" | "ml" | "structural"` for any input feeding an animal-advancement gate.
+* L2 explicitly refuses (compile-time) to consume a `source: "heuristic"` value on safety-critical axes (hERG, hepatotox, genotox, off-target liability).
+* The refusal mechanism is the same envelope shape as §10.1 — once §10.1 is in place, this boundary is enforced for free.
+
+---
+
+## 13. Doc hygiene
+
+* **This audit is a versioned artifact.** It lives in the repo under `CODEOWNERS` (recommend: assign to the L1 maintainer + HAIOps owner). Any PR touching `lib/admet.ts`, `lib/inVitroSim.ts`, `lib/cascadeGate.ts`, `services/aiService.ts`, or `artifacts/ai-service/models/*.py` must update this audit's "diff since last audit" section in the same PR.
+* **Diff-since-last-audit section.** Add a top-of-doc changelog block. Every change bumps the audit revision (e.g., `Audit revision: 2026-05-12-rev3`) and lists which RFs it closes / opens.
+* **Cross-link from sibling specs.** When the HAIOps spec is written, link from its falsifier-registry section back to §10.3 here, and from its safety-input contract back to §12.
+
+---
+
+*Generated 2026-05-12 (revision 2 — incorporates architect review of 2026-05-12: 3 new RFs added (totalTargetsTested, confidence calibration, potencyClass under default), §9 reordered by demo embarrassment, §§10–13 added on write-time invariants / unified gate / HAIOps registration / fixture suite / L1→L2 typing / doc hygiene). Cross-references: `lib/admet.ts`, `lib/inVitroSim.ts`, `lib/chemistry.ts`, `lib/cascadeGate.ts`, `lib/bioactivationEngine.ts`, `components/MlAdmetCard.tsx` (consensus rule, fallback banner pattern), `pages/HakaseAI.tsx` L4215-4266 (cascade preview + recommendations), L8870-8930 (Go/No-Go header + key metrics), `artifacts/ai-service/models/*.py` (six ML models per §0.5).*
