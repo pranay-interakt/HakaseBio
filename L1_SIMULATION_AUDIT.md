@@ -83,9 +83,11 @@ Source: `lib/chemistry.ts → getMolecularProperties(smiles)`. Calls `RDKit_mini
 
 ## 3. `runAdmetSimulation()` outputs — `simResults` (admet.ts)
 
-### 3.1 ADMET 5-axis scores (`simResults.admet`)
+> **Important — what these numbers are NOT.** This whole section audits **only pipeline 1** (the heuristic `admet.ts` engine). Every "rule-based" / "heuristic" verdict below applies to `simResults.admet.*` and feeds the **rule-based column** of the "ML vs Rule-based — 5-axis ADMET" card and the heuristic-only legacy panels. The **ML column** of that same card — and the "ML-Enhanced ADMET" header, the "All ML Endpoints by Bucket" panel, the paired hERG card, etc. — are produced by the **real ADMET-AI v2 Chemprop-RDKit GNN ensemble** documented in §0.5 (pipeline 3). Do not read §3.1 as "the 5-axis ADMET scores in the dashboard are heuristic"; read it as "the rule-based half of the paired 5-axis card is heuristic, and here's exactly how each rule works".
 
-All five scores are **deterministic rule-based functions of RDKit descriptors plus a seeded jitter from a SMILES hash**. They are NOT learned model outputs.
+### 3.1 ADMET 5-axis scores (`simResults.admet`) — heuristic only
+
+All five scores in `simResults.admet` (the rule-based column of the paired card) are **deterministic rule-based functions of RDKit descriptors plus a seeded jitter from a SMILES hash**. They are NOT learned model outputs. The corresponding ML column comes from ADMET-AI's HIA_Hou / BBB_Martins / mean(CYP*_Veith) / Clearance_Hepatocyte_AZ / mean(critical safety probs) endpoints — see §0.5 row 1 for the ML pathway, and `MlAdmetCard.tsx::mlAxisScore` for the axis-mapping code.
 
 | Field | Formula (admet.ts) | Inputs | Hard-coded constants | Verdict |
 |---|---|---|---|---|
