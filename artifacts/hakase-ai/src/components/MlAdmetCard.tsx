@@ -259,7 +259,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           <div className="text-[10px] text-red-300 leading-relaxed">
             <span className="font-semibold">ML service unavailable.</span> {error}
             <div className="text-slate-500 mt-0.5">
-              Heuristic ADMET (left of comparison view) is still valid for this molecule.
+              Rule-based ADMET (left of comparison view) is still valid for this molecule.
             </div>
           </div>
         </div>
@@ -272,7 +272,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           <div className="text-[10px] text-amber-300 leading-relaxed">
             <span className="font-semibold">ML inference unavailable for this molecule.</span>{" "}
             <span className="text-slate-400">
-              {result.error ?? "The model returned no predictions."} Heuristic ADMET below remains the source of truth.
+              {result.error ?? "The model returned no predictions."} Rule-based ADMET below remains the source of truth.
             </span>
           </div>
         </div>
@@ -282,7 +282,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
       {result && result.source === "ml" && (
         <div>
           <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            ML vs Heuristic — 5-axis ADMET
+            ML vs Rule-based — 5-axis ADMET
           </div>
           <div className="grid grid-cols-5 gap-2">
             {axes.map(axis => {
@@ -308,10 +308,10 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
                       />
                     </div>
                   </div>
-                  {/* Heuristic bar */}
+                  {/* Rule-based bar */}
                   <div>
                     <div className="flex items-center justify-between text-[9px]">
-                      <span className="text-slate-400">Heur</span>
+                      <span className="text-slate-400">Rule-based</span>
                       <span className="text-slate-400">{heurPct !== null ? `${heurPct}%` : "—"}</span>
                     </div>
                     <div className="w-full bg-white/5 rounded h-1.5 mt-0.5">
