@@ -6,7 +6,7 @@ import screenshotL2 from "@assets/Screenshot_2026-03-15_at_2.21.26_1773526937475
 import screenshotL3 from "@assets/Screenshot_2026-03-15_at_2.21.44_1773526937476.png";
 
 export function Platform() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -198,6 +198,43 @@ export function Platform() {
               <p className="text-[11px] text-slate-600 text-center mt-2">Layer 2 · In-silico (10 stages) + Ex-vivo · ConfirmationBlock v2.0.0 sealed</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── IVIVE Bridge (L2 → L3) ── */}
+      <section id="ivive" className="max-w-6xl mx-auto px-6 py-16 border-b border-white/5 scroll-mt-20">
+        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/6 via-transparent to-amber-500/6 p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-[10px] font-bold uppercase tracking-widest text-cyan-300">L2 → L3 Bridge</div>
+            <div className="text-[10px] uppercase tracking-widest text-slate-500">IVIVE Gate</div>
+          </div>
+          <h3 className="text-[22px] font-black tracking-tight text-white mb-2">IVIVE — the gate that decides whether animal studies are warranted.</h3>
+          <p className="text-[13px] text-slate-400 leading-relaxed max-w-3xl mb-5">
+            L2's ConfirmationBlock seals docking, FEP, ML cross-checks, and a first-pass PBPK projection — but it cannot, by itself,
+            justify an animal cohort. The IVIVE gate captures the wet-lab substrate (fu_p · fu_mic · B/P across human +
+            preclinical species), assesses the tier, applies the Obach 1999 correction inside a well-stirred liver model, and
+            requires explicit sign-off before L3 is unlocked.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+            {[
+              { tag: "Inputs",   val: "3 × 5 matrix",       sub: "fu_p · fu_mic · B/P · 5 species" },
+              { tag: "Tiers",    val: "4 levels",           sub: "Insufficient → Minimum → Standard → Premium" },
+              { tag: "Rule",     val: "Cross-species",      sub: "Human + ≥1 preclinical · MEASURED only" },
+              { tag: "Handoff",  val: "Sealed sign-off",    sub: "Substrate mode propagated to L3 + L4" },
+            ].map(({ tag, val, sub }) => (
+              <div key={tag} className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-semibold mb-1">{tag}</div>
+                <div className="text-[13px] font-bold text-white mb-0.5">{val}</div>
+                <div className="text-[10px] text-slate-500 leading-snug">{sub}</div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => navigate("/ivive")}
+            className="text-[12px] font-semibold px-4 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-200 transition-colors"
+          >
+            See the IVIVE gate in detail →
+          </button>
         </div>
       </section>
 

@@ -39,6 +39,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     { label: "Overview",                              sub: "Pre-clinical pipeline, end-to-end",                          anchor: "",        route: "",            color: "violet"  },
     { label: "Layer 1 — In Vitro Twin",               sub: "RDKit · ADMET · Binding · Cascade Gate",                     anchor: "#layer1", route: "",            color: "violet"  },
     { label: "Layer 2 — Confirmation Layer",          sub: "Docking · FEP · ML cross-check · PBPK · QSP/PD · Ex-Vivo",   anchor: "#layer2", route: "",            color: "blue"    },
+    { label: "IVIVE Bridge",                          sub: "L2 → L3 gate · wet-lab substrate · cross-species rule · sign-off", anchor: "",   route: "/ivive",      color: "blue"    },
     { label: "Layer 3 — Animal Cohort",               sub: "Multi-species PBPK · Formulation · NOAEL · Allometric",      anchor: "#layer3", route: "",            color: "amber"   },
     { label: "Layer 4 — First-In-Human Readiness",    sub: "MABEL · IND gate · Phase 1 Planner · Sealed Handoff",        anchor: "#layer4", route: "",            color: "emerald" },
     { label: "Regulatory Intelligence",               sub: "IND-enabling · FDA Designations · Pre-IND meetings",         anchor: "",        route: "/regulatory", color: "blue"    },
@@ -75,6 +76,17 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+      ),
+    },
+    {
+      label: "IVIVE Bridge",
+      sub: "L2 → L3 gate · wet-lab matrix · Obach 1999 · sealed sign-off",
+      route: "/ivive",
+      color: "blue",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h4l3-7 4 14 3-7h4" />
         </svg>
       ),
     },
