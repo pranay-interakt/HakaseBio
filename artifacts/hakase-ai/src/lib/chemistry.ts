@@ -1,3 +1,4 @@
+import { computeQED, type QEDResult } from "./drugLikeness";
 
 let rdkit: any = null;
 let initPromise: Promise<void> | null = null;
@@ -10,7 +11,16 @@ export interface MolecularProperties {
   hba: number;
   tpsa: number;
   rotBonds: number;
+  /**
+   * Bickerton QED (weighted mean) ∈ (0, 1].
+   * Implemented per Bickerton et al., Nat. Chem. 4:90 (2012) using the
+   * canonical ADS parameter set; see `drugLikeness.ts`.
+   */
   qed: number;
+  /** Bickerton QED components (per-property desirability) for explainability. */
+  qedComponents?: QEDResult["components"];
+  /** Count of structural alerts used by the ALERTS desirability term. */
+  numStructuralAlerts: number;
   heavyAtoms: number;
   numRings: number;
   numAromaticRings: number;
@@ -39,6 +49,8 @@ export interface MolecularProperties {
   numBridgeheadAtoms: number;
   numStereoCenters: number;
   phi: number;
+  /** Size of the largest detected ring (≥ 3); 0 if no rings. */
+  largestRingSize: number;
 }
 
 export interface PharmacophoreProfile {
@@ -125,7 +137,8 @@ export function getRDKitInstance(): any | null {
 const INVALID_PROPS: MolecularProperties = {
   isValid: false,
   mw: 0, logP: 0, hbd: 0, hba: 0, tpsa: 0, rotBonds: 0,
-  qed: 0, heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
+  qed: 0, numStructuralAlerts: 0,
+  heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
   lipinskiMW: false, lipinskiLogP: false, lipinskiHBD: false,
   lipinskiHBA: false, lipinskiPass: false,
   fsp3: 0, numHeteroatoms: 0, numHeterocycles: 0, numAromaticHeterocycles: 0,
@@ -133,7 +146,86 @@ const INVALID_PROPS: MolecularProperties = {
   kappa1: 0, kappa2: 0, kappa3: 0, hallKierAlpha: 0,
   numAmideBonds: 0, numAliphaticRings: 0, numSaturatedRings: 0,
   numSpiroAtoms: 0, numBridgeheadAtoms: 0, numStereoCenters: 0, phi: 0,
+  largestRingSize: 0,
 };
+
+/**
+ * SMARTS for the structural-alert subset of Brenk / Bickerton's QED ALERTS
+ * dimension that we can detect cheaply. Each match contributes +1 to the
+ * `numStructuralAlerts` count.
+ *
+ * The full Bickerton list contains ~100 SMARTS patterns — most of which
+ * overlap with the bioactivation reactive-metabolite alerts surfaced
+ * elsewhere in Layer 1. Adding more SMARTS only ratchets ALERTS desirability
+ * downward, which is the correct directional behaviour, so the subset below
+ * is a conservative under-estimate of the full Bickerton ALERTS count.
+ */
+const BICKERTON_ALERT_SMARTS: { id: string; smarts: string }[] = [
+  { id: "nitro",            smarts: "[NX3](=O)=O" },
+  { id: "nitro_anion",      smarts: "[N+](=O)[O-]" },
+  { id: "epoxide",          smarts: "C1OC1" },
+  { id: "aziridine",        smarts: "C1CN1" },
+  { id: "michael_acceptor", smarts: "[CX3]=[CX3][CX3](=O)" },
+  { id: "hydroxamic_acid",  smarts: "[CX3](=O)[NX3][OX2H]" },
+  { id: "thiol",            smarts: "[SX2H]" },
+  { id: "isocyanate",       smarts: "[NX2]=[CX2]=O" },
+  { id: "azide",            smarts: "N=[N+]=[N-]" },
+  { id: "phosphate_diester", smarts: "[PX4](=O)([OX2])[OX2]" },
+  { id: "acyl_halide",      smarts: "[CX3](=O)[F,Cl,Br,I]" },
+  { id: "alkyl_halide",     smarts: "[CX4][F,Cl,Br,I]" },
+  { id: "perhalo_methyl",   smarts: "[CX4]([F,Cl,Br,I])([F,Cl,Br,I])[F,Cl,Br,I]" },
+  { id: "anhydride",        smarts: "[CX3](=O)[OX2][CX3](=O)" },
+];
+
+/**
+ * Detect whether the molecule contains a macrocycle (any ring with ≥ 9 atoms)
+ * and, if so, return its size. Otherwise return a representative ring size
+ * (6 if rings exist, 0 if not).
+ *
+ * Macrocycles are rare in drug-like compounds; ring-walking via RDKit-JS
+ * minimal is awkward, so we use explicit closed-ring SMARTS for sizes 9-14
+ * (the range that triggers the Ertl macrocycle penalty). This is sufficient
+ * for the SA-score complexity penalty — a more expensive walk would not
+ * change the result for any standard small-molecule.
+ */
+function detectLargestRingSize(mol: any, knownNumRings: number): number {
+  if (knownNumRings <= 0) return 0;
+  for (let n = 14; n >= 9; n--) {
+    const smarts = `*1${"*".repeat(n - 1)}1`;
+    let qmol: any = null;
+    try {
+      qmol = rdkit.get_qmol(smarts);
+      if (!qmol) continue;
+      const matchJson: string = mol.get_substruct_match(qmol);
+      if (matchJson && matchJson.length > 2 && matchJson !== "{}") {
+        return n;
+      }
+    } catch {
+      // fall through
+    } finally {
+      qmol?.delete();
+    }
+  }
+  return 6;
+}
+
+function countAlerts(mol: any): number {
+  let n = 0;
+  for (const { smarts } of BICKERTON_ALERT_SMARTS) {
+    let qmol: any = null;
+    try {
+      qmol = rdkit.get_qmol(smarts);
+      if (!qmol) continue;
+      const matchJson: string = mol.get_substruct_match(qmol);
+      if (matchJson && matchJson.length > 2 && matchJson !== "{}") n += 1;
+    } catch {
+      // ignore — alert undetected
+    } finally {
+      qmol?.delete();
+    }
+  }
+  return n;
+}
 
 export function getMolecularProperties(smiles: string): MolecularProperties | null {
   if (!rdkit || !smiles.trim()) return null;
@@ -182,15 +274,17 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
     const numStereoCenters = Number(desc.NumAtomStereoCenters ?? 0);
     const phi = Number(desc.Phi ?? 0);
 
-    const qed = (() => {
-      if (mw === 0) return 0;
-      const mwScore  = mw  <= 300 ? 1 : mw  <= 400 ? 0.9 : mw  <= 500 ? 0.75 : mw  <= 600 ? 0.5 : 0.2;
-      const logPScore = logP >= 0 && logP <= 3 ? 1 : logP <= 5 ? 0.8 : 0.3;
-      const hbdScore = hbd <= 1 ? 1 : hbd <= 3 ? 0.8 : hbd <= 5 ? 0.5 : 0.2;
-      const hbaScore = hba <= 5 ? 1 : hba <= 8 ? 0.8 : hba <= 10 ? 0.5 : 0.2;
-      const tpsaScore = tpsa <= 60 ? 1 : tpsa <= 90 ? 0.85 : tpsa <= 120 ? 0.6 : 0.3;
-      return parseFloat(((mwScore + logPScore + hbdScore + hbaScore + tpsaScore) / 5).toFixed(3));
-    })();
+    const numStructuralAlerts = countAlerts(mol);
+    const largestRingSize = detectLargestRingSize(mol, numRings);
+
+    const qedResult = mw === 0
+      ? { weighted: 0, mean: 0, components: undefined as unknown as QEDResult["components"] }
+      : computeQED({
+          mw, logP, hba, hbd, tpsa,
+          rotBonds, numAromaticRings,
+          numAlerts: numStructuralAlerts,
+        });
+    const qed = qedResult.weighted;
 
     const lipinskiMW   = mw   <= 500;
     const lipinskiLogP = logP <= 5;
@@ -205,6 +299,8 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       tpsa:     parseFloat(tpsa.toFixed(1)),
       rotBonds,
       qed:      parseFloat(qed.toFixed(3)),
+      qedComponents: qedResult.components,
+      numStructuralAlerts,
       heavyAtoms, numRings, numAromaticRings, numAtoms,
       lipinskiMW, lipinskiLogP, lipinskiHBD, lipinskiHBA,
       lipinskiPass: lipinskiMW && lipinskiLogP && lipinskiHBD && lipinskiHBA,
@@ -221,6 +317,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       numAmideBonds, numAliphaticRings, numSaturatedRings,
       numSpiroAtoms, numBridgeheadAtoms, numStereoCenters,
       phi:      parseFloat(phi.toFixed(3)),
+      largestRingSize,
     };
   } catch {
     return null;

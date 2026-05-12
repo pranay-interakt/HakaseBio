@@ -489,6 +489,10 @@ export function HakaseAI() {
   const [targetSuggOpen, setTargetSuggOpen] = useState(false);
   const [chemblLookupLoading, setChemblLookupLoading] = useState(false);
   const [chemblSuggestions, setChemblSuggestions] = useState<TargetSuggestion[]>([]);
+  // Raw ChEMBL hits (with measured pIC50 values) — separate from the
+  // UI-shaped TargetSuggestion[] so the in-vitro selectivity engine can
+  // operate on measured ratios instead of pattern-match heuristics.
+  const [chemblHits, setChemblHits] = useState<import("@/lib/chemblTargetLookup").ChEMBLTargetHit[]>([]);
   const chemblLookupRef = useRef<string>("");
   const [chemblCompoundName, setChemblCompoundName] = useState<string | null>(null);
   const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
@@ -526,6 +530,7 @@ export function HakaseAI() {
       // suggestion chips, not silently write a UniProt ID into the field.
       setUniprotId("");
       setChemblSuggestions([]);
+      setChemblHits([]);
       setProteinInfo(null);
       setProteinError(null);
       setAlphafoldData(null);
@@ -538,12 +543,14 @@ export function HakaseAI() {
   useEffect(() => {
     if (!activatedMolProps?.isValid || !activatedSmiles) {
       setChemblSuggestions([]);
+      setChemblHits([]);
       return;
     }
     const currentSmiles = activatedSmiles;
     chemblLookupRef.current = currentSmiles;
     molNameManual.current = false;
     setChemblSuggestions([]);
+    setChemblHits([]);
     setChemblCompoundName(null);
     setChemblCompoundId(null);
     setChemblLookupLoading(true);
@@ -564,13 +571,20 @@ export function HakaseAI() {
           if (result.targets.length > 0) {
             const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
             setChemblSuggestions(converted.length > 0 ? converted : []);
+            // Stash the raw measured hits so the in-vitro selectivity engine
+            // can compute real IC50 ratios rather than the lipophilicity heuristic.
+            setChemblHits(result.targets);
           }
         } else {
           setChemblSuggestions([]);
+          setChemblHits([]);
         }
       })
       .catch(() => {
-        if (chemblLookupRef.current === currentSmiles) setChemblSuggestions([]);
+        if (chemblLookupRef.current === currentSmiles) {
+          setChemblSuggestions([]);
+          setChemblHits([]);
+        }
       })
       .finally(() => {
         if (chemblLookupRef.current === currentSmiles) setChemblLookupLoading(false);
@@ -901,6 +915,40 @@ export function HakaseAI() {
 
   const [simResults,    setSimResults]    = useState<SimResults | null>(null);
   const [inVitroResults, setInVitroResults] = useState<InVitroResults | null>(null);
+  // When ChEMBL hits arrive AFTER the in-vitro sim has already produced a
+  // heuristic selectivity panel, recompute selectivity from the measured
+  // ratios and patch the result in place — same shape, real data.
+  useEffect(() => {
+    if (!inVitroResults || chemblHits.length === 0) return;
+    // Skip if selectivity is already chembl-measured to avoid loops.
+    if (inVitroResults.selectivity.dataSource === "chembl_measured") return;
+    // Defer to next tick so the import isn't pulled at top-level type cycle.
+    import("@/lib/chemblSelectivity").then(({ computeChEMBLSelectivity }) => {
+      const sel = computeChEMBLSelectivity(uniprotId, chemblHits);
+      if (!sel.dataAvailable) return;
+      setInVitroResults((prev) => prev ? {
+        ...prev,
+        selectivity: {
+          ...prev.selectivity,
+          kinaseSelectivityScore: sel.selectivityScore,
+          offTargetHits: sel.offTargetHits,
+          totalTargetsTested: sel.totalTargetsTested,
+          selectivityClass: sel.selectivityClass,
+          topOffTargets: sel.topOffTargets.map(o => ({
+            name: o.name,
+            ic50_nM: o.ic50_nM,
+            selectivityRatio: o.selectivityRatio,
+            uniprotId: o.uniprotId,
+            similarityPct: o.similarityPct,
+            fromSimilarity: o.fromSimilarity,
+          })),
+          dataSource: "chembl_measured",
+          rationale: sel.rationale,
+        },
+      } : prev);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chemblHits, inVitroResults?.selectivity.dataSource, uniprotId]);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
@@ -1548,7 +1596,14 @@ export function HakaseAI() {
           }
 
           setSimResults(results);
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea);
+          // Forward measured ChEMBL hits so the selectivity panel uses real
+          // IC50 ratios when the data is already loaded. If chemblHits is
+          // still empty (lookup in flight), the sim falls back to the heuristic
+          // panel and a follow-up effect will re-run the sim once data arrives.
+          const ivResults = runInVitroSimulation(
+            molProps, smiles, uniprotId, therapeuticArea,
+            chemblHits.length > 0 ? chemblHits : undefined,
+          );
           setInVitroResults(ivResults);
           const l1Flags = computeLayer1Flags(ivResults);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);

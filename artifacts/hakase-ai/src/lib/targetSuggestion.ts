@@ -736,6 +736,18 @@ const CATALOGUE: TargetEntry[] = [
 /**
  * Suggest catalogue targets ranked by physicochemical / pharmacophore match.
  *
+ * IMPORTANT — this is a **last-resort heuristic fallback only**:
+ *   • No measured binding data is used. Scoring is pattern matching against a
+ *     curated 29-target pharmacophore catalogue (kinase aromatic N count,
+ *     CNS basic amine count, GPCR class A features, etc.).
+ *   • These suggestions exist so the UI never shows an empty target list when
+ *     ChEMBL similarity has no hits. They should always be drawn AFTER any
+ *     ChEMBL-derived suggestions in the combined view.
+ *   • Per project policy, heuristic results are CAPPED at "Medium" confidence.
+ *     Only experimental ChEMBL evidence may earn the "High" label —
+ *     pattern-match overlap, no matter how strong, is not a measurement and
+ *     must not be displayed at the same confidence tier.
+ *
  * The number of returned suggestions is **dynamic** — driven by the molecule's
  * actual catalogue overlap rather than a hard top-N cap:
  *   1. Score every catalogue target.
@@ -747,6 +759,10 @@ const CATALOGUE: TargetEntry[] = [
  *   4. Hard ceiling: clamp at `opts.maxN` (default 25 — well above the typical
  *      ~12 catalogue targets that score >0.35) just to prevent pathological
  *      cases from flooding the UI.
+ *
+ * Prefer `fetchChEMBLTargets` (chemblTargetLookup.ts) → exact-match or
+ * similarity-based real measured data → fall through to this catalogue only
+ * if ChEMBL is unreachable or returns no protein-class targets.
  */
 export function suggestTargets(
   smiles: string,
@@ -794,20 +810,34 @@ export function suggestTargets(
   const kept = aboveThreshold.length >= floor ? aboveThreshold : scoredWithConf.slice(0, floor);
 
   return kept.slice(0, maxN).map(({ t, conf }) => {
-    const label: TargetSuggestion["confidenceLabel"] = conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
+    // Heuristic suggestions are pattern-match-only — never measured.
+    // Cap confidence at "Medium" so the UI cannot display them at the same
+    // tier as real ChEMBL evidence. (See doc-block above for policy rationale.)
+    const cappedConf = Math.min(conf, 0.6499);
+    const label: TargetSuggestion["confidenceLabel"] =
+      cappedConf >= 0.35 ? "Medium" : "Low";
+    const rationale = t.reasons.length > 0
+      ? [
+          ...t.reasons,
+          "Pattern match against pharmacophore catalogue — no measured binding data for this molecule.",
+        ]
+      : [
+          "Physicochemical profile overlaps with known inhibitors of this target class.",
+          "Pattern match against pharmacophore catalogue — no measured binding data for this molecule.",
+        ];
     return {
       uniprotId:   t.uniprotId,
       geneName:    t.geneName,
       fullName:    t.fullName,
       targetClass: t.targetClass,
-      confidence:  conf,
+      confidence:  cappedConf,
       confidenceLabel: label,
-      rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
+      rationale,
       area:        t.area,
       color:       t.color,
       source:      "heuristic" as const,
       quality:     makeQuality("heuristic", "RDKit pharmacophore catalogue", {
-        note: "Pattern match against curated 29-target catalogue — no measured binding data",
+        note: "Pattern match against curated 29-target catalogue — no measured binding data. Confidence capped at 'Medium' by policy; only ChEMBL-measured evidence can be 'High'.",
       }),
     };
   });
