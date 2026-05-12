@@ -8,6 +8,9 @@ resolution-markers = [
     "sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
 ]
 
+[manifest]
+overrides = [{ name = "rdkit-pypi", marker = "sys_platform == 'never'" }]
+
 [[package]]
 name = "admet-ai"
 version = "2.0.1"
@@ -1507,7 +1510,7 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "rdkit-pypi" },
+    { name = "rdkit-pypi", marker = "sys_platform == 'never'" },
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "seaborn" },
@@ -1612,15 +1615,8 @@ name = "rdkit-pypi"
 version = "2022.9.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/61/f38bf03fb4060076aa955a62812de3176add23df7a8fbda2e2889316f4a6/rdkit_pypi-2022.9.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:53313eb37f73d15d371bbd8ec13e4c92d8bf31267f674711854075261a81147c", size = 24807020, upload-time = "2023-02-26T17:07:09.999Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/34/6ece020ec7589ebcd784a8ec7f0d4bb13ab44f86a08fb43f799b50f43674/rdkit_pypi-2022.9.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:6a82ee606af360cc55e4fdd04f64a08f92ed716b172c7eee6bbb866e46c0ea63", size = 23080555, upload-time = "2023-02-26T17:07:13.129Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/53/b79c3e0b4e11427e93bc061acb56d866054d85fc5aab54cf215146d94415/rdkit_pypi-2022.9.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f79fc47608c805d9af843b772be0a6de480048698ef3086563a1504c6d989821", size = 28625393, upload-time = "2023-02-26T17:07:16.397Z" },
-    { url = "https://files.pythonhosted.org/packages/4d/65/b1f26c03be19b10ac47dd501a0cde5475a0758972789fea01a3f23258d59/rdkit_pypi-2022.9.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:35ed0bff871c871999433a94ca8115285c2910cfad3b98763590311db4129afa", size = 29369096, upload-time = "2023-02-26T17:07:20.06Z" },
-    { url = "https://files.pythonhosted.org/packages/59/1b/725c8e447edd8b3ccb9a38858606397c67809620d92383e7fa312b90c8d6/rdkit_pypi-2022.9.5-cp311-cp311-win_amd64.whl", hash = "sha256:ca2a566b19a57d20b050ddf3a2c7700902e3bc59fa70f8686a5a6d4d081f30de", size = 20452731, upload-time = "2023-02-26T17:07:22.805Z" },
+    { name = "numpy", marker = "sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'" },
+    { name = "pillow", marker = "sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'" },
 ]
 
 [[package]]
