@@ -507,7 +507,18 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         case 0: setOne("s0", runStage0(simResults, inVitroResults)); break;
         case 1: setOne("s1", await runStage1(simResults)); break;
         case 2: setOne("s2", await runStage2Docking(simResults)); break;
-        case 3: setOne("s3", await runStage3(simResults)); break;
+        case 3: {
+          // RF#1 / §9 step 1: runStage3 throws if sim.binding is null.
+          if (!simResults.binding) {
+            setOne("s3", {
+              stage: 3, name: "Selectivity profile", status: "error",
+              reason: "Stage 3 requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
+            } as StageResult<any>);
+            break;
+          }
+          setOne("s3", await runStage3(simResults));
+          break;
+        }
         case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
         case 5: {
           // Stage 5 is opt-in and requires explicit Ligand B + PDB ID + cost confirmation
@@ -537,6 +548,14 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         }
         case 6: setOne("s6", runStage6(simResults, inVitroResults, params, stage8DosePerAdmin())); break;
         case 7: {
+          // RF#1 / §9 step 1: runStage7 throws if sim.binding is null.
+          if (!simResults.binding) {
+            setOne("s7", {
+              stage: 7, name: "QSP / PD coupling", status: "error",
+              reason: "Stage 7 requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
+            } as StageResult<any>);
+            break;
+          }
           const pk = results.s6?.result;
           const fu = results.s8?.result?.fu_fraction;
           if (!pk || !fu) {
@@ -550,6 +569,18 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
           break;
         }
         case 8: {
+          // RF#1 / §9 step 1 (code-review fix): L2 dose projection requires
+          // an L1 binding estimate (primaryKi). When the target UniProt is
+          // off-catalog, sim.binding is null and computeL2DoseProjection
+          // throws. Surface this as a friendly stage-error instead of a
+          // runtime overlay.
+          if (!simResults.binding) {
+            setOne("s8", {
+              stage: 8, name: "Dose projection", status: "error",
+              reason: "L2 dose projection requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
+            } as StageResult<any>);
+            break;
+          }
           const r = runStage8(simResults, inVitroResults, mergeIvie(params));
           setOne("s8", r);
           if (r.status === "wired") {
@@ -567,6 +598,17 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
 
   const runFull = async () => {
     if (!simResults || !inVitroResults) return;
+    // RF#1 / §9 step 1 (code-review fix): runFullPipeline drives stages 3,
+    // 7, 8, and tissue-selectivity which all throw on null binding. Block
+    // the full-pipeline run upfront and tell the user why.
+    if (!simResults.binding) {
+      alert(
+        "L2 pipeline requires a validated on-target binding estimate.\n\n" +
+        "L1 returned binding=null because the selected UniProt is not in the validated catalog. " +
+        "Pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK) before running the full L2 pipeline."
+      );
+      return;
+    }
     setPipelineRunning(true);
     setResults({});
     try {
