@@ -355,6 +355,7 @@ export function HakaseAI() {
   const [diliMl, setDiliMl] = useState<DiliMlResult | null>(null);
   const diliMlSeqRef = useRef(0);
   const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
+  const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
   const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
   const [admetOn, setAdmetOn] = useState(true);
@@ -920,16 +921,23 @@ export function HakaseAI() {
     if (!sm || !rdkitReady || !molProps?.isValid) {
       setDiliMl(null);
       setAdmetMl(null);
+      setAdmetMlError(null);
       return;
     }
     const seqDili = ++diliMlSeqRef.current;
     const seqAdmet = ++admetMlSeqRef.current;
+    setAdmetMlError(null);
     predictDiliMl(sm)
       .then(r => { if (diliMlSeqRef.current === seqDili) setDiliMl(r); })
       .catch(() => { if (diliMlSeqRef.current === seqDili) setDiliMl(null); });
     predictAdmetMl(sm)
-      .then(r => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(r); })
-      .catch(() => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(null); });
+      .then(r => { if (admetMlSeqRef.current === seqAdmet) { setAdmetMl(r); setAdmetMlError(null); } })
+      .catch(e => {
+        if (admetMlSeqRef.current === seqAdmet) {
+          setAdmetMl(null);
+          setAdmetMlError(e instanceof Error ? e.message : String(e));
+        }
+      });
   }, [smiles, rdkitReady, molProps?.isValid]);
 
   const cascadeGate = useMemo(
@@ -3747,22 +3755,134 @@ export function HakaseAI() {
                             )}
                           </div>
 
-                          {/* Placeholder ADMET sections — model scaffolding made
-                              visible so the user knows where future models will
-                              land. Kept intentionally minimal (no fake data). */}
-                          {[
-                            { name: "Distribution", note: "PPB, V_d, BBB" },
-                            { name: "Metabolism", note: "CYP3A4 / 2D6 / 2C9 inhibition, CL_int" },
-                            { name: "Toxicity", note: "Ames mutagenicity, hepatotoxicity (cardiotox already wired)" },
-                          ].map(({ name, note }) => (
-                            <div key={name} className="flex items-center justify-between border-t border-white/5 pt-2 opacity-50">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wider">{name}</span>
-                                <span className="text-[9px] text-slate-600">{note}</span>
+                          {/* ADMET-AI compact summary — one tile per bucket
+                              showing the worst-flagged endpoint. Real ML values
+                              from `admetMl.structured` (no fake data; tiles
+                              degrade to "Awaiting SMILES" / "Loading…" / "ML
+                              unavailable" / "No endpoints" honestly). The full
+                              5-axis panel lives lower at #ml-admet-detail. */}
+                          {(() => {
+                            const sx = admetMl?.structured;
+                            const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+                            const probTone = (p: number) =>
+                              p < 0.3 ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
+                              : p < 0.6 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/5"
+                              : "text-red-400 border-red-500/30 bg-red-500/5";
+                            const labelFor = (p: number) => (p < 0.3 ? "Low" : p < 0.6 ? "Moderate" : "High");
+
+                            type Flag = { headline: string; sub: string; tone: string } | null;
+
+                            const distFlag = (): Flag => {
+                              if (!sx) return null;
+                              const bbb = sx.distribution?.BBB_Martins?.value;
+                              const ppb = sx.distribution?.PPBR_AZ?.value;
+                              const vd  = sx.distribution?.VDss_Lombardo?.value;
+                              if (!finite(bbb) && !finite(ppb) && !finite(vd)) return null;
+                              if (finite(bbb)) {
+                                const cls = bbb >= 0.5 ? "BBB-penetrant" : "BBB-restricted";
+                                const tone = bbb >= 0.5 ? "text-violet-300 border-violet-500/30 bg-violet-500/5"
+                                                        : "text-slate-300 border-white/10 bg-white/5";
+                                const extra = finite(ppb) ? ` · PPB ${(ppb * 100).toFixed(0)}%` : "";
+                                return { headline: `${cls} (${bbb.toFixed(2)})`, sub: `BBB_Martins${extra}`, tone };
+                              }
+                              const parts: string[] = [];
+                              if (finite(ppb)) parts.push(`PPB ${(ppb * 100).toFixed(0)}%`);
+                              if (finite(vd)) parts.push(`Vd ${vd.toFixed(2)} L/kg`);
+                              return { headline: parts[0] ?? "—", sub: parts.slice(1).join(" · ") || "PPBR_AZ / VDss_Lombardo",
+                                       tone: "text-slate-300 border-white/10 bg-white/5" };
+                            };
+
+                            const metFlag = (): Flag => {
+                              if (!sx) return null;
+                              const isos = ["CYP1A2_Veith","CYP2C9_Veith","CYP2C19_Veith","CYP2D6_Veith","CYP3A4_Veith"];
+                              const hits = isos
+                                .map(k => ({ k, v: sx.metabolism?.[k]?.value }))
+                                .filter((e): e is { k: string; v: number } => finite(e.v));
+                              if (hits.length === 0) return null;
+                              const worst = hits.reduce((a, b) => (b.v > a.v ? b : a));
+                              const iso = worst.k.replace("_Veith", "");
+                              const verdict = worst.v >= 0.5 ? `${iso} inhibitor` : `Clean CYP panel`;
+                              const sub = worst.v >= 0.5
+                                ? `worst of ${hits.length}/5 isoforms`
+                                : `${iso} max p=${worst.v.toFixed(2)} across ${hits.length}/5`;
+                              return { headline: `${verdict} (${worst.v.toFixed(2)})`, sub, tone: probTone(worst.v) };
+                            };
+
+                            const toxFlag = (): Flag => {
+                              if (!sx) return null;
+                              const keys = [
+                                { k: "hERG", l: "hERG" },
+                                { k: "AMES", l: "AMES" },
+                                { k: "DILI", l: "DILI" },
+                                { k: "ClinTox", l: "ClinTox" },
+                                { k: "Carcinogens_Lagunin", l: "Carcinogenicity" },
+                                { k: "Skin_Reaction", l: "Skin sensitization" },
+                              ];
+                              const hits = keys
+                                .map(({ k, l }) => ({ l, v: sx.toxicity?.[k]?.value }))
+                                .filter((e): e is { l: string; v: number } => finite(e.v));
+                              if (hits.length === 0) return null;
+                              const worst = hits.reduce((a, b) => (b.v > a.v ? b : a));
+                              const verdict = worst.v >= 0.5 ? `${worst.l} ${labelFor(worst.v).toLowerCase()} risk` : `Clean tox panel`;
+                              const sub = worst.v >= 0.5
+                                ? `worst of ${hits.length} safety endpoints`
+                                : `${worst.l} max p=${worst.v.toFixed(2)} across ${hits.length}`;
+                              return { headline: `${verdict} (${worst.v.toFixed(2)})`, sub, tone: probTone(worst.v) };
+                            };
+
+                            const rows: Array<{ name: string; note: string; flag: Flag }> = [
+                              { name: "Distribution", note: "BBB · PPB · Vd",       flag: distFlag() },
+                              { name: "Metabolism",   note: "CYP1A2/2C9/2C19/2D6/3A4 inhibition", flag: metFlag() },
+                              { name: "Toxicity",     note: "hERG · AMES · DILI · ClinTox · carc · skin", flag: toxFlag() },
+                            ];
+
+                            const noSmiles = !smiles.trim();
+                            const invalid = !!(smiles.trim() && rdkitReady && molProps && !molProps.isValid);
+                            const transportFail = !!smiles.trim() && !invalid && !admetMl && !!admetMlError;
+                            const loading = !!smiles.trim() && !invalid && !admetMl && !admetMlError;
+                            const mlDown  = !!admetMl && admetMl.ml_available === false;
+
+                            const placeholder = (msg: string, tone = "text-slate-600") =>
+                              <span className={`text-[9px] italic ${tone}`}>{msg}</span>;
+
+                            return (
+                              <div className="border-t border-white/5 pt-2.5 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ADMET-AI summary</span>
+                                  <a href="#ml-admet-detail" className="text-[9px] text-violet-300/80 hover:text-violet-200 transition-colors">
+                                    Full 5-axis panel ↓
+                                  </a>
+                                </div>
+                                {rows.map(({ name, note, flag }) => (
+                                  <div key={name} className="flex items-center justify-between gap-2 py-1">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">{name}</span>
+                                      <span className="text-[9px] text-slate-600 truncate">{note}</span>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      {noSmiles ? placeholder("Awaiting SMILES")
+                                        : invalid ? placeholder("SMILES invalid", "text-amber-400/80")
+                                        : transportFail ? placeholder(`Service unreachable: ${admetMlError}`, "text-red-400/80")
+                                        : mlDown ? placeholder(admetMl?.error ?? "ML unavailable", "text-amber-400/80")
+                                        : loading ? placeholder("Loading…")
+                                        : !flag ? placeholder("No endpoints returned", "text-amber-400/80")
+                                        : (
+                                          <span className={`inline-flex flex-col items-end gap-0.5 px-1.5 py-1 rounded border ${flag.tone}`}>
+                                            <span className="text-[10px] font-mono font-semibold leading-none">{flag.headline}</span>
+                                            <span className="text-[8px] text-slate-500 leading-none">{flag.sub}</span>
+                                          </span>
+                                        )}
+                                    </div>
+                                  </div>
+                                ))}
+                                {admetMl?.model_info?.engine && admetMl.ml_available && (
+                                  <div className="text-[8px] text-slate-700 font-mono leading-tight pt-0.5">
+                                    {admetMl.model_info.engine}
+                                  </div>
+                                )}
                               </div>
-                              <span className="text-[9px] text-slate-600 italic">More models coming</span>
-                            </div>
-                          ))}
+                            );
+                          })()}
                         </div>
                       );
                     })()}
@@ -8752,7 +8872,9 @@ function Layer1Results({
 
       {/* ML-Enhanced ADMET Tab */}
       {activeTab === "ml-admet" && (
-        <MlAdmetCard smiles={smiles} heuristicAdmet={simResults?.admet ?? null} />
+        <div id="ml-admet-detail" className="scroll-mt-24">
+          <MlAdmetCard smiles={smiles} heuristicAdmet={simResults?.admet ?? null} />
+        </div>
       )}
 
       {/* Dose-Response Tab */}
