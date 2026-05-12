@@ -950,11 +950,63 @@ export function HakaseAI() {
         };
       }
       if (admetMl && admetMl.source === "ml" && admetMl.ml_available) {
-        const eng = admetMl.model_info?.engine ?? "Chemprop ADMET";
-        overrides.absorption_admet = {
-          available: true,
-          note: `ML — ${eng}; Caco-2 + HIA + bioavailability heads`,
-        };
+        const eng = admetMl.model_info?.engine ?? "ADMET-AI v2";
+        const sx = admetMl.structured;
+        // Strict numeric guard: reject null, undefined, strings, NaN, and ±Inf.
+        // A malformed ML payload must NOT silently upgrade the quality tier
+        // (project policy: NO silent coercion).
+        const finite = (v: unknown): boolean =>
+          typeof v === "number" && Number.isFinite(v);
+        const finiteHits = (bucket: Record<string, { value: unknown } | undefined> | undefined) =>
+          Object.values(bucket ?? {}).filter(e => finite(e?.value)).length;
+
+        // ADMET-AI absorption bucket → absorption_admet (non-safety, partial OK).
+        const absHits = finiteHits(sx.absorption);
+        if (absHits > 0) {
+          overrides.absorption_admet = {
+            available: true,
+            note: `ML — ${eng}; Caco-2 + HIA + P-gp + bioavailability heads (${absHits} endpoints)`,
+          };
+        }
+        // ADMET-AI toxicity.hERG → hERG (substitute for hard-rule logP heuristic).
+        // SAFETY_KEY — single endpoint, finite probability required.
+        const hergVal = sx.toxicity?.hERG?.value;
+        if (finite(hergVal)) {
+          overrides.hERG = {
+            available: true,
+            note: `ML — ${eng} hERG channel blockade head; p(blocker)=${(hergVal as number).toFixed(2)}`,
+          };
+        }
+        // ADMET-AI metabolism (CYP1A2/2C9/2C19/2D6/3A4_Veith) → cyp_panel.
+        // SAFETY_KEY: require ALL FIVE isoforms present and finite before
+        // upgrading. Partial CYP coverage is not sufficient evidence to flip
+        // a safety-critical tier (per architect review).
+        const REQUIRED_CYP = ["CYP1A2_Veith", "CYP2C9_Veith", "CYP2C19_Veith", "CYP2D6_Veith", "CYP3A4_Veith"];
+        const cypBucket = sx.metabolism ?? {};
+        const cypPresent = REQUIRED_CYP.filter(k => finite(cypBucket[k]?.value)).length;
+        if (cypPresent === REQUIRED_CYP.length) {
+          overrides.cyp_panel = {
+            available: true,
+            note: `ML — ${eng}; full 5-isoform CYP inhibition panel (Veith dataset: 1A2/2C9/2C19/2D6/3A4)`,
+          };
+        }
+        // ADMET-AI distribution (BBB/PPBR/VDss) → distribution_admet (non-safety).
+        const distHits = finiteHits(sx.distribution);
+        if (distHits > 0) {
+          overrides.distribution_admet = {
+            available: true,
+            note: `ML — ${eng}; BBB_Martins + PPBR_AZ + VDss_Lombardo heads (${distHits} endpoints)`,
+          };
+        }
+        // ADMET-AI excretion (Clearance/Half_Life) → metabolism_admet (non-safety).
+        // (UI naming: "metabolism_admet" covers downstream PK clearance signals.)
+        const exHits = finiteHits(sx.excretion);
+        if (exHits > 0) {
+          overrides.metabolism_admet = {
+            available: true,
+            note: `ML — ${eng}; Clearance_Hepatocyte_AZ + Half_Life_Obach heads (${exHits} endpoints)`,
+          };
+        }
       }
       if (bindingMl && bindingMl.source === "ml" && bindingMl.prediction.pKd_predicted !== null) {
         const tr = bindingMl.model_info?.training;

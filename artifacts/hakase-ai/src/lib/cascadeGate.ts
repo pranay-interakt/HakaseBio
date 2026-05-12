@@ -14,8 +14,16 @@
  * Rules
  *   1. NO-GO compounds: never auto-cascade, regardless of data quality.
  *   2. Safety-critical outputs (hERG, hepatotoxicity, bioactivation, CYP)
- *      must each meet *minimum* quality ≥ 0.6 ("enriched" tier or better).
+ *      must each meet *minimum* quality ≥ 0.6 ("structural" tier or better).
  *      A single heuristic-only safety output blocks the cascade.
+ *
+ *      DELIBERATE POLICY (May 2026): the "structural" tier (score 0.6) sits
+ *      EXACTLY at SAFETY_MIN_SCORE so a SMARTS-based bioactivation alert scan
+ *      passes the safety gate by itself. Rationale: deterministic substructure
+ *      matching against a curated reactive-metabolite alert library is a
+ *      defensible discovery-stage signal, even though it is not a predictive
+ *      model. If a future critic decides this is too permissive, raise
+ *      SAFETY_MIN_SCORE to 0.7 (only ML/enriched/experimental will then pass).
  *   3. Average quality of non-safety outputs must be ≥ 0.6.
  *
  * When blocked, the UI is expected to show a "Stage-Gate Review Required"
@@ -54,11 +62,20 @@ export interface CascadeGateResult {
  * the gate flips that output's tier from "heuristic" to "ml" (score 0.7) and
  * uses the `note` as the per-output rationale. Pass only what's actually loaded
  * — undefined keys leave the heuristic default in place.
+ *
+ * NOTE: each override must be set to `available: true` ONLY when the underlying
+ * service returned `source === "ml"` AND the relevant value is non-null. A
+ * fallback / failed prediction MUST NOT upgrade the tier — the gate would
+ * silently lie about quality.
  */
 export interface CascadeMlOverrides {
-  hepatotoxicity?:    { available: boolean; note: string };
-  absorption_admet?:  { available: boolean; note: string };
-  binding_estimate?:  { available: boolean; note: string };
+  hERG?:               { available: boolean; note: string };
+  hepatotoxicity?:     { available: boolean; note: string };
+  cyp_panel?:          { available: boolean; note: string };
+  absorption_admet?:   { available: boolean; note: string };
+  distribution_admet?: { available: boolean; note: string };
+  metabolism_admet?:   { available: boolean; note: string };
+  binding_estimate?:   { available: boolean; note: string };
 }
 
 /**
@@ -78,8 +95,8 @@ function defaultDetail(): Record<string, OutputQualitySummary> {
       note: "Rule-based: logP > 4.5 or MW > 550 (no reactive metabolite modelling)",
     },
     bioactivation: {
-      tier: "heuristic", score: TIER_SCORE.heuristic,
-      note: "SMARTS structural alert scan (no CYP transformation prediction)",
+      tier: "structural", score: TIER_SCORE.structural,
+      note: "SMARTS structural alert scan (substructure match — no CYP transformation prediction)",
     },
     cyp_panel: {
       tier: "heuristic", score: TIER_SCORE.heuristic,
@@ -102,8 +119,8 @@ function defaultDetail(): Record<string, OutputQualitySummary> {
       note: "Pharmacophore + jitter from hardcoded potency range",
     },
     target_identification: {
-      tier: "heuristic", score: TIER_SCORE.heuristic,
-      note: "Pharmacophore catalogue — no measured target evidence",
+      tier: "structural", score: TIER_SCORE.structural,
+      note: "Pharmacophore catalogue — substructure match, no measured target evidence",
     },
   };
 }
@@ -112,13 +129,13 @@ function bestTargetTier(suggestions: TargetSuggestion[]): { tier: QualityTier; n
   if (suggestions.length === 0) {
     return { tier: "inferred", note: "No targets surfaced — chemistry novel or off-class" };
   }
-  let best: QualityTier = "heuristic";
-  let bestScore = TIER_SCORE.heuristic;
+  let best: QualityTier = "structural";
+  let bestScore = TIER_SCORE.structural;
   for (const s of suggestions) {
     const t: QualityTier =
       s.source === "chembl"          ? "experimental" :
       s.source === "chembl-similar"  ? "enriched"     :
-                                       "heuristic";
+                                       "structural";  // pharmacophore SMARTS match
     if (TIER_SCORE[t] > bestScore) { best = t; bestScore = TIER_SCORE[t]; }
   }
   const counts = {
@@ -151,7 +168,15 @@ export function evaluateCascadeGate(
   // Override per-output tier to "ml" when a validated ML prediction is loaded.
   // We check `available` explicitly so a fallback / failed prediction does NOT
   // upgrade the tier (otherwise the gate would silently lie about quality).
-  const mlKeys = ["hepatotoxicity", "absorption_admet", "binding_estimate"] as const;
+  const mlKeys = [
+    "hERG",
+    "hepatotoxicity",
+    "cyp_panel",
+    "absorption_admet",
+    "distribution_admet",
+    "metabolism_admet",
+    "binding_estimate",
+  ] as const;
   for (const k of mlKeys) {
     const ov = mlOverrides[k];
     if (ov?.available) {

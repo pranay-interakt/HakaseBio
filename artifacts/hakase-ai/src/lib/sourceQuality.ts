@@ -5,20 +5,31 @@
  *   experimental (1.0) — direct measured assay data (ChEMBL activity, BindingDB)
  *   enriched     (0.7) — database-derived but inferred (ChEMBL similarity, Open Targets tractability)
  *   ml           (0.7) — validated ML model (held-out CV AUC reported, training set cited)
- *   heuristic    (0.3) — rules / patterns / interpolation (TPSA brackets, pharmacophore matching)
+ *   structural   (0.6) — deterministic structural query (SMARTS alerts, pharmacophore
+ *                       catalogue). Not a prediction — a literal substructure match.
+ *                       Defensible signal but does not estimate magnitude/affinity.
+ *   heuristic    (0.3) — rules / patterns / interpolation (TPSA brackets, logP rules)
  *   inferred     (0.1) — model prediction without validation (pharmacophore-jitter pIC50)
  *
  * One score per data point — never one score per compound. Used by `cascadeGate`
  * to decide whether L1→L2 auto-advance is permitted.
  */
 
-export type QualityTier = "experimental" | "physical" | "enriched" | "ml" | "heuristic" | "inferred";
+export type QualityTier =
+  | "experimental"
+  | "physical"
+  | "enriched"
+  | "ml"
+  | "structural"
+  | "heuristic"
+  | "inferred";
 
 export const TIER_SCORE: Record<QualityTier, number> = {
   experimental: 1.0,
   physical:     0.85, // physics-based on actual coordinates (e.g. AutoDock Vina docking)
   enriched:     0.7,
   ml:           0.7,
+  structural:   0.6,  // deterministic SMARTS / pharmacophore match — not a prediction
   heuristic:    0.3,
   inferred:     0.1,
 };
@@ -69,6 +80,7 @@ export function tierChipClasses(tier: QualityTier): string {
     case "physical":     return "bg-teal-500/15    text-teal-300    border-teal-500/30";
     case "enriched":     return "bg-blue-500/15    text-blue-300    border-blue-500/30";
     case "ml":           return "bg-violet-500/15  text-violet-300  border-violet-500/30";
+    case "structural":   return "bg-cyan-500/15    text-cyan-300    border-cyan-500/30";
     case "heuristic":    return "bg-amber-500/15   text-amber-300   border-amber-500/30";
     case "inferred":     return "bg-rose-500/15    text-rose-300    border-rose-500/30";
   }
