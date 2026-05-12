@@ -1,4 +1,6 @@
-# L1 Simulation Output — Parameter Audit
+# L1 Dashboard — Provenance Audit (heuristic engines + real ML pipeline)
+
+> **Scope correction (2026-05-12).** An earlier revision of this document framed the L1 dashboard as a "two-engine" system and detailed only the heuristic engines (`admet.ts`, `inVitroSim.ts`). That framing was incomplete and misleading: the dashboard *also* runs a **real ML pipeline** of six independently-trained models served from `artifacts/ai-service/` and consumed in L1 (additional ML models exist for L3 — `celltype_aggregation.py`, `patient_line.py` — and are out of scope here). The L1 ML models produce the numbers visible in the "ML-Enhanced ADMET", "All ML Endpoints by Bucket", "hERG paired prediction", and solubility-paired panels. Sections 0 and 0.5 below describe **all three** pipelines; sections §1–§9 audit only the heuristic engines (their original scope) and should be read as such.
 
 **Test molecule for cross-check:** α-tocopherol-fragment (chromanol head)
 SMILES: `OC1=C(C)C(CCC(C)(C)O2)=C2C(C)=C1C`
@@ -6,16 +8,40 @@ Note: the chromanol fragment of vitamin E. No phytyl tail. Antioxidant pharmacop
 
 ---
 
-## 0. The two-engine duality (read this first)
+## 0. The three-pipeline reality (read this first)
 
-The L1 panel renders state from **two independent engines** that both run on a `runSimulation()` click. Several panel sections have *both* engines' versions of the same biological concept, which can disagree.
+The L1 panel renders state from **three independent pipelines** that run on a `runSimulation()` click. Most panels show numbers from one pipeline; several panels (notably "ML-Enhanced ADMET", paired hERG, paired solubility, paired DILI) show **two** pipelines' answers side-by-side so the user can see agreement or divergence.
 
-| State variable | Producer | Source file | What it feeds in the L1 UI |
-|----|----|----|----|
-| `simResults` | `runAdmetSimulation()` | `lib/admet.ts` | "Confidence Score" line, ML-Enhanced ADMET 5-axis card (rule-based side), L1→L2 Cascade Preview tile, Recommendations block, Lipinski violations badge, target binding table (Kd/Ki/IC50 + off-targets) |
-| `inVitroResults` | `runInVitroSimulation()` | `lib/inVitroSim.ts` | Go/No-Go badge label (GO / WATCH / NO-GO), "In Vitro Score: X%", advance-text, key-metrics strip (IC50, Caco-2, CLint, fu%, hERG IC50, TI), Dose-Response tab, Permeability tab, Clearance tab, Safety tab, Selectivity tab, CYP panel, Bioactivation card |
+| # | Pipeline | Producer | Source | Nature | What it feeds in the L1 UI |
+|---|----|----|----|----|----|
+| 1 | Heuristic ADMET | `runAdmetSimulation()` | `lib/admet.ts` | **Rule-based** (RDKit descriptors → hand-tuned brackets + seeded jitter) | "Confidence Score", **rule-based column** of MlAdmetCard, L1→L2 Cascade Preview, Recommendations block, Lipinski badge, target binding Kd/Ki/IC50, organ risks, similar drugs |
+| 2 | Heuristic In-Vitro | `runInVitroSimulation()` | `lib/inVitroSim.ts` | **Rule-based** (descriptor regressions + seeded jitter) | Go/No-Go badge, "In Vitro Score", key-metrics strip (IC50, Caco-2, CLint, fu%, hERG IC50, TI), Dose-Response / Permeability / Clearance / Safety / Selectivity tabs, CYP panel, Bioactivation card |
+| 3 | **Real ML services** (six L1 models) | FastAPI service on `:8090`, called from `lib/aiService.ts` | `artifacts/ai-service/models/*.py` | **Trained ML models** (Chemprop GNN, Random Forests, Gradient Boosting, ESM-2 + LR) | **ML column** of MlAdmetCard, "All ML Endpoints by Bucket" panel (curated `KEY_ENDPOINTS` subset, not all raw model outputs), paired hERG card (ADMET-AI + CardioTox), paired solubility, ML binding affinity panel, ML-druggability second opinion. DILI-ML feeds the cascade-gate ML override and L3 Stage 2 — there is no L1 paired DILI card. |
 
-The Go/No-Go **badge** ("GO / WATCH / NO-GO") comes from `inVitroResults.overallRisk`, while the **cascade preview** "Go/No-Go" line and several recommendations come from `simResults.goNogo`. These can give different verdicts because they use different scoring (see §6).
+The Go/No-Go **badge** ("GO / WATCH / NO-GO") comes from `inVitroResults.overallRisk` (pipeline 2), while the **cascade preview** "Go/No-Go" line and several recommendations come from `simResults.goNogo` (pipeline 1). These can give different verdicts because they use different scoring (see §6). The cascade gate (`lib/cascadeGate.ts`) tags every output with a quality tier — `heuristic` (0.5) for pipelines 1–2, `ml` (0.7) for pipeline 3 — and blocks auto-advance when too many safety-critical signals are heuristic-only.
+
+---
+
+## 0.5. Real ML pipeline — what it is, what it feeds (NOT heuristic)
+
+All six models are trained ML, not rule-based. Each one was deliberately built to be **methodologically independent** of the heuristic engine it second-opinions: different training data, different feature representation, different algorithm class. Every model returns a `source: "ml" | "fallback"` envelope so the UI can never confuse a real prediction with a degraded fallback.
+
+| # | Model (UI label) | File | Training data | Features | Algorithm | Endpoints / output | UI surfaces |
+|---|---|---|---|---|---|---|---|
+| 1 | **ADMET-AI v2** (Chemprop-RDKit GNN ensemble) | `models/admet_ml.py` | TDC ADMET benchmark (41 endpoints, ~tens of thousands of compounds across HIA_Hou, BBB_Martins, CYP*_Veith, hERG_Karim, AMES, DILI, ClinTox, Carcinogens_Lagunin, Skin_Reaction, Caco2_Wang, Lipophilicity_AstraZeneca, Solubility_AqSolDB, Bioavailability_Ma, Pgp_Broccatelli, PPBR_AZ, VDss_Lombardo, Clearance_Hepatocyte_AZ, Half_Life_Obach, LD50_Zhu, …) | Learned graph embeddings (Chemprop directed-MPNN) + RDKit physchem descriptors | Chemprop-RDKit **GNN ensemble** | 41 endpoints + ~60 physchem ⇒ ~104 numeric values, of which a **curated `KEY_ENDPOINTS` subset** (defined in `admet_ml.py`) is grouped into 5 buckets (absorption / distribution / metabolism / excretion / toxicity) for the UI | "ML-Enhanced ADMET" header label, **ML column** of the 5-axis comparison (numbers derived in `MlAdmetCard.tsx::mlAxisScore`: HIA_Hou for absorption, BBB_Martins for distribution, mean(CYP*_Veith) for metabolism, Clearance_Hepatocyte_AZ for excretion, mean(critical safety probs) for toxicity), Critical Safety Endpoints panel, "All ML Endpoints by Bucket" expandable panel (renders the curated `structured` view, not all raw model outputs), ADMET-AI side of the paired hERG card |
+| 2 | **CardioTox v1** (Random Forest on Morgan FP + RDKit) | `models/cardiotox.py` | TDC `hERG` / Wang et al. (n=655, binary IC50<10 µM) — **distinct corpus** from ADMET-AI's hERG_Karim (~13k, different curation) | 1024-bit Morgan circular fingerprint (radius 2) + 7 RDKit scalar descriptors (MolWt, MolLogP, TPSA, HBD, HBA, FractionCSP3, BasicN) | **Random Forest classifier** (sklearn) | hERG blocker probability + qualitative class (Low/Moderate/High) + IC50 band; reports 5-fold CV ROC-AUC mean ± std | CardioTox side of the paired hERG card; consensus badge (Consensus / Aligned / Divergent) computed against ADMET-AI's hERG_Karim |
+| 3 | **Solubility-ML** (RF on Morgan FP + 9 RDKit descriptors) | `models/solubility_ml.py` | ~135 curated compounds with measured aqueous logS (Delaney 2004 + DrugBank + standard pharma references) — **no overlap** with closed-form ESOL coefficients | 1024-bit Morgan FP (r=2) + 9 RDKit physchem descriptors | **Random Forest Regressor** | Continuous logS + 4-class label (Highly soluble / Soluble / Slightly soluble / Insoluble) | Paired-view solubility tile (ML side vs ESOL rule-based side) |
+| 4 | **DILI-ML** (RF on Morgan FP + 6 RDKit descriptors) | `models/dili_ml.py` | TDC `DILI` / Xu et al. 2015 (n=475, binary DILI-positive/negative from FDA orange-box drug labels, CC-BY 4.0) | 1024-bit Morgan FP (r=2) + 6 RDKit descriptors (MolWt, MolLogP, TPSA, HBD, HBA, FractionCSP3) | **Random Forest classifier** | Binary DILI-risk probability + qualitative class. **Honest scope:** does NOT predict 5-class severity or mechanism flags (mitochondrial / BSEP / ROS / immune) — those require gated DrugBank tables not in this corpus | Cascade-gate ML override (in L1, used by `cascadeGate.ts` to upgrade the heuristic hepatotox signal when ML is available) **and** L3 Stage 2 hepatic surrogate; high probability triggers manual severity/mechanism review. **No L1 paired DILI display card** — DILI-ML's L1 effect is gate-side, not panel-side. |
+| 5 | **Binding-ML** (DeepDTA-style GBR on Morgan + ESM-2) | `models/binding_ml.py` | ~125 curated literature drug–target pairs spanning ~60 UniProts and ~65 drugs (kinases, GPCRs, COX, HDAC, BCL-2, opioid, SERT, GABA-A, ACE/ARB, statins, PARP — see `binding_ml_data.py`) — **no overlap** with the ChEMBL similarity index | drug = 1024-bit Morgan FP (r=2) + 8 RDKit descriptors (1032-d); target = 480-d ESM-2 t12 35M mean-pooled embedding; concat = **1512-d** | **GradientBoostingRegressor** on the concatenated drug+target vector | **pKd** prediction (`prediction.pKd_predicted`, with derived `Kd_nM` and qualitative affinity class) for an arbitrary SMILES × UniProt pair, with the protein side carrying learned biophysical / evolutionary signal across the full sequence | ML second-opinion in the L2 binding-affinity panel; sits alongside the ChEMBL-similarity rule-based path in `drug_target.py` |
+| 6 | **Protein-ML** (ESM-2 + LR druggability) | `models/protein_ml.py` | ~80 well-known human drug targets (multiple FDA-approved small molecules each) vs ~80 essential housekeeping proteins with no approved small-molecule drug — see `protein_ml_data.py` | 480-d mean-pooled per-residue embedding from `facebook/esm2_t12_35M_UR50D` (self-supervised PLM trained on UniRef50) | **Logistic regression** on top of frozen ESM-2 embedding (5-fold CV) | Druggability probability for an arbitrary UniProt | ML second-opinion to `protein.py`'s heuristic druggability score (binding-site count + active-site count + sequence length) |
+
+**Honesty contract every model honors.**
+* Each model returns `source: "ml"` only when the trained model actually ran. If loading or inference fails, it returns `source: "fallback"` with an explicit `error` string and **empty structured outputs** — never silently filled-in numbers. The UI gates every render on `source === "ml"` (see `MlAdmetCard.tsx` L268-279 for the fallback banner pattern; same pattern in solubility-paired and hERG-paired). DILI-ML and Binding-ML respect the same envelope contract, but their consumers are the cascade gate (`cascadeGate.ts` ML-override paths) and the L2 binding panel respectively, not paired L1 display cards.
+* Inference time and engine string are surfaced in the UI (`model_info.engine` + `model_info.inference_time_ms`) so the user can verify the model is actually running.
+* All training corpora are public / CC-BY 4.0 (TDC, Delaney) or curated literature pairs documented in `*_data.py` files.
+* The cascade gate (`lib/cascadeGate.ts`) tags real-ML outputs as tier `ml` (0.7) — strictly higher than `heuristic` (0.5) or `structural` (0.6), strictly lower than `enriched` (0.8) or `experimental` (0.9, ChEMBL exact match).
+
+**What sections §1–§9 below audit (and what they don't).** The remaining sections audit only pipelines 1–2 (`admet.ts` and `inVitroSim.ts`) — the heuristic engines. Read them as "here is what the rule-based side does and where its numbers stop being defensible". Do **not** read them as "here is what the dashboard does", because the dashboard also shows the real-ML pipeline above on the same screen, and the rule-based numbers are increasingly displayed *paired* with their ML counterparts (with an honest Δ badge) precisely so the user can see when the heuristic disagrees with the trained model.
 
 ---
 
@@ -258,7 +284,7 @@ Notes column for each output is honest ("LogP rules of thumb; no species differe
 - Pharmacophore SMARTS substructure detection.
 - Lipinski violations count.
 - Bioactivation engine (SMARTS scan against curated reactive-metabolite library).
-- ADMET-AI ML predictions (when the ai-service responds with `source==="ml"`).
+- All six real ML models in pipeline 3 — see §0.5 for specs (ADMET-AI v2 GNN ensemble, CardioTox v1 RF, Solubility-ML RF, DILI-ML RF, Binding-ML GBR on Morgan+ESM-2, Protein-ML LR on ESM-2). Outputs are gated on `source === "ml"` in every consumer; `source === "fallback"` renders an explicit unavailable banner rather than silent substitution.
 
 ---
 
