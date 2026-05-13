@@ -2,9 +2,6 @@ import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import hakaseLogo from "@assets/image_1773504202272.png";
 import { NavBar } from "@/components/NavBar";
-import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
-import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
-import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 
 const LAYERS = [
   {
@@ -131,7 +128,6 @@ function AnimatedGrid() {
 
 export function Landing() {
   const [, navigate] = useLocation();
-  const [activeViewer, setActiveViewer] = useState<"cinematic" | "scientific" | "explorer">("cinematic");
 
   return (
     <div className="min-h-screen bg-[#07080c] text-white font-['Inter',sans-serif] overflow-x-hidden">
@@ -548,120 +544,6 @@ export function Landing() {
             </div>
           </div>
 
-        </div>
-      </section>
-
-      {/* ── 3D Viewer — live embedded ── */}
-      <section className="relative z-10 py-20 px-6 border-t border-white/5">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-10">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-4">3D Molecular Visualization</div>
-            <h2 className="text-[36px] font-black tracking-tight text-white mb-3">
-              Three ways to see your molecule
-            </h2>
-            <p className="text-[15px] text-slate-400 max-w-2xl mx-auto">
-              Every viewer is fully interactive — rotate, zoom, switch render modes and inspect atom-level properties without leaving the platform.
-            </p>
-          </div>
-
-          {/* Tab switcher */}
-          <div className="flex justify-center mb-6">
-            <div className="inline-flex items-center gap-1 bg-[#0d0f17] border border-white/10 rounded-2xl p-1.5">
-              {([
-                { key: "cinematic", label: "Cinematic", emoji: "🎬", accent: "violet" },
-                { key: "scientific", label: "Scientific", emoji: "🔬", accent: "blue" },
-                { key: "explorer",  label: "Explorer",  emoji: "🧬", accent: "emerald" },
-              ] as const).map(({ key, label, emoji, accent }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveViewer(key)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
-                    activeViewer === key
-                      ? accent === "violet"
-                        ? "bg-violet-600/25 border border-violet-500/40 text-violet-300 shadow-lg shadow-violet-900/30"
-                        : accent === "blue"
-                        ? "bg-blue-600/25 border border-blue-500/40 text-blue-300 shadow-lg shadow-blue-900/30"
-                        : "bg-emerald-600/25 border border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-900/30"
-                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent"
-                  }`}
-                >
-                  <span>{emoji}</span>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Viewer description strip */}
-          <div className="text-center mb-4 h-8 flex items-center justify-center">
-            {activeViewer === "cinematic" && (
-              <p className="text-[13px] text-slate-500">
-                <span className="text-violet-400 font-medium">Cinematic mode</span> — auto-rotating, presentation-quality rendering with dramatic lighting and molecular surface overlays.
-              </p>
-            )}
-            {activeViewer === "scientific" && (
-              <p className="text-[13px] text-slate-500">
-                <span className="text-blue-400 font-medium">Scientific mode</span> — split-panel layout with atom tables, bond angles, energy breakdown, and protein–ligand contacts.
-              </p>
-            )}
-            {activeViewer === "explorer" && (
-              <p className="text-[13px] text-slate-500">
-                <span className="text-emerald-400 font-medium">Explorer mode</span> — multi-molecule library browser with side-by-side 3D comparison and composite scoring.
-              </p>
-            )}
-          </div>
-
-          {/* Live viewer frame */}
-          <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60" style={{ height: "640px" }}>
-            {/* Browser chrome bar */}
-            <div className="absolute top-0 left-0 right-0 h-9 bg-[#0a0b10]/95 backdrop-blur-sm border-b border-white/8 flex items-center px-4 gap-3 z-20 pointer-events-none">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                <div className="w-3 h-3 rounded-full bg-green-500/50" />
-              </div>
-              <div className="flex-1 mx-4">
-                <div className="mx-auto max-w-xs bg-white/5 border border-white/8 rounded-md px-3 py-1 text-[10px] text-slate-500 font-mono text-center">
-                  hakase.ai / molecular-viewer / {activeViewer}
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
-                  activeViewer === "cinematic" ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
-                  : activeViewer === "scientific" ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                }`}>
-                  ● LIVE
-                </div>
-              </div>
-            </div>
-
-            {/* Viewer content — scrolled down 36px to hide the top bar inside each viewer */}
-            <div className="absolute inset-0 top-9 overflow-hidden">
-              <div style={{ height: "100vh", marginTop: "-0px", pointerEvents: "all" }}>
-                {activeViewer === "cinematic" && <MolViewer3D_Cinematic />}
-                {activeViewer === "scientific" && <MolViewer3D_Scientific />}
-                {activeViewer === "explorer"  && <MolViewer3D_Explorer />}
-              </div>
-            </div>
-
-            {/* Bottom fade gradient */}
-            <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-10"
-              style={{ background: "linear-gradient(to top, #07080c 0%, transparent 100%)" }} />
-          </div>
-
-          {/* Feature chips below viewer */}
-          <div className="flex justify-center gap-3 mt-6 flex-wrap">
-            {[
-              "Ball & Stick", "VDW Surface", "Wireframe", "Space Fill",
-              "Atom Labels", "Atom Selection", "Pharmacophore", "QSAR Docking Estimate",
-            ].map(f => (
-              <div key={f} className="text-[11px] px-3 py-1 rounded-full border border-white/10 text-slate-500 bg-white/3">
-                {f}
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
