@@ -156,12 +156,20 @@ export function Landing() {
             BioDigital Twin.
           </span>
         </h1>
-        <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-8 max-w-3xl mx-auto">
+        <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-4 max-w-3xl mx-auto">
           From SMILES to a sealed, IND-ready handoff — a 100% Zero-Lab In-Silico Cascade across four pre-clinical layers.
+        </p>
+
+        <p className="text-[16px] text-slate-300 font-semibold tracking-tight mb-8 max-w-3xl mx-auto leading-snug">
+          Predict your IND-enabling package <span className="text-white">before</span> you fund the studies. Runway extension, not lab replacement.
         </p>
 
         <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
           Software-only ingestion: in-vitro twin, in-silico + virtual-tissue confirmation, multi-species PBPK animal cohort, and First-In-Human readiness — all governed by HAIOps. No wet-lab dependency in the run path. Source-quality tiered per output — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median). No fake data, no synthetic fallbacks, no silent coercion.
+        </p>
+
+        <p className="text-[13px] text-slate-500 max-w-2xl mx-auto leading-relaxed mb-6 italic">
+          Zero-lab cycle time + regulator-credible evidence + privacy-first moat — the category-defining pre-clinical platform.
         </p>
 
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
@@ -1027,6 +1035,38 @@ export function Landing() {
                     {item}
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Data residency & federated benchmarking */}
+          <div className="mb-12 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-7">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Planned · Opt-in</span>
+              <div className="text-[11px] uppercase tracking-widest text-emerald-500 font-semibold">Data residency & federated benchmarking</div>
+            </div>
+            <h3 className="text-[20px] font-bold text-white mb-3 tracking-tight">Your IN-HOUSE bench data never trains the global engine.</h3>
+            <p className="text-[13px] text-slate-400 leading-relaxed mb-4">
+              IN-HOUSE rows you enter — Cl_int, Papp, fu, Ki, IC50, NOAEL — stay in your tenant's substrate matrix. They never enter another tenant's substrate, never enter the platform's class-median anchor refit, and never train the global engine. Engine recalibration on your IN-HOUSE data produces a <span className="text-white">tenant-scoped overlay</span> only. Your predict-vs-observed track record is private, bound to your tenant ID, and visible only inside your workspace.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4 text-[12px]">
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-4">
+                <div className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold mb-2">Strict, today</div>
+                <ul className="space-y-1.5 text-slate-400 leading-relaxed">
+                  <li>• IN-HOUSE values stay in tenant; never federated</li>
+                  <li>• No global training of any kind, ever</li>
+                  <li>• No leaderboards, no per-tenant rankings</li>
+                  <li>• No federated views of substrate inputs</li>
+                </ul>
+              </div>
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="text-[10px] uppercase tracking-widest text-emerald-400 font-semibold mb-2">Planned, opt-in</div>
+                <ul className="space-y-1.5 text-slate-400 leading-relaxed">
+                  <li>• Aggregate-only fold-error vs. platform corpus</li>
+                  <li>• k-anonymous: ≥ 5 contributing tenants per cell</li>
+                  <li>• Residuals only — never raw inputs, structures, or targets</li>
+                  <li>• 24-hour withdrawal purges your residuals from future aggregates</li>
+                </ul>
               </div>
             </div>
           </div>

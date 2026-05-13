@@ -30,8 +30,14 @@ export function Platform() {
         <h1 className="text-[52px] font-black tracking-tight text-white leading-tight mb-5">
           From SMILES to IND-ready handoff
         </h1>
-        <p className="text-[16px] text-slate-400 max-w-2xl mx-auto">
+        <p className="text-[16px] text-slate-400 max-w-2xl mx-auto mb-5">
           A 100% Zero-Lab In-Silico Cascade — four cascading pre-clinical layers (In Vitro, in-silico + virtual-tissue Confirmation, multi-species PBPK Animal Cohort, First-In-Human Readiness) running entirely in software. Each layer's evidence is sealed and cascaded forward by HAIOps. Source-quality tiered per output. No wet-lab dependency, no fake data, no synthetic fallbacks.
+        </p>
+        <p className="text-[14px] text-slate-300 font-semibold max-w-2xl mx-auto leading-snug mb-2">
+          Predict your IND-enabling package <span className="text-white">before</span> you fund the studies — runway extension, not lab replacement.
+        </p>
+        <p className="text-[12px] text-slate-500 italic max-w-2xl mx-auto">
+          Zero-lab cycle time + regulator-credible evidence + privacy-first moat — the category-defining pre-clinical platform.
         </p>
       </div>
 

@@ -210,6 +210,15 @@ export function IVIVE() {
           </div>
         </div>
 
+        <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex items-start gap-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-[7px] shrink-0" />
+          <div className="text-[12px] text-slate-400 leading-relaxed">
+            <span className="text-emerald-300 font-semibold">Data residency & federated benchmarking · planned, opt-in.</span>{" "}
+            IN-HOUSE bench rows you enter (Cl_int, Papp, fu, Ki, IC50…) stay in your tenant's substrate matrix. They never train the global engine, never enter another tenant's substrate, and never enter the platform's class-median anchor refit. Engine recalibration on your IN-HOUSE rows produces a tenant-scoped overlay only; your predict-vs-observed track record is private and bound to your tenant ID.
+            {" "}A planned <span className="text-white">opt-in federated benchmark</span> will let you compare your engine's fold-error to the platform's overall IN-HOUSE corpus — <span className="text-white">aggregate-only, k-anonymous (≥ 5 contributing tenants per cell), residuals only</span> (predicted/observed fold-error scalars, never raw inputs, structures, targets, or indications), with a one-click withdrawal that purges your residuals from future aggregates within 24 h. Default is off until that gate ships; the current build is strictly tenant-isolated.
+          </div>
+        </div>
+
         <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-start gap-3">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-[7px] shrink-0" />
           <div className="text-[12px] text-slate-400 leading-relaxed">
