@@ -964,6 +964,21 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
+  // Stale-results guard: when the user edits the SMILES away from the value
+  // the L1 simulation was computed for, clear simResults / inVitroResults so
+  // the Directional ADMET radar, organ-risk panels, and dose-response curve
+  // stop showing numbers from the previous compound while the live Lipinski
+  // card (which is recomputed from molProps on every keystroke) shows the new
+  // one. Without this, the radar looks "hardcoded" because it never updates
+  // until the user explicitly clicks Run.
+  useEffect(() => {
+    const current = smiles.trim();
+    if (simResults && simResults.smiles.trim() !== current) {
+      setSimResults(null);
+      setInVitroResults(null);
+    }
+  }, [smiles, simResults]);
+
   // ── Cascade gate (L1 → L2) ───────────────────────────────────────────────
   // Auto-cascade is permitted only when:
   //   (a) compound is not NO-GO,
