@@ -8859,6 +8859,26 @@ function Layer1Results({
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const handleGeneratePdf = async () => {
+    if (pdfGenerating) return;
+    setPdfGenerating(true);
+    try {
+      const { generateLayer1Report } = await import("@/lib/pdfReport");
+      await generateLayer1Report({
+        smiles,
+        indication,
+        molProps: molProps as unknown as Record<string, unknown> | null,
+        simResults: simResults as unknown as Record<string, unknown> | null,
+        inVitroResults: inVitroResults as unknown as Record<string, unknown> | null,
+      });
+    } catch (err) {
+      console.error("[Layer1 PDF] generation failed", err);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   const iv = inVitroResults;
   const goColor = !iv ? "emerald" : iv.overallRisk === "Low" ? "emerald" : iv.overallRisk === "Moderate" ? "yellow" : "red";
@@ -9456,8 +9476,16 @@ function Layer1Results({
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
           <Download className="w-3.5 h-3.5" /> Export PNG
         </Button>
-        <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
-          <FileText className="w-3.5 h-3.5" /> PDF Report
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGeneratePdf}
+          disabled={pdfGenerating || !inVitroResults}
+          className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5 disabled:opacity-50"
+          title={!inVitroResults ? "Run the simulation first" : "Generate PDF report (Claude-authored narrative + charts)"}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          {pdfGenerating ? "Generating…" : "PDF Report"}
         </Button>
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
           <Download className="w-3.5 h-3.5" /> Export JSON
