@@ -8984,7 +8984,19 @@ function Layer1Results({
               </Badge>
             )}
           </div>
-          <svg viewBox="0 0 400 200" className="w-full h-auto">
+          {iv.doseResponse.curve.length === 0 ? (
+            // Anti-fabrication: no synthetic curve when target isn't validated.
+            // Render a compact, informative empty state instead of a giant blank chart.
+            <div className="flex flex-col items-center justify-center py-10 px-4 bg-white/[0.02] rounded-lg border border-white/5">
+              <TrendingUp className="w-8 h-8 text-slate-700 mb-2" />
+              <div className="text-[12px] text-slate-400 font-medium">Dose-response curve unavailable</div>
+              <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
+                No data is fabricated for unvalidated targets. Try a validated UniProt
+                (e.g. <span className="font-mono text-violet-400">P00533</span> · EGFR) to see the curve.
+              </div>
+            </div>
+          ) : (
+          <svg viewBox="0 0 400 200" className="w-full h-auto max-w-[560px] mx-auto block">
             <defs>
               <linearGradient id="drGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
@@ -8999,18 +9011,6 @@ function Layer1Results({
             ))}
             {(() => {
               const pts = iv.doseResponse.curve;
-              // Guard: empty curve (no validated target / sim returned no
-              // dose-response points) previously crashed at pts[pts.length - 1]
-              // with "Cannot read properties of undefined (reading 'concentration')".
-              // Render an in-SVG empty-state label instead, consistent with
-              // the anti-fabrication policy (no synthetic placeholder curve).
-              if (pts.length === 0) {
-                return (
-                  <text x="220" y="100" fill="#64748b" fontSize="10" textAnchor="middle">
-                    Dose-response curve unavailable — no validated target
-                  </text>
-                );
-              }
               const minLog = -2, maxLog = 5;
               const toX = (c: number) => 50 + ((Math.log10(Math.max(0.01, c)) - minLog) / (maxLog - minLog)) * 340;
               const toY = (r: number) => 180 - (r / 100) * 160;
@@ -9034,6 +9034,7 @@ function Layer1Results({
             })()}
             <text x="220" y="198" fill="#64748b" fontSize="8" textAnchor="middle">Concentration (nM, log scale)</text>
           </svg>
+          )}
           <div className="grid grid-cols-4 gap-3">
             {[
               { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "no validated target" },
