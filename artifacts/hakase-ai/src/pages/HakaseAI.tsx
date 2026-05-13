@@ -1427,7 +1427,27 @@ export function HakaseAI() {
   }, [savedProjects]);
 
   const runSimulation = useCallback(async () => {
-    if (!molProps?.isValid) return;
+    // Guard: invalid SMILES previously bailed silently, leaving stale
+    // simResults from the prior compound. The Directional ADMET radar then
+    // looked "hardcoded" because the user had no signal that the run never
+    // executed. Surface an explicit alert so the failure is visible, and
+    // clear stale L1 outputs so downstream panels don't show numbers from
+    // the previous molecule.
+    if (!molProps?.isValid) {
+      // Only alert once RDKit has actually rejected the SMILES (molProps !== null
+      // and isValid === false). While molProps is null we're still in the 250 ms
+      // debounce window — bail silently rather than flash a false-positive error.
+      if (smiles.trim().length > 0 && molProps && molProps.isValid === false) {
+        setSimResults(null);
+        setInVitroResults(null);
+        alert(
+          "SMILES is invalid — RDKit could not parse this structure.\n\n" +
+          "Check the notation (valences, ring closures, aromaticity) and try again. " +
+          "The Directional ADMET radar and other L1 panels will stay empty until a valid SMILES is provided."
+        );
+      }
+      return;
+    }
 
     setSidebarOpen(false);
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
