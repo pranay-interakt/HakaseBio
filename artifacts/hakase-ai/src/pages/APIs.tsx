@@ -265,8 +265,8 @@ const ENGINES: EngineEntry[] = [
     name: "Ex-Vivo Evidence Ingestion",
     color: "blue",
     layer: "Layer 2 — Confirmation Layer (Ex-Vivo Sub-Track)",
-    description: "Structured ingestion of wet-lab confirmation evidence. Promotes source-quality tier to 'measured' — trumps ML and structural tiers in the cascade gate. Every measurement is HAIOps-traceable with operator and protocol provenance.",
-    capabilities: ["Organoid panel result ingestion", "Primary hepatocyte intrinsic clearance (CLint)", "hERG manual patch-clamp IC50", "Microsomal stability (t½, CLint)", "Caco-2 / MDCK permeability", "Source-quality tier promotion (ML/structural → measured)"],
+    description: "Structured ingestion of substrate-side evidence — literature values (DOI / PMID for this compound or a Tanimoto ≥ 0.4 congener) and in-house values (bench / CRO measurement with assay method + lab + date). Promotes the row tier to LITERATURE or IN-HOUSE — both satisfy the IVIVE cross-species rule and trump downstream ML tiers in the cascade gate. Every entry is HAIOps-traceable with operator and provenance.",
+    capabilities: ["Literature substrate ingestion (CVCL accession + DOI/PMID)", "In-house substrate ingestion (CVCL + bench/CRO IC50 + assay method)", "fu_p, fu_mic, B/P substrate cells across 5 species", "Class-median fallback (Lombardo 2018 / Smith 2010) with explicit CLASS-MEDIAN tagging", "Source-quality tier promotion (ML/structural → literature or in-house)"],
   },
   {
     name: "Animal Cohort PBPK Engine",

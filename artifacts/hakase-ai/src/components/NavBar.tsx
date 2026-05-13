@@ -39,7 +39,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     { label: "Overview",                              sub: "Pre-clinical pipeline, end-to-end",                          anchor: "",        route: "",            color: "violet"  },
     { label: "Layer 1 — In Vitro Twin",               sub: "RDKit · ADMET · Binding · Cascade Gate",                     anchor: "#layer1", route: "",            color: "violet"  },
     { label: "Layer 2 — Confirmation Layer",          sub: "Docking · FEP · ML cross-check · PBPK · QSP/PD · Ex-Vivo",   anchor: "#layer2", route: "",            color: "blue"    },
-    { label: "IVIVE Bridge",                          sub: "In-silico → animal cohort · wet-lab substrate · sealed sign-off", anchor: "",   route: "/ivive",      color: "blue"    },
+    { label: "IVIVE Bridge",                          sub: "In-silico → animal cohort · literature + in-house substrate · sealed sign-off", anchor: "",   route: "/ivive",      color: "blue"    },
     { label: "Layer 3 — Animal Cohort",               sub: "Multi-species PBPK · Formulation · NOAEL · Allometric",      anchor: "#layer3", route: "",            color: "amber"   },
     { label: "Layer 4 — First-In-Human Readiness",    sub: "MABEL · IND gate · Phase 1 Planner · Sealed Handoff",        anchor: "#layer4", route: "",            color: "emerald" },
     { label: "Regulatory Intelligence",               sub: "IND-enabling · FDA Designations · Pre-IND meetings",         anchor: "",        route: "/regulatory", color: "blue"    },
@@ -81,7 +81,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
     },
     {
       label: "IVIVE Bridge",
-      sub: "In-silico → animal cohort gate · wet-lab matrix · Obach 1999 · sealed sign-off",
+      sub: "In-silico → animal cohort gate · substrate matrix · Obach 1999 · sealed sign-off",
       route: "/ivive",
       color: "blue",
       icon: (

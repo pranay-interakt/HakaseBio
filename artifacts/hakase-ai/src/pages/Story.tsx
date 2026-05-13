@@ -100,7 +100,7 @@ export function Story() {
               Before a pilot flies a real plane, they spend hundreds of hours in a flight simulator. The simulator doesn't replace real flying — but it tells you whether this pilot, in this plane, on this route, is likely to succeed. And it does it without risking a single life or a dollar on jet fuel.
             </p>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              Our platform does the same for the pre-clinical journey. A scientist types in a molecule and a target, and four cascading layers walk it from in-vitro screen through to a sealed, IND-ready handoff — every output tagged with how it was produced (heuristic, structural, ML, or literature-curated), every override logged.
+              Our platform does the same for the pre-clinical journey. A scientist types in a molecule and a target, and four cascading layers walk it from in-vitro screen through to a sealed, IND-ready handoff — every output tagged with how it was produced (heuristic, structural, ML, literature, in-house, or class-median anchor), every override logged.
             </p>
 
             <div className="space-y-4">
@@ -283,7 +283,7 @@ export function Story() {
               What the BioDigital Twin actually computes
             </h2>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              Four cascading pre-clinical layers. RDKit.js (WASM) for cheminformatics in the browser; an isolated AI Service for ML inference (fingerprints only, never SMILES); RunPod GPU for opt-in FEP. Every output tagged with a source-quality tier — heuristic / structural / ML / literature-curated. HAIOps governs the cascade gate; the clinician-in-the-loop owns every override.
+              Four cascading pre-clinical layers. RDKit.js (WASM) for cheminformatics in the browser; an isolated AI Service for ML inference (fingerprints only, never SMILES); RunPod GPU for opt-in FEP. Every output tagged with a source-quality tier — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median). HAIOps governs the cascade gate; the clinician-in-the-loop owns every override.
             </p>
 
             {/* Layer 1 */}
@@ -315,7 +315,7 @@ export function Story() {
               <div className="mt-4 rounded-lg border border-white/8 bg-white/2 p-4">
                 <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Source-Quality Tiers</div>
                 <div className="text-[12px] text-slate-400 leading-relaxed">
-                  Descriptors: <span className="text-emerald-400 font-medium">structural</span> (RDKit). ADMET: <span className="text-blue-400 font-medium">ML</span> with QSAR cross-check. Binding: <span className="text-blue-400 font-medium">ML</span> when validated, <span className="text-amber-400 font-medium">heuristic</span> with explicit flag when not. Literature-curated overrides (cited CVCL/published IC50) promote tier to <span className="text-emerald-400 font-medium">literature-curated</span> and trump downstream ML.
+                  Descriptors: <span className="text-emerald-400 font-medium">structural</span> (RDKit). ADMET: <span className="text-blue-400 font-medium">ML</span> with QSAR cross-check. Binding: <span className="text-blue-400 font-medium">ML</span> when validated, <span className="text-amber-400 font-medium">heuristic</span> with explicit flag when not. Substrate overrides — <span className="text-emerald-400 font-medium">literature</span> (DOI/PMID + CVCL) or <span className="text-emerald-400 font-medium">in-house</span> (bench/CRO with assay method) — promote the row tier and trump downstream ML.
                 </div>
               </div>
             </div>
@@ -340,7 +340,7 @@ export function Story() {
                   ["In-Silico · Stage 5 — FEP Free-Energy Refinement (opt-in)", "Alchemical FEP on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the gate calls for it. Tier: physics."],
                   ["In-Silico · Stage 6-8 — Pharmacology Projection", "PBPK projection (compartmental ODE) → QSP/PD coupling → therapeutic-index ranking. The PBPK output seeds L3, the TI ranking seeds the L4 dose conversation."],
                   ["In-Silico · Stage 9 — Sealed Block", "ConfirmationLayerPanel seals a v2.0.0 ConfirmationEvidenceBlock with the L1 EvidencePointer baked in. Re-runs require explicit unseal — no silent recomputation."],
-                  ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation: GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas (480 cell types × 28 organs) + DepMap PRISM. No physical tissue, no organ-on-chip vendor dependency. Literature-curated overrides promote tier to 'literature-curated' — trumps ML and structural in the cascade gate."],
+                  ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation: GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas (480 cell types × 28 organs) + DepMap PRISM 24Q2. No physical tissue, no organ-on-chip vendor dependency. Substrate overrides — literature (CVCL + DOI/PMID) or in-house (bench/CRO with assay method) — promote the row tier and trump downstream ML in the cascade gate."],
                 ].map(([title, desc]) => (
                   <div key={title as string} className="rounded-lg border border-blue-500/10 bg-blue-500/4 p-4">
                     <div className="text-[12px] font-semibold text-blue-300 mb-1">{title}</div>

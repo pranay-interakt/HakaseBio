@@ -22,7 +22,7 @@ interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
   simResults: SimResults | null;
   inVitroResults: InVitroResults | null;
-  /** P0 IVIVE wet-lab inputs (cross-species fu_p, fu_mic, B/P).
+  /** P0 IVIVE substrate inputs (cross-species fu_p, fu_mic, B/P).
    *  When supplied, human values are merged into the L2 params right before
    *  invoking the pipeline — form overrides still win. */
   ivieInputs?: IvieWetLabInputs;
@@ -431,7 +431,7 @@ function MiniLineChart({ data, xKey, yKey, color, height = 80 }: {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, ivieInputs, onContinue, onComplete, onProjectionReady }: Layer2InSilicoScaffoldProps) {
-  // Merge IVIVE wet-lab inputs into L2 params at run-time.
+  // Merge IVIVE substrate inputs into L2 params at run-time.
   // Precedence: explicit form override > IVIVE measured value > L1 fallback.
   const mergeIvie = (p: L2InputParams): L2InputParams => {
     if (!ivieInputs) return p;

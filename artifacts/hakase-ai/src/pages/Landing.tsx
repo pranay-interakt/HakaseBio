@@ -161,7 +161,7 @@ export function Landing() {
         </p>
 
         <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
-          Software-only ingestion: in-vitro twin, in-silico + virtual-tissue confirmation, multi-species PBPK animal cohort, and First-In-Human readiness — all governed by HAIOps. No wet-lab dependency in the run path. Source-quality tiered per output (heuristic / structural / ML / literature-curated). No fake data, no synthetic fallbacks, no silent coercion.
+          Software-only ingestion: in-vitro twin, in-silico + virtual-tissue confirmation, multi-species PBPK animal cohort, and First-In-Human readiness — all governed by HAIOps. No wet-lab dependency in the run path. Source-quality tiered per output — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median). No fake data, no synthetic fallbacks, no silent coercion.
         </p>
 
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
@@ -410,7 +410,7 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · In Vitro Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Is this molecule worth confirming?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    RDKit.js (WASM) computes descriptors in the browser; ML-augmented ADMET adds confidence intervals; a validated-target binding estimate and organ-tox cascade feed the HAIOps cascade gate. Output: GO / WATCH / NO-GO with a source-quality tier (heuristic / structural / ML / literature-curated) per output, plus an EvidencePointer that L2 freezes at Stage 0.
+                    RDKit.js (WASM) computes descriptors in the browser; ML-augmented ADMET adds confidence intervals; a validated-target binding estimate and organ-tox cascade feed the HAIOps cascade gate. Output: GO / WATCH / NO-GO with a source-quality tier per output (heuristic / structural / ML on the computed side; literature / in-house / class-median on the substrate side), plus an EvidencePointer that L2 freezes at Stage 0.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">

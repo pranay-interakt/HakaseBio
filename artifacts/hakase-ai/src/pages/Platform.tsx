@@ -113,7 +113,7 @@ export function Platform() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              Type a SMILES string and a UniProt target. RDKit.js (WebAssembly) runs the cheminformatics in your browser. ML-augmented ADMET, validated-target binding, organ-tox cascade, and a HAIOps cascade gate produce a verdict in seconds — every output tagged with its source-quality tier (heuristic / structural / ML / literature-curated).
+              Type a SMILES string and a UniProt target. RDKit.js (WebAssembly) runs the cheminformatics in your browser. ML-augmented ADMET, validated-target binding, organ-tox cascade, and a HAIOps cascade gate produce a verdict in seconds — every output tagged with its source-quality tier — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median).
             </p>
             <div className="space-y-3">
               {[
@@ -163,7 +163,7 @@ export function Platform() {
                 ["Stage 5 · FEP Free-Energy Refinement", "Optional alchemical free-energy perturbation on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the gate calls for it."],
                 ["Stages 6–8 · Pharmacology Projection", "PBPK projection → QSP/PD coupling → therapeutic-index ranking. The PBPK projection seeds L3, the TI ranking seeds the L4 dose conversation."],
                 ["Stage 9 · Sealed Confirmation Block", "ConfirmationLayerPanel seals a v2.0.0 ConfirmationEvidenceBlock with the L1 EvidencePointer baked in. Re-runs require explicit unseal — no silent recomputation."],
-                ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation. Maps L1 + L2 outputs against GTEx tissue-expression baselines and Tabula Sapiens v2 cell-type atlas. Optional manual entry for literature-curated values (CVCL accession + citation) promotes tier to 'literature-curated' in the cascade gate."],
+                ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation. Maps L1 + L2 outputs against GTEx tissue-expression baselines and Tabula Sapiens v2 cell-type atlas. Optional manual entry for literature (CVCL + DOI/PMID) or in-house (bench / CRO with assay method) values promotes the row tier in the cascade gate."],
               ].map(([title, desc]) => (
                 <div key={title} className="rounded-xl border border-blue-500/10 bg-blue-500/4 p-4">
                   <div className="text-[11px] font-semibold text-blue-300 mb-1">{title}</div>
@@ -211,15 +211,22 @@ export function Platform() {
           <h3 className="text-[22px] font-black tracking-tight text-white mb-2">IVIVE — the gate that decides whether animal studies are warranted.</h3>
           <p className="text-[13px] text-slate-400 leading-relaxed max-w-3xl mb-5">
             The sealed in-silico confirmation block holds docking, FEP, ML cross-checks, and a first-pass PBPK projection —
-            but it cannot, by itself, justify an animal cohort. The IVIVE gate captures the literature-curated PK substrate (fu_p · fu_mic · B/P
-            across human + preclinical species), assesses the tier, applies the Obach 1999 correction inside a well-stirred liver
+            but it cannot, by itself, justify an animal cohort. The IVIVE gate captures the PK substrate matrix (fu_p · fu_mic · B/P
+            across human + preclinical species, tagged LITERATURE / IN-HOUSE / CLASS-MEDIAN per cell), assesses the tier, applies the Obach 1999 correction inside a well-stirred liver
             model, and requires explicit sign-off before animal-cohort study design is unlocked.
           </p>
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 mb-5 flex items-start gap-2 max-w-3xl">
+            <div className="w-1 h-1 rounded-full bg-amber-400 mt-[7px] shrink-0" />
+            <div className="text-[11px] text-slate-400 leading-relaxed">
+              <span className="text-amber-300 font-semibold">Transition note · current release.</span> The in-app IVIVE cell badge still reads
+              <span className="font-mono text-white"> MEASURED</span> for both LITERATURE and IN-HOUSE inputs; the per-cell schema split that surfaces the distinction in the dashboard is a planned follow-up. The cross-species rule and sealed substrate-mode tag already use the new ladder.
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
             {[
               { tag: "Inputs",   val: "3 × 5 matrix",       sub: "fu_p · fu_mic · B/P · 5 species" },
               { tag: "Tiers",    val: "4 levels",           sub: "Insufficient → Minimum → Standard → Premium" },
-              { tag: "Rule",     val: "Cross-species",      sub: "Human + ≥1 preclinical · literature-curated + virtual-tissue" },
+              { tag: "Rule",     val: "Cross-species",      sub: "Human + ≥1 preclinical · LITERATURE or IN-HOUSE (class-median fallback excluded)" },
               { tag: "Handoff",  val: "Sealed sign-off",    sub: "Substrate mode propagated downstream" },
             ].map(({ tag, val, sub }) => (
               <div key={tag} className="rounded-xl border border-white/8 bg-white/[0.02] p-3">

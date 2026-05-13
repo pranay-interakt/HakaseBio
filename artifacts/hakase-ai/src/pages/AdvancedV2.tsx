@@ -51,7 +51,7 @@ const LAYERS = [
       {
         label: "Ex-Vivo Evidence Ingestion",
         status: "planned",
-        desc: "Structured ingestion of organoid panels, primary hepatocyte CLint, hERG patch-clamp, and microsomal stability. Promotes source-quality tier to 'measured' — trumps ML and structural in the cascade gate.",
+        desc: "Structured override path for substrate-side evidence: literature (DOI/PMID for this compound or a Tanimoto ≥ 0.4 congener) and in-house (bench / CRO measurement with assay method + lab + date). Promotes the row tier to LITERATURE or IN-HOUSE — both satisfy the IVIVE cross-species rule and trump downstream ML in the cascade gate.",
       },
     ],
   },

@@ -38,8 +38,11 @@ export interface IvieHandoffSignOff {
   signedAt: string; // ISO
   /** Substrate mode at the moment of sign-off — captured for the audit
    *  trail so L3 study design + L4 FIH can tag derived outputs with the
-   *  correct confidence band. "auto-estimated" or "mixed" implies the
-   *  user explicitly acknowledged proceeding on literature midpoints. */
+   *  correct confidence band. "auto-estimated" (= class-median) or "mixed"
+   *  implies the user explicitly acknowledged proceeding on
+   *  Lombardo / Smith drug-class anchors instead of LITERATURE / IN-HOUSE evidence.
+   *  (Enum value names retained pre-schema-rewrite; display strings already use
+   *  the LITERATURE / IN-HOUSE / CLASS-MEDIAN ladder.) */
   substrateMode: IvieSubstrateMode;
 }
 
@@ -65,7 +68,7 @@ interface SafetyFlagLike {
 
 interface Props {
   ivieInputs: IvieWetLabInputs;
-  /** Editable on this page — wet-lab substrate is now captured at the
+  /** Editable on this page — substrate matrix is now captured at the
    *  L2 → L3 handoff (was previously inside the L2 Confirmation page). */
   onIvieInputsChange: (next: IvieWetLabInputs) => void;
   simResults: SimResultsLike | null;
@@ -152,9 +155,9 @@ function buildAlerts(
     });
   }
   // Cross-species rule logic now branches on substrate mode:
-  //   • Measured rule satisfied → no alert.
-  //   • Estimated cells close the gap → "auto-substrate acknowledgment" warn
-  //     (the user MUST tick the box that they're proceeding on literature
+  //   • LITERATURE / IN-HOUSE rule satisfied → no alert.
+  //   • Class-median cells close the gap → "class-median acknowledgment" warn
+  //     (the user MUST tick the box that they're proceeding on Lombardo / Smith
   //     midpoints; the substrate mode is captured in the sign-off payload).
   //   • Neither satisfies → original "cross-species rule unmet" warn.
   if (!tierA.crossSpeciesRuleSatisfied && tierA.tier !== "Insufficient") {
@@ -162,15 +165,15 @@ function buildAlerts(
       alerts.push({
         id: "ivie-auto-substrate",
         level: "warn",
-        title: "Auto-substrate in use — measured cross-species data missing",
-        detail: "One or more cells are literature midpoints (AUTO), not CRO measurements. Acknowledge that L3 study design + L4 FIH dose will be tagged 'estimated substrate' in the audit trail and cannot be used for IND submission without re-running on measured data.",
+        title: "Class-median substrate in use — LITERATURE or IN-HOUSE cross-species data missing",
+        detail: "One or more cells are Lombardo / Smith drug-class anchors, not LITERATURE (DOI/PMID for this compound or Tanimoto ≥ 0.4 congener) or IN-HOUSE (bench / CRO with assay method + lab + date) values. Acknowledge that L3 study design + L4 FIH dose will be tagged 'class-median substrate' in the audit trail and cannot be used for IND submission without re-running on LITERATURE or IN-HOUSE data.",
       });
     } else {
       alerts.push({
         id: "ivie-cross-species",
         level: "warn",
         title: "Cross-species rule unmet",
-        detail: "fu_p AND B/P each need human + ≥1 preclinical species. Without it the species translation in L3 is a best guess, not an evidence-based design. Tip: use 'Auto-fill empty cells' below if you need to proceed without CRO data — it will require explicit acknowledgment.",
+        detail: "fu_p AND B/P each need human + ≥1 preclinical species (LITERATURE or IN-HOUSE). Without it the species translation in L3 is a best guess, not an evidence-based design. Tip: use 'Auto-fill empty cells' below if you need to proceed without LITERATURE or IN-HOUSE data — the resulting CLASS-MEDIAN substrate will require explicit acknowledgment.",
       });
     }
   }
@@ -291,7 +294,7 @@ export function IvieOutputHandoffPage({
             <p className="text-[12px] text-slate-300/80 max-w-[820px]">
               Final review before initiating L3 Animal Cohort study design. All evidence
               produced by L1 In-Vitro and L2 Confirmation is summarised below alongside
-              the IVIVE wet-lab substrate. Hard blocks must be cleared upstream; soft
+              the IVIVE substrate matrix. Hard blocks must be cleared upstream; soft
               warnings require explicit client acknowledgment.
             </p>
           </div>
@@ -337,7 +340,7 @@ export function IvieOutputHandoffPage({
                 : <span className="text-slate-500">L1 has not been run.</span>}
             </div>
 
-            {/* ── L1 IVIVE Output — wet-lab numerics consumed by IVIVE ───── */}
+            {/* ── L1 IVIVE Output — substrate numerics consumed by IVIVE ───── */}
             {inVitroResults ? (
               <div className="mt-3 pt-3 border-t border-violet-500/15">
                 <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
@@ -512,15 +515,15 @@ export function IvieOutputHandoffPage({
             )}
           </div>
 
-          {/* IVIVE wet-lab substrate — editable here (moved out of L2 Confirmation
+          {/* IVIVE substrate matrix — editable here (moved out of L2 Confirmation
               so the substrate is captured at the L2 → L3 handoff). Status chip
               above the panel reflects current cross-species rule + completion. */}
           <div>
             <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-2">
                 <Microscope className="w-4 h-4 text-cyan-300" />
-                <h3 className="text-[13px] font-semibold text-white">IVIVE Wet-Lab Substrate</h3>
-                <span className="text-[10.5px] text-slate-500">— enter what your CRO returned</span>
+                <h3 className="text-[13px] font-semibold text-white">IVIVE Substrate Matrix</h3>
+                <span className="text-[10.5px] text-slate-500">— enter LITERATURE or IN-HOUSE values</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
@@ -530,17 +533,17 @@ export function IvieOutputHandoffPage({
                 }`}>
                   Cross-species rule: {tierA.crossSpeciesRuleSatisfied ? "MET" : "UNMET"}
                 </span>
-                {/* Substrate mode chip — visible whenever any cell is auto. */}
+                {/* Substrate mode chip — visible whenever any cell falls back to a class-median anchor. */}
                 {substrateMode !== "measured" && (
                   <span
                     title={
                       substrateMode === "auto-estimated"
-                        ? "All IVIVE values are literature midpoints (auto-filled from species defaults). No CRO measurements provided. Sign-off will record this in the audit trail."
-                        : "Some IVIVE values are CRO-measured and some are literature midpoints (auto-filled). Sign-off will record the breakdown in the audit trail."
+                        ? "All IVIVE cells use Lombardo / Smith drug-class medians (CLASS-MEDIAN substrate). No LITERATURE or IN-HOUSE values entered. Sign-off will record this in the audit trail."
+                        : "Mixed substrate — some cells are LITERATURE or IN-HOUSE, others are Lombardo / Smith CLASS-MEDIAN anchors. Sign-off will record the breakdown in the audit trail."
                     }
                     className="px-2 py-0.5 rounded text-[10px] font-bold border bg-orange-500/15 text-orange-300 border-orange-500/40"
                   >
-                    AUTO-FILLED VALUES
+                    {substrateMode === "auto-estimated" ? "CLASS-MEDIAN" : "MIXED SUBSTRATE"}
                   </span>
                 )}
                 <span className="text-[10px] text-slate-500">

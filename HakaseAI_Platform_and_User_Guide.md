@@ -49,17 +49,28 @@ These are not aspirations; they are enforced in code and surfaced in the UI.
 ### Anti-fabrication
 - Empty / unrunnable values render as **`—`**, never `0`, never a literature midpoint.
 - No silent fallbacks. When a database degrades (UniProt, ChEMBL, BindingDB, AlphaFold, GTEx, Tabula Sapiens, etc.), the **External Validation Sources Unavailable** banner appears and explicitly states no values were injected.
-- Auto-substrate (e.g. Lombardo 2018 / Smith 2010 fu_p anchors in IVIVE) is allowed only behind explicit `AUTO` pills and a substrate-mode tag that propagates downstream.
+- Class-median substrate (e.g. Lombardo 2018 / Smith 2010 fu_p anchors in IVIVE) is allowed only behind explicit `CLASS-MEDIAN` pills and a substrate-mode tag that propagates downstream.
 
 ### Source-quality tiered evidence
-Every output ships with one of four tier badges, surfaced everywhere a number appears:
+Every output ships with a tier badge, surfaced everywhere a number appears. The ladder splits into a *computed* side and a *substrate* side because the regulatory weight of "computed by us" vs "anchored against external evidence" is fundamentally different.
+
+**Computed-side tiers** (platform-generated):
 
 | Tier | Meaning |
 |---|---|
 | `HEURISTIC` | Rule- or descriptor-based. Lowest confidence; below most stage-gate thresholds. |
 | `STRUCTURAL` | Derived from validated structural rules (e.g. Lipinski, structural alerts). |
-| `ML` | A trained model with disclosed corpus + version (Chemprop, DeepDTA, Cardiotox-ML, DILI-ML, …). |
-| `MEASURED` | Wet-lab measured values entered into the platform. Only tier that satisfies the IVIVE cross-species defensibility rule. |
+| `ML` | A pre-trained model with disclosed corpus + version (ESM2, Chemprop, DeepDTA, Cardiotox-ML, DILI-ML, Drug2cell + Tabula Sapiens v2, DepMap PRISM 24Q2, …). |
+
+**Substrate-side tiers** (external evidence anchored to *this* compound or its class):
+
+| Tier | Meaning |
+|---|---|
+| `LITERATURE` | Published value with DOI / PMID for this exact compound or a sufficiently-similar congener (Tanimoto ≥ 0.4). Sources: FDA Drug Approval Packages, DrugBank PK panel, PK-DB, Open TG-GATEs, eTRANSAFE, primary literature. **Satisfies** the IVIVE cross-species defensibility rule. |
+| `IN-HOUSE` | Bench / CRO measurement supplied by the operating team, with assay method + lab + date. **Satisfies** the IVIVE cross-species defensibility rule. |
+| `CLASS-MEDIAN` | Drug-class median anchor (Lombardo 2018 fu_p, Smith 2010 PPB). Keeps downstream math runnable but does **not** satisfy the cross-species rule. |
+
+> **Transition note.** In this release the in-app IVIVE cell badge still reads `MEASURED` for both LITERATURE and IN-HOUSE inputs; the schema split that exposes the distinction per cell is a planned follow-up. Marketing surfaces and the cross-species rule already use the new ladder.
 
 ### Cascade gates and overrides
 - The **Cascade Gate** (L1 → L3) blocks any compound whose verdict is `NO-GO`, whose safety key falls below 0.6, or whose non-safety average falls below 0.6.
@@ -205,9 +216,9 @@ The right pane renders, in order:
 
 > **Goal.** Reconcile L1 in-silico predictions against ex-vivo measurements, run a structured falsifier check, allow authorised overrides, and seal a `ConfirmationEvidenceBlock` that L3 and L4 can cite.
 
-L2 is split into two parallel **sub-tracks** (toggled via pill buttons), with a compact **Confirmation Orchestrator** strip rendered above them. Above both sits the **IVIVE Wet-Lab Inputs** panel (orchestrator-level — both sub-tracks consume it).
+L2 is split into two parallel **sub-tracks** (toggled via pill buttons), with a compact **Confirmation Orchestrator** strip rendered above them. Above both sits the **IVIVE Substrate Inputs** panel (orchestrator-level — both sub-tracks consume it).
 
-### 6.1 IVIVE Wet-Lab Inputs (the matrix)
+### 6.1 IVIVE Substrate Inputs (the matrix)
 
 The orchestrator-level panel captures the cross-species measurements the IVIVE math needs *before* either sub-track runs. The matrix persists to local storage so users do not re-enter it between sessions.
 
@@ -257,9 +268,9 @@ Compact strip above the sub-track tabs. Collapsed by default; force-expandable f
 
 Workflow:
 
-1. **Emit Pre-Confirmation Directive** — binds in-silico predictions to required ex-vivo assays. Predicted central values come from L1 in-silico evidence (null-when-missing); hERG prefers measured in-vitro IC50 over the ML-derived proxy.
-2. **Enter Ex-Vivo Measurements** — defaults: primary hepatocyte clearance (mL/min/kg), CYP3A4 inhibition IC50 (µM), BSEP inhibition (µM), hERG patch-clamp (µM), primary cellular dose-response (fold).
-3. **Falsifier check** — runs the falsifier registry (e.g. `FX-CLEARANCE-OVERPREDICT` if measured > 3× predicted).
+1. **Emit Pre-Confirmation Directive** — binds in-silico predictions to the substrate fields the orchestrator expects. Predicted central values come from L1 in-silico evidence (null-when-missing); the hERG field prefers a LITERATURE or IN-HOUSE IC50 over the ML-derived proxy.
+2. **Enter Substrate Measurements** — fields: hepatocyte CL_int (mL/min/kg), CYP3A4 inhibition IC50 (µM), BSEP inhibition IC50 (µM), hERG IC50 (µM), cellular dose-response (fold). Each field accepts LITERATURE (DOI/PMID for this compound or Tanimoto ≥ 0.4 congener), IN-HOUSE (operator-supplied with assay method + lab + date), or CLASS-MEDIAN (Lombardo/Smith fallback) — tagged per cell.
+3. **Falsifier check** — runs the falsifier registry (e.g. `FX-CLEARANCE-OVERPREDICT` if the substrate value > 3× the in-silico prediction).
 4. **Override authoring** — files an `OverrideRecord` citing actor, role (e.g. `PreClinicalSafetyReviewer`, `ProgramLead`), and authority (e.g. `AKTHealth-SOP-PCS-007#§3.4`).
 5. **Joint-output synthesis** — merges ML and kinetic evidence into `agree | disagree | partial | mlGap` states across the five joint outputs (CYP transporter, clearance fractions, dose response, off-target, hERG-PBPK projection).
 6. **Seal** — emits the `ConfirmationEvidenceBlock`. Required: directive must exist, ex-vivo measurements must be entered, every unhandled trigger must have a matching override.
@@ -270,7 +281,7 @@ The sealed block carries `gateStatus: passed | overridden | failed`, an emitted-
 
 ## 7. The IVIVE Gate
 
-The IVIVE page (`/ivive`) is the marketing/spec surface for the standalone gate that sits between L2 confirmation and L3 animal-cohort design. The in-app implementation is the IVIVE Wet-Lab Inputs panel (§6.1) plus the well-stirred clearance scaler that consumes it.
+The IVIVE page (`/ivive`) is the marketing/spec surface for the standalone gate that sits between L2 confirmation and L3 animal-cohort design. The in-app implementation is the IVIVE Substrate Inputs panel (§6.1) plus the well-stirred clearance scaler that consumes it.
 
 ### 7.1 The four-tier ladder
 
@@ -280,18 +291,19 @@ The tier is **deterministic** from the matrix — no judgement calls.
 |---|---|---|
 | **Insufficient** | No `fu_p (human)` | Hard block. IVIVE math cannot start; the bridge to animal-cohort design is closed until at least the human plasma binding is on the bench. |
 | **Minimum** | `fu_p (human)` only | IVIVE math runs, but cross-species extrapolation is undefended. Animal-cohort design is allowed only with explicit sign-off acknowledging the gap. |
-| **Standard** | `fu_p` (human + mouse + rat) AND `B/P` (human + ≥ 1 preclinical) | Tier ladder satisfied. Auto-substrate is allowed; cross-species defensibility is evaluated separately. |
+| **Standard** | `fu_p` (human + mouse + rat) AND `B/P` (human + ≥ 1 preclinical) | Tier ladder satisfied. Class-median cells are allowed at this level; cross-species defensibility is evaluated separately. |
 | **Premium** | Standard + `fu_mic` (human + ≥ 1 preclinical) | Full Obach-correction substrate. The highest tier the ladder reports; the confidence band the L4 MABEL projection pulls through. |
 
 ### 7.2 Cross-species defensibility flag (independent of tier)
 
-Standard / Premium can be *reached* with auto-estimated cells, but the green defensibility flag only flips when **measured** cells satisfy the rule (`fu_p` AND `B/P` each have human + ≥ 1 preclinical species). Auto-estimated cells from Lombardo 2018 / Smith 2010 anchors keep downstream math runnable but do not satisfy the rule.
+Standard / Premium can be *reached* with class-median cells, but the green defensibility flag only flips when **LITERATURE** or **IN-HOUSE** cells satisfy the rule (`fu_p` AND `B/P` each have human + ≥ 1 preclinical species). Class-median cells from Lombardo 2018 / Smith 2010 anchors keep downstream math runnable but do not satisfy the rule.
 
 ### 7.3 Math anchors
 
-- **Obach 1999** — `CL_int_corrected = CL_int_measured / fu_mic`
-- **Lombardo 2018** — `fu_p` drug-class medians, auto-substrate anchor
-- **Smith 2010** — plasma protein binding review, auto-substrate anchor
+- **Obach 1999** — `CL_int_corrected = CL_int_measured / fu_mic` (also a 29-compound IVIVE benchmark for engine recalibration)
+- **Hosea 2009 / Wang 2010** — extended IVIVE benchmark sets · validates beyond Obach's 29
+- **Lombardo 2018** — `fu_p` drug-class medians · CLASS-MEDIAN substrate anchor
+- **Smith 2010** — plasma protein binding review · CLASS-MEDIAN substrate anchor
 - **ICH M3(R2)** — allometric scaling and species selection conventions
 
 ### 7.4 Hard blocks, soft warns, info
@@ -299,12 +311,12 @@ Standard / Premium can be *reached* with auto-estimated cells, but the green def
 | Class | Items | Behaviour |
 |---|---|---|
 | **Hard blocks** | In-vitro twin not run · L1 verdict NO-GO · Insufficient tier (no human fu_p) | Cannot be acknowledged away. Block release to L3. |
-| **Soft warns** | In-silico ConfirmationBlock not yet sealed · cross-species rule met only with estimates · substrate mode auto-estimated or mixed · HAIOps safety flag with `reviewRequired` | Per-alert acknowledgment required at sign-off. |
+| **Soft warns** | In-silico ConfirmationBlock not yet sealed · cross-species rule met only with class-median estimates · substrate mode class-median or mixed · HAIOps safety flag with `reviewRequired` | Per-alert acknowledgment required at sign-off. |
 | **Info** | `ivie-no-fumic` (Obach correction skipped because `fu_mic` is missing) | Tracked through to provenance but does not gate sign-off. |
 
 ### 7.5 Sign-off payload
 
-Captured per release: name + role + ISO timestamp · justification text · acknowledged alert IDs · substrate mode (`measured` / `auto-estimated` / `mixed`). Tamper-evident; consumed by L3 animal-cohort design and L4 FIH MABEL projection. A run sealed on auto-substrate is **not** silently identical to a run sealed on measured substrate — the substrate mode tag rides through to the IND-enabling package.
+Captured per release: name + role + ISO timestamp · justification text · acknowledged alert IDs · substrate mode (`literature` / `in-house` / `class-median` / `mixed`). Tamper-evident; consumed by L3 animal-cohort design and L4 FIH MABEL projection. A run sealed on class-median substrate is **not** silently identical to a run sealed on literature or in-house substrate — the substrate mode tag rides through to the IND-enabling package.
 
 ---
 
@@ -334,7 +346,7 @@ The cohort sim consumes the L1 ADMET fields (`lipinski.{MW, LogP, HBD, TPSA}`, `
 - **HED (PBPK-refined)** — BSA HED × PBPK clearance correction.
 - **Proposed FIH dose** — `min(HED) / 10`.
 
-> **Known propagation gap.** The cohort sim today consumes L1 ADMET only. The L2 ConfirmationBlock (Kd, PBPK CL, measured permeability, joint outputs) and the IVIVE substrate-mode tag are surfaced on screen via the L2 Confirmation Inputs panel but are not yet wired into the NOAEL/MTD/HED math. This is documented as the next major step.
+> **Known propagation gap.** The cohort sim today consumes L1 ADMET only. The L2 ConfirmationBlock (Kd, PBPK CL, permeability, joint outputs) and the IVIVE substrate-mode tag are surfaced on screen via the L2 Confirmation Inputs panel but are not yet wired into the NOAEL/MTD/HED math. This is documented as the next major step.
 
 ### 8.3 Reading the results
 
@@ -404,7 +416,7 @@ The page documents *how* the platform is allowed to ship a verdict. Five pillars
 | 2 | **Regulatory Audit Trail** | Every override (Stage-Gate, IVIVE, Confirmation) persisted with actor + role + justification + authority citation. |
 | 3 | **Patient Safety Surveillance** | Safety Flag Cascade — flags raised upstream are *never* cleared downstream. |
 | 4 | **Compliance Monitoring** | Codified rules engine for ICH / FDA mappings. |
-| 5 | **Confidence Scoring** | Source-quality tiers (HEURISTIC / STRUCTURAL / ML / MEASURED) propagate everywhere. |
+| 5 | **Confidence Scoring** | Source-quality tiers propagate everywhere. Computed-side: HEURISTIC / STRUCTURAL / ML. Substrate-side: LITERATURE / IN-HOUSE / CLASS-MEDIAN. |
 
 The page also renders Safety Flag Cascade, AI Model Governance, Model Lifecycle, Clinician-in-the-Loop Design, Data Governance & Provenance, and a Regulatory Compliance section (ICH S7A/B, M3(R2)). HAIOps and Safety Flags are policy-locked surfaces — they are not modified in feature work.
 
@@ -538,7 +550,11 @@ The hash chain is canonical-JSON based: object keys are sorted recursively befor
 | BCS class table | Reference | L3 formulation → F% |
 | FAERS | Post-market AE DB | L3 / `/regulatory` AE label-signal calibration |
 | ToxCast / ToxRefDB | Tox DB | L3 cross-validation reference |
-| Lombardo 2018 · Smith 2010 · Obach 1999 | Pharmacokinetics literature | IVIVE auto-substrate anchors + microsomal binding correction |
+| Lombardo 2018 · Smith 2010 · Obach 1999 | Pharmacokinetics literature | IVIVE class-median anchors + microsomal binding correction |
+| FDA Drug Approval Packages (DAPs) | Regulatory PK ground truth | Held-out human PK for ~1,000+ approved compounds — IVIVE LITERATURE substrate + recalibration corpus |
+| DrugBank PK panel · PK-DB (UKonstanz) | Curated human PK | Broader IVIVE LITERATURE substrate coverage |
+| Obach 1999 · Hosea 2009 · Wang 2010 | IVIVE benchmark sets | Engine recalibration / fold-error reporting |
+| Open TG-GATEs · eTRANSAFE | Toxicogenomics + translational safety | Cross-species recalibration substrate (hepatocyte CL_int proxies) |
 | ECOTox | Environmental tox | L1 ecotox card (no fallback table — explicit policy) |
 
 ### 15.2 Key thresholds
@@ -586,12 +602,12 @@ The hash chain is canonical-JSON based: object keys are sorted recursively befor
 
 ### 15.5 Common workflows
 
-- **Single compound from scratch** — Type SMILES → set UniProt target + therapeutic area → *Run In-Vitro Simulation* → review verdict + Stage-Gate banner → enter IVIVE wet-lab matrix → run L2 In-Silico (and Ex-Vivo if substrate exists) → seal Confirmation block → sign IVIVE handoff → run L3 → review L4 readiness.
+- **Single compound from scratch** — Type SMILES → set UniProt target + therapeutic area → *Run In-Vitro Simulation* → review verdict + Stage-Gate banner → enter IVIVE substrate matrix (literature + in-house cells) → run L2 In-Silico (and Tissue-Scale if substrate exists) → seal Confirmation block → sign IVIVE handoff → run L3 → review L4 readiness.
 - **Compound from a database** — *Import via API* (ChEMBL / PubChem / DrugBank / UniChem / ZINC) → *Use* → continue as above.
 - **Diagen Cascade run** — *Import from Diagen AI* → choose *Cascade* → enter Molecule ID → walk away while L1 → L4 propagate.
 - **Batch screening** — Drop CSV with `smiles` header (≤ 500 rows) → set ranking criteria + composite weights → run → export top-N CSV. (Batch is L1 only.)
 - **Stage-Gate override path** — When the cascade gate blocks: review the `BLOCKED BY` chips and per-output quality detail, then *Override & advance to L3*. Capture actor, role, justification, and authority citation in the override modal — these persist to the provenance trail.
-- **IVIVE substrate hardening** — Open the IVIVE Wet-Lab Inputs panel, fill the matrix with measured `fu_p`, `fu_mic`, and `B/P` values across human + ≥ 1 preclinical species, watch the tier badge climb from Insufficient → Standard → Premium and the cross-species defensibility flag flip green.
+- **IVIVE substrate hardening** — Open the IVIVE Substrate Inputs panel, fill the matrix with literature or in-house `fu_p`, `fu_mic`, and `B/P` values across human + ≥ 1 preclinical species, watch the tier badge climb from Insufficient → Standard → Premium and the cross-species defensibility flag flip green.
 
 ### 15.6 Glossary (selected)
 

@@ -55,24 +55,24 @@ const TIERS: Array<{
     name: "Standard",
     color: "cyan",
     rule: "fu_p (human + mouse + rat) and B/P (human + ≥1 preclinical)",
-    meaning: "Tier ladder is satisfied for fu_p and B/P. Whether the cross-species defensibility flag flips green is evaluated separately on measured-only cells at sign-off — Standard can be reached with auto-substrate.",
+    meaning: "Tier ladder is satisfied for fu_p and B/P. Whether the cross-species defensibility flag flips green is evaluated separately on LITERATURE or IN-HOUSE cells at sign-off — Standard can be reached with class-median substrate.",
   },
   {
     name: "Premium",
     color: "emerald",
     rule: "Standard + fu_mic (human + ≥1 preclinical)",
-    meaning: "Full substrate for the Obach correction is present, end-to-end. This is the highest tier the ladder reports; defensibility still depends on the measured-only check that runs alongside it. This is the confidence band the first-in-human readiness step pulls through to MABEL.",
+    meaning: "Full substrate for the Obach correction is present, end-to-end. This is the highest tier the ladder reports; defensibility still depends on the LITERATURE / IN-HOUSE check that runs alongside it. This is the confidence band the first-in-human readiness step pulls through to MABEL.",
   },
 ];
 
 const PIPELINE_STEPS = [
   ["1", "Receive sealed in-silico confirmation block (v2.0.0)", "sealed", "text-amber-300"],
-  ["2", "Capture wet-lab matrix · 3 measurements × 5 species", "measured", "text-cyan-300"],
+  ["2", "Capture substrate matrix · 3 measurements × 5 species", "substrate", "text-cyan-300"],
   ["3", "Tier assessment · Insufficient / Minimum / Standard / Premium", "derived", "text-cyan-300"],
   ["4", "Apply Obach 1999 fu_mic correction to microsomal CL_int", "physics", "text-cyan-300"],
   ["5", "Well-stirred liver model · CL_h per species", "physics", "text-cyan-300"],
   ["6", "Plasma → blood clearance via B/P", "physics", "text-cyan-300"],
-  ["7", "Cross-species rule check (measured-only)", "gate", "text-amber-300"],
+  ["7", "Cross-species rule check (LITERATURE or IN-HOUSE)", "gate", "text-amber-300"],
   ["8", "Hard-block / soft-warn assembly", "gate", "text-amber-300"],
   ["9", "Sign-off · name + role + ack'd alerts + substrate mode", "sealed", "text-amber-300"],
   ["10", "Release to animal cohort study design", "handoff", "text-amber-300"],
@@ -111,7 +111,7 @@ export function IVIVE() {
             In-vitro to in-vivo extrapolation is the single decision that transitions a compound from
             <span className="text-cyan-300"> in-silico and ex-vivo confirmation</span> into a defensible
             <span className="text-amber-300"> animal cohort</span> study design. HakaseAI runs IVIVE as a
-            standalone gate — wet-lab substrate in, tiered confidence assessment out, sealed sign-off required to proceed.
+            standalone gate — literature + in-house substrate in, tiered confidence assessment out, sealed sign-off required to proceed.
             This is HakaseAI's first target area: the place where most pre-clinical programmes either harden or quietly fabricate.
           </p>
 
@@ -146,8 +146,8 @@ export function IVIVE() {
               Most pipelines paper over this gap with synthetic defaults — a literature midpoint here, a "typical drug"
               assumption there. HakaseAI's IVIVE gate refuses that path. Empty cells render
               <span className="text-cyan-300 font-mono"> &nbsp;—&nbsp; </span>
-              never zero, never inferred. Auto-substrate is allowed only as an explicitly tagged path with
-              <span className="text-amber-300"> AUTO</span> pills on every estimated cell and substrate mode captured in the audit trail.
+              never zero, never inferred. Class-median substrate (Lombardo 2018 / Smith 2010 drug-class anchors) is allowed only as an explicitly tagged path with
+              <span className="text-amber-300"> CLASS-MEDIAN</span> pills on every fallback cell and substrate mode captured in the audit trail.
             </p>
           </div>
           <div className="lg:col-span-3">
@@ -179,10 +179,10 @@ export function IVIVE() {
         <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-2">The four-tier ladder</div>
         <h2 className="text-[28px] font-black tracking-tight text-white mb-3">What you have on the bench decides what L3 is allowed to assume.</h2>
         <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl mb-8">
-          The tier assessment is deterministic from the wet-lab matrix. There is no "good enough" judgement call —
-          the gate reads the cells and reports the tier. Tier level and measured-only cross-species defensibility are
-          tracked independently: Standard and Premium can be reached with auto-estimated cells, but the defensibility
-          flag is evaluated separately at sign-off and only counts <span className="text-white">measured</span> values.
+          The tier assessment is deterministic from the substrate matrix. There is no "good enough" judgement call —
+          the gate reads the cells and reports the tier. Tier level and cross-species defensibility are
+          tracked independently: Standard and Premium can be reached with class-median cells, but the defensibility
+          flag is evaluated separately at sign-off and only counts <span className="text-white">LITERATURE</span> or <span className="text-white">IN-HOUSE</span> values.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {TIERS.map(({ name, color, rule, meaning }) => (
@@ -201,14 +201,24 @@ export function IVIVE() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-start gap-3">
+        <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 flex items-start gap-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-[7px] shrink-0" />
+          <div className="text-[12px] text-slate-400 leading-relaxed">
+            <span className="text-amber-300 font-semibold">Transition note · current release.</span>{" "}
+            The in-app IVIVE cell badge still reads <span className="font-mono text-white">MEASURED</span> for both LITERATURE and IN-HOUSE inputs.
+            The per-cell schema split that surfaces the distinction in the dashboard is a planned follow-up; the cross-species rule and sealed substrate-mode tag already use the new ladder.
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-start gap-3">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-[7px] shrink-0" />
           <div className="text-[12px] text-slate-400 leading-relaxed">
             <span className="text-amber-300 font-semibold">Cross-species defensibility rule.</span>{" "}
             For both fu_p and B/P, the gate requires human + ≥1 preclinical species — and only
-            <span className="text-white"> measured</span> cells count. Auto-estimated cells
-            from literature midpoints (Lombardo 2018, Smith 2010) populate the math so downstream panels can run,
-            but they do not satisfy the rule. Proceeding on auto-substrate requires explicit acknowledgment captured in the sign-off.
+            <span className="text-white"> LITERATURE</span> (DOI / PMID for this compound or a Tanimoto ≥ 0.4 congener) or
+            <span className="text-white"> IN-HOUSE</span> (bench / CRO measurement with assay method + lab + date) cells count. Class-median anchors
+            from Lombardo 2018 / Smith 2010 populate the math so downstream panels can run,
+            but they do not satisfy the rule. Proceeding on class-median substrate requires explicit acknowledgment captured in the sign-off.
           </div>
         </div>
       </section>
@@ -226,9 +236,10 @@ export function IVIVE() {
             </p>
             <div className="space-y-2 mt-4">
               {[
-                { ref: "Obach 1999",     desc: "fu_mic correction · CL_int_corrected = CL_int_measured / fu_mic" },
-                { ref: "Lombardo 2018",  desc: "fu_p drug-class medians · auto-substrate anchor" },
-                { ref: "Smith 2010",     desc: "Plasma protein binding review · auto-substrate anchor" },
+                { ref: "Obach 1999",     desc: "fu_mic correction · CL_int_corrected = CL_int_measured / fu_mic · also a 29-compound IVIVE benchmark for engine recalibration" },
+                { ref: "Hosea 2009 / Wang 2010", desc: "Extended IVIVE benchmark sets · validates beyond Obach's original 29" },
+                { ref: "Lombardo 2018",  desc: "fu_p drug-class medians · CLASS-MEDIAN substrate anchor" },
+                { ref: "Smith 2010",     desc: "Plasma protein binding review · CLASS-MEDIAN substrate anchor" },
                 { ref: "ICH M3(R2)",     desc: "Allometric scaling and species selection conventions" },
               ].map(({ ref, desc }) => (
                 <div key={ref} className="border border-white/8 rounded-lg px-3 py-2 grid grid-cols-[140px_1fr] gap-3 items-start">
@@ -282,7 +293,7 @@ export function IVIVE() {
             <ul className="text-[12px] text-slate-400 space-y-1.5">
               <li>• In-silico confirmation block not yet sealed</li>
               <li>• Cross-species rule met only with estimates</li>
-              <li>• Substrate mode is auto-estimated or mixed</li>
+              <li>• Substrate mode is class-median or mixed</li>
               <li>• fu_mic missing (Obach correction skipped)</li>
               <li>• HAIOps safety flag with reviewRequired</li>
             </ul>
@@ -293,7 +304,7 @@ export function IVIVE() {
               <li>• Name + role + ISO timestamp</li>
               <li>• Justification text</li>
               <li>• Acknowledged alert IDs</li>
-              <li>• Substrate mode (measured / auto-estimated / mixed)</li>
+              <li>• Substrate mode (literature / in-house / class-median / mixed)</li>
             </ul>
           </div>
         </div>
@@ -302,10 +313,51 @@ export function IVIVE() {
           <div className="text-[11px] text-slate-500 leading-relaxed">
             The substrate mode at sign-off propagates downstream. Animal-cohort study design tags its outputs with the
             confidence band that was sealed here, and first-in-human readiness reads it again before MABEL projection.
-            A run sealed on auto-substrate is not silently identical to a run sealed on measured substrate — it is auditable
+            A run sealed on class-median substrate is not silently identical to a run sealed on literature or in-house substrate — it is auditable
             as such all the way through to the IND-enabling package.
           </div>
         </div>
+      </section>
+
+      {/* ── Zero-Lab recalibration substrate ───────────────────────────────── */}
+      <section className="max-w-6xl mx-auto px-6 md:px-8 py-16 border-b border-white/5">
+        <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-2">Zero-Lab recalibration substrate</div>
+        <h2 className="text-[28px] font-black tracking-tight text-white mb-3">Calibration targets are named public corpora — not chip-vendor data.</h2>
+        <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl mb-3">
+          Because HakaseAI is a 100% Zero-Lab cascade, calibration is anchored to public datasets the regulator already recognises.
+          The intent is for the IVIVE engine version stamp to record the calibration set + per-corpus fold-error band alongside the version itself.
+        </p>
+        <div className="mb-8 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 flex items-start gap-2 max-w-3xl">
+          <div className="w-1 h-1 rounded-full bg-amber-400 mt-[7px] shrink-0" />
+          <div className="text-[11px] text-slate-400 leading-relaxed">
+            <span className="text-amber-300 font-semibold">Status.</span> The corpora below are the named calibration targets of record.
+            Automated ingestion + per-version fold-error reporting is a scheduled follow-up; the version-stamp format below is the target shape, not the current runtime output.
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[
+            { name: "FDA Drug Approval Packages (DAPs)",       role: "LITERATURE substrate + recalibration corpus", note: "Clin-pharm reviews with measured human PK · ~1,000+ approved compounds · regulator-grade ground truth" },
+            { name: "Obach 1999 IVIVE benchmark",              role: "Recalibration corpus",                        note: "29 compounds with CL_int + fu + observed CL · the canonical IVIVE evaluation set" },
+            { name: "Hosea 2009 / Wang 2010 IVIVE extensions", role: "Recalibration corpus",                        note: "Extended IVIVE benchmark sets · validates beyond Obach's 29" },
+            { name: "DrugBank PK panel",                       role: "LITERATURE substrate",                        note: "Human PK across marketed drugs · broad coverage, lower per-record curation" },
+            { name: "PK-DB (UKonstanz)",                       role: "LITERATURE substrate",                        note: "Curated human PK with study metadata · academically structured" },
+            { name: "Open TG-GATEs",                           role: "Cross-species recalibration",                 note: "Human + rat hepatocyte toxicogenomics · CL_int proxies for cross-species translation" },
+            { name: "eTRANSAFE",                               role: "Cross-species recalibration",                 note: "EMA-led translational safety database · regulator-recognised provenance" },
+            { name: "Lombardo 2018 / Smith 2010",              role: "CLASS-MEDIAN anchors",                        note: "Drug-class fu_p / PPB medians · runnable fallback only · does not satisfy the cross-species rule" },
+          ].map(({ name, role, note }) => (
+            <div key={name} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+              <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                <div className="text-[13px] font-bold text-cyan-200">{name}</div>
+                <div className="text-[9px] uppercase tracking-wider text-amber-300/80 font-mono shrink-0">{role}</div>
+              </div>
+              <div className="text-[11px] text-slate-500 leading-relaxed">{note}</div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-600 mt-6 leading-relaxed max-w-3xl">
+          Target version-stamp shape (post-ingestion):
+          <span className="font-mono text-slate-500"> v2.4.1 / Obach29 + Hosea50 / fold-error 1.8× geomean</span>. The intent is to seal this into the sign-off so the IND-enabling package can defend the choice of calibration substrate downstream.
+        </p>
       </section>
 
       {/* ── First target area ──────────────────────────────────────────────── */}
@@ -317,8 +369,8 @@ export function IVIVE() {
           </h2>
           <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl">
             The bridge from in-silico / ex-vivo confirmation into animal-cohort design is where most pre-clinical
-            programmes either get the cross-species story right or quietly accept estimated substrate as if it were
-            measured. We treat it as the keystone gate of the platform: if IVIVE is not defensible, nothing downstream
+            programmes either get the cross-species story right or quietly accept class-median substrate as if it were
+            literature- or in-house-anchored. We treat it as the keystone gate of the platform: if IVIVE is not defensible, nothing downstream
             can be. Animal study design, NOAEL conversion, allometric HED, MABEL — all of it inherits whatever the IVIVE
             handoff sealed. Getting this layer right is the precondition for everything else HakaseAI promises.
           </p>
@@ -334,7 +386,7 @@ export function IVIVE() {
           >
             <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-1">Upstream</div>
             <div className="text-[14px] font-bold text-white group-hover:text-cyan-200 transition-colors">In-Silico &amp; Ex-Vivo Confirmation</div>
-            <div className="text-[11px] text-slate-500 mt-1">10-stage in-silico pipeline + ex-vivo wet-lab · sealed confirmation block</div>
+            <div className="text-[11px] text-slate-500 mt-1">10-stage in-silico pipeline + virtual tissue-scale projection · sealed confirmation block</div>
           </button>
           <button
             onClick={() => { navigate("/platform"); setTimeout(() => document.querySelector("#layer3")?.scrollIntoView({ behavior: "smooth" }), 150); }}

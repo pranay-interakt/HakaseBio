@@ -158,7 +158,7 @@ export function HakaseAI() {
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
   // L2 Confirmation hosts two sub-tracks: in-silico (existing scaffold) and ex-vivo (existing scaffold).
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
-  // P0 IVIVE wet-lab inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
+  // P0 IVIVE substrate inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
   const [ivieInputs, setIvieInputs] = useState(bootstrapIvieInputs);
   useIvieInputsAutosave(ivieInputs);
   // L2 → L3 handoff gate. When true, the IVIVE Output / Animal Cohort Handoff
@@ -4690,7 +4690,7 @@ export function HakaseAI() {
                 }}
                 forceExpandSignal={confirmationExpandSignal}
               />
-              {/* IVIVE Wet-Lab Inputs panel was relocated to the L2 → L3
+              {/* IVIVE Substrate Inputs panel was relocated to the L2 → L3
                   IVIVE Output / Animal Cohort Handoff page (May 2026). The
                   substrate now lives at the handoff because that's where it
                   gates progression to L3. L2 In-Silico still reads whatever
@@ -4903,7 +4903,7 @@ export function HakaseAI() {
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IVIVE Substrate</span>
                             {ivieHasData && anyAuto && (
                               <span
-                                title="One or more IVIVE values are literature midpoints (auto-filled from species defaults), not measured CRO data. See the 'Substrate mode' row below for the exact breakdown."
+                                title="One or more IVIVE cells are Lombardo / Smith CLASS-MEDIAN anchors, not LITERATURE or IN-HOUSE values. See the 'Substrate mode' row below for the exact breakdown."
                                 className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
                               >
                                 Auto-filled
@@ -4916,13 +4916,13 @@ export function HakaseAI() {
                             )}
                           </div>
                           <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
-                            <Row label="Cross-species rule" source="measured fu_p + B/P, human + ≥1 preclinical"
+                            <Row label="Cross-species rule" source="LITERATURE or IN-HOUSE fu_p + B/P, human + ≥1 preclinical"
                                  value={tierA ? (tierA.crossSpeciesRuleSatisfied ? "MET" : "UNMET") : "—"} />
                             <Row label="Substrate mode"     source="current ivieInputs provenance"
                                  value={
-                                   substrateMode === "measured"       ? "Measured (CRO)"
-                                   : substrateMode === "auto-estimated" ? "All auto-filled (literature)"
-                                   : substrateMode === "mixed"          ? "Partial auto (some CRO, some literature)"
+                                   substrateMode === "measured"       ? "LITERATURE or IN-HOUSE"
+                                   : substrateMode === "auto-estimated" ? "All CLASS-MEDIAN (Lombardo / Smith)"
+                                   : substrateMode === "mixed"          ? "Mixed (LITERATURE/IN-HOUSE + CLASS-MEDIAN)"
                                    : "—"
                                  } />
                             <Row label="Completion"         source="cells filled / total"
@@ -4935,17 +4935,17 @@ export function HakaseAI() {
                               <>
                                 <Row label="Signed at"          source="ISO 8601"        value={iviveHandoffSignOff.signedAt} />
                                 <Row label="Sign-off substrate" source="captured at sign-off"
-                                     value={iviveHandoffSignOff.substrateMode === "measured" ? "Measured (CRO)"
-                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "All auto-filled (literature)"
-                                          : "Partial auto (some CRO, some literature)"} />
+                                     value={iviveHandoffSignOff.substrateMode === "measured" ? "LITERATURE or IN-HOUSE"
+                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "All CLASS-MEDIAN (Lombardo / Smith)"
+                                          : "Mixed (LITERATURE/IN-HOUSE + CLASS-MEDIAN)"} />
                               </>
                             )}
                           </div>
                           {ivieHasData && anyAuto && (
                             <p className="mt-1.5 px-1 text-[10px] text-orange-300/90 leading-relaxed">
                               ⚠ L3 study design + L4 FIH dose will be tagged{" "}
-                              <span className="font-semibold">"estimated substrate"</span> in the audit trail
-                              and cannot be used for IND submission without re-running on measured CRO data.
+                              <span className="font-semibold">"class-median substrate"</span> in the audit trail
+                              and cannot be used for IND submission without re-running on LITERATURE or IN-HOUSE data.
                             </p>
                           )}
                           {iviveHandoffSignOff && substrateMode && iviveHandoffSignOff.substrateMode !== substrateMode && (
