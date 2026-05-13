@@ -4142,8 +4142,12 @@ export function HakaseAI() {
 
                 {/* L1 → L2 Cascade Preview + Recommendations */}
                 <div className="px-5 pb-3 space-y-3">
-                  {/* Stage-Gate Cascade Decision (always visible — surfaces the gate verdict) */}
-                  {(() => {
+                  {/* Stage-Gate Cascade Decision — only meaningful AFTER an L1
+                      simulation has produced outputs to gate against. Before
+                      a molecule is run, the gate would render with default
+                      heuristic-tier scores and falsely demand a stage-gate
+                      review for a compound that doesn't exist yet. */}
+                  {simResults && (() => {
                     const g = cascadeGate;
                     const passed = g.canAutoCascade;
                     const overridden = !!cascadeOverride;
