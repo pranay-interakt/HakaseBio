@@ -9150,6 +9150,18 @@ function Layer1Results({
             ))}
             {(() => {
               const pts = iv.doseResponse.curve;
+              // Guard: empty curve (no validated target / sim returned no
+              // dose-response points) previously crashed at pts[pts.length - 1]
+              // with "Cannot read properties of undefined (reading 'concentration')".
+              // Render an in-SVG empty-state label instead, consistent with
+              // the anti-fabrication policy (no synthetic placeholder curve).
+              if (pts.length === 0) {
+                return (
+                  <text x="220" y="100" fill="#64748b" fontSize="10" textAnchor="middle">
+                    Dose-response curve unavailable — no validated target
+                  </text>
+                );
+              }
               const minLog = -2, maxLog = 5;
               const toX = (c: number) => 50 + ((Math.log10(Math.max(0.01, c)) - minLog) / (maxLog - minLog)) * 340;
               const toY = (r: number) => 180 - (r / 100) * 160;
