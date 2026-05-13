@@ -280,17 +280,20 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Diagen Integration ── */}
+      {/* ── Discovery Partner Integration ── */}
       <section id="diagen" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-violet-500 mb-4">Hakase Ecosystem</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-violet-500 mb-4">Discovery Partner Integration</div>
               <h2 className="text-[38px] font-black tracking-tight text-white leading-tight mb-4">
-                Seamlessly connected<br />with Diagen AI
+                Plugs into any drug-<br />discovery engine
               </h2>
-              <p className="text-[15px] text-slate-400 leading-relaxed mb-6">
-                Diagen AI generates optimized drug candidates. BioDigital Twin walks them through pre-clinical confirmation. Together they form the only platform that goes from molecular generation to a sealed, IND-ready PreClinicalPackage without leaving the Hakase ecosystem.
+              <p className="text-[15px] text-slate-400 leading-relaxed mb-4">
+                BioDigital Twin is the pre-clinical confirmation layer for whatever generates your molecules — generative-AI platforms, virtual-screening pipelines, in-house medchem, or licensed assets. Hand us a SMILES (and optionally fingerprints, ADMET pre-scores, or a target UniProt) and we walk it through L1 → L4 to a sealed, IND-ready PreClinicalPackage.
+              </p>
+              <p className="text-[12px] text-slate-500 leading-relaxed mb-6">
+                <span className="text-violet-300 font-semibold">Diagen AI</span> is our reference partner — the integration shown here — but the same payload contract works with any source. We're actively partnering with discovery teams across the industry.
               </p>
               <div className="space-y-3">
                 {[
@@ -307,7 +310,7 @@ export function Landing() {
             </div>
 
             <div className="bg-[#0d0f17] border border-white/8 rounded-2xl p-5 font-mono text-[12px] space-y-2">
-              <div className="text-slate-600 mb-3">{`// Diagen → BioDigital Twin handoff`}</div>
+              <div className="text-slate-600 mb-3">{`// Discovery partner → BioDigital Twin handoff`}</div>
               <div><span className="text-violet-400">const</span> <span className="text-white">payload</span> <span className="text-slate-500">=</span> <span className="text-slate-400">{"{"}</span></div>
               <div className="pl-4 space-y-1">
                 <div><span className="text-blue-400">smiles</span><span className="text-slate-500">:</span> <span className="text-emerald-400">"CC(C)Cc1ccc(cc1)..."</span><span className="text-slate-500">,</span></div>
@@ -344,11 +347,10 @@ export function Landing() {
           {/* Two-engine overview */}
           <div className="grid md:grid-cols-2 gap-4 mb-24">
             <div className="rounded-2xl border border-violet-500/25 bg-violet-500/5 p-8">
-              <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">The Creator</div>
-              <h3 className="text-[22px] font-black text-white mb-3">Diagen</h3>
+              <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">The Creator · any discovery engine</div>
+              <h3 className="text-[22px] font-black text-white mb-3">Generative chemistry, virtual screening, or in-house medchem</h3>
               <p className="text-[14px] text-slate-400 leading-relaxed">
-                Generates novel drug molecules using generative AI — exploring chemical space, optimising for drug-likeness,
-                and producing candidate SMILES strings with preliminary safety and binding scores.
+                Wherever your candidate molecules come from — generative AI (Diagen, Insilico, Iktos, Chemistry42…), virtual-screening pipelines, or your medchem team — BioDigital Twin is the pre-clinical confirmation layer that takes them forward. <span className="text-violet-300">Diagen is our reference integration; the contract is open.</span>
               </p>
             </div>
             <div className="rounded-2xl border border-blue-500/25 bg-blue-500/5 p-8">
@@ -372,25 +374,24 @@ export function Landing() {
 
             <div className="space-y-10">
 
-              {/* Diagen step */}
+              {/* Molecule input step — discovery-source agnostic */}
               <div className="flex gap-8">
-                <div className="shrink-0 w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400 z-10">D</div>
+                <div className="shrink-0 w-12 h-12 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400 z-10">M</div>
                 <div className="flex-1 pt-1 pb-10 border-b border-white/5">
-                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Diagen</div>
-                  <h4 className="text-[18px] font-bold text-white mb-2">Generate the Molecule</h4>
+                  <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Molecule Input · any source</div>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Bring your candidate molecule</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    A researcher enters a target — say, EGFR for non-small-cell lung cancer. Diagen's models explore chemical space,
-                    optimise for drug-likeness, and deliver candidate SMILES strings within minutes, each scored for synthetic feasibility and estimated binding affinity.
+                    A researcher hands BioDigital Twin a candidate molecule and a target — say, EGFR for non-small-cell lung cancer. The molecule can come from anywhere: a generative-AI partner (Diagen, Insilico, Iktos, Chemistry42…), a virtual-screening pipeline, an in-house medchem series, a licensed asset, or a manual SMILES paste. Hakase doesn't care where it came from — only that the input contract is met.
                   </p>
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-5">
-                    <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">What Diagen passes to BioDigital Twin</div>
+                    <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">Input contract — what BioDigital Twin needs</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6">
                       {[
-                        "SMILES strings (molecular structure notation)",
-                        "Molecular fingerprints (structural feature vectors)",
-                        "ADMET pre-scores (absorption, distribution, metabolism, excretion, toxicity)",
-                        "3D conformers (spatial molecular geometry)",
-                        "Target protein IDs (UniProt, e.g. P00533 for EGFR)",
+                        "SMILES string (required — molecular structure notation)",
+                        "Target protein ID (required — UniProt, e.g. P00533 for EGFR)",
+                        "Molecular fingerprints (optional — accelerates L1)",
+                        "ADMET pre-scores (optional — fed in as priors)",
+                        "3D conformers (optional — used by L2 docking)",
                       ].map(item => (
                         <div key={item} className="flex items-start gap-2 text-[12px] text-slate-400">
                           <span className="text-violet-500 mt-0.5 shrink-0">→</span> {item}
@@ -398,10 +399,10 @@ export function Landing() {
                       ))}
                     </div>
                     <div className="mt-4 pt-3 border-t border-white/5 text-[11px] text-slate-600">
-                      Three integration modes:&nbsp;
+                      Three ingestion modes:&nbsp;
                       <span className="text-violet-400">Synchronous</span> (single molecule, &lt;30 s) ·&nbsp;
                       <span className="text-blue-400">Async Batch</span> (webhook callbacks) ·&nbsp;
-                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3→L4 in one call)
+                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3→L4 in one call). Diagen is our reference integration; the same contract is open to any discovery partner.
                     </div>
                   </div>
                 </div>
@@ -542,7 +543,7 @@ export function Landing() {
             </div>
             <div className="px-8 py-5 border-t border-white/5 text-center">
               <p className="text-[13px] text-slate-600 italic">
-                Diagen designs the molecule. BioDigital Twin confirms it through to IND.
+                You bring the molecule. BioDigital Twin confirms it through to IND.
               </p>
             </div>
           </div>
