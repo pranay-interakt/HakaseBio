@@ -36,6 +36,10 @@ export * from "./v2.js";
 export * from "./v2_0_0.js";
 export * from "./falsifierRegistry.js";
 
+// Evidence Hash Chain (May 2026) — tamper-evident SHA-256 chain across the
+// four pre-clinical gates. See ./hashChain.ts for the construction rule.
+export * from "./hashChain.js";
+
 export type IsoTimestamp = string;
 
 /** Where a derived field came from. `null` when the field itself is null. */

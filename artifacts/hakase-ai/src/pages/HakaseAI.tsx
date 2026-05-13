@@ -52,7 +52,7 @@ import {
   freezeL1EvidencePointer,
 } from "@/lib/confirmationEngine";
 import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
-import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage } from "@workspace/preclinical-handoff";
+import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage, type EvidenceChain, type ChainHash, EMPTY_EVIDENCE_CHAIN, chainHash, shortHash } from "@workspace/preclinical-handoff";
 import type { L2DoseProjection } from "@/lib/l2DoseProjection";
 import { makeL2CacheKey, loadCachedL2, saveCachedL2 } from "@/lib/l2ConfirmationCache";
 import { buildPreClinicalPackage } from "@/lib/preClinicalPackage";
@@ -978,6 +978,94 @@ export function HakaseAI() {
       setInVitroResults(null);
     }
   }, [smiles, simResults]);
+
+  // ── Evidence Hash Chain (May 2026) ──────────────────────────────────────
+  // Tamper-evident SHA-256 chain across L1 → L2 → IVIVE → L3 → L4. Each
+  // stage's hash folds the previous hash into its input, so any post-hoc
+  // edit to an upstream block invalidates every downstream hash. Surfaced
+  // as 8-char badges on the stepper. See lib/preclinical-handoff/hashChain.ts.
+  //
+  // L1 → L3 are recomputed reactively here from in-state payloads. L4 is
+  // computed in `FirstInHumanPanel` (where the v1 PreClinicalPackage is
+  // built via useMemo) and reported back via `onL4HashChange` so the
+  // upstream chain anchors what the planner actually consumed.
+  //
+  // A monotonically incrementing token prevents an older recomputation from
+  // overwriting a newer one (mirrors the L1 ML stale-request guard pattern).
+  // On hash failure the chain is set to all-null and `chainError` carries
+  // the failure reason — we surface invalidity rather than silently retain
+  // stale hashes (anti-fabrication invariant).
+  const [evidenceChain, setEvidenceChain] = useState<EvidenceChain>(EMPTY_EVIDENCE_CHAIN);
+  // Two error channels so an upstream success doesn't clobber an L4 failure
+  // and vice versa. The stepper surfaces whichever is non-null (L4 takes
+  // precedence because a broken L4 means the bundle can't be exported).
+  const [chainErrorUpstream, setChainErrorUpstream] = useState<string | null>(null);
+  const [chainErrorL4, setChainErrorL4] = useState<string | null>(null);
+  const chainError = chainErrorL4 ?? chainErrorUpstream;
+  const evidenceChainTokenRef = useRef(0);
+  useEffect(() => {
+    const token = ++evidenceChainTokenRef.current;
+    let cancelled = false;
+    void (async () => {
+      try {
+        let l1: ChainHash | null = null;
+        let l2: ChainHash | null = null;
+        let ivive: ChainHash | null = null;
+        let l3: ChainHash | null = null;
+        if (simResults || inVitroResults) {
+          l1 = await chainHash(null, { simResults, inVitroResults });
+        }
+        if (l1 && confirmationBlock) {
+          l2 = await chainHash(l1, confirmationBlock);
+        }
+        if (l2 && iviveHandoffSignOff) {
+          ivive = await chainHash(l2, iviveHandoffSignOff);
+        }
+        if (ivive && animalResults) {
+          l3 = await chainHash(ivive, animalResults);
+        }
+        if (cancelled || token !== evidenceChainTokenRef.current) return;
+        setChainErrorUpstream(null);
+        setEvidenceChain((prev) => {
+          // L4 invalidation is parent-authoritative: any change to L3 (incl.
+          // a numerically different non-null hash) MUST null the L4 hash so
+          // a stale L4 cannot survive an upstream rebuild while the user is
+          // off Layer 4 (the child effect that owns L4 only runs when the
+          // panel is mounted). The child will recompute on next mount/run.
+          const l4 = l3 && prev.l3 === l3 ? prev.l4 : null;
+          if (prev.l1 === l1 && prev.l2 === l2 && prev.ivive === ivive && prev.l3 === l3 && prev.l4 === l4) {
+            return prev;
+          }
+          // Parent-authoritative L4 invalidation also clears any stale L4
+          // error: if the L3 anchor changed, the child's prior failure no
+          // longer describes the current state.
+          if (l4 === null) setChainErrorL4(null);
+          return { schemaVersion: prev.schemaVersion, l1, l2, ivive, l3, l4 };
+        });
+      } catch (err) {
+        if (cancelled || token !== evidenceChainTokenRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("[evidenceChain] hash recomputation failed", err);
+        // Fail loud, not silent: clear the upstream chain so a stale
+        // tamper-evident hash isn't left visible after canonicalization
+        // rejected the input. L4 follows automatically (depends on L3).
+        setChainErrorUpstream(`Evidence chain unavailable — ${msg}`);
+        setEvidenceChain(EMPTY_EVIDENCE_CHAIN);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [simResults, inVitroResults, confirmationBlock, iviveHandoffSignOff, animalResults]);
+
+  // L4 hash is reported by FirstInHumanPanel (which owns the package useMemo).
+  // Stable callback so the child's effect doesn't re-fire on every parent render.
+  const reportL4Hash = useCallback((l4: ChainHash | null) => {
+    setEvidenceChain((prev) => (prev.l4 === l4 ? prev : { ...prev, l4 }));
+  }, []);
+  const reportL4Error = useCallback((msg: string | null) => {
+    setChainErrorL4((prev) => (prev === msg ? prev : msg));
+  }, []);
 
   // ── Cascade gate (L1 → L2) ───────────────────────────────────────────────
   // Auto-cascade is permitted only when:
@@ -2072,6 +2160,15 @@ export function HakaseAI() {
         </div>
 
         {/* Layer Stepper */}
+        {chainError && (
+          <div
+            role="alert"
+            title={chainError}
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-950/40 border border-rose-700/50 text-rose-300 max-w-[420px] truncate"
+          >
+            ⚠ {chainError}
+          </div>
+        )}
         <div id="demo-layer-nav" className="flex items-center gap-1 mx-auto">
           {([1, 2, 3, 4] as Layer[]).map((layer, i) => {
             const Icon = layerIcons[i];
@@ -2113,6 +2210,25 @@ export function HakaseAI() {
                   )}
                   <Icon className="w-3.5 h-3.5" />
                   {layerLabels[i]}
+                  {/* Evidence Hash Chain badge — short SHA-256 of the sealed
+                      block at this stage. Surfaces tamper-evident provenance
+                      next to the stepper checkmark. "—" while the stage hasn't
+                      sealed yet. See lib/preclinical-handoff/hashChain.ts. */}
+                  {(() => {
+                    const h = layer === 1 ? evidenceChain.l1
+                      : layer === 2 ? evidenceChain.l2
+                      : layer === 3 ? evidenceChain.l3
+                      : evidenceChain.l4;
+                    if (!h) return null;
+                    return (
+                      <span
+                        title={`Evidence hash (SHA-256) — ${h}`}
+                        className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-tight bg-slate-800/80 text-slate-400 border border-slate-700"
+                      >
+                        {shortHash(h)}
+                      </span>
+                    );
+                  })()}
                 </button>
                 {i < 3 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
@@ -2149,6 +2265,14 @@ export function HakaseAI() {
                           <Microscope className="w-3 h-3" />
                         </div>
                         IVIVE
+                        {evidenceChain.ivive && (
+                          <span
+                            title={`Evidence hash (SHA-256) — ${evidenceChain.ivive}`}
+                            className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-tight bg-slate-800/80 text-slate-400 border border-slate-700"
+                          >
+                            {shortHash(evidenceChain.ivive)}
+                          </span>
+                        )}
                       </button>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
                     </>
@@ -5163,6 +5287,9 @@ export function HakaseAI() {
               confirmationBlock={confirmationBlock}
               inVitroResults={inVitroResults}
               mlAdmet={admetMl}
+              parentL3Hash={evidenceChain.l3}
+              onL4HashChange={reportL4Hash}
+              onL4HashError={reportL4Error}
             />
           )}
 
@@ -11234,6 +11361,9 @@ function FirstInHumanPanel({
   confirmationBlock,
   inVitroResults,
   mlAdmet,
+  parentL3Hash,
+  onL4HashChange,
+  onL4HashError,
 }: {
   hasL3: boolean;
   animalResults: any;
@@ -11243,6 +11373,10 @@ function FirstInHumanPanel({
   confirmationBlock: ConfirmationEvidenceBlock | null;
   inVitroResults: InVitroResults | null;
   mlAdmet: MlAdmetResult | null;
+  /** L3 hash to fold into the L4 seal — null until L3 is sealed. */
+  parentL3Hash: ChainHash | null;
+  onL4HashChange: (h: ChainHash | null) => void;
+  onL4HashError: (msg: string | null) => void;
 }) {
   const plannerHandleRef = useRef<Phase1PlannerHandle | null>(null);
   const registerPlannerHandle = useCallback((h: Phase1PlannerHandle) => {
@@ -11287,6 +11421,41 @@ function FirstInHumanPanel({
         : undefined,
     });
   }, [hasL3, animalResults, simResults, molName, mlAdmet, inVitroResults]);
+
+  // L4 evidence-chain seal — fold parent L3 hash into the built v1 package.
+  // Reports the hash up to HakaseAI's chain state. Null when either the L3
+  // anchor or the package itself isn't ready (anti-fabrication: no L3 anchor
+  // means no L4 seal is honest to claim).
+  const l4SealTokenRef = useRef(0);
+  useEffect(() => {
+    const token = ++l4SealTokenRef.current;
+    if (!parentL3Hash || !pkg) {
+      // L4 isn't sealable right now; clear both the hash AND any stale
+      // error from a previous attempt so the alert channel doesn't show
+      // an irrelevant historical failure.
+      onL4HashChange(null);
+      onL4HashError(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const l4 = await chainHash(parentL3Hash, pkg);
+        if (cancelled || token !== l4SealTokenRef.current) return;
+        onL4HashChange(l4);
+        onL4HashError(null);
+      } catch (err) {
+        if (cancelled || token !== l4SealTokenRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("[evidenceChain] L4 hash failed", err);
+        onL4HashChange(null);
+        onL4HashError(`L4 evidence hash unavailable — ${msg}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [parentL3Hash, pkg, onL4HashChange, onL4HashError]);
 
   if (!hasL3 || !animalResults) {
     return (

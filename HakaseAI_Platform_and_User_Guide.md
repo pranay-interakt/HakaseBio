@@ -474,6 +474,22 @@ The viewer shows the molecule name, SMILES preview, and a **Live Preview** badge
 
 Across all layers, the **Full Report** button generates a Claude-powered narrative synthesis with GO/NO-GO rationale, risk flags, mitigation recommendations, cross-layer consistency checks, and recommended next steps.
 
+### 13.1 Evidence Hash Chain (tamper-evident provenance)
+
+Every sealed block in the pipeline is cryptographically chained to the block before it using SHA-256. The construction is:
+
+- `l1Hash = sha256(canonicalJSON(simResults + inVitroResults))`
+- `l2Hash = sha256(l1Hash + canonicalJSON(ConfirmationEvidenceBlock))`
+- `iviveHash = sha256(l2Hash + canonicalJSON(IvieHandoffSignOff))`
+- `l3Hash = sha256(iviveHash + canonicalJSON(AnimalCohortEvidenceBlock))`
+- `l4Hash = sha256(l3Hash + canonicalJSON(PreClinicalPackage v2.0.0))`
+
+Because each downstream hash folds the upstream hash into its input, any post-hoc edit to an L1 measurement, an L2 stage output, an IVIVE sign-off, or an L3 cohort result invalidates every subsequent hash. A regulator can re-derive the chain from the exported bundle and compare against the stored hashes; mismatch at any stage names the broken layer.
+
+Each chain hash is emitted with the `sha256:` prefix. The dashboard surfaces the first 8 hex characters as a small badge next to each layer's stepper checkmark — the full hash is visible on hover. Stages that have not sealed yet show no badge. The chain itself is portable: the verifier helper (`verifyChain` in `@workspace/preclinical-handoff`) accepts a partial set of payloads so that a downstream consumer can verify the tail of a chain without needing every upstream input.
+
+The hash chain is canonical-JSON based: object keys are sorted recursively before hashing, so two semantically equivalent payloads that differ only in field ordering hash identically. Non-finite numbers (NaN, ±Infinity) and BigInts are rejected at hash time — they cannot be silently encoded as null.
+
 ---
 
 ## 14. Marketing & Information Pages
