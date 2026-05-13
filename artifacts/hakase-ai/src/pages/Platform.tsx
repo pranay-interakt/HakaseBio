@@ -31,7 +31,7 @@ export function Platform() {
           From SMILES to IND-ready handoff
         </h1>
         <p className="text-[16px] text-slate-400 max-w-2xl mx-auto">
-          Four cascading pre-clinical layers — In Vitro screening, in-silico + ex-vivo Confirmation, multi-species Animal Cohort, and First-In-Human Readiness. Each layer's evidence is sealed and cascaded forward by HAIOps. Source-quality tiered per output. No fake data, no synthetic fallbacks.
+          A 100% Zero-Lab In-Silico Cascade — four cascading pre-clinical layers (In Vitro, in-silico + virtual-tissue Confirmation, multi-species PBPK Animal Cohort, First-In-Human Readiness) running entirely in software. Each layer's evidence is sealed and cascaded forward by HAIOps. Source-quality tiered per output. No wet-lab dependency, no fake data, no synthetic fallbacks.
         </p>
       </div>
 
@@ -43,7 +43,7 @@ export function Platform() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           {[
             { num: "L1", label: "In Vitro Twin",                q: "Is this molecule worth confirming?",                       color: "violet",  desc: "RDKit.js cheminformatics in the browser, ML-augmented ADMET, validated-target binding estimate, organ-tox cascade, and a HAIOps cascade gate that returns GO / WATCH / NO-GO with source-quality tier per output." },
-            { num: "L2", label: "Confirmation Layer",            q: "Does the L1 verdict survive confirmation?",                color: "blue",    desc: "Two parallel sub-tracks. In-silico: a 10-stage pipeline (ESM2 druggability → AutoDock Vina docking → ML cross-check → selectivity / cardiotox → optional FEP on RunPod GPU → PBPK → QSP/PD → TI ranking → handoff). Ex-vivo: ingestion of wet-lab confirmation evidence. Sealed into a v2.0.0 ConfirmationBlock." },
+            { num: "L2", label: "Confirmation Layer",            q: "Does the L1 verdict survive confirmation?",                color: "blue",    desc: "Two parallel sub-tracks, both 100% computational. In-silico: a 10-stage pipeline (ESM2 druggability → AutoDock Vina docking → ML cross-check → selectivity / cardiotox → optional FEP on RunPod GPU → PBPK → QSP/PD → TI ranking → handoff). Virtual-tissue (ex-vivo): multi-cellular simulation against GTEx + Tabula Sapiens v2 — no physical tissue. Sealed into a v2.0.0 ConfirmationBlock." },
             { num: "L3", label: "Animal Cohort",                 q: "How does it behave across species?",                       color: "amber",   desc: "Multi-species PBPK across rat, dog, and monkey with BCS-aware FDA-IIG formulation modeling, allometric scaling per ICH M3(R2), and species-by-species NOAEL — cross-validated against ToxCast, ToxRefDB, and ECOTOX." },
             { num: "L4", label: "First-In-Human Readiness",      q: "Are we IND-ready?",                                        color: "emerald", desc: "Phase 1 Planner derives a defensible MABEL-biased starting dose (FDA 2005 / EMA 2017), evaluates the IND-enabling gate (GLP tox · CMC · IB · Pre-IND), and seals the entire upstream evidence trail into a regulator-ingestible PreClinicalPackage v2.0.0." },
           ].map(({ num, label, q, color, desc }) => (
@@ -113,7 +113,7 @@ export function Platform() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              Type a SMILES string and a UniProt target. RDKit.js (WebAssembly) runs the cheminformatics in your browser. ML-augmented ADMET, validated-target binding, organ-tox cascade, and a HAIOps cascade gate produce a verdict in seconds — every output tagged with its source-quality tier (heuristic / structural / ML / measured).
+              Type a SMILES string and a UniProt target. RDKit.js (WebAssembly) runs the cheminformatics in your browser. ML-augmented ADMET, validated-target binding, organ-tox cascade, and a HAIOps cascade gate produce a verdict in seconds — every output tagged with its source-quality tier (heuristic / structural / ML / literature-curated).
             </p>
             <div className="space-y-3">
               {[
@@ -155,7 +155,7 @@ export function Platform() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <p className="text-[14px] text-slate-400 leading-relaxed">
-              Two parallel sub-tracks confirm the L1 verdict. The <span className="text-blue-300 font-semibold">in-silico track</span> runs a 10-stage pipeline that ingests the L1 EvidencePointer (frozen at Stage 0) and walks it through structural confirmation, physics-grounded refinement, and pharmacology projection. The <span className="text-blue-300 font-semibold">ex-vivo track</span> ingests wet-lab confirmation evidence. Both tracks seal into a single v2.0.0 ConfirmationBlock that L3 must consume.
+              Two parallel sub-tracks confirm the L1 verdict — both 100% software, no wet-lab. The <span className="text-blue-300 font-semibold">in-silico track</span> runs a 10-stage pipeline that ingests the L1 EvidencePointer (frozen at Stage 0) and walks it through structural confirmation, physics-grounded refinement, and pharmacology projection. The <span className="text-blue-300 font-semibold">virtual-tissue (ex-vivo) track</span> simulates a multi-cellular tissue environment by mapping L1 descriptors and L2 docking poses against GTEx tissue-expression baselines and the Tabula Sapiens v2 cell-type atlas. Both tracks seal into a single v2.0.0 ConfirmationBlock that L3 must consume.
             </p>
             <div className="space-y-3">
               {[
@@ -163,7 +163,7 @@ export function Platform() {
                 ["Stage 5 · FEP Free-Energy Refinement", "Optional alchemical free-energy perturbation on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the gate calls for it."],
                 ["Stages 6–8 · Pharmacology Projection", "PBPK projection → QSP/PD coupling → therapeutic-index ranking. The PBPK projection seeds L3, the TI ranking seeds the L4 dose conversation."],
                 ["Stage 9 · Sealed Confirmation Block", "ConfirmationLayerPanel seals a v2.0.0 ConfirmationEvidenceBlock with the L1 EvidencePointer baked in. Re-runs require explicit unseal — no silent recomputation."],
-                ["Ex-Vivo Sub-Track", "Wet-lab evidence ingestion: organoid panels, primary hepatocyte CLint, hERG patch-clamp, microsomal stability. Tier promotion ('measured') trumps ML and structural tiers in the cascade gate."],
+                ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation. Maps L1 + L2 outputs against GTEx tissue-expression baselines and Tabula Sapiens v2 cell-type atlas. Optional manual entry for literature-curated values (CVCL accession + citation) promotes tier to 'literature-curated' in the cascade gate."],
               ].map(([title, desc]) => (
                 <div key={title} className="rounded-xl border border-blue-500/10 bg-blue-500/4 p-4">
                   <div className="text-[11px] font-semibold text-blue-300 mb-1">{title}</div>
@@ -211,7 +211,7 @@ export function Platform() {
           <h3 className="text-[22px] font-black tracking-tight text-white mb-2">IVIVE — the gate that decides whether animal studies are warranted.</h3>
           <p className="text-[13px] text-slate-400 leading-relaxed max-w-3xl mb-5">
             The sealed in-silico confirmation block holds docking, FEP, ML cross-checks, and a first-pass PBPK projection —
-            but it cannot, by itself, justify an animal cohort. The IVIVE gate captures the wet-lab substrate (fu_p · fu_mic · B/P
+            but it cannot, by itself, justify an animal cohort. The IVIVE gate captures the literature-curated PK substrate (fu_p · fu_mic · B/P
             across human + preclinical species), assesses the tier, applies the Obach 1999 correction inside a well-stirred liver
             model, and requires explicit sign-off before animal-cohort study design is unlocked.
           </p>
@@ -219,7 +219,7 @@ export function Platform() {
             {[
               { tag: "Inputs",   val: "3 × 5 matrix",       sub: "fu_p · fu_mic · B/P · 5 species" },
               { tag: "Tiers",    val: "4 levels",           sub: "Insufficient → Minimum → Standard → Premium" },
-              { tag: "Rule",     val: "Cross-species",      sub: "Human + ≥1 preclinical · MEASURED only" },
+              { tag: "Rule",     val: "Cross-species",      sub: "Human + ≥1 preclinical · literature-curated + virtual-tissue" },
               { tag: "Handoff",  val: "Sealed sign-off",    sub: "Substrate mode propagated downstream" },
             ].map(({ tag, val, sub }) => (
               <div key={tag} className="rounded-xl border border-white/8 bg-white/[0.02] p-3">

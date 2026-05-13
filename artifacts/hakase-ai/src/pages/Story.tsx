@@ -62,7 +62,7 @@ export function Story() {
             <div className="space-y-4">
               {[
                 ["1", "Is this molecule worth confirming?", "Is it absorbable, drug-like, and free of obvious organ-tox liabilities — based on real chemistry, not estimates?", "violet"],
-                ["2", "Does the verdict survive deeper confirmation?", "Does in-silico docking + free-energy refinement and ex-vivo wet-lab evidence agree with the in-vitro screen?", "blue"],
+                ["2", "Does the verdict survive deeper confirmation?", "Does in-silico docking + free-energy refinement agree with virtual-tissue (GTEx + Tabula Sapiens) projections of the in-vitro screen — entirely Zero-Lab?", "blue"],
                 ["3", "Are we IND-ready, and what is a defensible First-In-Human starting dose?", "Have we covered multi-species animal PK, NOAEL, GLP tox, CMC, and the Investigator's Brochure — and can we justify a MABEL-biased starting dose?", "emerald"],
               ].map(([num, q, detail, color]) => (
                 <div key={num} className={`rounded-xl border p-5 flex gap-5 items-start ${
@@ -100,7 +100,7 @@ export function Story() {
               Before a pilot flies a real plane, they spend hundreds of hours in a flight simulator. The simulator doesn't replace real flying — but it tells you whether this pilot, in this plane, on this route, is likely to succeed. And it does it without risking a single life or a dollar on jet fuel.
             </p>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              Our platform does the same for the pre-clinical journey. A scientist types in a molecule and a target, and four cascading layers walk it from in-vitro screen through to a sealed, IND-ready handoff — every output tagged with how it was produced (heuristic, structural, ML, or measured), every override logged.
+              Our platform does the same for the pre-clinical journey. A scientist types in a molecule and a target, and four cascading layers walk it from in-vitro screen through to a sealed, IND-ready handoff — every output tagged with how it was produced (heuristic, structural, ML, or literature-curated), every override logged.
             </p>
 
             <div className="space-y-4">
@@ -112,7 +112,7 @@ export function Story() {
                 },
                 {
                   step: "Step 2 · Layer 2", label: "Does it survive confirmation?",
-                  desc: "Two parallel sub-tracks — a 10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD) and an ex-vivo wet-lab evidence track — both seal into a single ConfirmationBlock v2.0.0.",
+                  desc: "Two parallel sub-tracks, both 100% computational — a 10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD) and a virtual-tissue (ex-vivo) track that maps L1+L2 outputs against GTEx and Tabula Sapiens v2. Both seal into a single ConfirmationBlock v2.0.0.",
                   verdict: "Sealed Confirmation Block", color: "blue",
                 },
                 {
@@ -283,7 +283,7 @@ export function Story() {
               What the BioDigital Twin actually computes
             </h2>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              Four cascading pre-clinical layers. RDKit.js (WASM) for cheminformatics in the browser; an isolated AI Service for ML inference (fingerprints only, never SMILES); RunPod GPU for opt-in FEP. Every output tagged with a source-quality tier — heuristic / structural / ML / measured. HAIOps governs the cascade gate; the clinician-in-the-loop owns every override.
+              Four cascading pre-clinical layers. RDKit.js (WASM) for cheminformatics in the browser; an isolated AI Service for ML inference (fingerprints only, never SMILES); RunPod GPU for opt-in FEP. Every output tagged with a source-quality tier — heuristic / structural / ML / literature-curated. HAIOps governs the cascade gate; the clinician-in-the-loop owns every override.
             </p>
 
             {/* Layer 1 */}
@@ -315,7 +315,7 @@ export function Story() {
               <div className="mt-4 rounded-lg border border-white/8 bg-white/2 p-4">
                 <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Source-Quality Tiers</div>
                 <div className="text-[12px] text-slate-400 leading-relaxed">
-                  Descriptors: <span className="text-emerald-400 font-medium">structural</span> (RDKit, identical to wet-lab computed properties). ADMET: <span className="text-blue-400 font-medium">ML</span> with QSAR cross-check. Binding: <span className="text-blue-400 font-medium">ML</span> when validated, <span className="text-amber-400 font-medium">heuristic</span> with explicit flag when not. Wet-lab measurements (ex-vivo) promote tier to <span className="text-emerald-400 font-medium">measured</span> and trump downstream ML.
+                  Descriptors: <span className="text-emerald-400 font-medium">structural</span> (RDKit). ADMET: <span className="text-blue-400 font-medium">ML</span> with QSAR cross-check. Binding: <span className="text-blue-400 font-medium">ML</span> when validated, <span className="text-amber-400 font-medium">heuristic</span> with explicit flag when not. Literature-curated overrides (cited CVCL/published IC50) promote tier to <span className="text-emerald-400 font-medium">literature-curated</span> and trump downstream ML.
                 </div>
               </div>
             </div>
@@ -340,7 +340,7 @@ export function Story() {
                   ["In-Silico · Stage 5 — FEP Free-Energy Refinement (opt-in)", "Alchemical FEP on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the gate calls for it. Tier: physics."],
                   ["In-Silico · Stage 6-8 — Pharmacology Projection", "PBPK projection (compartmental ODE) → QSP/PD coupling → therapeutic-index ranking. The PBPK output seeds L3, the TI ranking seeds the L4 dose conversation."],
                   ["In-Silico · Stage 9 — Sealed Block", "ConfirmationLayerPanel seals a v2.0.0 ConfirmationEvidenceBlock with the L1 EvidencePointer baked in. Re-runs require explicit unseal — no silent recomputation."],
-                  ["Ex-Vivo Sub-Track", "Wet-lab evidence ingestion: organoid panels, primary hepatocyte CLint, hERG patch-clamp, microsomal stability. Promotes tier to 'measured' — trumps ML and structural in the cascade gate."],
+                  ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation: GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas (480 cell types × 28 organs) + DepMap PRISM. No physical tissue, no organ-on-chip vendor dependency. Literature-curated overrides promote tier to 'literature-curated' — trumps ML and structural in the cascade gate."],
                 ].map(([title, desc]) => (
                   <div key={title as string} className="rounded-lg border border-blue-500/10 bg-blue-500/4 p-4">
                     <div className="text-[12px] font-semibold text-blue-300 mb-1">{title}</div>

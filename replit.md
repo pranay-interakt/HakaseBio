@@ -6,6 +6,13 @@ HakaseAI is a BioDigital Twin Platform designed to simulate **pre-clinical** dru
 ## User Preferences
 I prefer detailed explanations and for you to ask before making major changes. Do not make changes to the `artifacts/hakase-ai/src/pages/HAIOps.tsx` file. Do not make changes to the folder `artifacts/hakase-ai/src/lib/safetyFlags.ts`.
 
+### Zero-Lab Pivot (May 13, 2026 — supersedes prior IVIVE chip-vendor strategy)
+HakaseAI is marketed as a **100% Zero-Lab In-Silico Cascade**. The customer-facing pipeline is software-only end-to-end (SMILES → L4 FIH readiness) with no physical assays, no tissue chips, no organoids in the run path. Implications:
+- **Ex-Vivo (L2 sub-track) is computational tissue simulation** — virtual multi-cellular tissue environment derived from GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas + DepMap PRISM, NOT physical organoids/PCLS/organ-on-chip data ingestion.
+- **IVIVE recalibration substrate is literature + public PK datasets + virtual-tissue outputs ONLY**. The May 6 plan to use Emulate / CN Bio / Mimetas chip-vendor data as recalibration substrate is **deprecated**. Do not reintroduce wet-lab assay terminology ("organoid panels", "primary hepatocyte CLint", "hERG patch-clamp", "microsomal stability", "perfusion", "assay telemetry", "CRO organoid panels") into customer-facing marketing or scaffold UI labels.
+- Manual-entry paths in scaffolds remain as **literature-curated overrides** (user pastes published values + citation), not as wet-lab data ingestion endpoints.
+- Chip-vendor data-access deals as a 2-quarter critical-dependency workstream is **dead**. Do not staff against it.
+
 ## System Architecture
 
 ### UI/UX Decisions

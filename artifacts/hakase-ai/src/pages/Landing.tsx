@@ -54,7 +54,7 @@ const LAYERS = [
     ),
     runtime: "1–10 min · GPU opt-in",
     question: "Does the L1 verdict survive in-silico + ex-vivo confirmation?",
-    metrics: ["10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD)", "AutoDock Vina + ESM2 druggability + ML affinity", "FEP free-energy refinement (RunPod GPU, opt-in)", "Ex-vivo evidence panel (wet-lab confirmation)", "Sealed Confirmation Block (v2.0.0)"],
+    metrics: ["10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD)", "AutoDock Vina + ESM2 druggability + ML affinity", "FEP free-energy refinement (RunPod GPU, opt-in)", "Virtual tissue panel (GTEx + Tabula Sapiens v2)", "Sealed Confirmation Block (v2.0.0)"],
   },
   {
     num: "03",
@@ -157,11 +157,11 @@ export function Landing() {
           </span>
         </h1>
         <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-8 max-w-3xl mx-auto">
-          From SMILES to a sealed, IND-ready handoff — across four cascading pre-clinical layers.
+          From SMILES to a sealed, IND-ready handoff — a 100% Zero-Lab In-Silico Cascade across four pre-clinical layers.
         </p>
 
         <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
-          In vitro screening, in-silico + ex-vivo confirmation, multi-species animal cohort, and First-In-Human readiness — all governed by HAIOps. Source-quality tiered per output (heuristic / structural / ML / measured). No fake data, no synthetic fallbacks, no silent coercion.
+          Software-only ingestion: in-vitro twin, in-silico + virtual-tissue confirmation, multi-species PBPK animal cohort, and First-In-Human readiness — all governed by HAIOps. No wet-lab dependency in the run path. Source-quality tiered per output (heuristic / structural / ML / literature-curated). No fake data, no synthetic fallbacks, no silent coercion.
         </p>
 
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
@@ -239,7 +239,7 @@ export function Landing() {
             <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">Four Cascading Layers</div>
             <h2 className="text-[40px] font-black tracking-tight text-white">One pre-clinical pipeline</h2>
             <p className="text-[15px] text-slate-500 mt-3 max-w-xl mx-auto">
-              In vitro screen → in-silico + ex-vivo confirmation → animal cohort → FIH readiness. Each layer's evidence is sealed and cascaded forward — no copy-paste, no silent recomputation.
+              In vitro twin → in-silico + virtual-tissue confirmation → PBPK animal cohort → FIH readiness. Zero-Lab end-to-end: every layer's evidence is computed, sealed, and cascaded forward — no copy-paste, no silent recomputation.
             </p>
           </div>
 
@@ -351,7 +351,7 @@ export function Landing() {
               <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-3">The Validator</div>
               <h3 className="text-[22px] font-black text-white mb-3">BioDigital Twin</h3>
               <p className="text-[14px] text-slate-400 leading-relaxed">
-                Confirms those molecules across four cascading pre-clinical layers — In Vitro, in-silico + ex-vivo Confirmation, multi-species Animal Cohort, and First-In-Human Readiness — sealing the evidence into a regulator-ingestible PreClinicalPackage v2.0.0.
+                Confirms those molecules across four cascading pre-clinical layers — In Vitro, in-silico + virtual-tissue Confirmation, multi-species PBPK Animal Cohort, and First-In-Human Readiness — entirely Zero-Lab, sealing the evidence into a regulator-ingestible PreClinicalPackage v2.0.0.
               </p>
             </div>
           </div>
@@ -410,7 +410,7 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · In Vitro Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Is this molecule worth confirming?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    RDKit.js (WASM) computes descriptors in the browser; ML-augmented ADMET adds confidence intervals; a validated-target binding estimate and organ-tox cascade feed the HAIOps cascade gate. Output: GO / WATCH / NO-GO with a source-quality tier (heuristic / structural / ML / measured) per output, plus an EvidencePointer that L2 freezes at Stage 0.
+                    RDKit.js (WASM) computes descriptors in the browser; ML-augmented ADMET adds confidence intervals; a validated-target binding estimate and organ-tox cascade feed the HAIOps cascade gate. Output: GO / WATCH / NO-GO with a source-quality tier (heuristic / structural / ML / literature-curated) per output, plus an EvidencePointer that L2 freezes at Stage 0.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
@@ -437,14 +437,14 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 2 · Confirmation Layer</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Does the L1 Verdict Survive Confirmation?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Two parallel sub-tracks. The <span className="text-blue-300">in-silico track</span> runs a 10-stage pipeline — ESM2 druggability → AutoDock Vina docking → ML affinity + ADMET cross-check → selectivity / cardiotox panel → optional FEP free-energy refinement (RunPod GPU) → PBPK projection → QSP/PD coupling → therapeutic-index ranking → handoff. The <span className="text-blue-300">ex-vivo track</span> ingests wet-lab confirmation evidence (organoid panels, primary hepatocyte CLint, hERG patch-clamp, microsomal stability) and seals it into a v2.0.0 ConfirmationBlock.
+                    Two parallel sub-tracks — both 100% computational. The <span className="text-blue-300">in-silico track</span> runs a 10-stage pipeline — ESM2 druggability → AutoDock Vina docking → ML affinity + ADMET cross-check → selectivity / cardiotox panel → optional FEP free-energy refinement (RunPod GPU) → PBPK projection → QSP/PD coupling → therapeutic-index ranking → handoff. The <span className="text-blue-300">virtual-tissue (ex-vivo) track</span> simulates a multi-cellular tissue environment by mapping L1 descriptors and L2 docking poses against GTEx tissue baselines and the Tabula Sapiens v2 cell-type atlas — no physical tissue, no chip vendors. Both seal into a v2.0.0 ConfirmationBlock.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
                         ["In-Silico Pipeline", "10 stages · AutoDock Vina + OpenBabel + RDKit · ESM2 druggability"],
                         ["Free-Energy Refinement", "FEP on RunPod GPU (opt-in, ~24 GPU-h, cost-confirmed)"],
-                        ["Ex-Vivo Evidence", "Wet-lab assay ingestion · organoid · hepatocyte · hERG · microsomal"],
+                        ["Virtual-Tissue Evidence", "GTEx tissue baselines · Tabula Sapiens v2 cell-type atlas · DepMap PRISM — computational, no chips"],
                         ["Sealed Confirmation Block", "v2.0.0 evidence package · L1 EvidencePointer frozen at Stage 0"],
                       ].map(([label, desc]) => (
                         <div key={label} className="p-4">
