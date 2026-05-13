@@ -164,12 +164,8 @@ export function Landing() {
           Predict your IND-enabling package <span className="text-white">before</span> you fund the studies. Runway extension, not lab replacement.
         </p>
 
-        <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed mb-6">
-          Software-only ingestion: in-vitro twin, in-silico + virtual-tissue confirmation, multi-species PBPK animal cohort, and First-In-Human readiness — all governed by HAIOps. No wet-lab dependency in the run path. Source-quality tiered per output — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median). No fake data, no synthetic fallbacks, no silent coercion.
-        </p>
-
         <p className="text-[13px] text-slate-500 max-w-2xl mx-auto leading-relaxed mb-6 italic">
-          Zero-lab cycle time + regulator-credible evidence + privacy-first moat — the category-defining pre-clinical platform.
+          Zero-lab cycle time. Regulator-credible evidence. Privacy-first by design.
         </p>
 
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
