@@ -185,6 +185,7 @@ export function HakaseAI() {
   });
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [inputPanelOpen, setInputPanelOpen] = useState(true);
   const [lightMode, setLightMode] = useState(false);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer" | "docking">("cinematic");
@@ -2566,12 +2567,40 @@ export function HakaseAI() {
           {/* Layer 1 — In Vitro Digital Twin */}
           {activeLayer === 1 && !iviveHandoffOpen && (
             <div className="flex-1 flex overflow-hidden">
-              {/* Input Panel */}
-              <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col">
+              {/* Input Panel — collapsible */}
+              {!inputPanelOpen && (
+                <div className="w-10 border-r border-white/8 bg-[#0d0f17]/60 flex flex-col items-center py-3 shrink-0">
+                  <button
+                    onClick={() => setInputPanelOpen(true)}
+                    className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-violet-300 transition-colors"
+                    title="Expand input panel"
+                  >
+                    <Menu className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="mt-3 flex flex-col items-center gap-2">
+                    <TestTube2 className="w-4 h-4 text-violet-400/70" />
+                    <div
+                      className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                    >
+                      Layer 1 Input
+                    </div>
+                  </div>
+                </div>
+              )}
+              {inputPanelOpen && (
+              <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col shrink-0">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <TestTube2 className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
+                    <h2 className="text-[15px] font-semibold text-white flex-1">Layer 1 — In Vitro Digital Twin</h2>
+                    <button
+                      onClick={() => setInputPanelOpen(false)}
+                      className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-slate-300 transition-colors"
+                      title="Hide input panel"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                    </button>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure in vitro structure and simulation parameters</p>
                 </div>
@@ -4188,6 +4217,7 @@ export function HakaseAI() {
                   </p>
                 </div>
               </div>
+              )}
 
               {/* Output Panel — Layer 1 */}
               <div id="demo-results" className="flex-1 overflow-y-auto p-5">
