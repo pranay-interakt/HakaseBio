@@ -31,9 +31,13 @@ export function WetLabReportView({ open, onClose, ...input }: Props) {
     };
     window.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
+    // While the modal is mounted, mark <html> so the print CSS can target
+    // it and release the body-overflow lock during print preview / PDF export.
+    document.documentElement.classList.add("wet-lab-report-open");
     return () => {
       window.removeEventListener("keydown", handler);
       document.body.style.overflow = "";
+      document.documentElement.classList.remove("wet-lab-report-open");
     };
   }, [open, onClose]);
 
@@ -62,7 +66,7 @@ export function WetLabReportView({ open, onClose, ...input }: Props) {
   const handlePrint = () => window.print();
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#05060a] flex flex-col print:bg-white print:relative print:inset-auto">
+    <div className="wet-lab-report-print-host fixed inset-0 z-[100] bg-[#05060a] flex flex-col print:bg-white print:relative print:inset-auto">
       {/* Header toolbar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-[#0d0f17]/80 backdrop-blur print:hidden">
         <div>
@@ -104,7 +108,7 @@ export function WetLabReportView({ open, onClose, ...input }: Props) {
       </div>
 
       {/* Document */}
-      <div className="flex-1 overflow-y-auto print:overflow-visible">
+      <div className="wet-lab-report-print-host flex-1 overflow-y-auto print:overflow-visible print:flex-none print:block">
         <article className="wet-lab-report mx-auto max-w-[920px] px-10 py-12 bg-white text-slate-900 print:max-w-none print:px-0 print:py-0 my-6 print:my-0 rounded-md print:rounded-none shadow-2xl print:shadow-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkMath]}

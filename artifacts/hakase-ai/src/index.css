@@ -514,11 +514,46 @@
 .wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
 
 @media print {
-  body * { visibility: hidden; }
-  .wet-lab-report, .wet-lab-report * { visibility: visible; }
-  .wet-lab-report { position: absolute; left: 0; top: 0; width: 100%; max-width: none; padding: 24px; box-shadow: none; }
-  .wet-lab-report h2 { page-break-after: avoid; }
-  .wet-lab-report table, .wet-lab-report pre { page-break-inside: avoid; }
+  @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+  /* Release the modal's fixed/flex/overflow constraints so the document
+     flows naturally across pages instead of being clipped to one page. */
+  html, body { height: auto !important; overflow: visible !important; background: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+  body * { visibility: hidden !important; }
+  .wet-lab-report, .wet-lab-report * { visibility: visible !important; }
+  /* Walk every ancestor of .wet-lab-report and neutralize fixed/flex/scroll. */
+  .wet-lab-report, .wet-lab-report * { box-shadow: none !important; }
+  .wet-lab-report {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* Hoist the report out of any fixed/scrolling parents during print. */
+  .wet-lab-report-print-host {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    z-index: auto !important;
+  }
+  .wet-lab-report-print-host > * {
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: #ffffff !important;
+  }
+  .wet-lab-report h1, .wet-lab-report h2, .wet-lab-report h3 { page-break-after: avoid; break-after: avoid; }
+  .wet-lab-report table, .wet-lab-report pre, .wet-lab-report .wet-lab-chart, .wet-lab-report .katex-display { page-break-inside: avoid; break-inside: avoid; }
+  .wet-lab-report tr, .wet-lab-report li { page-break-inside: avoid; break-inside: avoid; }
 }
 
 /* ── Wet-Lab Report — embedded SVG chart ─────────────────────────────── */
