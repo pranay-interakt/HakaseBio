@@ -4303,6 +4303,16 @@ export function HakaseAI() {
                       topTarget={targetSuggestions[0] ?? null}
                       therapeuticArea={therapeuticArea}
                       onCloseInputPanel={() => setInputPanelOpen(false)}
+                      targetSuggestions={targetSuggestions}
+                      onSelectTarget={(uid) => {
+                        uniprotManual.current = true;
+                        setUniprotAutoMode(false);
+                        setUniprotId(uid);
+                        setPdbId("");
+                        setPdbStructure(null);
+                        setProteinInfo(null);
+                        setProteinError(null);
+                      }}
                     />
                     {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
                       <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
@@ -8843,6 +8853,7 @@ function Layer1Results({
   bindingOn, toxOn, confidenceThreshold,
   safetyFlags, flagsAcknowledged, onAcknowledgeFlags,
   topTarget, therapeuticArea, onCloseInputPanel,
+  targetSuggestions, onSelectTarget,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -8867,6 +8878,8 @@ function Layer1Results({
   topTarget?: TargetSuggestion | null;
   therapeuticArea?: string;
   onCloseInputPanel?: () => void;
+  targetSuggestions?: TargetSuggestion[];
+  onSelectTarget?: (uniprotId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
@@ -9066,14 +9079,41 @@ function Layer1Results({
           {iv.doseResponse.curve.length === 0 ? (
             // Anti-fabrication: no synthetic curve when target isn't validated.
             // Render a compact, informative empty state instead of a giant blank chart.
-            <div className="flex flex-col items-center justify-center py-10 px-4 bg-white/[0.02] rounded-lg border border-white/5">
-              <TrendingUp className="w-8 h-8 text-slate-700 mb-2" />
-              <div className="text-[12px] text-slate-400 font-medium">Dose-response curve unavailable</div>
-              <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
-                No data is fabricated for unvalidated targets. Try a validated UniProt
-                (e.g. <span className="font-mono text-violet-400">P00533</span> · EGFR) to see the curve.
-              </div>
-            </div>
+            // When the molecule HAS a high-confidence (≥0.65) auto-matched target
+            // but the user hasn't selected it yet, surface a one-click CTA so they
+            // don't have to scroll back to the Target panel — addresses repeated
+            // friction where users paste a SMILES, hit Run, and see "no curve"
+            // without realising a validated suggestion is sitting one panel up.
+            (() => {
+              const topValidated = (targetSuggestions ?? []).find(s => s.confidence >= 0.65);
+              return (
+                <div className="flex flex-col items-center justify-center py-10 px-4 bg-white/[0.02] rounded-lg border border-white/5">
+                  <TrendingUp className="w-8 h-8 text-slate-700 mb-2" />
+                  <div className="text-[12px] text-slate-400 font-medium">Dose-response curve unavailable</div>
+                  {topValidated && !uniprotId && onSelectTarget ? (
+                    <>
+                      <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
+                        A high-confidence target was auto-matched for this molecule but isn't selected yet.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onSelectTarget(topValidated.uniprotId)}
+                        className="mt-3 px-3 py-1.5 text-[10px] rounded-md bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25 transition-colors"
+                        title="Set this UniProt as the target, then re-run the simulation to generate the curve"
+                      >
+                        Use {topValidated.geneName ?? topValidated.uniprotId} ({topValidated.uniprotId}) · {(topValidated.confidence * 100).toFixed(0)}% conf
+                      </button>
+                      <div className="text-[9px] text-slate-600 mt-2 text-center">Then re-run the simulation to generate the curve.</div>
+                    </>
+                  ) : (
+                    <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
+                      No data is fabricated for unvalidated targets. Try a validated UniProt
+                      (e.g. <span className="font-mono text-violet-400">P00533</span> · EGFR) to see the curve.
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           ) : (
           <svg viewBox="0 0 400 200" className="w-full h-auto max-w-[560px] mx-auto block">
             <defs>
