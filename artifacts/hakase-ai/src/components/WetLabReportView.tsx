@@ -3,9 +3,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
 import { X, Download, Printer, Copy } from "lucide-react";
 import "katex/dist/katex.min.css";
 import { buildWetLabMarkdownReport, type ReportInput } from "@/lib/wetLabReportMarkdown";
+import { WetLabReportChart } from "./WetLabReportChart";
 
 type Props = ReportInput & {
   open: boolean;
@@ -104,7 +106,32 @@ export function WetLabReportView({ open, onClose, ...input }: Props) {
       {/* Document */}
       <div className="flex-1 overflow-y-auto print:overflow-visible">
         <article className="wet-lab-report mx-auto max-w-[920px] px-10 py-12 bg-white text-slate-900 print:max-w-none print:px-0 print:py-0 my-6 print:my-0 rounded-md print:rounded-none shadow-2xl print:shadow-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+            components={{
+              code({ className, children, ...rest }) {
+                const lang = /language-(\w[\w-]*)/.exec(className || "")?.[1];
+                if (lang === "chart-dose-response") {
+                  try {
+                    const payload = JSON.parse(String(children).trim());
+                    return <WetLabReportChart payload={payload} />;
+                  } catch {
+                    return (
+                      <pre className="chart-error">
+                        Failed to render dose-response chart (invalid payload).
+                      </pre>
+                    );
+                  }
+                }
+                return (
+                  <code className={className} {...rest}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
             {markdown}
           </ReactMarkdown>
         </article>

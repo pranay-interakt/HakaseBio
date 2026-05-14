@@ -520,3 +520,9 @@
   .wet-lab-report h2 { page-break-after: avoid; }
   .wet-lab-report table, .wet-lab-report pre { page-break-inside: avoid; }
 }
+
+/* ── Wet-Lab Report — embedded SVG chart ─────────────────────────────── */
+.wet-lab-report .wet-lab-chart { margin: 18px 0 22px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; page-break-inside: avoid; }
+.wet-lab-report .wet-lab-chart svg { width: 100%; height: auto; display: block; }
+.wet-lab-report .wet-lab-chart figcaption { margin-top: 8px; font-size: 11px; color: #475569; font-style: italic; text-align: center; }
+.wet-lab-report .chart-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px; border-radius: 4px; font-size: 12px; }

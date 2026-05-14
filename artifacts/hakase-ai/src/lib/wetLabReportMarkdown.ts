@@ -47,6 +47,35 @@ function fmt(n: number | null | undefined, digits = 2, suffix = ""): string {
   return `${n.toFixed(digits)}${suffix}`;
 }
 
+// Derive a therapeutic-area enum value from a free-text or ICD-10-coded
+// indication string (e.g. "C50 – Breast Cancer (HR+/HER2-)" → "Oncology").
+// Returns undefined only when nothing matches — callers should fall back
+// to a placeholder rather than fabricating a category.
+export function deriveTherapeuticAreaFromIndication(
+  indication?: string,
+): string | undefined {
+  if (!indication) return undefined;
+  const s = indication.toLowerCase();
+  // ICD-10 chapter prefix (first letter+digits) before the dash, if present
+  const codeMatch = indication.match(/^\s*([A-Z])(\d{1,2})/);
+  const letter = codeMatch?.[1];
+  const num = codeMatch ? parseInt(codeMatch[2], 10) : NaN;
+  if (letter === "C" || (letter === "D" && num <= 49)) return "Oncology";
+  if (letter === "I") return "Cardiovascular";
+  if (letter === "F" || letter === "G") return "CNS";
+  if (letter === "A" || letter === "B" || letter === "J") return "Infectious Disease";
+  if (letter === "E") return "Metabolic";
+  if (letter === "M" || (letter === "D" && num >= 80 && num <= 89)) return "Immunology";
+  // keyword fallback
+  if (/cancer|carcinoma|tumou?r|leukem|lymphoma|sarcoma|oncolog|neoplas|melanoma|glioma|myeloma/.test(s)) return "Oncology";
+  if (/cardio|cardiac|heart|hyperten|atrial|ventric|stroke|coronar|arrhythm/.test(s)) return "Cardiovascular";
+  if (/alzheim|parkins|epilep|depress|anxiet|schizo|migra|neuro|cns|brain|cognit/.test(s)) return "CNS";
+  if (/infect|bacter|viral|virus|fung|covid|tubercul|malaria|hiv|hepatit|antimicrob/.test(s)) return "Infectious Disease";
+  if (/diabet|obesi|metabol|nash|nafld|cholester|lipid|thyroid/.test(s)) return "Metabolic";
+  if (/autoimmun|immune|rheumat|arthrit|lupus|psorias|crohn|colitis|ibd|ms|multiple sclerosis/.test(s)) return "Immunology";
+  return undefined;
+}
+
 // Therapeutic-area enum matches the UI / inVitroSim values
 // (Oncology, CNS, Cardiovascular, Metabolic, Infectious Disease, Immunology).
 function classifyTargetClass(area?: string): string {
@@ -64,6 +93,13 @@ function classifyTargetClass(area?: string): string {
 export function buildWetLabMarkdownReport(input: ReportInput): string {
   const { smiles, molName, molProps, iv, therapeuticArea, uniprotId, proteinName, pdbId, indication } = input;
   const dr = iv.doseResponse;
+
+  // Effective therapeutic area: explicit selection wins; otherwise derive
+  // from the indication (ICD-10 code or keyword). Drives kit selection,
+  // target-class label, and the report metadata row.
+  const derivedTA = therapeuticArea ? undefined : deriveTherapeuticAreaFromIndication(indication);
+  const effectiveTA = therapeuticArea || derivedTA;
+
   const haveCurve = dr.ic50_nM != null && dr.hillCoefficient != null && dr.maxInhibition != null;
   const wet: WetLabAssayReport | null = haveCurve
     ? buildWetLabReport({
@@ -71,12 +107,17 @@ export function buildWetLabMarkdownReport(input: ReportInput): string {
         ic50_nM: dr.ic50_nM!,
         hillCoefficient: dr.hillCoefficient!,
         maxInhibition_pct: dr.maxInhibition!,
-        therapeuticArea,
+        therapeuticArea: effectiveTA,
       })
     : null;
 
   const draftTag = DRAFT_TAG(smiles);
-  const targetClass = classifyTargetClass(therapeuticArea);
+  const targetClass = classifyTargetClass(effectiveTA);
+  const taDisplay = therapeuticArea
+    ? therapeuticArea
+    : derivedTA
+    ? `${derivedTA} _(derived from indication)_`
+    : PLACEHOLDER;
 
   // 95% CI estimates for IC50 and Hill (back-derived from triplicate noise
   // in the wet-lab report; honest range for a model-derived dataset).
@@ -147,7 +188,7 @@ export function buildWetLabMarkdownReport(input: ReportInput): string {
 | **Compound Identifier** | ${molName || PLACEHOLDER} |
 | **SMILES** | \`${smiles || PLACEHOLDER}\` |
 | **Molecular Weight** | ${fmt(molProps?.mw, 2, " g/mol")} |
-| **Therapeutic Area** | ${therapeuticArea || PLACEHOLDER} |
+| **Therapeutic Area** | ${taDisplay} |
 | **Indication** | ${indication || PLACEHOLDER} |
 | **Target Class** | ${targetClass} |
 | **Primary Target (UniProt)** | ${uniprotId ? `\`${uniprotId}\` — ${proteinName || PLACEHOLDER}` : PLACEHOLDER} |
@@ -351,11 +392,31 @@ ${replicateRows}
 
 ### 6.3 Dose–Response Curve
 
+${wet ? `\`\`\`chart-dose-response
+${JSON.stringify({
+  ic50_uM: wet.fit.ic50_uM,
+  hill: wet.fit.hill_slope,
+  top: wet.fit.top,
+  bottom: wet.fit.bottom,
+  r_squared: wet.fit.r_squared,
+  replicates: wet.replicates.map((r) => ({
+    concentration_uM: r.concentration_uM,
+    normalized_pct: r.normalized_pct,
+    normalized_sd_pct: r.normalized_sd_pct,
+  })),
+  fittedCurve: wet.fittedCurve,
+})}
+\`\`\`
+
+<details><summary>ASCII fallback (for plain-text archival / non-rendered viewers)</summary>
+
 \`\`\`
 ${asciiPlot}
 \`\`\`
 
-> _Publication-grade rendered plot is generated by the in-app viewer (Wet-Lab View, Dose-Response tab). Embedded above as ASCII rendering for archival-text compatibility._
+</details>` : `> _Curve fit not available — IC₅₀ / Hill / max-inhibition were not computed by the simulator for this run._`}
+
+> _Rendered SVG plot is the canonical figure for this section. The ASCII rendering above is preserved for plain-text exports (\`.md\`) and archival viewers that do not execute custom code-block renderers._
 
 ---
 
