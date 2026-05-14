@@ -480,8 +480,24 @@ function computeCYPInhibition(
  * wired (audit RF#3 / RF#4 / §9 steps 3–4).
  */
 const VALIDATED_TARGET_UNIPROTS = new Set([
-  "P00533", "P04626", "P01116", "P11802",
-  "Q00534", "Q06187", "P00519", "P15056",
+  // Kinases — well-characterized, abundant public IC50 data
+  "P00533", // EGFR
+  "P04626", // HER2 / ERBB2
+  "P01116", // KRAS
+  "P11802", // CDK4
+  "Q00534", // CDK6
+  "Q06187", // BTK
+  "P00519", // ABL1
+  "P15056", // BRAF
+  // HDAC family — extensive published IC50 / Ki data, well-validated
+  // biochemical assays (HDAC-Glo, fluorogenic peptide deacetylation)
+  "Q13547", // HDAC1
+  "Q92769", // HDAC2
+  "O15379", // HDAC3
+  "Q9UBN7", // HDAC6
+  "Q9UQL6", // HDAC5
+  "Q8WUI4", // HDAC7
+  "Q9BY41", // HDAC8
 ]);
 
 export function runInVitroSimulation(
