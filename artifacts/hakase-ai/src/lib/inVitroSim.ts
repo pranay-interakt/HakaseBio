@@ -512,6 +512,15 @@ export function runInVitroSimulation(
    * current MVP where no such service exists. Audit RF#3 / RF#4.
    */
   hasValidatedScreen: boolean = false,
+  /**
+   * Auto-match confidence for the chosen UniProt (0–1), as scored by
+   * `suggestTargets` / `convertChEMBLHitsToSuggestions`. When >= 0.65
+   * (the "High" / "Experimental" threshold the UI uses), the target is
+   * treated as validated for dose-response generation, even if it is
+   * not in the hard-coded `VALIDATED_TARGET_UNIPROTS` allow-list. Pass
+   * `null` to fall back to the allow-list only.
+   */
+  targetConfidence: number | null = null,
 ): InVitroResults {
   const seed = hashSmiles(smiles);
   const mw = molProps.mw ?? 300;
@@ -549,7 +558,18 @@ export function runInVitroSimulation(
   // in the validated catalog. Off-catalog molecule + no ML binding signal
   // → no IC50 / EC50 / curve, and downstream consumers (UI cards,
   // overallRisk scoring) must treat these as "no data" rather than zero.
-  const hasValidatedTarget = !!uniprotId && VALIDATED_TARGET_UNIPROTS.has(uniprotId);
+  // A target is treated as "validated" — and therefore eligible for
+  // dose-response generation — when EITHER:
+  //   (a) its UniProt is in the curated allow-list (kinases / HDACs with
+  //       extensive published IC50 data), OR
+  //   (b) the auto-match (suggestTargets / ChEMBL) scored it at "High"
+  //       confidence (≥ 0.65). This matches the confidence label the UI
+  //       already shows on the Target Suggestions panel, so users never
+  //       see "100% confidence — auto-matched" alongside "no curve".
+  const hasValidatedTarget =
+    !!uniprotId &&
+    (VALIDATED_TARGET_UNIPROTS.has(uniprotId) ||
+      (targetConfidence !== null && targetConfidence >= 0.65));
 
   const ic50_nM_raw = clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
   const ic50_nM: number | null = hasValidatedTarget ? ic50_nM_raw : null;

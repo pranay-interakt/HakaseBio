@@ -1798,7 +1798,14 @@ export function HakaseAI() {
           }
 
           setSimResults(results);
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea);
+          // Look up the auto-match confidence for the chosen UniProt so the
+          // simulator can treat any High-confidence (≥ 0.65) suggestion as
+          // a validated target for dose-response generation — not just the
+          // hard-coded allow-list. Falls back to null when no suggestion
+          // matches (e.g. user typed an arbitrary UniProt manually).
+          const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+          const targetConfidence = matchedSuggestion?.confidence ?? null;
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, false, targetConfidence);
           setInVitroResults(ivResults);
           const l1Flags = computeLayer1Flags(ivResults);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
