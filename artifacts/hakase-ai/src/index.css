@@ -491,3 +491,32 @@
   .text-\[60px\] { font-size: 62px; }
   .text-\[64px\] { font-size: 66px; }
 }
+
+/* ── Wet-Lab Comprehensive Report — typography + print ───────────────── */
+.wet-lab-report { font-family: ui-serif, Georgia, "Times New Roman", serif; line-height: 1.65; color: #0f172a; }
+.wet-lab-report h1 { font-size: 28px; font-weight: 800; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 3px double #0f172a; letter-spacing: -0.01em; }
+.wet-lab-report h2 { font-size: 20px; font-weight: 700; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; color: #1e293b; }
+.wet-lab-report h3 { font-size: 15px; font-weight: 700; margin: 22px 0 10px; color: #334155; }
+.wet-lab-report p, .wet-lab-report li { font-size: 13px; }
+.wet-lab-report strong { color: #0f172a; }
+.wet-lab-report code { font-family: "SF Mono", ui-monospace, Consolas, monospace; font-size: 12px; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; color: #0f172a; }
+.wet-lab-report pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 11px; line-height: 1.45; }
+.wet-lab-report pre code { background: transparent; color: inherit; padding: 0; font-size: 11px; }
+.wet-lab-report table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 12px; }
+.wet-lab-report th, .wet-lab-report td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; vertical-align: top; }
+.wet-lab-report th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+.wet-lab-report tr:nth-child(even) td { background: #f8fafc; }
+.wet-lab-report hr { border: none; border-top: 1px solid #cbd5e1; margin: 24px 0; }
+.wet-lab-report blockquote { border-left: 3px solid #94a3b8; padding: 6px 14px; margin: 12px 0; color: #475569; font-style: italic; background: #f8fafc; font-size: 12px; }
+.wet-lab-report ul, .wet-lab-report ol { padding-left: 22px; margin: 8px 0 14px; }
+.wet-lab-report li { margin: 3px 0; }
+.wet-lab-report .katex { font-size: 1.05em; }
+.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
+
+@media print {
+  body * { visibility: hidden; }
+  .wet-lab-report, .wet-lab-report * { visibility: visible; }
+  .wet-lab-report { position: absolute; left: 0; top: 0; width: 100%; max-width: none; padding: 24px; box-shadow: none; }
+  .wet-lab-report h2 { page-break-after: avoid; }
+  .wet-lab-report table, .wet-lab-report pre { page-break-inside: avoid; }
+}

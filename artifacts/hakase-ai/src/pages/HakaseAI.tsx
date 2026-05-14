@@ -75,6 +75,7 @@ import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { DemoRunner } from "@/components/DemoRunner";
 import { MlAdmetCard } from "@/components/MlAdmetCard";
 import { WetLabAssayCard } from "@/components/WetLabAssayCard";
+import { WetLabReportView } from "@/components/WetLabReportView";
 import {
   predictProtein,
   predictProteinMl,
@@ -4294,6 +4295,7 @@ export function HakaseAI() {
                       onAcknowledgeFlags={() => setHAIOpsCtx(prev => acknowledgeReview(prev))}
                       topTarget={targetSuggestions[0] ?? null}
                       therapeuticArea={therapeuticArea}
+                      onCloseInputPanel={() => setInputPanelOpen(false)}
                     />
                     {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
                       <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
@@ -8833,7 +8835,7 @@ function Layer1Results({
   uniprotId, pdbId, alphafoldPlddt, proteinName,
   bindingOn, toxOn, confidenceThreshold,
   safetyFlags, flagsAcknowledged, onAcknowledgeFlags,
-  topTarget, therapeuticArea,
+  topTarget, therapeuticArea, onCloseInputPanel,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -8857,11 +8859,14 @@ function Layer1Results({
   onAcknowledgeFlags?: () => void;
   topTarget?: TargetSuggestion | null;
   therapeuticArea?: string;
+  onCloseInputPanel?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [wetLabView, setWetLabView] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const molName = simResults?.molName ?? "";
 
   const handleGeneratePdf = async () => {
     if (pdfGenerating) return;
@@ -9528,6 +9533,41 @@ function Layer1Results({
           <Download className="w-3.5 h-3.5" /> Export JSON
         </Button>
       </div>
+
+      {/* Comprehensive Wet-Lab Report — full-screen, Markdown + LaTeX */}
+      {inVitroResults && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <Button
+            onClick={() => {
+              onCloseInputPanel?.();
+              setReportOpen(true);
+            }}
+            className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-[12px] font-semibold gap-2 px-5 py-2.5 shadow-lg shadow-violet-500/20"
+            title="Generate the comprehensive wet-lab assay report (full-screen, Markdown + LaTeX)"
+          >
+            <FileText className="w-4 h-4" />
+            Generate Comprehensive Wet-Lab Report
+          </Button>
+          <div className="text-[10px] text-slate-500">
+            Corporate-ready report · §1 Document Control → §15 Signatures · 4PL · Z′-factor · 95% CI
+          </div>
+        </div>
+      )}
+      {inVitroResults && (
+        <WetLabReportView
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          smiles={smiles}
+          molName={molName}
+          molProps={molProps}
+          iv={inVitroResults}
+          therapeuticArea={therapeuticArea}
+          uniprotId={uniprotId}
+          proteinName={proteinName}
+          pdbId={pdbId}
+          indication={indication}
+        />
+      )}
 
       <RegulatoryInsightCard layer={1} indication={indication} simResults={simResults} />
       <SimulationDataSources

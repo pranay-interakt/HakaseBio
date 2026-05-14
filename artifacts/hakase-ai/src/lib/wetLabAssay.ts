@@ -31,6 +31,9 @@ export interface AssayKit {
   notes: string;
 }
 
+// Therapeutic-area enum matches the values emitted by the UI / inVitroSim
+// (Oncology, CNS, Cardiovascular, Metabolic, Infectious Disease, Immunology).
+// A neutral "Generic" kit is used for any TA without a specialised mapping.
 const KIT_BY_AREA: Record<string, AssayKit> = {
   Oncology: {
     id: "adp-glo-kinase",
@@ -42,7 +45,7 @@ const KIT_BY_AREA: Record<string, AssayKit> = {
     positiveControl: "Staurosporine (1 µM)",
     notes: "Two-step luminescent kinase activity assay. ATP-depletion based.",
   },
-  Cardiology: {
+  Cardiovascular: {
     id: "lanthascreen-tr-fret",
     vendor: "Thermo Fisher",
     name: "LanthaScreen Eu Kinase Binding",
@@ -52,7 +55,7 @@ const KIT_BY_AREA: Record<string, AssayKit> = {
     positiveControl: "Reference inhibitor (10 µM)",
     notes: "Time-resolved FRET binding assay. ATP-independent.",
   },
-  Neurology: {
+  CNS: {
     id: "homogeneous-time-resolved-fluorescence",
     vendor: "PerkinElmer",
     name: "HTRF KinEASE-STK",
@@ -62,8 +65,47 @@ const KIT_BY_AREA: Record<string, AssayKit> = {
     positiveControl: "Staurosporine (1 µM)",
     notes: "Homogeneous TR-FRET. Suitable for low-volume 384-well screens.",
   },
+  "Infectious Disease": {
+    id: "alphalisa",
+    vendor: "PerkinElmer",
+    name: "AlphaLISA Target Engagement",
+    readout: "AlphaLISA counts",
+    incubationMin: 90,
+    atpConc_uM: null,
+    positiveControl: "Reference antimicrobial (10 µM)",
+    notes: "Bead-based proximity assay. Suitable for microbial enzyme inhibition.",
+  },
+  Metabolic: {
+    id: "homogeneous-time-resolved-fluorescence",
+    vendor: "Cisbio / Revvity",
+    name: "HTRF Nuclear Receptor Coactivator Recruitment",
+    readout: "TR-FRET ratio",
+    incubationMin: 120,
+    atpConc_uM: null,
+    positiveControl: "Reference agonist / antagonist (1 µM)",
+    notes: "Cofactor-recruitment TR-FRET assay for nuclear receptors.",
+  },
+  Immunology: {
+    id: "alphalisa",
+    vendor: "PerkinElmer",
+    name: "AlphaLISA Cytokine / Phospho-Protein",
+    readout: "AlphaLISA counts",
+    incubationMin: 90,
+    atpConc_uM: null,
+    positiveControl: "Reference modulator (1 µM)",
+    notes: "Bead-based proximity assay. Suitable for cytokine/phospho-readouts.",
+  },
 };
-const KIT_DEFAULT: AssayKit = KIT_BY_AREA.Oncology;
+const KIT_DEFAULT: AssayKit = {
+  id: "adp-glo-kinase",
+  vendor: "—",
+  name: "Generic Biochemical Inhibition Assay (kit not specified)",
+  readout: "Luminescence (RLU)",
+  incubationMin: 60,
+  atpConc_uM: null,
+  positiveControl: "Reference inhibitor (10 µM)",
+  notes: "No therapeutic-area-specific kit selected. Replace with the validated kit for your target class before bench execution.",
+};
 
 export function selectAssayKit(therapeuticArea?: string): AssayKit {
   if (!therapeuticArea) return KIT_DEFAULT;
