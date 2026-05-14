@@ -1,3 +1,5 @@
+import { hasSubstructure } from "./chemistry";
+
 export interface MechanisticToxicity {
   organ: string;
   risk: "High" | "Moderate" | "Low";
@@ -57,17 +59,6 @@ interface InVitroInput {
   ic50_nM: number;
 }
 
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-function sr(seed: number): number {
-  const v = Math.sin(seed * 9301 + 49297) * 233280;
-  return v - Math.floor(v);
-}
-
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -75,7 +66,20 @@ function clamp(v: number, lo: number, hi: number): number {
 interface StructuralAlertDef {
   name: string;
   motifDescription: string;
-  triggers: (mol: MolInput, seed: number) => boolean;
+  /**
+   * SMARTS patterns that identify the structural motif. The alert fires only
+   * when the molecule actually contains at least one of these substructures
+   * (real RDKit substruct match — never stochastic). This is the anti-
+   * fabrication invariant: an alert with no motif present must NEVER fire.
+   */
+  motifSmarts: string[];
+  /**
+   * Literature-prior confidence (0–1) for this AOP, anchored on published
+   * clinical evidence (e.g. NAPQI/acetaminophen ≈ 0.95; arene oxide ≈ 0.60
+   * because most aromatic rings are not appreciably epoxidized in vivo).
+   * Modulated at runtime by logP / CL_int / hERG signal — never randomized.
+   */
+  literatureConfidence: number;
   organ: string;
   aopId: string;
   aopChain: string[];
@@ -98,7 +102,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Aniline / Aromatic Amine",
     motifDescription: "Ar-NH₂ or Ar-NHR",
-    triggers: (mol, seed) => mol.logP > 1.5 && sr(seed + 200) < 0.55,
+    motifSmarts: ["[NX3;H1,H2;$(Nc);!$(NC=O)]"],
+    literatureConfidence: 0.75,
     organ: "Liver",
     aopId: "AOP-18",
     aopChain: [
@@ -123,7 +128,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Quinone / Hydroquinone",
     motifDescription: "1,4-dihydroxybenzene or catechol",
-    triggers: (mol, seed) => mol.logP > 2.0 && mol.hbdCount >= 2 && sr(seed + 201) < 0.4,
+    motifSmarts: ["c1cc(O)c(O)cc1", "Oc1ccc(O)cc1", "c1cc(O)ccc1O"],
+    literatureConfidence: 0.85,
     organ: "Liver / Bone Marrow",
     aopId: "AOP-220",
     aopChain: [
@@ -148,7 +154,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Thiophene S-Oxidation",
     motifDescription: "Thiophene ring system",
-    triggers: (mol, seed) => mol.logP > 1.0 && sr(seed + 202) < 0.35,
+    motifSmarts: ["c1ccsc1", "s1cccc1"],
+    literatureConfidence: 0.80,
     organ: "Liver",
     aopId: "AOP-34",
     aopChain: [
@@ -173,7 +180,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Acyl Glucuronide Reactivity",
     motifDescription: "Carboxylic acid (forms reactive acyl glucuronide)",
-    triggers: (mol, seed) => mol.hbaCount >= 4 && mol.logP > 1.5 && sr(seed + 203) < 0.4,
+    motifSmarts: ["[CX3](=O)[OX2H1]"],
+    literatureConfidence: 0.70,
     organ: "Liver / GI Tract",
     aopId: "AOP-150",
     aopChain: [
@@ -198,7 +206,11 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Epoxide Formation (Arene Oxide)",
     motifDescription: "Unsubstituted aromatic ring susceptible to CYP epoxidation",
-    triggers: (mol, seed) => mol.molecularWeight > 250 && mol.logP > 2.5 && sr(seed + 204) < 0.45,
+    // Phenyl ring with at least 3 unsubstituted aromatic carbons — broad
+    // benzene/naphthalene-style ring susceptible to CYP arene-oxide formation.
+    // Excludes already-substituted electron-poor systems by requiring [cH].
+    motifSmarts: ["[cH]1[cH][cH][cH]cc1", "c1ccc2ccccc2c1"],
+    literatureConfidence: 0.60,
     organ: "Liver / Skin",
     aopId: "AOP-107",
     aopChain: [
@@ -223,7 +235,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Nitroaromatic Reduction",
     motifDescription: "Ar-NO₂ (nitro group on aromatic ring)",
-    triggers: (mol, seed) => mol.logP > 0.5 && sr(seed + 205) < 0.3,
+    motifSmarts: ["c[NX3](=O)=O", "c[N+](=O)[O-]"],
+    literatureConfidence: 0.90,
     organ: "Liver / Bladder",
     aopId: "AOP-262",
     aopChain: [
@@ -248,7 +261,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "α,β-Unsaturated Carbonyl (Michael Acceptor)",
     motifDescription: "Conjugated enone or enal system",
-    triggers: (mol, seed) => mol.logP > 1.0 && mol.molecularWeight > 200 && sr(seed + 206) < 0.35,
+    motifSmarts: ["[CX3]=[CX3][CX3]=O", "C=CC(=O)"],
+    literatureConfidence: 0.85,
     organ: "Liver / Kidney",
     aopId: "AOP-131",
     aopChain: [
@@ -273,7 +287,8 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Furan Ring Oxidation",
     motifDescription: "Furan heterocycle",
-    triggers: (mol, seed) => mol.logP > 1.5 && sr(seed + 207) < 0.3,
+    motifSmarts: ["c1ccoc1", "o1cccc1"],
+    literatureConfidence: 0.85,
     organ: "Liver",
     aopId: "AOP-38",
     aopChain: [
@@ -298,7 +313,9 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Methylene Dioxy (MDP) Metabolic Inhibition",
     motifDescription: "Methylenedioxy bridge (-OCH₂O-)",
-    triggers: (mol, seed) => mol.molecularWeight > 250 && sr(seed + 208) < 0.3,
+    // Methylenedioxy (benzodioxole) — fused 5-ring -O-CH2-O- on aromatic ring
+    motifSmarts: ["c1ccc2OCOc2c1", "[#6;a][OX2][CH2][OX2][#6;a]"],
+    literatureConfidence: 0.85,
     organ: "Liver (CYP Inhibition)",
     aopId: "AOP-445",
     aopChain: [
@@ -323,7 +340,9 @@ const STRUCTURAL_ALERTS: StructuralAlertDef[] = [
   {
     name: "Phenol Oxidation to Quinone-Imine",
     motifDescription: "para-Aminophenol or hydroxylamine adjacent to ring",
-    triggers: (mol, seed) => mol.hbdCount >= 1 && mol.logP > 0.5 && sr(seed + 209) < 0.35,
+    // para-Aminophenol motif (NAPQI precursor — acetaminophen archetype)
+    motifSmarts: ["Nc1ccc(O)cc1", "Oc1ccc(N)cc1", "[NX3;H1,H2]c1ccc([OX2H])cc1"],
+    literatureConfidence: 0.95,
     organ: "Liver / Skin / Blood",
     aopId: "AOP-96",
     aopChain: [
@@ -351,20 +370,24 @@ export function runBioactivationAssessment(
   mol: MolInput,
   ivData: InVitroInput
 ): BioactivationAssessment {
-  const seed = hashStr(mol.smiles);
+  // Anti-fabrication invariant: alerts must reflect real substructure
+  // matches against the SMILES, never a stochastic seed. If RDKit hasn't
+  // loaded (rare — only on cold start before initChemistry resolves), we
+  // return an empty assessment instead of fabricating alerts.
   const triggered: StructuralAlertDef[] = [];
-
   for (const alert of STRUCTURAL_ALERTS) {
-    if (alert.triggers(mol, seed)) {
-      triggered.push(alert);
-    }
+    const present = alert.motifSmarts.some(s => hasSubstructure(mol.smiles, s));
+    if (present) triggered.push(alert);
   }
 
-  const mechanisticToxicities: MechanisticToxicity[] = triggered.map((a, idx) => {
-    const baseConf = 0.55 + sr(seed + 300 + idx) * 0.35;
-    const clintBoost = ivData.microsomalCLint > 30 ? 0.08 : 0;
-    const logPBoost = mol.logP > 4 ? 0.05 : 0;
-    const confidence = clamp(baseConf + clintBoost + logPBoost, 0.3, 0.95);
+  const mechanisticToxicities: MechanisticToxicity[] = triggered.map(a => {
+    // Confidence is the literature prior for the AOP, gently modulated by
+    // metabolic-load signals (high microsomal CL_int and high logP both
+    // increase the chance the motif is actually bioactivated in vivo).
+    // No randomness — same SMILES → same confidence, every run.
+    const clintBoost = ivData.microsomalCLint > 30 ? 0.05 : 0;
+    const logPBoost = mol.logP > 4 ? 0.03 : 0;
+    const confidence = clamp(a.literatureConfidence + clintBoost + logPBoost, 0.3, 0.97);
 
     return {
       organ: a.organ,

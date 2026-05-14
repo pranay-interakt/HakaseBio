@@ -284,6 +284,20 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
   }
 }
 
+export function hasSubstructure(smiles: string, smarts: string): boolean {
+  if (!rdkit || !smiles.trim()) return false;
+  let mol: any = null;
+  try {
+    mol = rdkit.get_mol(smiles.trim());
+    if (!mol || !mol.is_valid()) return false;
+    return trySubstructMatch(mol, smarts);
+  } catch {
+    return false;
+  } finally {
+    mol?.delete();
+  }
+}
+
 function trySubstructMatch(mol: any, smarts: string): boolean {
   let qmol: any = null;
   try {
