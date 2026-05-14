@@ -74,6 +74,7 @@ import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
 import { DemoRunner } from "@/components/DemoRunner";
 import { MlAdmetCard } from "@/components/MlAdmetCard";
+import { WetLabAssayCard } from "@/components/WetLabAssayCard";
 import {
   predictProtein,
   predictProteinMl,
@@ -8860,6 +8861,7 @@ function Layer1Results({
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [wetLabView, setWetLabView] = useState(false);
 
   const handleGeneratePdf = async () => {
     if (pdfGenerating) return;
@@ -9000,22 +9002,55 @@ function Layer1Results({
       {/* Dose-Response Tab */}
       {activeTab === "dose-response" && iv && (
         <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-[12px] font-semibold text-slate-300">Dose-Response Curve</h3>
-            {/* RF#12 / §9 step 11: potencyClass is nullable when ic50_nM
-                is null (no validated target). When present, surface the TA
-                convention used so the user knows whether "High" means kinase
-                <100 nM, GPCR <50 nM, etc. */}
-            {iv.doseResponse.potencyClass !== null ? (
-              <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
-                {iv.doseResponse.potencyClass} Potency{iv.doseResponse.potencyConvention ? ` · ${iv.doseResponse.potencyConvention}` : ""}
-              </Badge>
-            ) : (
-              <Badge className="text-[9px] bg-white/5 text-slate-400">
-                Potency — no validated target
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Wet-lab view toggle — only meaningful when a curve exists */}
+              {iv.doseResponse.curve.length > 0 && iv.doseResponse.ic50_nM != null && (
+                <div className="inline-flex rounded-md border border-white/10 overflow-hidden text-[10px]">
+                  <button
+                    onClick={() => setWetLabView(false)}
+                    className={`px-2.5 py-1 transition-colors ${!wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Sleek
+                  </button>
+                  <button
+                    onClick={() => setWetLabView(true)}
+                    className={`px-2.5 py-1 transition-colors border-l border-white/10 ${wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                    title="Wet-lab style assay report (raw RLU + 4PL fit + plate controls)"
+                  >
+                    Wet-Lab View
+                  </button>
+                </div>
+              )}
+              {/* RF#12 / §9 step 11: potencyClass is nullable when ic50_nM
+                  is null (no validated target). When present, surface the TA
+                  convention used so the user knows whether "High" means kinase
+                  <100 nM, GPCR <50 nM, etc. */}
+              {iv.doseResponse.potencyClass !== null ? (
+                <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+                  {iv.doseResponse.potencyClass} Potency{iv.doseResponse.potencyConvention ? ` · ${iv.doseResponse.potencyConvention}` : ""}
+                </Badge>
+              ) : (
+                <Badge className="text-[9px] bg-white/5 text-slate-400">
+                  Potency — no validated target
+                </Badge>
+              )}
+            </div>
           </div>
+
+          {/* Wet-lab view — replaces the sleek curve + metrics + viability block when toggled on */}
+          {wetLabView && iv.doseResponse.ic50_nM != null && iv.doseResponse.hillCoefficient != null && iv.doseResponse.maxInhibition != null && (
+            <WetLabAssayCard
+              smiles={smiles}
+              ic50_nM={iv.doseResponse.ic50_nM}
+              hillCoefficient={iv.doseResponse.hillCoefficient}
+              maxInhibition_pct={iv.doseResponse.maxInhibition}
+              therapeuticArea={therapeuticArea}
+            />
+          )}
+          {!wetLabView && (
+          <>
           {iv.doseResponse.curve.length === 0 ? (
             // Anti-fabrication: no synthetic curve when target isn't validated.
             // Render a compact, informative empty state instead of a giant blank chart.
@@ -9088,6 +9123,8 @@ function Layer1Results({
               <div><div className="text-[9px] text-slate-500">Viability @10µM</div><div className={`text-[12px] font-semibold ${iv.cellViability.viabilityAt10uM > 80 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.viabilityAt10uM.toFixed(0)}%</div></div>
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 

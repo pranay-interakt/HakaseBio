@@ -1,0 +1,52 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# 1. Simulated Raw Data Entry (Replace these with your exact wet-lab numbers)
+# Concentration values in Micromolar (µM)
+concentrations = np.array([10.0, 3.33, 1.11, 0.37, 0.123, 0.041, 0.014, 0.0046])
+# Mean raw luminescence/absorbance signal per dose
+raw_signals = np.array([4500, 12000, 35000, 78000, 112000, 121000, 124000, 125000])
+# Standard deviation from your pipetted triplicates
+std_devs = np.array([350, 890, 2100, 4500, 5100, 3900, 4100, 3800])
+
+# Control Reference baselines
+dmso_control_mean = 126000
+positive_control_mean = 3800
+
+# 2. Mathematical Normalization to Percent (%) Response / Inhibition
+normalized_response = ((raw_signals - positive_control_mean) / (dmso_control_mean - positive_control_mean)) * 100
+normalized_errors = (std_devs / (dmso_control_mean - positive_control_mean)) * 100
+
+# 3. Define the Sigmoidal 4-Parameter Logistic Equation (4PL Curve Fit)
+def four_param_logistic(x, bottom, top, log_ic50, hill_slope):
+    return bottom + (top - bottom) / (1 + 10**((log_ic50 - x) * hill_slope))
+
+# Log-transform concentrations for linear spacing on charts
+log_conc = np.log10(concentrations)
+
+# Curve fitting optimization execution
+popt, pcov = curve_fit(four_param_logistic, log_conc, normalized_response, p0=[0, 100, -0.5, 1.0])
+fitted_bottom, fitted_top, calculated_log_ic50, calculated_hill_slope = popt
+calculated_ic50 = 10**calculated_log_ic50
+
+# 4. Generate High-Resolution Publication Graph
+x_fine = np.linspace(min(log_conc) - 0.5, max(log_conc) + 0.5, 500)
+y_fine = four_param_logistic(x_fine, *popt)
+
+plt.figure(figsize=(7, 4.5), dpi=150)
+plt.errorbar(log_conc, normalized_response, yerr=normalized_errors, fmt='o', color='#1f77b4', capsize=4, elinewidth=1.5, label='Compound X Data')
+plt.plot(x_fine, y_fine, color='#d62728', linewidth=2, label=f'4PL Fit (IC50 = {calculated_ic50:.3f} µM)')
+
+plt.xscale('linear')
+plt.title('Small Molecule Target Inhibition Profile', fontsize=12, fontweight='bold')
+plt.xlabel('Log [Compound Concentration, µM]', fontsize=10)
+plt.ylabel('% Relative Response (Normalized to Controls)', fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.4)
+plt.legend(loc='lower left')
+plt.tight_layout()
+plt.show()
+
+print(f"--- Potency Fitting Output ---")
+print(f"Calculated IC50 Profile: {calculated_ic50:.4f} µM")
+print(f"Hill Slope Dynamic Parameter: {calculated_hill_slope:.2f}")
