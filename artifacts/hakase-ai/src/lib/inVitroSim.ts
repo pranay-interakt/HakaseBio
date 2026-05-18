@@ -243,7 +243,11 @@ function getTherapeuticProfile(therapeuticArea: string | null | undefined): Ther
   return THERAPEUTIC_AREA_PROFILES[therapeuticArea] ?? TA_PROFILE_NEUTRAL;
 }
 
-function computeBaselinePIC50(
+// Exported for the internal L1 bioactivity QC harness
+// (scripts/qc-l1-bioactivity.mts) which back-tests this predictor against
+// DrugCentral literature IC50 / Ki / Kd values. Not part of the public
+// runtime API — UI code should call runInVitroSimulation instead.
+export function computeBaselinePIC50(
   mw: number, logP: number, tpsa: number,
   hbd: number, hba: number, rotBonds: number,
   nArom: number, fsp3: number, heavyAtoms: number,
@@ -306,7 +310,8 @@ function computeBaselinePIC50(
   return clamp(pIC50, 4.0, 9.0);
 }
 
-function computePharmacophoreBonus(
+// Exported for the L1 bioactivity QC harness — see computeBaselinePIC50.
+export function computePharmacophoreBonus(
   pharm: PharmacophoreProfile | null,
   therapeuticArea: string | null | undefined,
 ): number {

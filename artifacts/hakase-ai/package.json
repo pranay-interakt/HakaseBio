@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint:terminology": "node scripts/lint-terminology.mjs",
     "check": "pnpm run typecheck && pnpm run lint:terminology",
-    "build:drugcentral": "node scripts/build-drugcentral-allowlist.mjs"
+    "build:drugcentral": "node scripts/build-drugcentral-allowlist.mjs",
+    "qc:l1": "tsx scripts/qc-l1-bioactivity.mts"
   },
   "dependencies": {
     "3dmol": "^2.5.4",
