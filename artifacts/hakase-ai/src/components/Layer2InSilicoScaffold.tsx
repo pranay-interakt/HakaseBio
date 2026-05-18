@@ -508,15 +508,13 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         case 1: setOne("s1", await runStage1(simResults)); break;
         case 2: setOne("s2", await runStage2Docking(simResults)); break;
         case 3: {
-          // RF#1 / §9 step 1: runStage3 throws if sim.binding is null.
-          if (!simResults.binding) {
-            setOne("s3", {
-              stage: 3, name: "Selectivity profile", status: "error",
-              reason: "Stage 3 requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
-            } as StageResult<any>);
-            break;
-          }
-          setOne("s3", await runStage3(simResults));
+          // Stage 3 now works for ALL targets (including off-catalog). It runs
+          // ML binding + ADMET-AI for any UniProt. The L1↔ML agreement check
+          // is simply skipped when L1 catalog binding is not available.
+          // Pass Stage 2 Vina result for the physics↔ML cross-comparison when
+          // docking has already been run via the Stage 2 "Run" button.
+          const s2r = results.s2?.status === "wired" ? results.s2.result : undefined;
+          setOne("s3", await runStage3(simResults, s2r));
           break;
         }
         case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
@@ -548,14 +546,9 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         }
         case 6: setOne("s6", runStage6(simResults, inVitroResults, params, stage8DosePerAdmin())); break;
         case 7: {
-          // RF#1 / §9 step 1: runStage7 throws if sim.binding is null.
-          if (!simResults.binding) {
-            setOne("s7", {
-              stage: 7, name: "QSP / PD coupling", status: "error",
-              reason: "Stage 7 requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
-            } as StageResult<any>);
-            break;
-          }
+          // Stage 7 now works with or without L1 catalog binding — it prefers
+          // the ML pKd from Stage 3 when available, falls back to L1 heuristic
+          // Ki, and uses a labeled fallback default when neither is available.
           const pk = results.s6?.result;
           const fu = results.s8?.result?.fu_fraction;
           if (!pk || !fu) {
@@ -564,7 +557,11 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               reason: "Run Stage 6 (PBPK) and Stage 8 (TI) first — Stage 7 needs the PK curve and a valid fu.",
             } as StageResult<any>);
           } else {
-            setOne("s7", runStage7(simResults, pk, fu));
+            // Pass ML Kd from Stage 3 (preferred) — null if Stage 3 hasn't run
+            const mlKd = results.s3?.result?.binding_ml.available
+              ? results.s3.result.binding_ml.Kd_nM
+              : null;
+            setOne("s7", runStage7(simResults, pk, fu, mlKd));
           }
           break;
         }
@@ -795,7 +792,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
                           <span className="text-slate-500">TPSA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.tpsa.toFixed(0)}</span>
                           <span className="text-slate-500">HBD/HBA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.hbd}/{r.rdkit_descriptors.hba}</span>
                           <span className="text-slate-500">RotB</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.rotBonds}</span>
-                          <span className="text-slate-500">QED · SA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.qed.toFixed(2)} · {r.rdkit_descriptors.saScore.toFixed(2)}</span>
+                          <span className="text-slate-500">QED~ · SA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.qed_approx.toFixed(2)} · {r.rdkit_descriptors.saScore.toFixed(2)}</span>
                         </div>
                         <div className="flex gap-2 pt-1">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${r.rule_of_5.pass ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8" : "border-amber-500/30 text-amber-300 bg-amber-500/8"}`}>RoF {r.rule_of_5.pass ? "pass" : `${r.rule_of_5.violations} viol.`}</span>

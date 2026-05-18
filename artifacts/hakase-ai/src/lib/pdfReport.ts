@@ -134,7 +134,7 @@ export async function generateLayer1Report(input: Layer1ReportInput): Promise<vo
     ["LogP", fmt((input.molProps as { logP?: number })?.logP)],
     ["TPSA", `${fmt((input.molProps as { tpsa?: number })?.tpsa)} Å²`],
     ["HBD / HBA", `${fmt((input.molProps as { hbd?: number })?.hbd, 0)} / ${fmt((input.molProps as { hba?: number })?.hba, 0)}`],
-    ["QED", fmt((input.molProps as { qed?: number })?.qed)],
+    ["QED (approx)", fmt((input.molProps as { qed_approx?: number })?.qed_approx)],
   ]);
 
   // ── Narrative from Claude ────────────────────────────────────

@@ -48,6 +48,14 @@ type StageDef = {
   pendingReason?: string;
   /** True for stages whose schema also accepts a Manual Entry path (currently 2, 3, 4, 5). Stage 6 is pure orchestration. */
   acceptsManualEntry: boolean;
+  /**
+   * "data-unavailable" — endpoint exists but required data artifact (Parquet/snapshot) is not yet provisioned.
+   *                      Stage is rendered dimmed with a DATA UNAVAILABLE badge.
+   * "roadmap"          — stage logic exists but depends on manual entry only; no automated inference yet.
+   *                      Stage is rendered with a ROADMAP badge.
+   * undefined          — fully operational (S1, S2).
+   */
+  readinessFlag?: "data-unavailable" | "roadmap";
 };
 
 const L3_STAGES: StageDef[] = [
@@ -80,6 +88,7 @@ const L3_STAGES: StageDef[] = [
       { name: "Manual entry (literature-curated)",        note: "Cellosaurus CVCL accession + published IC50 + citation — Zero-Lab override path, no CRO dependency" },
     ],
     acceptsManualEntry: true,
+    readinessFlag: "data-unavailable",
   },
   {
     n: 4, name: "Patient-line projection (oncology only)", wired: "ml-service",
@@ -91,6 +100,7 @@ const L3_STAGES: StageDef[] = [
       { name: "Manual entry (this build)",        note: "DepMap accession + literature-curated IC50 rows + citation, OR explicit non-oncology not_applicable" },
     ],
     acceptsManualEntry: true,
+    readinessFlag: "data-unavailable",
   },
   {
     n: 5, name: "DILI biomarker proxy + permeability", wired: "in-house",
@@ -101,6 +111,7 @@ const L3_STAGES: StageDef[] = [
     ],
     pendingReason: "Auto-runs deterministically once Stage 2 Manual Entry is filled (mechanism flags required). Optional brain Kp,uu override available.",
     acceptsManualEntry: true,
+    readinessFlag: "roadmap",
   },
   {
     n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "in-house",
@@ -110,6 +121,7 @@ const L3_STAGES: StageDef[] = [
       { name: "lib/cascadeFlagState.ts → canSignLoadBearing", note: "Amber Curator predicate consumed downstream by L3 — requires cascadeKind:'pass'; t-user / t0 surrogate map to prediction_only" },
     ],
     acceptsManualEntry: false,
+    readinessFlag: "roadmap",
   },
 ];
 
@@ -313,6 +325,21 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
   );
 }
 
+function ReadinessBadge({ flag }: { flag: StageDef["readinessFlag"] }) {
+  if (!flag) return null;
+  const isUnavailable = flag === "data-unavailable";
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase border ${
+      isUnavailable
+        ? "bg-rose-500/12 text-rose-400 border-rose-500/30"
+        : "bg-amber-500/12 text-amber-400 border-amber-500/30"
+    }`}>
+      <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+      {isUnavailable ? "Data unavailable" : "Roadmap"}
+    </span>
+  );
+}
+
 function StageCard({
   stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason, errorReason, children,
 }: {
@@ -328,16 +355,34 @@ function StageCard({
 }) {
   const wb = wiredBadge(stage.wired);
   const canAutoRun = stage.wired === "in-house" || stage.wired === "ml-service";
+  const dimmed = stage.readinessFlag != null;
   return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+    <div className={`rounded-lg border p-3 ${dimmed ? "border-white/5 bg-white/[0.01] opacity-75" : "border-white/8 bg-white/[0.02]"}`}>
+      {stage.readinessFlag === "data-unavailable" && (
+        <div className="flex items-center gap-2 rounded-md border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 mb-2.5">
+          <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+          <p className="text-[10px] text-rose-300/80 leading-snug">
+            Required data artifact (Parquet) is not yet provisioned. This stage will show real results once the data pipeline is deployed. Manual entry is available in the interim.
+          </p>
+        </div>
+      )}
+      {stage.readinessFlag === "roadmap" && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 mb-2.5">
+          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+          <p className="text-[10px] text-amber-300/80 leading-snug">
+            Automated inference not yet implemented. Manual entry only — enter literature-curated values to populate this stage.
+          </p>
+        </div>
+      )}
       <div className="flex items-start gap-2.5 mb-2">
-        <div className="w-6 h-6 rounded-md bg-teal-500/10 border border-teal-500/25 text-teal-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
+        <div className={`w-6 h-6 rounded-md border text-[11px] font-semibold flex items-center justify-center shrink-0 ${dimmed ? "bg-slate-500/10 border-slate-500/25 text-slate-400" : "bg-teal-500/10 border-teal-500/25 text-teal-300"}`}>
           {stage.n}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
             <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${wb.cls}`}>{wb.text}</span>
+            <ReadinessBadge flag={stage.readinessFlag} />
             {hasResult && (
               <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
             )}
@@ -1513,9 +1558,18 @@ export function Layer3ExVivoScaffold({
           <L3InputParamsCard params={params} setParams={setParams} simResults={simResults} />
 
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <Atom className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Ex-Vivo Pipeline (Spec v1.1 §3 + §10)</span>
+            </div>
+            {/* Pipeline readiness banner */}
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 mb-3">
+              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-300/80 leading-snug">
+                <span className="font-semibold text-amber-300">S1–S2 are fully operational</span> (real data pipelines, no synthetic fallback).{" "}
+                <span className="font-semibold text-rose-300">S3–S4</span> require external data artifacts (Parquet) to be provisioned before automated inference is available — manual entry works now.{" "}
+                <span className="font-semibold text-amber-300">S5–S6</span> are roadmap stages; S5 auto-runs once S2 manual entry is complete, S6 is pure orchestration.
+              </p>
             </div>
             <div className="space-y-2">
               {L3_STAGES.map(s => {

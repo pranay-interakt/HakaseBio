@@ -10,7 +10,8 @@ export interface MolecularProperties {
   hba: number;
   tpsa: number;
   rotBonds: number;
-  qed: number;
+  /** Bickerton QED approximation (8-component ADS; ALERTS component uses pharmacophore proxy, not full ~150 SMARTS). Use as a drug-likeness heuristic only. */
+  qed_approx: number;
   heavyAtoms: number;
   numRings: number;
   numAromaticRings: number;
@@ -125,7 +126,7 @@ export function getRDKitInstance(): any | null {
 const INVALID_PROPS: MolecularProperties = {
   isValid: false,
   mw: 0, logP: 0, hbd: 0, hba: 0, tpsa: 0, rotBonds: 0,
-  qed: 0, heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
+  qed_approx: 0, heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
   lipinskiMW: false, lipinskiLogP: false, lipinskiHBD: false,
   lipinskiHBA: false, lipinskiPass: false,
   fsp3: 0, numHeteroatoms: 0, numHeterocycles: 0, numAromaticHeterocycles: 0,
@@ -193,7 +194,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
     // (Michael acceptor, epoxide, nitro, aromatic amine); the bioactivation
     // engine still runs a fuller alert scan separately. Documented honest
     // approximation — not a re-fit, no jitter.
-    const qed = (() => {
+    const qedApprox = (() => {
       if (mw === 0) return 0;
       const ads = (
         x: number, a: number, b: number, c: number, d: number,
@@ -245,7 +246,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
         w.ALERTS * Math.log(dALERTS);
       const qedRaw = Math.exp(lnSum / wSum);
       return parseFloat(Math.max(0, Math.min(1, qedRaw)).toFixed(3));
-    })();
+    })(); // end qedApprox
 
     const lipinskiMW   = mw   <= 500;
     const lipinskiLogP = logP <= 5;
@@ -259,7 +260,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       hbd, hba,
       tpsa:     parseFloat(tpsa.toFixed(1)),
       rotBonds,
-      qed:      parseFloat(qed.toFixed(3)),
+      qed_approx: parseFloat(qedApprox.toFixed(3)),
       heavyAtoms, numRings, numAromaticRings, numAtoms,
       lipinskiMW, lipinskiLogP, lipinskiHBD, lipinskiHBA,
       lipinskiPass: lipinskiMW && lipinskiLogP && lipinskiHBD && lipinskiHBA,

@@ -57,7 +57,8 @@ export interface SimResults {
    */
   binding:   BindingEstimate | null;
   lipinski:  LipinskiAnalysis;
-  qed:       number;
+  /** Bickerton QED approximation — 8-component ADS with pharmacophore-proxy ALERTS. Optimistic upper bound when broader PAINS/Brenk alerts fire. */
+  qed_approx: number;
   /**
    * Synthetic Accessibility complexity score (1=easy, 10=hard).
    * Implements the COMPLEXITY-PENALTY portion of Ertl-Schuffenhauer 2009
@@ -69,6 +70,14 @@ export interface SimResults {
    */
   saScore:   number;
   goNogo:    "GO" | "WATCH" | "NO-GO";
+  /**
+   * Composite Heuristic Score in [0, 1].
+   * NOT a calibrated probability. Computed as a weighted sum of ADMET
+   * sub-scores, Lipinski violation penalties, and tox-alert counts:
+   *   overall × 0.6 + (1 − violations × 0.12) × 0.25 + alert_bonus × 0.15
+   * Use only as a relative rank-ordering signal within the same target.
+   * Do not interpret as P(clinical success) or report as a validated metric.
+   */
   confidence: number;
   similarDrugs: string[];
   recommendation: string;
@@ -167,9 +176,22 @@ function clamp(v: number, lo = 0, hi = 1): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/**
+ * Deterministic seeded PRNG using the mulberry32 algorithm.
+ * Produces a float in [0, 1) from a uint32 seed.
+ * Replaces the former Math.sin LCG which had poor spectral properties
+ * and was not reproducible across JS engines.
+ */
+function mulberry32(seed: number): number {
+  let t = (seed + 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 function jitter(base: number, range: number, seed: number): number {
-  const pseudo = Math.sin(seed * 9301 + 49297) * 233280;
-  return clamp(base + (pseudo - Math.floor(pseudo) - 0.5) * range * 2);
+  const pseudo = mulberry32(seed >>> 0);
+  return clamp(base + (pseudo - 0.5) * range * 2);
 }
 
 function hashSmiles(smiles: string): number {
@@ -185,7 +207,7 @@ export function runAdmetSimulation(
   uniprotId:    string,
   therapeuticArea: string | null = null,
 ): SimResults {
-  const { mw, logP, hbd, hba, tpsa, rotBonds, qed } = molProps;
+  const { mw, logP, hbd, hba, tpsa, rotBonds, qed_approx } = molProps;
   const seed = hashSmiles(smiles);
   const taMod = getAdmetModifiers(therapeuticArea);
 
@@ -357,7 +379,7 @@ export function runAdmetSimulation(
   if (targetInfo) {
     const [pMin, pMax] = targetInfo.potencyRange;
     const drugLikenessFactor = molProps.lipinskiPass ? 0.4 : 0.7;
-    const qedFactor = (1 - qed) * 0.3;
+    const qedFactor = (1 - qed_approx) * 0.3;
     const basePotency = pMin + (pMax - pMin) * (drugLikenessFactor + qedFactor);
 
     const primaryKd   = clamp(jitter(basePotency, basePotency * 0.3, seed + 20), 0.1, pMax * 2);
@@ -482,7 +504,7 @@ export function runAdmetSimulation(
     organs,
     binding,
     lipinski,
-    qed,
+    qed_approx,
     saScore,
     goNogo,
     confidence,
@@ -493,4 +515,200 @@ export function runAdmetSimulation(
     uniprotId,
     timestamp: new Date().toISOString(),
   };
+}
+
+// ── ML inputs shape (kept lightweight to avoid circular deps with aiService) ──
+export interface MlConsensusInputs {
+  /** DILI-ML predicted risk class (from dili_ml.py). */
+  diliRiskClass?: "High" | "Moderate" | "Low" | null;
+  /** CardioTox ML blocker probability (0–1). */
+  cardiotoxBlockerProb?: number | null;
+  /** CardioTox ML risk class. */
+  cardiotoxRiskClass?: "High" | "Moderate" | "Low" | null;
+  /** ADMET-AI hERG blocker probability (0–1). */
+  admetHergProb?: number | null;
+  /** ADMET-AI Ames mutagenicity probability (0–1). */
+  admetAmesProb?: number | null;
+  /** ADMET-AI DILI probability (0–1). */
+  admetDiliProb?: number | null;
+  /** ADMET-AI ClinTox probability (0–1). */
+  admetClintoxProb?: number | null;
+}
+
+export interface MlConsensusResult {
+  decision:    "GO" | "WATCH" | "NO-GO";
+  driver:      string;
+  /** Each contributing signal that influenced the decision. */
+  signals:     Array<{ source: string; label: string; severity: "info" | "warn" | "critical" }>;
+  /** True when at least one ML model contributed (vs pure heuristic). */
+  mlEnriched:  boolean;
+}
+
+/**
+ * Computes a conservative consensus Go/No-Go that combines:
+ *   1. Heuristic ADMET `goNogo` from `runAdmetSimulation`
+ *   2. In-vitro overall risk from `runInVitroSimulation`
+ *   3. DILI-ML risk class (dili_ml.py — RF on Morgan FP + RDKit, n=475)
+ *   4. CardioTox ML risk class (cardiotox.py — RF on Morgan FP, n=655)
+ *   5. ADMET-AI Chemprop ensemble toxicity probabilities (41 endpoints)
+ *
+ * Resolution rule: the most severe signal wins (conservatism first).
+ *   NO-GO triggers: any heuristic NO-GO, DILI High, Cardiotox High (p>0.8),
+ *                   ADMET-AI hERG>0.85, Ames>0.75, ClinTox>0.75, DILI>0.80
+ *   WATCH triggers: heuristic WATCH, DILI Moderate, Cardiotox Moderate,
+ *                   ADMET-AI hERG 0.6–0.85, Ames 0.5–0.75, DILI 0.55–0.80,
+ *                   in-vitro Moderate risk
+ *   GO:            all signals below thresholds
+ *
+ * The function is intentionally conservative: false-positive WATCH/NO-GO is
+ * preferred over a false-negative GO that lets a toxic compound advance.
+ */
+export function computeMlConsensusGoNogo(
+  heuristicGoNogo: SimResults["goNogo"],
+  inVitroRisk: "Low" | "Moderate" | "High",
+  ml: MlConsensusInputs,
+): MlConsensusResult {
+  const signals: MlConsensusResult["signals"] = [];
+  let maxSeverity: 0 | 1 | 2 = 0; // 0=GO, 1=WATCH, 2=NO-GO
+  const mlEnriched = Object.values(ml).some(v => v !== null && v !== undefined);
+
+  // ── Heuristic ADMET ───────────────────────────────────────────────────────
+  if (heuristicGoNogo === "NO-GO") {
+    maxSeverity = 2;
+    signals.push({ source: "ADMET heuristic", label: "NO-GO (Lipinski excess or critical tox alert)", severity: "critical" });
+  } else if (heuristicGoNogo === "WATCH") {
+    maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+    signals.push({ source: "ADMET heuristic", label: "WATCH (borderline drug-likeness or safety margin)", severity: "warn" });
+  } else {
+    signals.push({ source: "ADMET heuristic", label: "GO", severity: "info" });
+  }
+
+  // ── In-vitro risk ─────────────────────────────────────────────────────────
+  if (inVitroRisk === "High") {
+    maxSeverity = 2;
+    signals.push({ source: "In-vitro heuristic", label: "NO-GO (High in-vitro risk)", severity: "critical" });
+  } else if (inVitroRisk === "Moderate") {
+    maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+    signals.push({ source: "In-vitro heuristic", label: "WATCH (Moderate in-vitro risk)", severity: "warn" });
+  } else {
+    signals.push({ source: "In-vitro heuristic", label: "Low in-vitro risk", severity: "info" });
+  }
+
+  // ── DILI-ML (FDA DILIrank-trained RF) ─────────────────────────────────────
+  if (ml.diliRiskClass === "High") {
+    maxSeverity = 2;
+    signals.push({ source: "DILI-ML (DILIrank RF)", label: "High DILI risk predicted by ML", severity: "critical" });
+  } else if (ml.diliRiskClass === "Moderate") {
+    maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+    signals.push({ source: "DILI-ML (DILIrank RF)", label: "Moderate DILI risk predicted by ML", severity: "warn" });
+  } else if (ml.diliRiskClass === "Low") {
+    signals.push({ source: "DILI-ML (DILIrank RF)", label: "Low DILI risk (ML)", severity: "info" });
+  }
+
+  // ── CardioTox ML (ChEMBL-trained hERG RF) ────────────────────────────────
+  const ctxProb = ml.cardiotoxBlockerProb;
+  if (ctxProb !== null && ctxProb !== undefined) {
+    if (ctxProb > 0.80) {
+      maxSeverity = 2;
+      signals.push({ source: "CardioTox ML (hERG RF)", label: `hERG blocker p=${(ctxProb * 100).toFixed(0)}% (>80% — NO-GO threshold)`, severity: "critical" });
+    } else if (ctxProb > 0.55) {
+      maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+      signals.push({ source: "CardioTox ML (hERG RF)", label: `hERG blocker p=${(ctxProb * 100).toFixed(0)}% (55–80% — WATCH)`, severity: "warn" });
+    } else {
+      signals.push({ source: "CardioTox ML (hERG RF)", label: `hERG blocker p=${(ctxProb * 100).toFixed(0)}% (low risk)`, severity: "info" });
+    }
+  }
+
+  // ── ADMET-AI Chemprop toxicity endpoints ─────────────────────────────────
+  if (ml.admetHergProb !== null && ml.admetHergProb !== undefined) {
+    if (ml.admetHergProb > 0.85) {
+      maxSeverity = 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `hERG ${(ml.admetHergProb * 100).toFixed(0)}% (>85% — NO-GO)`, severity: "critical" });
+    } else if (ml.admetHergProb > 0.60) {
+      maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `hERG ${(ml.admetHergProb * 100).toFixed(0)}% (WATCH)`, severity: "warn" });
+    }
+  }
+  if (ml.admetAmesProb !== null && ml.admetAmesProb !== undefined) {
+    if (ml.admetAmesProb > 0.75) {
+      maxSeverity = 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `Ames mutagenicity ${(ml.admetAmesProb * 100).toFixed(0)}% (>75% — NO-GO)`, severity: "critical" });
+    } else if (ml.admetAmesProb > 0.50) {
+      maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `Ames ${(ml.admetAmesProb * 100).toFixed(0)}% (WATCH)`, severity: "warn" });
+    }
+  }
+  if (ml.admetDiliProb !== null && ml.admetDiliProb !== undefined) {
+    if (ml.admetDiliProb > 0.80) {
+      maxSeverity = 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `DILI ${(ml.admetDiliProb * 100).toFixed(0)}% (>80% — NO-GO)`, severity: "critical" });
+    } else if (ml.admetDiliProb > 0.55) {
+      maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `DILI ${(ml.admetDiliProb * 100).toFixed(0)}% (WATCH)`, severity: "warn" });
+    }
+  }
+  if (ml.admetClintoxProb !== null && ml.admetClintoxProb !== undefined) {
+    if (ml.admetClintoxProb > 0.75) {
+      maxSeverity = 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `ClinTox ${(ml.admetClintoxProb * 100).toFixed(0)}% (>75% — NO-GO)`, severity: "critical" });
+    } else if (ml.admetClintoxProb > 0.50) {
+      maxSeverity = Math.max(maxSeverity, 1) as 0 | 1 | 2;
+      signals.push({ source: "ADMET-AI (Chemprop)", label: `ClinTox ${(ml.admetClintoxProb * 100).toFixed(0)}% (WATCH)`, severity: "warn" });
+    }
+  }
+
+  // ── Resolve decision ──────────────────────────────────────────────────────
+  const decision: "GO" | "WATCH" | "NO-GO" = maxSeverity === 2 ? "NO-GO" : maxSeverity === 1 ? "WATCH" : "GO";
+  const criticals = signals.filter(s => s.severity === "critical").map(s => s.label);
+  const warns     = signals.filter(s => s.severity === "warn").map(s => s.label);
+  let driver: string;
+  if (decision === "NO-GO") {
+    driver = criticals.length > 0
+      ? `Critical signals: ${criticals.join("; ")}`
+      : "Multiple combined WATCH signals escalated to NO-GO";
+  } else if (decision === "WATCH") {
+    driver = warns.length > 0
+      ? `Watch signals: ${warns.join("; ")}`
+      : "Borderline profile across ADMET dimensions";
+  } else {
+    driver = mlEnriched
+      ? "All ML and heuristic signals below safety thresholds"
+      : "All heuristic signals below safety thresholds (no ML available)";
+  }
+
+  return { decision, driver, signals, mlEnriched };
+}
+
+/**
+ * Arbitrates between the ADMET-layer Go/No-Go (from `runAdmetSimulation`)
+ * and the in-vitro risk level (from `runInVitroSimulation`) to produce a
+ * single conservative decision.
+ *
+ * Resolution table:
+ *   ADMET goNogo | InVitro overallRisk | arbitrated
+ *   -------------|---------------------|------------
+ *   NO-GO        | any                 | NO-GO
+ *   any          | High                | NO-GO
+ *   WATCH        | Moderate            | WATCH
+ *   WATCH        | Low                 | WATCH
+ *   GO           | Moderate            | WATCH
+ *   GO           | Low                 | GO
+ *
+ * The arbitrated decision and its primary driver reason are returned so the
+ * UI can surface "why" without recomputing.
+ */
+export function arbitrateGoNogo(
+  admetGoNogo: SimResults["goNogo"],
+  inVitroRisk: "Low" | "Moderate" | "High",
+): { decision: "GO" | "WATCH" | "NO-GO"; driver: string } {
+  if (admetGoNogo === "NO-GO") {
+    return { decision: "NO-GO", driver: "ADMET layer flagged critical violation (Lipinski excess, severe tox alert, or very high predicted toxicity)" };
+  }
+  if (inVitroRisk === "High") {
+    return { decision: "NO-GO", driver: "In-vitro simulation flagged High overall risk (hERG, hepatotox, or CYP panel)" };
+  }
+  if (admetGoNogo === "WATCH" || inVitroRisk === "Moderate") {
+    return { decision: "WATCH", driver: admetGoNogo === "WATCH" ? "ADMET layer flagged borderline properties" : "In-vitro simulation flagged Moderate overall risk" };
+  }
+  return { decision: "GO", driver: "ADMET and in-vitro simulations both clear at current thresholds" };
 }

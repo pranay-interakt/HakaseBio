@@ -9,7 +9,7 @@ import {
   type FingerprintInfo,
   getRDKitInstance,
 } from "@/lib/chemistry";
-import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
+import { runAdmetSimulation, arbitrateGoNogo, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
 import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
 import {
   fetchUniProt, fetchPdbStructure, fetchAlphaFoldFull,
@@ -1205,7 +1205,11 @@ export function HakaseAI() {
     const abs = simResults.admet.absorption;
     const logP = simResults.lipinski.logP;
     const mw = simResults.lipinski.mw;
-    const goNogo = simResults.goNogo;
+    // Use arbitrated Go/No-Go when in-vitro results are available; fall back to
+    // ADMET-only goNogo otherwise (inVitroResults may not be computed yet).
+    const goNogo = inVitroResults
+      ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
+      : simResults.goNogo;
 
     if (!l2ManualOverride.current.species) {
       if (tox > 0.6) setAnimalSpecies("dog_beagle");
@@ -1233,7 +1237,7 @@ export function HakaseAI() {
     l2ManualOverride.current = { species: false, study: false, route: false, formulation: false };
     setL2AutoConfigured(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simResults]);
+  }, [simResults, inVitroResults]);
 
   const [haIOpsCtx, setHAIOpsCtx] = useState<HAIOpsContext>(createHAIOpsContext());
   const safetyFlags = haIOpsCtx.flags;
@@ -2258,8 +2262,8 @@ export function HakaseAI() {
             {activeLayer < 4 && (
               <button
                 onClick={() => {
-                  const verdict = activeLayer === 1 && inVitroResults
-                    ? (inVitroResults.overallRisk === "High" ? "NO-GO" : inVitroResults.overallRisk === "Moderate" ? "WATCH" : "GO")
+                  const verdict = activeLayer === 1 && simResults && inVitroResults
+                    ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
                     : "GO";
                   if (verdict === "NO-GO") {
                     setHAIOpsCtx(prev => addOverride(prev, {
@@ -6913,7 +6917,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           {!iv && sim && (
             <>
               <AiMiniBar label="Absorption" value={(sim.admet.absorption) * 100} max={100} color={sim.admet.absorption >= 0.7 ? "emerald" : "amber"} />
-              <AiMiniBar label="QED" value={sim.qed * 100} max={100} color={sim.qed > 0.5 ? "emerald" : "amber"} />
+              <AiMiniBar label="QED (approx)" value={sim.qed_approx * 100} max={100} color={sim.qed_approx > 0.5 ? "emerald" : "amber"} />
               <AiMiniBar label="Toxicity Risk" value={sim.admet.toxicity * 100} max={100} color={sim.admet.toxicity < 0.3 ? "emerald" : sim.admet.toxicity < 0.6 ? "amber" : "red"} />
             </>
           )}
@@ -6924,7 +6928,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           {[
             { l: "Go/No-Go", v: sim.goNogo, good: sim.goNogo === "GO" },
             { l: "Lipinski", v: `${sim.lipinski.violations}/4 viol.`, good: sim.lipinski.violations <= 1 },
-            { l: "QED", v: sim.qed.toFixed(2), good: sim.qed > 0.5 },
+            { l: "QED~", v: sim.qed_approx.toFixed(2), good: sim.qed_approx > 0.5 },
             { l: "SA Score", v: sim.saScore.toFixed(1), good: sim.saScore <= 4 },
           ].map(m => (
             <div key={m.l} className={`rounded-lg px-2.5 py-2 text-center border ${m.good ? "border-emerald-500/15 bg-emerald-500/5" : "border-red-500/15 bg-red-500/5"}`}>
@@ -9892,7 +9896,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
   const toxLevel  = toxAlerts.some(a => a.severity === "High") ? "High" : toxAlerts.some(a => a.severity === "Medium") ? "Medium" : "Low";
   const base = simResults
     ? {
-        qed: simResults.qed, toxLevel,
+        qed: simResults.qed_approx, toxLevel,
         binding: simResults.binding ? `${simResults.binding.primaryKd.toFixed(1)} nM` : "no validated target",
         composite: simResults.confidence,
       }

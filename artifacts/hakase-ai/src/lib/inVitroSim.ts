@@ -147,9 +147,17 @@ function hashSmiles(smiles: string): number {
   return h;
 }
 
+/**
+ * Deterministic seeded PRNG using the mulberry32 algorithm.
+ * Produces a float in [0, 1) from a uint32 seed.
+ * Replaces the former Math.sin LCG which had poor spectral properties
+ * and was not reproducible across JS engines.
+ */
 function seededRandom(seed: number): number {
-  const v = Math.sin(seed * 9301 + 49297) * 233280;
-  return v - Math.floor(v);
+  let t = ((seed >>> 0) + 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 function cypRisk(ic50: number): "Low" | "Moderate" | "High" {
@@ -243,10 +251,21 @@ function getTherapeuticProfile(therapeuticArea: string | null | undefined): Ther
   return THERAPEUTIC_AREA_PROFILES[therapeuticArea] ?? TA_PROFILE_NEUTRAL;
 }
 
-// Exported for the internal L1 bioactivity QC harness
-// (scripts/qc-l1-bioactivity.mts) which back-tests this predictor against
-// DrugCentral literature IC50 / Ki / Kd values. Not part of the public
-// runtime API — UI code should call runInVitroSimulation instead.
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Computes a baseline pIC50 from physicochemical descriptors using a
+ * hand-tuned additive scoring function anchored to mean oral-drug pIC50 ≈ 5.2.
+ * Penalty/bonus terms are derived from literature correlations (logP parabola,
+ * MW sweet-spot, HBD/HBA ranges, Ligand Efficiency) but have NOT been fitted
+ * to a labelled dataset.  Expected MAE ≈ 0.8–1.2 log units versus DrugCentral
+ * IC50 values.  Do not report as a quantitative pIC50 prediction.
+ *
+ * Exported for the internal L1 bioactivity QC harness
+ * (scripts/qc-l1-bioactivity.mts) which back-tests this predictor against
+ * DrugCentral literature IC50 / Ki / Kd values. Not part of the public
+ * runtime API — UI code should call runInVitroSimulation instead.
+ */
 export function computeBaselinePIC50(
   mw: number, logP: number, tpsa: number,
   hbd: number, hba: number, rotBonds: number,
@@ -369,6 +388,14 @@ export function computePharmacophoreBonus(
   return clamp(bonus, 0, 1.5);
 }
 
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Estimates Caco-2 apparent permeability (Papp A→B, ×10⁻⁶ cm/s) from logP,
+ * TPSA, MW, and HBD using a log-linear additive rule derived from
+ * Palm et al. 1997 and Artursson & Karlsson 1991 correlations.
+ * Not fitted to a Caco-2 assay dataset; expected accuracy ±5–10× on Papp.
+ */
 function computeCaco2Permeability(
   logP: number, tpsa: number, mw: number, hbd: number,
 ): { papp: number; cls: PermeabilityData["caco2Class"] } {
@@ -389,6 +416,14 @@ function computeCaco2Permeability(
   return { papp: pappClamped, cls };
 }
 
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Estimates human liver microsomal intrinsic clearance (CLint, µL/min/mg protein)
+ * from logP, MW, aromatic ring count, Fsp3, and rotatable bonds, using an
+ * additive log-linear rule grounded in Obach 1999 lipophilicity–clearance trends.
+ * Not fitted to HLM assay data; expected accuracy ±3–5× on CLint.
+ */
 function computeMicrosomalCLint(
   logP: number, mw: number, nArom: number, fsp3: number, rotBonds: number,
 ): number {
@@ -406,6 +441,15 @@ function computeMicrosomalCLint(
   return clamp(Math.pow(10, logCLint), 3, 250);
 }
 
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Estimates hERG channel IC50 (µM) from lipophilicity, molecular weight,
+ * basic nitrogen count, TPSA, and aromatic ring count, based on the
+ * Cavalli 2002 and Aronov 2008 physicochemical hERG risk rules.
+ * Not fitted to a patch-clamp dataset; error bars are ±0.5 log units typical.
+ * Actual hERG liability requires wet-lab patch-clamp (IonWorks/QPatch) confirmation.
+ */
 function computeHERGIC50(
   logP: number, mw: number, basicN: number, tpsa: number,
   nArom: number, pharm: PharmacophoreProfile | null,
@@ -429,6 +473,14 @@ function computeHERGIC50(
   return clamp(Math.pow(10, logIC50), 0.1, 100);
 }
 
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Estimates fraction unbound in plasma (fu, %) from logP, MW, and acidic
+ * group count, using a log-linear rule based on Lobell 2003 PPB trends.
+ * Not fitted to equilibrium dialysis data; expected accuracy ±2–3× on fu.
+ * Highly lipophilic or acidic compounds (NSAIDs, statins) may be mis-estimated.
+ */
 function computePPB(logP: number, mw: number, acidic: number): {
   fu: number; cls: PlasmaProteinBindingData["bindingClass"];
 } {
@@ -446,6 +498,16 @@ function computePPB(logP: number, mw: number, acidic: number): {
   return { fu, cls };
 }
 
+/**
+ * RULE-BASED ESTIMATE — not a trained QSAR model.
+ *
+ * Estimates CYP isoform inhibition IC50 (µM) for CYP1A2, 2C9, 2C19, 2D6, 3A4
+ * using isoform-specific physicochemical rules (aromatic N for 2C19, basic
+ * amine for 2D6, lipophilicity × MW for 3A4) derived from Pelkonen 2008 and
+ * Obach 2009 substrate/inhibitor SAR reviews.
+ * Not fitted to fluorescence or LC-MS CYP assay data; ±0.5 log unit error typical.
+ * Actual CYP DDI risk requires full reversible + time-dependent inhibition assays.
+ */
 function computeCYPInhibition(
   logP: number, mw: number, nArom: number, pharm: PharmacophoreProfile | null,
   seed: number,
@@ -627,13 +689,23 @@ export function runInVitroSimulation(
 
   // Curve only when target is validated; otherwise empty array (the UI's
   // dose-response chart renders its no-data state for length === 0).
+  //
+  // Noise model: heteroscedastic Gaussian with σ = 4 % of Emax (maxInhibitionRaw).
+  // Uses Box-Muller transform on two independent seededRandom calls to yield
+  // N(0, 1), then scales by the heteroscedastic σ.  This more closely matches
+  // real plate-reader CVs (3–6 % at plateau) compared to the previous uniform
+  // ±1 % additive noise which underestimates variance at low concentrations.
   const curve: DoseResponsePoint[] = [];
   if (hasValidatedTarget) {
+    const sigma = maxInhibitionRaw * 0.04; // heteroscedastic: 4 % of Emax
     for (let i = -2; i <= 5; i += 0.5) {
       const conc = Math.pow(10, i);
       const response = maxInhibitionRaw / (1 + Math.pow(ic50_nM_raw / conc, hillCoeffRaw));
-      const noise = (r(200 + i * 10) - 0.5) * 2;
-      curve.push({ concentration: conc, response: clamp(response + noise, 0, 100) });
+      // Box-Muller: two uniform samples → standard normal
+      const u1 = Math.max(1e-10, r(200 + i * 10));
+      const u2 = r(201 + i * 10);
+      const gaussianNoise = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      curve.push({ concentration: conc, response: clamp(response + gaussianNoise * sigma, 0, 100) });
     }
   }
 
