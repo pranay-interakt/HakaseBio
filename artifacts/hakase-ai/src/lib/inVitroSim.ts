@@ -612,6 +612,12 @@ export function runInVitroSimulation(
    * `null` to fall back to the allow-list only.
    */
   targetConfidence: number | null = null,
+  /**
+   * Optional predicted Kd in nM from the backend ML model (DeepDTA-GBM / binding_ml).
+   * If provided and valid, it dynamically unlocks dose-response generation
+   * and populates binding potency calculations directly using the ML prediction.
+   */
+  predictedKd_nM: number | null = null,
 ): InVitroResults {
   const seed = hashSmiles(smiles);
   const mw = molProps.mw ?? 300;
@@ -646,7 +652,8 @@ export function runInVitroSimulation(
   const finalPIC50 = clamp(basePIC50 + pharmBonus + taMult, 4.0, 9.5);
 
   // RF#7 / §9 step 7: only emit dose-response numbers when the UniProt is
-  // in the validated catalog. Off-catalog molecule + no ML binding signal
+  // in the validated catalog or has a valid neural binding (ESM-2 + GNN)
+  // prediction from the backend. Off-catalog molecule with no ML binding signal
   // → no IC50 / EC50 / curve, and downstream consumers (UI cards,
   // overallRisk scoring) must treat these as "no data" rather than zero.
   // A target is treated as "validated" — and therefore eligible for
@@ -654,15 +661,17 @@ export function runInVitroSimulation(
   //   (a) its UniProt is in the curated allow-list (kinases / HDACs with
   //       extensive published IC50 data), OR
   //   (b) the auto-match (suggestTargets / ChEMBL) scored it at "High"
-  //       confidence (≥ 0.65). This matches the confidence label the UI
-  //       already shows on the Target Suggestions panel, so users never
-  //       see "100% confidence — auto-matched" alongside "no curve".
+  //       confidence (≥ 0.65), OR
+  //   (c) a valid neural predictedKd_nM is active for the target.
   const hasValidatedTarget =
     !!uniprotId &&
     (VALIDATED_TARGET_UNIPROTS.has(uniprotId) ||
-      (targetConfidence !== null && targetConfidence >= 0.65));
+      (targetConfidence !== null && targetConfidence >= 0.65) ||
+      predictedKd_nM !== null);
 
-  const ic50_nM_raw = clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
+  const ic50_nM_raw = predictedKd_nM !== null
+    ? predictedKd_nM
+    : clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
   const ic50_nM: number | null = hasValidatedTarget ? ic50_nM_raw : null;
   const ec50_nM: number | null = hasValidatedTarget
     ? ic50_nM_raw * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2)

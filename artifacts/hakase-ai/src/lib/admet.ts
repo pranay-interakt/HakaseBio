@@ -206,6 +206,7 @@ export function runAdmetSimulation(
   molName:      string,
   uniprotId:    string,
   therapeuticArea: string | null = null,
+  predictedKd_nM: number | null = null,
 ): SimResults {
   const { mw, logP, hbd, hba, tpsa, rotBonds, qed_approx } = molProps;
   const seed = hashSmiles(smiles);
@@ -370,34 +371,43 @@ export function runAdmetSimulation(
 
   // ── Binding Affinity ────────────────────────────────────────────────────
   // RF#1 / §9 step 1: gate ALL binding output on the UniProt being in the
-  // validated TARGET_MAP catalog. Off-catalog UniProts (or no UniProt at
-  // all) get `binding = null` so the UI surfaces "no validated target"
-  // rather than fabricated Kd/Ki/IC50 against an "Unknown Target" with a
-  // hardcoded [10,1000] nM potency range.
+  // validated TARGET_MAP catalog or having a valid neural/ML prediction from
+  // the backend (FastAPI binding_ml). When no catalog entry AND no ML binding
+  // signal is present, we return null to let the UI render the honest
+  // "no validated target" state.
   const targetInfo = TARGET_MAP[uniprotId] ?? null;
   let binding: BindingEstimate | null = null;
-  if (targetInfo) {
-    const [pMin, pMax] = targetInfo.potencyRange;
-    const drugLikenessFactor = molProps.lipinskiPass ? 0.4 : 0.7;
-    const qedFactor = (1 - qed_approx) * 0.3;
-    const basePotency = pMin + (pMax - pMin) * (drugLikenessFactor + qedFactor);
+  if (targetInfo || predictedKd_nM !== null) {
+    const [pMin, pMax] = targetInfo ? targetInfo.potencyRange : [0.1, 50000];
+    const primaryKd = predictedKd_nM !== null
+      ? predictedKd_nM
+      : (() => {
+          const drugLikenessFactor = molProps.lipinskiPass ? 0.4 : 0.7;
+          const qedFactor = (1 - qed_approx) * 0.3;
+          const basePotency = pMin + (pMax - pMin) * (drugLikenessFactor + qedFactor);
+          return clamp(jitter(basePotency, basePotency * 0.3, seed + 20), 0.1, pMax * 2);
+        })();
 
-    const primaryKd   = clamp(jitter(basePotency, basePotency * 0.3, seed + 20), 0.1, pMax * 2);
-    const primaryKi   = clamp(primaryKd * jitter(0.85, 0.15, seed + 21), 0.1, pMax * 2);
-    const primaryIC50 = clamp(primaryKd * jitter(1.20, 0.20, seed + 22), 0.1, pMax * 2);
+    // Compute Ki and IC50 in realistic physiological proportions to Kd, scaled by physchem.
+    const primaryKi   = clamp(primaryKd * jitter(0.85, 0.15, seed + 21), 0.1, primaryKd * 1.5);
+    const primaryIC50 = clamp(primaryKd * jitter(1.20, 0.20, seed + 22), 0.1, primaryKd * 2.0);
     const selectivity = clamp(jitter(3.5, 1.5, seed + 23), 0.1, 10);
 
-    const offTargets = targetInfo.offTargets.slice(0, 2).map((name, i) => ({
-      name,
-      kd:   clamp(primaryKd   * jitter(12, 6, seed + 30 + i), 0.1, 50000),
-      ki:   clamp(primaryKi   * jitter(14, 6, seed + 31 + i), 0.1, 50000),
-      ic50: clamp(primaryIC50 * jitter(13, 5, seed + 32 + i), 0.1, 50000),
-      selectivity: clamp(jitter(0.05, 0.03, seed + 33 + i), 0.01, 0.5),
-    }));
+    const offTargets = targetInfo
+      ? targetInfo.offTargets.slice(0, 2).map((name, i) => ({
+          name,
+          kd:   clamp(primaryKd   * jitter(12, 6, seed + 30 + i), 0.1, 50000),
+          ki:   clamp(primaryKi   * jitter(14, 6, seed + 31 + i), 0.1, 50000),
+          ic50: clamp(primaryIC50 * jitter(13, 5, seed + 32 + i), 0.1, 50000),
+          selectivity: clamp(jitter(0.05, 0.03, seed + 33 + i), 0.01, 0.5),
+        }))
+      : [];
 
     binding = {
       primaryKd, primaryKi, primaryIC50, selectivity,
-      targetName: targetInfo.name, targetClass: targetInfo.class, offTargets,
+      targetName: targetInfo ? targetInfo.name : (uniprotId || "ML Target"),
+      targetClass: targetInfo ? targetInfo.class : "Protein Target",
+      offTargets,
     };
   }
 

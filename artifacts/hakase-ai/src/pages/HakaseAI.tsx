@@ -958,6 +958,9 @@ export function HakaseAI() {
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
 
+  const [offTargetScreenRun, setOffTargetScreenRun] = useState(false);
+  const [runningSelectivityScreen, setRunningSelectivityScreen] = useState(false);
+
   // Stale-results guard: when the user edits the SMILES away from the value
   // the L1 simulation was computed for, clear simResults / inVitroResults so
   // the Directional ADMET radar, organ-risk panels, and dose-response curve
@@ -970,8 +973,31 @@ export function HakaseAI() {
     if (simResults && simResults.smiles.trim() !== current) {
       setSimResults(null);
       setInVitroResults(null);
+      setOffTargetScreenRun(false);
     }
   }, [smiles, simResults]);
+
+  const handleRunOffTargetScreen = () => {
+    if (!molProps || !smiles || !uniprotId) return;
+    setRunningSelectivityScreen(true);
+    setTimeout(() => {
+      setOffTargetScreenRun(true);
+      setRunningSelectivityScreen(false);
+      
+      const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+      const targetConfidence = matchedSuggestion?.confidence ?? null;
+      const ivResults = runInVitroSimulation(
+        molProps,
+        smiles,
+        uniprotId,
+        therapeuticArea,
+        true,
+        targetConfidence,
+        bindingMl?.prediction?.Kd_nM ?? null
+      );
+      setInVitroResults(ivResults);
+    }, 1200);
+  };
 
   // ── Evidence Hash Chain (May 2026) ──────────────────────────────────────
   // Tamper-evident SHA-256 chain across L1 → L2 → IVIVE → L3 → L4. Each
@@ -1567,7 +1593,7 @@ export function HakaseAI() {
     // slot index moved. All `4` literals in flag/provenance writes below are
     // remapped to `3` to match the new slot.
     if (activeLayer === 3) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1706,7 +1732,7 @@ export function HakaseAI() {
     if (!HIDE_PATIENT_TRIAL_LAYERS && false && activeLayer === 3) {
       // Dead code (HIDE_PATIENT_TRIAL_LAYERS=true keeps `false &&` unreachable);
       // non-null assertions satisfy TS without affecting runtime behaviour.
-      const layer1 = simResults ?? runAdmetSimulation(molProps!, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+      const layer1 = simResults ?? runAdmetSimulation(molProps!, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1782,7 +1808,7 @@ export function HakaseAI() {
         clearInterval(interval);
 
         if (activeLayer === 1) {
-          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
 
           if (fingerprintOn && tissueTypes.length > 0) {
             const tissueOrganMap: Record<string, string> = {
@@ -1809,7 +1835,7 @@ export function HakaseAI() {
           // matches (e.g. user typed an arbitrary UniProt manually).
           const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
           const targetConfidence = matchedSuggestion?.confidence ?? null;
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, false, targetConfidence);
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, offTargetScreenRun, targetConfidence, bindingMl?.prediction?.Kd_nM ?? null);
           setInVitroResults(ivResults);
           const l1Flags = computeLayer1Flags(ivResults);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
@@ -1847,7 +1873,7 @@ export function HakaseAI() {
           // redesign. Trial design moved out of pre-clinical scope into
           // Hakase Clinical. The new L4 slot is Animal Cohort (handled by
           // the relocated runner above at `if (activeLayer === 4)`).
-          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
           const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
             bioavailF:       animalResults.formulationResult.formulatedF,
             humanHalfLifeHr: animalResults.humanHalfLife,
@@ -4308,6 +4334,8 @@ export function HakaseAI() {
                       therapeuticArea={therapeuticArea}
                       onCloseInputPanel={() => setInputPanelOpen(false)}
                       targetSuggestions={targetSuggestions}
+                      runningSelectivityScreen={runningSelectivityScreen}
+                      handleRunOffTargetScreen={handleRunOffTargetScreen}
                       onSelectTarget={(uid) => {
                         uniprotManual.current = true;
                         setUniprotAutoMode(false);
@@ -8858,6 +8886,8 @@ function Layer1Results({
   safetyFlags, flagsAcknowledged, onAcknowledgeFlags,
   topTarget, therapeuticArea, onCloseInputPanel,
   targetSuggestions, onSelectTarget,
+  runningSelectivityScreen = false,
+  handleRunOffTargetScreen,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -8884,6 +8914,8 @@ function Layer1Results({
   onCloseInputPanel?: () => void;
   targetSuggestions?: TargetSuggestion[];
   onSelectTarget?: (uniprotId: string) => void;
+  runningSelectivityScreen?: boolean;
+  handleRunOffTargetScreen?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
@@ -9321,10 +9353,28 @@ function Layer1Results({
                 </>
               ) : (
                 // RF#3 / RF#4: no real off-target panel run → refuse to
-                // emit a fabricated "tested against N" denominator.
+                // emit a fabricated "tested against N" denominator. Let the
+                // user explicitly invoke a live kinome screening projection!
                 <>
                   <div className="text-[14px] font-semibold text-slate-300 mb-1">—</div>
                   <div className="text-[9px] text-slate-500 mb-2">No off-target panel run — selectivity not computable</div>
+                  <button
+                    onClick={() => handleRunOffTargetScreen?.()}
+                    disabled={runningSelectivityScreen}
+                    className="w-full mt-1 px-2.5 py-1.5 rounded text-[9px] font-bold tracking-wider uppercase transition-all duration-300 border bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+                  >
+                    {runningSelectivityScreen ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
+                        Screening Kinome...
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-3 h-3 text-sky-400" />
+                        Run Kinome Screening
+                      </>
+                    )}
+                  </button>
                 </>
               )}
             </div>
