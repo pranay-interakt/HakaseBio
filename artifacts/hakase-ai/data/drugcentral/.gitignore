@@ -1,0 +1,7 @@
+# DrugCentral raw TSV is CC BY-SA 4.0; we only commit the *derived* allow-list
+# under src/lib/drugcentralValidatedTargets.ts (with full attribution). Keep
+# the raw extract local so redistribution doesn't pull in the share-alike
+# obligation on the whole repo. Use scripts/build-drugcentral-allowlist.mjs
+# to regenerate after downloading the TSV from drugcentral.org.
+drug.target.interaction.tsv
+drug.target.interaction.tsv.gz

@@ -1,6 +1,7 @@
 import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import { detectPharmacophores } from "./chemistry";
 import { runBioactivationAssessment, type BioactivationAssessment } from "./bioactivationEngine";
+import { DRUGCENTRAL_VALIDATED_TARGETS } from "./drugcentralValidatedTargets";
 
 export interface DoseResponsePoint {
   concentration: number;
@@ -478,8 +479,14 @@ function computeCYPInhibition(
  * argument) — having a target does NOT imply the kinome / GPCR panel was
  * actually run; that requires a real off-target service which is not yet
  * wired (audit RF#3 / RF#4 / §9 steps 3–4).
+ *
+ * Curated seed below = kinases + HDAC family with deep in-house literature
+ * coverage. Kept explicit (rather than relying only on the DrugCentral
+ * allow-list) so that if the DrugCentral snapshot is regenerated against a
+ * newer release that re-classifies one of these, the Layer 1 dose-response
+ * gate doesn't silently regress.
  */
-const VALIDATED_TARGET_UNIPROTS = new Set([
+const CURATED_VALIDATED_TARGETS = new Set([
   // Kinases — well-characterized, abundant public IC50 data
   "P00533", // EGFR
   "P04626", // HER2 / ERBB2
@@ -498,6 +505,23 @@ const VALIDATED_TARGET_UNIPROTS = new Set([
   "Q9UQL6", // HDAC5
   "Q8WUI4", // HDAC7
   "Q9BY41", // HDAC8
+]);
+
+/**
+ * Final allow-list = curated seed ∪ DrugCentral targets with ≥5 quantitative
+ * human bioactivities. The DrugCentral expansion lifts coverage from 15 →
+ * ~570 UniProts — kinases, GPCRs, ion channels, transporters, NRs — so
+ * Layer 1 dose-response curves render for targets that genuinely have
+ * published activity to cross-check against, without weakening the
+ * "no fabrication for unvalidated targets" gate.
+ *
+ * DrugCentral source: CC BY-SA 4.0, Avram et al. NAR 2023 (D1276–D1287).
+ * See src/lib/drugcentralValidatedTargets.ts for the full attribution and
+ * the build script under scripts/build-drugcentral-allowlist.mjs.
+ */
+const VALIDATED_TARGET_UNIPROTS = new Set<string>([
+  ...CURATED_VALIDATED_TARGETS,
+  ...DRUGCENTRAL_VALIDATED_TARGETS,
 ]);
 
 export function runInVitroSimulation(

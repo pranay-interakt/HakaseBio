@@ -9,7 +9,8 @@
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint:terminology": "node scripts/lint-terminology.mjs",
-    "check": "pnpm run typecheck && pnpm run lint:terminology"
+    "check": "pnpm run typecheck && pnpm run lint:terminology",
+    "build:drugcentral": "node scripts/build-drugcentral-allowlist.mjs"
   },
   "dependencies": {
     "3dmol": "^2.5.4",
