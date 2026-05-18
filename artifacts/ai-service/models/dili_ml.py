@@ -46,7 +46,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "dili_ml_rf.pkl")
-MODEL_VERSION = "1.0.0"
+MODEL_VERSION = "1.1.0"  # bumped: added training_fps for AD scoring
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
 DESCRIPTOR_NAMES = ["MolWt", "MolLogP", "TPSA", "HBD", "HBA", "FractionCSP3"]
@@ -145,6 +145,9 @@ def _train() -> dict[str, Any]:
 
     clf.fit(X, y_arr)
 
+    # Store training Morgan FP matrix for Applicability Domain (AD) scoring
+    training_fps = X[:, :MORGAN_NBITS].astype(np.float32)
+
     bundle: dict[str, Any] = {
         "version": MODEL_VERSION,
         "model": clf,
@@ -156,6 +159,7 @@ def _train() -> dict[str, Any]:
         "trained_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "morgan_nbits": MORGAN_NBITS,
         "morgan_radius": MORGAN_RADIUS,
+        "training_fps": training_fps,  # (n_train, 1024) float32 for AD scoring
     }
 
     os.makedirs(CACHE_DIR, exist_ok=True)
@@ -220,6 +224,22 @@ def warmup() -> dict[str, Any]:
         return {"status": "ready", **is_ready()}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "error": str(exc), **is_ready()}
+
+
+def _compute_ad(bundle: dict[str, Any], query_fp: np.ndarray) -> dict[str, Any]:
+    """Applicability Domain via Tanimoto nearest-neighbor (same logic as cardiotox)."""
+    training_fps = bundle.get("training_fps")
+    if training_fps is None or len(training_fps) == 0:
+        return {"ad_tanimoto_nearest": None, "ad_in_domain": None}
+    q = query_fp[:MORGAN_NBITS].astype(np.float32)
+    T = training_fps
+    dot = T @ q
+    sum_q = float(q.sum())
+    sum_T = T.sum(axis=1)
+    union = sum_q + sum_T - dot
+    tanimoto = np.where(union > 0, dot / union, 0.0)
+    nearest = float(tanimoto.max())
+    return {"ad_tanimoto_nearest": round(nearest, 4), "ad_in_domain": bool(nearest >= 0.4)}
 
 
 def _risk_class(prob: float) -> str:
@@ -312,6 +332,8 @@ def predict_dili_ml(smiles: str) -> dict[str, Any]:
         logger.exception("DILI-ML inference failed for SMILES=%r", smiles)
         return _fallback_envelope(smiles, f"inference_failed: {exc}")
 
+    ad = _compute_ad(bundle, feats)
+
     return {
         "smiles": smiles,
         "source": "ml",
@@ -320,6 +342,16 @@ def predict_dili_ml(smiles: str) -> dict[str, Any]:
             "dili_probability": prob,
             "risk_class": _risk_class(prob),
             "severity_hint": _severity_hint(prob),
+        },
+        "applicability_domain": {
+            "ad_tanimoto_nearest": ad["ad_tanimoto_nearest"],
+            "ad_in_domain": ad["ad_in_domain"],
+            "ad_threshold": 0.4,
+            "ad_note": (
+                "In-domain: model interpolates within DILI training set chemistry."
+                if ad["ad_in_domain"]
+                else "Out-of-domain: query is structurally distant from training set — DILI prediction less reliable."
+            ) if ad["ad_in_domain"] is not None else "AD scoring unavailable",
         },
         "model_info": {
             "engine": "DILI-ML v1 (Random Forest on Morgan FP + RDKit descriptors)",

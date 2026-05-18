@@ -109,7 +109,7 @@ router.post("/bio-analysis", async (req, res) => {
       binding?: { primaryKd?: number; primaryKi?: number; primaryIC50?: number; targetName?: string; targetClass?: string };
       toxAlerts?: Array<{ name: string; category: string; severity: string; detail: string }>;
       goNogo?: string;
-      qed?: number;
+      qed_approx?: number;
       saScore?: number;
       confidence?: number;
       recommendation?: string;
@@ -160,7 +160,7 @@ ${interimAnalyses.map((ia, i) =>
 ${JSON.stringify({
   lipinskiRO5: l1.lipinski,
   admetScores: l1.admet,
-  qed: l1.qed,
+  qed_approx: l1.qed_approx,
   saScore: l1.saScore,
   targetBinding: l1.binding,
   toxicityAlerts: l1.toxAlerts,
