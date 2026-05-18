@@ -49,3 +49,11 @@ Thumbs.db
 .local/
 tdc_data/
 data/
+# Re-include the DrugCentral local-data directory so its README + .gitignore
+# (which document the CC BY-SA handling policy and exclude only the raw TSV)
+# stay tracked. Per gitignore semantics we must not ignore the parent dir
+# itself before re-including children.
+!artifacts/hakase-ai/data/
+!artifacts/hakase-ai/data/drugcentral/
+!artifacts/hakase-ai/data/drugcentral/README.md
+!artifacts/hakase-ai/data/drugcentral/.gitignore
