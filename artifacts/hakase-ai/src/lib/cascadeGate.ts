@@ -32,6 +32,7 @@
  */
 
 import type { SimResults } from "./admet";
+import type { InVitroResults } from "./inVitroSim";
 import type { TargetSuggestion } from "./targetSuggestion";
 import { TIER_SCORE, type QualityTier } from "./sourceQuality";
 
@@ -154,6 +155,14 @@ export function evaluateCascadeGate(
   simResults: SimResults | null,
   targetSuggestions: TargetSuggestion[],
   mlOverrides: CascadeMlOverrides = {},
+  /**
+   * Optional in-vitro result envelope. When provided, per-field provenance
+   * on hERG / CYP / Caco-2 / PPB / etc. is read directly off the live
+   * `iv.provenance` map — so the gate stops lying about quality the moment
+   * the L1 engine actually consumes the ML overlay (instead of waiting for
+   * the caller to also remember to pass the matching `mlOverrides`).
+   */
+  inVitroResults: InVitroResults | null = null,
 ): CascadeGateResult {
   const detail = defaultDetail();
 
@@ -165,9 +174,75 @@ export function evaluateCascadeGate(
     note:  tgt.note,
   };
 
-  // Override per-output tier to "ml" when a validated ML prediction is loaded.
-  // We check `available` explicitly so a fallback / failed prediction does NOT
-  // upgrade the tier (otherwise the gate would silently lie about quality).
+  // ── 1. Read live per-field provenance from L1 outputs ────────────────────
+  // The L1 engines now stamp `provenance: Record<key, "ml"|"heuristic"|...>`
+  // on every numeric output (see admet.ts / inVitroSim.ts). When the value
+  // is sourced from a real ML signal we immediately upgrade the matching
+  // cascade-gate tier — no need for the orchestrator to also pass a
+  // CascadeMlOverrides entry that duplicates what L1 already knows.
+  const lifProv = (key: string): "ml" | "heuristic" | "experimental" | undefined =>
+    inVitroResults?.provenance?.[key];
+  const simProv = (key: string): "ml" | "heuristic" | "experimental" | undefined =>
+    simResults?.provenance?.[key];
+
+  if (lifProv("hergRisk") === "ml" || lifProv("herg_ic50_uM") === "ml") {
+    detail.hERG = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — CardioTox-ML hERG channel blocker probability (Wang/Karim 2016 RF)",
+    };
+  }
+  if (simProv("toxicity") === "ml" || lifProv("hergRisk") === "experimental") {
+    // ADMET-AI toxicity head OR experimental data already covers hepatotox.
+    detail.hepatotoxicity = {
+      tier: simProv("toxicity") === "ml" ? "ml" : "experimental",
+      score: simProv("toxicity") === "ml" ? TIER_SCORE.ml : TIER_SCORE.experimental,
+      note:  simProv("toxicity") === "ml"
+        ? "ML — ADMET-AI / DILI-ML toxicity composite (Chemprop GNN + DILIrank RF)"
+        : "Experimental measurement supplied",
+    };
+  }
+  if (lifProv("cypInhibition") === "ml") {
+    detail.cyp_panel = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Veith 5-isoform CYP inhibition panel (1A2/2C9/2C19/2D6/3A4)",
+    };
+  }
+  if (simProv("absorption") === "ml" || lifProv("caco2Papp") === "ml") {
+    detail.absorption_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Caco2_Wang + HIA_Hou + Bioavailability_Ma blend",
+    };
+  }
+  if (simProv("distribution") === "ml" || lifProv("fuPercent") === "ml") {
+    detail.distribution_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI BBB_Martins + PPBR_AZ + VDss_Lombardo blend",
+    };
+  }
+  if (simProv("metabolism") === "ml" || lifProv("hepatoCLint") === "ml" || lifProv("halfLifeMin") === "ml") {
+    detail.metabolism_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Clearance_Hepatocyte_AZ + Half_Life_Obach heads",
+    };
+  }
+  if (simProv("binding") === "ml" || lifProv("doseResponse_IC50") === "ml") {
+    detail.binding_estimate = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — Binding-ML DeepDTA-GBM (ESM-2 + Morgan FP)",
+    };
+  } else if (simProv("binding") === "experimental") {
+    detail.binding_estimate = {
+      tier: "experimental", score: TIER_SCORE.experimental,
+      note: "Measured ChEMBL exact-match Kd/Ki",
+    };
+  }
+
+  // ── 2. Apply explicit caller overrides (still wins over the L1 read) ─────
+  // The orchestrator may have richer note strings (model versions, ROC-AUC,
+  // training-set sizes) it wants to show. We let those replace the auto-
+  // derived note. We DO NOT downgrade — an override that is `available:false`
+  // must NOT roll an ML tier back to heuristic; explicit fallbacks should
+  // already be reflected as "no override" in the orchestrator's logic.
   const mlKeys = [
     "hERG",
     "hepatotoxicity",

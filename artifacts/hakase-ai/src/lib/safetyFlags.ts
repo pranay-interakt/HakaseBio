@@ -1,4 +1,5 @@
 import type { InVitroResults } from "./inVitroSim";
+import type { StructuralAlertResult } from "./structuralAlerts";
 
 export type SafetyFlagType =
   | "cardiac"
@@ -6,7 +7,15 @@ export type SafetyFlagType =
   | "ddi"
   | "narrow-margin"
   | "high-grade-ae"
-  | "subgroup-disparity";
+  | "subgroup-disparity"
+  /**
+   * Raised by the structural alert scan (PAINS / Brenk / BMS / NIH-MLSMR /
+   * Ames-ICH). Surfaces in the L1 HAIOps safety panel. Severity maps to:
+   *   critical — one or more hard-reject (genotoxic / alkylating / reactive)
+   *   major    — two or more PAINS motifs OR two or more warn-tier reactives
+   *   warning  — single PAINS / single warn-tier reactive
+   */
+  | "structural-alert";
 
 export type SafetyFlagSeverity = "critical" | "major" | "warning";
 
@@ -55,8 +64,120 @@ export interface DatabaseQueryRecord {
   staleness?: string;
 }
 
-export function computeLayer1Flags(iv: InVitroResults): SafetyFlag[] {
+/**
+ * Derive HAIOps `SafetyFlag[]` entries from the structural alert scan result.
+ *
+ * Intended as the L1 complement to `computeLayer1Flags` — call both and
+ * merge. Structural alert flags are raised at L1 because the scan runs on
+ * the SMILES before any biological data is collected.
+ *
+ * Severity mapping
+ *   critical — any hard-reject alert (genotoxic / alkylating / reactive)
+ *   major    — ≥2 PAINS motifs  OR  ≥2 warn-tier reactive/metabolite flags
+ *   warning  — single PAINS / single warn-tier
+ *
+ * Safe to call with a null/undefined result (returns []).
+ */
+export function computeStructuralAlertFlags(
+  result: StructuralAlertResult | null | undefined,
+): SafetyFlag[] {
+  if (!result || !result.scanRan || result.hits.length === 0) return [];
+
   const flags: SafetyFlag[] = [];
+
+  // ── Hard-reject genotoxic / alkylating motifs ────────────────────────────
+  const genotoxRejects = result.hits.filter(
+    h => h.alert.severity === "reject" && h.alert.category === "Genotoxic",
+  );
+  if (genotoxRejects.length > 0) {
+    const names = genotoxRejects.map(h => h.alert.name).join("; ");
+    flags.push({
+      type: "structural-alert",
+      severity: "critical",
+      label: `Genotoxic Structural Alert (ICH S2) — ${genotoxRejects.length} motif${genotoxRejects.length > 1 ? "s" : ""}`,
+      detail: `ICH S2(R1) toxicophore${genotoxRejects.length > 1 ? "s" : ""} detected: ${names}. Mandatory in vitro genotoxicity battery (Ames test, micronucleus) required. NO-GO if Ames-confirmed.`,
+      originLayer: 1,
+      ichReference: "ICH S2(R1)",
+      reviewRequired: true,
+      acknowledged: false,
+      value: `${genotoxRejects.length} alert${genotoxRejects.length > 1 ? "s" : ""}`,
+    });
+  }
+
+  // ── Hard-reject reactive electrophiles / alkylators (non-genotoxic) ──────
+  const reactiveRejects = result.hits.filter(
+    h => h.alert.severity === "reject" && h.alert.category !== "Genotoxic",
+  );
+  if (reactiveRejects.length > 0) {
+    const names = reactiveRejects.map(h => h.alert.name).slice(0, 3).join("; ");
+    const extra = reactiveRejects.length > 3 ? ` +${reactiveRejects.length - 3} more` : "";
+    const libs  = [...new Set(reactiveRejects.map(h => h.alert.library))].join(", ");
+    flags.push({
+      type: "structural-alert",
+      severity: "critical",
+      label: `Hard-Exclude Reactive Alert (${libs}) — ${reactiveRejects.length} motif${reactiveRejects.length > 1 ? "s" : ""}`,
+      detail: `${names}${extra}. These motifs are excluded from all five public HTS libraries (Brenk 2008; NIH-MLSMR; BMS 2006) due to non-specific macromolecular reactivity. Structural modification required; no ML model can override deterministic chemistry.`,
+      originLayer: 1,
+      ichReference: "ICH Q3B",
+      reviewRequired: true,
+      acknowledged: false,
+      value: `${reactiveRejects.length} reject`,
+    });
+  }
+
+  // ── PAINS / assay-interference ────────────────────────────────────────────
+  if (result.painsCount > 0) {
+    const painsNames = result.hits
+      .filter(h => h.alert.library === "PAINS")
+      .map(h => h.alert.name)
+      .slice(0, 3)
+      .join("; ");
+    const extra = result.painsCount > 3 ? ` +${result.painsCount - 3} more` : "";
+    flags.push({
+      type: "structural-alert",
+      severity: result.painsCount >= 2 ? "major" : "warning",
+      label: `PAINS Alert — ${result.painsCount} pan-assay interference motif${result.painsCount > 1 ? "s" : ""}`,
+      detail: `${painsNames}${extra}. These patterns are over-represented in HTS false-positive hits (Baell & Holloway, J. Med. Chem. 2010). Confirm activity in an orthogonal assay (SPR, ITC, or biophysical counterscreen) before advancing.`,
+      originLayer: 1,
+      reviewRequired: result.painsCount >= 2,
+      acknowledged: false,
+      value: `${result.painsCount} PAINS`,
+    });
+  }
+
+  // ── Warn-tier reactive metabolite / property concerns ────────────────────
+  const warnMisc = result.hits.filter(
+    h => h.alert.severity === "warn" &&
+         h.alert.library !== "PAINS" &&
+         h.alert.category !== "Genotoxic",
+  );
+  if (warnMisc.length > 0) {
+    const names = warnMisc.map(h => h.alert.name).slice(0, 3).join("; ");
+    const extra = warnMisc.length > 3 ? ` +${warnMisc.length - 3} more` : "";
+    flags.push({
+      type: "structural-alert",
+      severity: warnMisc.length >= 2 ? "major" : "warning",
+      label: `Structural Liability Warning — ${warnMisc.length} motif${warnMisc.length > 1 ? "s" : ""}`,
+      detail: `${names}${extra}. Flagged by Brenk / BMS / NIH-MLSMR libraries as requiring context review (reactive metabolite, metal chelation, or property concern). Investigate with orthogonal assays before advancing to L2.`,
+      originLayer: 1,
+      reviewRequired: false,
+      acknowledged: false,
+      value: `${warnMisc.length} warn`,
+    });
+  }
+
+  return flags;
+}
+
+export function computeLayer1Flags(
+  iv: InVitroResults,
+  structuralAlerts?: StructuralAlertResult | null,
+): SafetyFlag[] {
+  const flags: SafetyFlag[] = [];
+
+  // Structural alert flags — prepended so they appear first in the panel
+  // (they are the earliest-stage, pre-biological signals).
+  flags.push(...computeStructuralAlertFlags(structuralAlerts));
 
   if (iv.herg.ic50_uM < 10) {
     flags.push({
@@ -238,6 +359,7 @@ export const SAFETY_FLAG_ICONS: Record<SafetyFlagType, string> = {
   "narrow-margin": "Shield",
   "high-grade-ae": "AlertTriangle",
   "subgroup-disparity": "Users",
+  "structural-alert": "FlaskConical",
 };
 
 export interface HAIOpsContext {

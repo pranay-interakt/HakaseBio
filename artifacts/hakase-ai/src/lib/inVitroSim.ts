@@ -2,6 +2,17 @@ import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import { detectPharmacophores } from "./chemistry";
 import { runBioactivationAssessment, type BioactivationAssessment } from "./bioactivationEngine";
 import { DRUGCENTRAL_VALIDATED_TARGETS } from "./drugcentralValidatedTargets";
+import type { MlOverlay } from "./mlOverlay";
+import { emptyOverlay, overlayHasAnyMl, cypProbToIc50_uM, hergProbToIc50_uM } from "./mlOverlay";
+import {
+  type CalDescriptors,
+  calCaco2Papp,
+  calPPBfuPercent,
+  calHalfLifeHours,
+  calHepatocyteCLint,
+  calHERGBlockerProbability,
+  calCYPInhibitorProbabilities,
+} from "./l1Calibration";
 
 export interface DoseResponsePoint {
   concentration: number;
@@ -135,6 +146,20 @@ export interface InVitroResults {
   overallRisk: "Low" | "Moderate" | "High";
   inVitroScore: number;
   timestamp: string;
+  /**
+   * Per-field provenance map ("ml" / "heuristic" / "experimental").
+   * Stamped based on whether each value came from the ML overlay or the
+   * deterministic literature rule. The L1 UI renders a per-row badge using
+   * this map. Optional for backward compatibility with consumers that
+   * pre-date the overlay refactor (treat missing as "all heuristic").
+   */
+  provenance?: Record<string, "ml" | "heuristic" | "experimental">;
+  /**
+   * True iff any field on this record was driven by a real ML inference.
+   * Surfaces an "ML-Enhanced" badge on the In-Vitro result panel header.
+   * Optional for backward compatibility (missing → render as `false`).
+   */
+  mlEnhanced?: boolean;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -389,150 +414,97 @@ export function computePharmacophoreBonus(
 }
 
 /**
- * RULE-BASED ESTIMATE — not a trained QSAR model.
- *
- * Estimates Caco-2 apparent permeability (Papp A→B, ×10⁻⁶ cm/s) from logP,
- * TPSA, MW, and HBD using a log-linear additive rule derived from
- * Palm et al. 1997 and Artursson & Karlsson 1991 correlations.
- * Not fitted to a Caco-2 assay dataset; expected accuracy ±5–10× on Papp.
+ * CALIBRATED QSPR ESTIMATE — Ridge regression fitted to the public
+ * TDC Caco2_Wang dataset (n=910, 5-fold CV R²=0.578, geomean fold-error
+ * 2.5×). Replaces the former hand-tuned log-linear rule (which was never
+ * fitted and showed ~3.5× benchmark fold-error). Still a heuristic
+ * fallback — the ADMET-AI Caco2_Wang GNN takes priority when available.
+ * Coefficients live in `l1Calibration.ts`.
  */
 function computeCaco2Permeability(
-  logP: number, tpsa: number, mw: number, hbd: number,
+  cal: CalDescriptors,
 ): { papp: number; cls: PermeabilityData["caco2Class"] } {
-  let logPapp = -5.75;
-  if (logP >= 0 && logP <= 4) logPapp += 0.35 * logP;
-  else if (logP > 4) logPapp += 0.35 * 4 - 0.2 * (logP - 4);
-  else logPapp += 0.15 * logP;
-
-  logPapp -= 0.012 * tpsa;
-  if (hbd > 3) logPapp -= 0.15 * (hbd - 3);
-  if (mw > 500) logPapp -= 0.001 * (mw - 500);
-
-  const papp = Math.pow(10, logPapp + 6) * 10;
-  const pappClamped = clamp(papp, 0.1, 80);
-
+  const papp = calCaco2Papp(cal);
   const cls: PermeabilityData["caco2Class"] =
-    pappClamped > 20 ? "High" : pappClamped > 5 ? "Moderate" : "Low";
-  return { papp: pappClamped, cls };
+    papp > 20 ? "High" : papp > 5 ? "Moderate" : "Low";
+  return { papp, cls };
 }
 
 /**
- * RULE-BASED ESTIMATE — not a trained QSAR model.
- *
- * Estimates human liver microsomal intrinsic clearance (CLint, µL/min/mg protein)
- * from logP, MW, aromatic ring count, Fsp3, and rotatable bonds, using an
- * additive log-linear rule grounded in Obach 1999 lipophilicity–clearance trends.
- * Not fitted to HLM assay data; expected accuracy ±3–5× on CLint.
+ * CALIBRATED QSPR ESTIMATE — Ridge regression fitted to the public TDC
+ * Clearance_Hepatocyte_AZ dataset (n=1213). Returns HEPATOCYTE intrinsic
+ * clearance (µL/min/10⁶ cells); the caller scales to microsomal CLint with
+ * the published hepatocyte→microsome factor (~2.5×, Brown 2007 / Foster
+ * 2011), mirroring the ML-overlay path. CLint is intrinsically hard to
+ * predict from 2-D structure (CV R²≈0.05, geomean fold-error ~3×) — treat
+ * as a coarse triage band. Coefficients live in `l1Calibration.ts`.
  */
-function computeMicrosomalCLint(
-  logP: number, mw: number, nArom: number, fsp3: number, rotBonds: number,
-): number {
-  let logCLint = 0.8;
-  logCLint += 0.25 * Math.max(0, logP - 1);
-  if (logP > 4) logCLint += 0.3 * (logP - 4);
-
-  logCLint += 0.0015 * mw;
-  if (nArom >= 3) logCLint += 0.15 * (nArom - 2);
-
-  logCLint -= 0.2 * fsp3;
-
-  if (rotBonds > 8) logCLint += 0.05 * (rotBonds - 8);
-
-  return clamp(Math.pow(10, logCLint), 3, 250);
+function computeHepatocyteCLint(cal: CalDescriptors): number {
+  return calHepatocyteCLint(cal);
 }
 
 /**
- * RULE-BASED ESTIMATE — not a trained QSAR model.
+ * CALIBRATED QSAR ESTIMATE — hERG channel IC50 (µM).
  *
- * Estimates hERG channel IC50 (µM) from lipophilicity, molecular weight,
- * basic nitrogen count, TPSA, and aromatic ring count, based on the
- * Cavalli 2002 and Aronov 2008 physicochemical hERG risk rules.
- * Not fitted to a patch-clamp dataset; error bars are ±0.5 log units typical.
- * Actual hERG liability requires wet-lab patch-clamp (IonWorks/QPatch) confirmation.
+ * Computes the hERG blocker probability with an L2-logistic model fitted to
+ * the public TDC hERG_Karim dataset (n=13,445, 5-fold CV ROC-AUC 0.739),
+ * then maps probability → IC50 via the calibrated inverse-logistic shared
+ * with the ML path (`hergProbToIc50_uM`, anchored p=0.5 ≈ 10 µM). Replaces
+ * the former hand-tuned rule, which showed ~27× benchmark fold-error.
+ *
+ * This logistic fallback is a SCREEN. The CardioTox RF in the AI-service
+ * (ROC-AUC ≈ 0.90 on the same chemistry) is materially stronger and takes
+ * priority via the ML overlay. Actual hERG liability still requires
+ * patch-clamp (IonWorks / QPatch) confirmation.
  */
-function computeHERGIC50(
-  logP: number, mw: number, basicN: number, tpsa: number,
-  nArom: number, pharm: PharmacophoreProfile | null,
-): number {
-  let logIC50 = 1.8;
-
-  logIC50 -= 0.22 * Math.max(0, logP - 2);
-  if (logP > 4) logIC50 -= 0.15 * (logP - 4);
-
-  if (basicN >= 1) logIC50 -= 0.35;
-  if (basicN >= 2) logIC50 -= 0.25;
-
-  if (pharm?.hasPiperidine || pharm?.hasPiperazine) logIC50 -= 0.2;
-
-  logIC50 -= 0.001 * Math.max(0, mw - 350);
-
-  if (tpsa > 100) logIC50 += 0.15;
-
-  if (nArom >= 3) logIC50 -= 0.1 * (nArom - 2);
-
-  return clamp(Math.pow(10, logIC50), 0.1, 100);
+function computeHERGIC50(cal: CalDescriptors): number {
+  const p = calHERGBlockerProbability(cal);
+  const ic50 = hergProbToIc50_uM(p);
+  return ic50 === null ? 10 : clamp(ic50, 0.05, 200);
 }
 
 /**
- * RULE-BASED ESTIMATE — not a trained QSAR model.
- *
- * Estimates fraction unbound in plasma (fu, %) from logP, MW, and acidic
- * group count, using a log-linear rule based on Lobell 2003 PPB trends.
- * Not fitted to equilibrium dialysis data; expected accuracy ±2–3× on fu.
- * Highly lipophilic or acidic compounds (NSAIDs, statins) may be mis-estimated.
+ * CALIBRATED QSPR ESTIMATE — fraction unbound in plasma (fu, %).
+ * Ridge regression on log10(fu) fitted to the public TDC PPBR_AZ dataset
+ * (n=1614, 5-fold CV R²=0.358, geomean fold-error 2.8×). Replaces the
+ * former hand-tuned rule (~7.5× benchmark fold-error on this panel).
+ * Coefficients live in `l1Calibration.ts`.
  */
-function computePPB(logP: number, mw: number, acidic: number): {
+function computePPB(cal: CalDescriptors): {
   fu: number; cls: PlasmaProteinBindingData["bindingClass"];
 } {
-  let logFu = 1.6;
-  logFu -= 0.35 * Math.max(0, logP);
-  if (logP > 3) logFu -= 0.2 * (logP - 3);
-
-  if (acidic >= 1) logFu -= 0.3;
-
-  if (mw > 500) logFu -= 0.1;
-
-  const fu = clamp(Math.pow(10, logFu), 0.1, 80);
+  const fu = calPPBfuPercent(cal);
   const cls: PlasmaProteinBindingData["bindingClass"] =
     fu > 20 ? "Weakly Bound" : fu > 5 ? "Moderately Bound" : "Highly Bound";
   return { fu, cls };
 }
 
 /**
- * RULE-BASED ESTIMATE — not a trained QSAR model.
+ * CALIBRATED QSAR ESTIMATE — CYP isoform inhibition.
  *
- * Estimates CYP isoform inhibition IC50 (µM) for CYP1A2, 2C9, 2C19, 2D6, 3A4
- * using isoform-specific physicochemical rules (aromatic N for 2C19, basic
- * amine for 2D6, lipophilicity × MW for 3A4) derived from Pelkonen 2008 and
- * Obach 2009 substrate/inhibitor SAR reviews.
- * Not fitted to fluorescence or LC-MS CYP assay data; ±0.5 log unit error typical.
- * Actual CYP DDI risk requires full reversible + time-dependent inhibition assays.
+ * Per-isoform L2-logistic classifiers fitted to the public TDC Veith CYP
+ * inhibition datasets (CYP1A2/2C9/2C19/2D6/3A4, n≈12–13k each, 5-fold CV
+ * ROC-AUC 0.75–0.85). The inhibitor probability is mapped to an IC50 (µM)
+ * via the same calibrated inverse-logistic the ML overlay uses
+ * (`cypProbToIc50_uM`, anchored p=0.5 ≈ 10 µM). Replaces the former
+ * hand-tuned per-isoform rule with SMILES-hash jitter — output is now
+ * deterministic (a molecule gives the same answer every run).
+ * Actual CYP DDI risk still requires reversible + time-dependent inhibition
+ * assays. Coefficients live in `l1Calibration.ts`.
  */
-function computeCYPInhibition(
-  logP: number, mw: number, nArom: number, pharm: PharmacophoreProfile | null,
-  seed: number,
-): CYPInhibitionPanel {
-  const base1A2 = 20 + (nArom >= 3 ? -8 : 0) + (logP > 3 ? -4 : 2);
-  const base2C9 = 22 + (pharm?.hasCarboxylicAcid ? -6 : 0) + (logP > 2.5 ? -3 : 2);
-  const base2C19 = 18 + (pharm?.aromaticNCount && pharm.aromaticNCount >= 2 ? -5 : 0) + (logP > 2 ? -3 : 1);
-  const base2D6 = 15 + (pharm?.basicAmineCount && pharm.basicAmineCount >= 1 ? -6 : 2) + (logP > 3 ? -3 : 1);
-  const base3A4 = 12 + (mw > 400 ? -4 : 2) + (logP > 3 ? -3 : 1) + (nArom >= 2 ? -2 : 0);
-
-  const r = (offset: number) => seededRandom(seed + offset);
-  const jitter = (base: number, idx: number) => clamp(base * (0.85 + r(idx) * 0.3), 1, 50);
-
-  const cyp1a2_ic50 = jitter(clamp(base1A2, 2, 50), 101);
-  const cyp2c9_ic50 = jitter(clamp(base2C9, 2, 50), 102);
-  const cyp2c19_ic50 = jitter(clamp(base2C19, 2, 50), 103);
-  const cyp2d6_ic50 = jitter(clamp(base2D6, 2, 50), 104);
-  const cyp3a4_ic50 = jitter(clamp(base3A4, 2, 50), 105);
-
+function computeCYPInhibition(cal: CalDescriptors): CYPInhibitionPanel {
+  const probs = calCYPInhibitorProbabilities(cal);
+  const toEntry = (p: number): { ic50_uM: number; risk: "Low" | "Moderate" | "High" } => {
+    const ic = cypProbToIc50_uM(p);
+    const v = ic === null ? 30 : clamp(ic, 0.05, 50);
+    return { ic50_uM: +v.toFixed(2), risk: cypRisk(v) };
+  };
   return {
-    CYP1A2:  { ic50_uM: +cyp1a2_ic50.toFixed(1), risk: cypRisk(cyp1a2_ic50) },
-    CYP2C9:  { ic50_uM: +cyp2c9_ic50.toFixed(1), risk: cypRisk(cyp2c9_ic50) },
-    CYP2C19: { ic50_uM: +cyp2c19_ic50.toFixed(1), risk: cypRisk(cyp2c19_ic50) },
-    CYP2D6:  { ic50_uM: +cyp2d6_ic50.toFixed(1), risk: cypRisk(cyp2d6_ic50) },
-    CYP3A4:  { ic50_uM: +cyp3a4_ic50.toFixed(1), risk: cypRisk(cyp3a4_ic50) },
+    CYP1A2:  toEntry(probs.CYP1A2),
+    CYP2C9:  toEntry(probs.CYP2C9),
+    CYP2C19: toEntry(probs.CYP2C19),
+    CYP2D6:  toEntry(probs.CYP2D6),
+    CYP3A4:  toEntry(probs.CYP3A4),
   };
 }
 
@@ -618,7 +590,20 @@ export function runInVitroSimulation(
    * and populates binding potency calculations directly using the ML prediction.
    */
   predictedKd_nM: number | null = null,
+  /**
+   * Optional ML overlay (ADMET-AI v2 Chemprop + CardioTox / DILI /
+   * Solubility / Binding RFs). When supplied, the corresponding clinical
+   * readouts (Caco-2 Papp, hERG IC50, CYP panel, PPB fu%, hepatocyte
+   * CL_int, half-life, P-gp substrate flag) override the deterministic
+   * rule estimates. Each field's provenance is stamped in the result.
+   */
+  mlOverlay: MlOverlay | null = null,
 ): InVitroResults {
+  const overlay = mlOverlay ?? emptyOverlay();
+  const provenance: Record<string, "ml" | "heuristic" | "experimental"> = {};
+  // Prefer Kd from the overlay over the positional `predictedKd_nM` so
+  // callers that pass both stay consistent (Kd_nM is the canonical channel).
+  const effectiveKd_nM = overlay.Kd_nM !== null ? overlay.Kd_nM : predictedKd_nM;
   const seed = hashSmiles(smiles);
   const mw = molProps.mw ?? 300;
   const logP = molProps.logP ?? 2.0;
@@ -639,6 +624,19 @@ export function runInVitroSimulation(
   const pharm = detectPharmacophores(smiles);
   const basicN = pharm?.basicAmineCount ?? 0;
   const acidicGroups = pharm?.acidicGroupCount ?? 0;
+
+  // Descriptor bundle for the calibrated QSPR/QSAR fallback models
+  // (l1Calibration.ts). Every field is a real RDKit descriptor already on
+  // `molProps` or a pharmacophore count — no new descriptor is computed.
+  const cal: CalDescriptors = {
+    mw, logP, tpsa, hbd, hba, rotBonds,
+    numAromaticRings: nArom,
+    numAromaticHeterocycles: molProps.numAromaticHeterocycles ?? 0,
+    fsp3, crippenMR,
+    aromaticNCount: pharm?.aromaticNCount ?? 0,
+    basicAmineCount: basicN,
+    acidicGroupCount: acidicGroups,
+  };
 
   const r = (offset: number) => seededRandom(seed + offset);
 
@@ -667,12 +665,17 @@ export function runInVitroSimulation(
     !!uniprotId &&
     (VALIDATED_TARGET_UNIPROTS.has(uniprotId) ||
       (targetConfidence !== null && targetConfidence >= 0.65) ||
-      predictedKd_nM !== null);
+      effectiveKd_nM !== null);
 
-  const ic50_nM_raw = predictedKd_nM !== null
-    ? predictedKd_nM
+  // ML primary path: Kd → IC50 via Cheng-Prusoff (Ki ≈ 0.85 Kd, IC50 ≈ 2 Ki
+  // at assay [S] ≈ Km). Heuristic fallback: hand-tuned QSPR pIC50.
+  const ic50_nM_raw = effectiveKd_nM !== null
+    ? clamp(effectiveKd_nM * 0.85 * 2, 0.3, 50000)
     : clamp(Math.pow(10, 9 - finalPIC50), 0.3, 50000);
   const ic50_nM: number | null = hasValidatedTarget ? ic50_nM_raw : null;
+  if (hasValidatedTarget) {
+    provenance.doseResponse_IC50 = effectiveKd_nM !== null ? "ml" : "heuristic";
+  }
   const ec50_nM: number | null = hasValidatedTarget
     ? ic50_nM_raw * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2)
     : null;
@@ -732,46 +735,173 @@ export function runInVitroSimulation(
       ? `${therapeuticArea}: High < ${taProfile.potencyThresholds.high} nM, Moderate < ${taProfile.potencyThresholds.moderate} nM`
       : null;
 
-  const { papp: caco2Papp, cls: caco2Class } = computeCaco2Permeability(logP, tpsa, mw, hbd);
+  // ── Caco-2 / PAMPA permeability ─────────────────────────────────────────
+  // Primary: ADMET-AI Caco2_Wang (Chemprop GNN, TDC Caco-2 benchmark).
+  // Fallback: literature-cited logP/TPSA QSPR.
+  let caco2Papp: number;
+  let caco2Class: PermeabilityData["caco2Class"];
+  if (overlay.caco2_Papp_1e6_cm_s !== null) {
+    caco2Papp = clamp(overlay.caco2_Papp_1e6_cm_s, 0.05, 200);
+    caco2Class = caco2Papp > 20 ? "High" : caco2Papp > 5 ? "Moderate" : "Low";
+    provenance.caco2Papp = "ml";
+  } else {
+    const r = computeCaco2Permeability(cal);
+    caco2Papp = r.papp; caco2Class = r.cls;
+    provenance.caco2Papp = "heuristic";
+  }
   const pampaPe = clamp(caco2Papp * (0.55 + fsp3 * 0.3), 0.1, 50);
   const pampaClass: PermeabilityData["pampaClass"] =
     pampaPe > 10 ? "High" : pampaPe > 2 ? "Moderate" : "Low";
+  provenance.pampaPe = "heuristic";
 
-  const effluxBase = 1.0 + (mw > 400 ? 0.5 : 0) + (tpsa > 100 ? 0.8 : 0) + (hbd > 3 ? 0.5 : 0);
-  const effluxRatio = clamp(effluxBase + logP * 0.15, 0.8, 12);
-  const pgpSubstrate = effluxRatio > 2.5;
+  // ── P-gp efflux ─────────────────────────────────────────────────────────
+  // Primary: ADMET-AI Pgp_Broccatelli probability → efflux ratio via
+  // Polli 2001 / Schinkel calibration (substrates routinely show E.R. 3–10,
+  // non-substrates ≤ 2). Fallback: legacy logP/MW/TPSA step rule.
+  let effluxRatio: number;
+  let pgpSubstrate: boolean;
+  if (overlay.pgp_substrate_prob !== null) {
+    const p = overlay.pgp_substrate_prob;
+    effluxRatio = clamp(1 + 9 * p, 0.8, 12);
+    pgpSubstrate = p >= 0.50;
+    provenance.effluxRatio = "ml";
+  } else {
+    const effluxBase = 1.0 + (mw > 400 ? 0.5 : 0) + (tpsa > 100 ? 0.8 : 0) + (hbd > 3 ? 0.5 : 0);
+    effluxRatio = clamp(effluxBase + logP * 0.15, 0.8, 12);
+    pgpSubstrate = effluxRatio > 2.5;
+    provenance.effluxRatio = "heuristic";
+  }
 
-  const microCLint = computeMicrosomalCLint(logP, mw, nArom, fsp3, rotBonds);
+  // ── Microsomal / hepatocyte CL_int ──────────────────────────────────────
+  // Primary: ADMET-AI Clearance_Hepatocyte_AZ (µL/min/10⁶ cells). Convert
+  // to microsomal CL_int using the published hepatocyte→microsome scaling
+  // factor (Brown 2007 / Foster 2011 mean ratio ≈ 2.5×).
+  let microCLint: number;
+  let hepatoCLint: number;
+  if (overlay.hepatocyte_clint_ul_min_1e6_cells !== null) {
+    hepatoCLint = clamp(overlay.hepatocyte_clint_ul_min_1e6_cells, 0.5, 500);
+    microCLint  = clamp(hepatoCLint * 2.5, 3, 500);
+    provenance.microCLint = "ml";
+    provenance.hepatoCLint = "ml";
+  } else {
+    // Calibrated QSPR — hepatocyte CL_int fitted to TDC Clearance_Hepatocyte_AZ
+    // (l1Calibration.ts); microsomal CL_int derived with the same 2.5×
+    // hepatocyte→microsome factor the ML path above uses, keeping the two
+    // paths dimensionally consistent.
+    hepatoCLint = clamp(computeHepatocyteCLint(cal), 0.5, 500);
+    microCLint  = clamp(hepatoCLint * 2.5, 3, 500);
+    provenance.microCLint = "heuristic";
+    provenance.hepatoCLint = "heuristic";
+  }
   const microsomalClass: MetabolicStabilityData["microsomalClass"] =
     microCLint < 15 ? "Stable" : microCLint < 50 ? "Moderate" : "Unstable";
-
-  const hepatoScaling = clamp(0.4 + fsp3 * 0.2, 0.3, 0.65);
-  const hepatoCLint = clamp(microCLint * hepatoScaling, 1, 150);
   const hepatocyteClass: MetabolicStabilityData["hepatocyteClass"] =
     hepatoCLint < 10 ? "Stable" : hepatoCLint < 30 ? "Moderate" : "Unstable";
 
-  const halfLifeMin = clamp(0.693 / (microCLint / 1000) * 0.9, 5, 300);
-
-  const cypInhibition = computeCYPInhibition(logP, mw, nArom, pharm, seed);
-
-  const { fu: fuPercent, cls: bindingClass } = computePPB(logP, mw, acidicGroups);
+  // ── Plasma protein binding (moved up — required by half-life PK math) ──
+  // Primary: ADMET-AI PPBR_AZ (predicted % bound → fu = 1 - bound/100).
+  // Fallback: literature-cited logP/MW QSPR (Sui 2008 surrogate).
+  let fuPercent: number;
+  let bindingClass: PlasmaProteinBindingData["bindingClass"];
+  if (overlay.ppb_fu_fraction !== null) {
+    fuPercent = clamp(overlay.ppb_fu_fraction * 100, 0.05, 100);
+    bindingClass = fuPercent > 20 ? "Weakly Bound" : fuPercent > 5 ? "Moderately Bound" : "Highly Bound";
+    provenance.fuPercent = "ml";
+  } else {
+    const r = computePPB(cal);
+    fuPercent = r.fu; bindingClass = r.cls;
+    provenance.fuPercent = "heuristic";
+  }
   const boundPercent = 100 - fuPercent;
 
-  const herg_ic50_uM = computeHERGIC50(logP, mw, basicN, tpsa, nArom, pharm);
+  // ── Half-life ───────────────────────────────────────────────────────────
+  // Primary: ADMET-AI Half_Life_Obach (hours; convert to minutes).
+  // Fallback: calibrated direct QSPR — Ridge regression on log10(t½) fitted
+  // to the public TDC Half_Life_Obach dataset (n=667, 5-fold CV geomean
+  // fold-error 2.7×; coefficients in l1Calibration.ts). This replaces the
+  // earlier well-stirred-liver fallback, which — having no fitted CL_int to
+  // feed it — over-predicted t½ by ~9× for high-Vd / high-PPB drugs such as
+  // atorvastatin. The well-stirred PBPK math still lives in
+  // l2DoseProjection.ts for the Layer-2 dose projection, where a
+  // measured / ML CL_int and Vd are available.
+  let halfLifeMin: number;
+  if (overlay.half_life_h !== null && overlay.half_life_h > 0) {
+    halfLifeMin = clamp(overlay.half_life_h * 60, 1, 7200);
+    provenance.halfLifeMin = "ml";
+  } else {
+    halfLifeMin = clamp(calHalfLifeHours(cal) * 60, 5, 7200);
+    provenance.halfLifeMin = "heuristic";
+  }
+
+  // ── CYP inhibition panel ────────────────────────────────────────────────
+  // Primary: per-isoform ADMET-AI CYP head (5 GNN classifiers). Probability
+  // → IC50 µM via the calibrated inverse-logistic in mlOverlay. Fallback:
+  // legacy linear-combination rule per isoform.
+  let cypInhibition: CYPInhibitionPanel;
+  const cypMlAvailable =
+    overlay.cyp1a2_inhibitor_prob !== null ||
+    overlay.cyp2c9_inhibitor_prob !== null ||
+    overlay.cyp2c19_inhibitor_prob !== null ||
+    overlay.cyp2d6_inhibitor_prob !== null ||
+    overlay.cyp3a4_inhibitor_prob !== null;
+  if (cypMlAvailable) {
+    const mlIc50 = (p: number | null): { ic50_uM: number; risk: "Low" | "Moderate" | "High" } => {
+      const ic = cypProbToIc50_uM(p);
+      const v = ic === null ? 30 : clamp(ic, 0.1, 50);
+      return { ic50_uM: +v.toFixed(2), risk: cypRisk(v) };
+    };
+    cypInhibition = {
+      CYP1A2:  mlIc50(overlay.cyp1a2_inhibitor_prob),
+      CYP2C9:  mlIc50(overlay.cyp2c9_inhibitor_prob),
+      CYP2C19: mlIc50(overlay.cyp2c19_inhibitor_prob),
+      CYP2D6:  mlIc50(overlay.cyp2d6_inhibitor_prob),
+      CYP3A4:  mlIc50(overlay.cyp3a4_inhibitor_prob),
+    };
+    provenance.cypInhibition = "ml";
+  } else {
+    cypInhibition = computeCYPInhibition(cal);
+    provenance.cypInhibition = "heuristic";
+  }
+
+  // (Plasma protein binding moved above — required by half-life PK math.)
+
+  // ── hERG IC50 ───────────────────────────────────────────────────────────
+  // Primary: CardioTox-ML (dedicated Wang/Karim 2016 RF). If CardioTox
+  // returned a parsed IC50 band midpoint, use that. Otherwise translate the
+  // blocker probability via the calibrated inverse in mlOverlay. Fallback:
+  // legacy logP/HBD/basicN QSPR rule.
+  let herg_ic50_uM: number;
+  let hergProvenance: "ml" | "heuristic";
+  if (overlay.herg_ic50_band_um !== null) {
+    herg_ic50_uM = clamp(overlay.herg_ic50_band_um, 0.05, 200);
+    hergProvenance = "ml";
+  } else if (overlay.herg_blocker_prob !== null) {
+    const ic = hergProbToIc50_uM(overlay.herg_blocker_prob);
+    herg_ic50_uM = ic === null ? computeHERGIC50(cal) : clamp(ic, 0.05, 200);
+    hergProvenance = "ml";
+  } else {
+    herg_ic50_uM = computeHERGIC50(cal);
+    hergProvenance = "heuristic";
+  }
+  provenance.herg_ic50_uM = hergProvenance;
   const hergMarginThreshold = taProfile.hergWeight;
   // Safety margin only meaningful when on-target IC50 exists; without a
   // validated target we cannot compute "hERG IC50 / on-target IC50".
   const safetyMargin = ic50_nM !== null ? (herg_ic50_uM * 1000) / Math.max(1, ic50_nM) : 0;
   const adjustedHergIC50 = herg_ic50_uM / hergMarginThreshold;
-  const hergRisk: HERGData["riskCategory"] =
-    adjustedHergIC50 < 1 ? "High" : adjustedHergIC50 < 10 ? "Moderate" : "Low";
-  // RF#6 / §9 step 6: prior `patchClampResult` was three string literals
-  // ("Significant block at 1 µM" / "Mild block at 10 µM" / "No significant
-  // block at 30 µM") keyed off a heuristic-derived hergRisk band, falsely
-  // implying patch-clamp electrophysiology. Replaced with a single honest
-  // provenance phrase. Field NAME retained for safetyFlags.ts back-compat
-  // (NEVER-MODIFY file).
-  const patchClampResult = "Heuristic prediction from physchem (no patch-clamp data)";
+  // hERG risk band — prefer the CardioTox RF class when available, else
+  // fall back to the µM-band rule (which still respects TA weighting).
+  const hergRisk: HERGData["riskCategory"] = overlay.herg_blocker_prob !== null
+    ? (overlay.herg_blocker_prob >= 0.66 ? "High"
+       : overlay.herg_blocker_prob >= 0.33 ? "Moderate" : "Low")
+    : (adjustedHergIC50 < 1 ? "High" : adjustedHergIC50 < 10 ? "Moderate" : "Low");
+  provenance.hergRisk = overlay.herg_blocker_prob !== null ? "ml" : "heuristic";
+  // Honest provenance phrase. Field NAME retained for safetyFlags.ts
+  // back-compat (NEVER-MODIFY file), but the CONTENT reflects what
+  // actually ran instead of falsely implying patch-clamp data.
+  const patchClampResult = overlay.herg_blocker_prob !== null
+    ? `CardioTox-ML blocker probability ${(overlay.herg_blocker_prob * 100).toFixed(0)}% (Wang/Karim 2016 hERG RF — no patch-clamp data)`
+    : "Heuristic prediction from physchem (no patch-clamp data)";
 
   // RF#3 / RF#4 / §9 steps 3–4: gate ALL selectivity output on
   // `hasValidatedScreen`. Without a real off-target panel run, the
@@ -812,8 +942,22 @@ export function runInVitroSimulation(
     }
   }
 
-  const cc50Base = logP > 4 ? 15 : logP > 2 ? 40 : 70;
-  const cc50_uM = clamp(cc50Base + (fsp3 * 20) - (nArom > 3 ? 10 : 0), 1, 100);
+  // ── Cytotoxicity CC50 ───────────────────────────────────────────────────
+  // No dedicated CC50 head exists in ai-service today. The LD50_Zhu acute
+  // tox endpoint is the closest analogue; when available we map LD50 mg/kg
+  // → CC50 µM via the empirically observed correlation in Lou 2014 (oral
+  // LD50 ~ 10⁰·⁵ × HepG2 CC50, r ≈ 0.6). Without an ML signal we keep the
+  // literature-derived logP/Fsp3/aromatic-ring rule.
+  let cc50_uM: number;
+  if (overlay.ld50_mg_per_kg !== null && overlay.ld50_mg_per_kg > 0) {
+    const logCc = Math.log10(overlay.ld50_mg_per_kg) - 0.5;
+    cc50_uM = clamp(Math.pow(10, logCc), 1, 200);
+    provenance.cc50_uM = "ml";
+  } else {
+    const cc50Base = logP > 4 ? 15 : logP > 2 ? 40 : 70;
+    cc50_uM = clamp(cc50Base + (fsp3 * 20) - (nArom > 3 ? 10 : 0), 1, 100);
+    provenance.cc50_uM = "heuristic";
+  }
   // Therapeutic index only meaningful when on-target IC50 exists.
   const therapeuticIndex = ic50_nM !== null ? (cc50_uM * 1000) / Math.max(1, ic50_nM) : 0;
   const viabilityAt10uM = clamp(90 - (logP > 4 ? 20 : 0) - (mw > 500 ? 5 : 0) + fsp3 * 10, 30, 100);
@@ -904,5 +1048,7 @@ export function runInVitroSimulation(
     overallRisk,
     inVitroScore: +inVitroScore.toFixed(2),
     timestamp: new Date().toISOString(),
+    provenance,
+    mlEnhanced: overlayHasAnyMl(overlay),
   };
 }

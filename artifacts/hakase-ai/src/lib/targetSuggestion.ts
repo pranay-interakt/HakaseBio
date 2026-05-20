@@ -1,6 +1,7 @@
 import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import type { ChEMBLTargetHit } from "./chemblTargetLookup";
 import { makeQuality, type SourceQuality } from "./sourceQuality";
+import type { MlTargetPrediction } from "./mlPolypharmacology";
 
 export interface TargetSuggestion {
   uniprotId:   string;
@@ -915,4 +916,57 @@ function extractGeneName(targetName: string): string {
   const words = targetName.split(/\s+/);
   if (words.length <= 2) return targetName;
   return words.slice(0, 2).map(w => w[0]).join("").toUpperCase() || targetName.slice(0, 6);
+}
+
+/**
+ * Convert ML-predicted polypharmacology panel hits to TargetSuggestions.
+ * These are real Binding-ML predictions (DeepDTA-GBM, ESM-2 + Morgan FP)
+ * against a curated diverse-class DrugCentral shortlist — surfaced when
+ * a truly novel molecule has no ChEMBL Tanimoto ≥ 70% neighbour and the
+ * kinase-biased pharmacophore catalogue would otherwise be the only path.
+ *
+ * Each hit carries `source: "chembl-similar"` (so the cascade gate scores
+ * it at the ML tier 0.7, not the structural tier 0.6) and `quality.tier =
+ * "ml"`.  The confidence is derived from the predicted pKd: pKd ≥ 8 → 0.85,
+ * 7–8 → 0.70, 6–7 → 0.55, < 6 → 0.45.  Out-of-domain predictions get a
+ * 0.7× confidence dampening so they fall below the High-confidence cutoff.
+ */
+export function convertMlPanelToSuggestions(panel: MlTargetPrediction[]): TargetSuggestion[] {
+  return panel.map(p => {
+    let confidence =
+      p.pKd_predicted >= 8 ? 0.85 :
+      p.pKd_predicted >= 7 ? 0.70 :
+      p.pKd_predicted >= 6 ? 0.55 :
+      0.45;
+    if (!p.adInDomain) confidence *= 0.7;
+    const label: TargetSuggestion["confidenceLabel"] =
+      confidence >= 0.65 ? "High" : confidence >= 0.35 ? "Medium" : "Low";
+    const rationale: string[] = [
+      `ML-predicted Kd ${formatNm(p.Kd_nM)} (pKd ${p.pKd_predicted.toFixed(2)}, ${p.affinityClass})`,
+      `Binding-ML (DeepDTA-GBM, Morgan FP + ESM-2 target embedding, BindingDB-trained)`,
+    ];
+    if (p.adTanimoto !== null) {
+      rationale.push(p.adInDomain
+        ? `Applicability domain: in-distribution (Tanimoto NN=${p.adTanimoto.toFixed(2)})`
+        : `Applicability domain: OUT-OF-DOMAIN (Tanimoto NN=${p.adTanimoto.toFixed(2)}) — ML extrapolation, treat predicted Kd cautiously`);
+    }
+    return {
+      uniprotId:        p.uniprotId,
+      geneName:         p.geneName,
+      fullName:         p.fullName,
+      targetClass:      p.targetClass,
+      confidence,
+      confidenceLabel:  label,
+      rationale,
+      area:             `${p.targetClass} (DrugCentral)`,
+      color:            potencyColor(p.Kd_nM),
+      // `chembl-similar` so cascadeGate.ts scores this at the ML tier (0.7);
+      // there is no separate "ml" enum on TargetSuggestion.source today, and
+      // adding one would force a schema migration across every consumer.
+      source:           "chembl-similar" as const,
+      quality:          makeQuality("ml", "Binding-ML polypharmacology panel", {
+        note: `DeepDTA-GBM predicted pKd ${p.pKd_predicted.toFixed(2)} against DrugCentral target ${p.geneName}; ${p.adInDomain ? "in-domain" : "out-of-domain"} prediction.`,
+      }),
+    };
+  });
 }

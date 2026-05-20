@@ -38,7 +38,8 @@ import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
 import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
-import { suggestTargets, convertChEMBLHitsToSuggestions, isValidUniprotAccession, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { suggestTargets, convertChEMBLHitsToSuggestions, convertMlPanelToSuggestions, isValidUniprotAccession, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { predictPolypharmacologyPanel, type MlTargetPrediction } from "@/lib/mlPolypharmacology";
 import { detectPharmacophores } from "@/lib/chemistry";
 import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
@@ -85,8 +86,10 @@ import {
   predictBindingMl,
   predictDiliMl,
   predictAdmetMl,
+  predictCardiotox,
   type DiliMlResult,
   type MlAdmetResult,
+  type CardiotoxResult,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
@@ -94,6 +97,7 @@ import {
   type AiBindingResult,
   type BindingMlResult,
 } from "@/lib/aiService";
+import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -351,6 +355,15 @@ export function HakaseAI() {
   const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
   const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
+  // CardioTox-ML (Wang/Karim 2016 hERG RF) — the dedicated hERG classifier
+  // is preferred over the ADMET-AI hERG head when building the L1 ML overlay
+  // (it's trained specifically on the patch-clamp-anchored Wang dataset).
+  // Cached in HakaseAI state so L1, L2 Stage 4, and the safety-flag engine
+  // share one prediction per SMILES rather than fetching three times.
+  const [cardiotoxMl, setCardiotoxMl] = useState<CardiotoxResult | null>(null);
+  const cardiotoxMlSeqRef = useRef(0);
+  const [solubilityMl, setSolubilityMl] = useState<SolubilityMlResult | null>(null);
+  const solubilityMlSeqRef = useRef(0);
   // Empty string ("") is the canonical "no therapeutic area selected" value.
   // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
   // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
@@ -502,6 +515,14 @@ export function HakaseAI() {
   const [chemblLookupLoading, setChemblLookupLoading] = useState(false);
   const [chemblSuggestions, setChemblSuggestions] = useState<TargetSuggestion[]>([]);
   const chemblLookupRef = useRef<string>("");
+  // ML-predicted polypharmacology panel — only fetched when ChEMBL similarity
+  // returned zero hits AND the molecule is genuinely novel.  Runs Binding-ML
+  // in parallel against a diverse-class DrugCentral shortlist so off-class
+  // scaffolds (anti-oxidants, GPCR ligands, ion-channel modulators) don't
+  // collapse onto kinase-only catalogue suggestions.  Stale-request guard.
+  const [mlPanelSuggestions, setMlPanelSuggestions] = useState<TargetSuggestion[]>([]);
+  const [mlPanelLoading, setMlPanelLoading] = useState(false);
+  const mlPanelRef = useRef<string>("");
   const [chemblCompoundName, setChemblCompoundName] = useState<string | null>(null);
   const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
   const molNameManual = useRef(false);
@@ -590,18 +611,77 @@ export function HakaseAI() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activatedSmiles, activatedMolProps?.isValid]);
 
+  // ML-predicted polypharmacology panel — fires ONLY when:
+  //   (a) ChEMBL lookup has returned (we're past loading), AND
+  //   (b) ChEMBL returned zero usable hits, AND
+  //   (c) the pharmacophore catalogue's top hit confidence is < 0.65
+  // This is the "truly novel scaffold" path — when the molecule has no
+  // chemical neighbours in ChEMBL and doesn't trigger the kinase-biased
+  // SMARTS rules strongly, we fall back to a real ML Kd panel against a
+  // diverse DrugCentral shortlist instead of returning canned kinase
+  // suggestions.  Predictions carry applicability-domain banding so the
+  // user sees when a hit is out-of-distribution.
+  useEffect(() => {
+    const sm = activatedSmiles.trim();
+    if (!sm || !activatedMolProps?.isValid) {
+      setMlPanelSuggestions([]);
+      return;
+    }
+    if (chemblLookupLoading) return;  // wait for ChEMBL to settle first
+    if (chemblSuggestions.length > 0) {
+      // ChEMBL had something — no need to ML-panel
+      setMlPanelSuggestions([]);
+      return;
+    }
+    const topHeurConf = heuristicSuggestions.length > 0
+      ? Math.max(...heuristicSuggestions.map(s => s.confidence))
+      : 0;
+    if (topHeurConf >= 0.65) {
+      // Pharmacophore catalogue already gives a strong-confidence hit;
+      // the ML panel would be redundant noise.
+      setMlPanelSuggestions([]);
+      return;
+    }
+    // Novel scaffold path — fire the panel.
+    mlPanelRef.current = sm;
+    setMlPanelLoading(true);
+    predictPolypharmacologyPanel(sm, { minPKd: 5.5, topN: 6 })
+      .then((panel: MlTargetPrediction[]) => {
+        if (mlPanelRef.current !== sm) return;
+        setMlPanelSuggestions(convertMlPanelToSuggestions(panel));
+      })
+      .catch(() => {
+        if (mlPanelRef.current === sm) setMlPanelSuggestions([]);
+      })
+      .finally(() => {
+        if (mlPanelRef.current === sm) setMlPanelLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activatedSmiles, activatedMolProps?.isValid, chemblLookupLoading, chemblSuggestions.length, heuristicSuggestions]);
+
   // Combined suggestion list — fully dynamic, no hard cap.
-  // Order: every ChEMBL hit first (real measured / similarity binding evidence
-  // for THIS molecule), then heuristic catalogue matches that aren't already
-  // surfaced by ChEMBL (deduped by UniProt ID). The heuristic side is already
-  // confidence-filtered upstream by `suggestTargets`, so the combined length
-  // naturally tracks how informative the molecule actually is.
+  // Order:
+  //   1. ChEMBL hits (real measured / similarity binding evidence — top tier)
+  //   2. ML-predicted polypharmacology panel (DeepDTA-GBM against DrugCentral —
+  //      ML tier, surfaces ONLY when ChEMBL was empty + pharmacophore weak)
+  //   3. Pharmacophore catalogue matches (deterministic SMARTS — structural tier)
+  // Deduped by UniProt ID at each merge step so the same target never appears
+  // twice. The heuristic side is already confidence-filtered upstream.
   const targetSuggestions = useMemo<TargetSuggestion[]>(() => {
-    if (chemblSuggestions.length === 0) return heuristicSuggestions;
-    const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
-    const fallbacks = heuristicSuggestions.filter(h => !chemblIds.has(h.uniprotId));
-    return [...chemblSuggestions, ...fallbacks];
-  }, [chemblSuggestions, heuristicSuggestions]);
+    const seen = new Set<string>();
+    const merged: TargetSuggestion[] = [];
+    const push = (list: TargetSuggestion[]) => {
+      for (const s of list) {
+        if (seen.has(s.uniprotId)) continue;
+        seen.add(s.uniprotId);
+        merged.push(s);
+      }
+    };
+    push(chemblSuggestions);
+    push(mlPanelSuggestions);
+    push(heuristicSuggestions);
+    return merged;
+  }, [chemblSuggestions, mlPanelSuggestions, heuristicSuggestions]);
 
   // ── Auto-sync top target suggestion → UniProt field ───────────────────────
   // Per project no-preload policy: auto-mode starts OFF. The Target UniProt ID
@@ -993,7 +1073,8 @@ export function HakaseAI() {
         therapeuticArea,
         true,
         targetConfidence,
-        bindingMl?.prediction?.Kd_nM ?? null
+        bindingMl?.prediction?.Kd_nM ?? null,
+        mlOverlay,
       );
       setInVitroResults(ivResults);
     }, 1200);
@@ -1104,10 +1185,14 @@ export function HakaseAI() {
       setDiliMl(null);
       setAdmetMl(null);
       setAdmetMlError(null);
+      setCardiotoxMl(null);
+      setSolubilityMl(null);
       return;
     }
     const seqDili = ++diliMlSeqRef.current;
     const seqAdmet = ++admetMlSeqRef.current;
+    const seqCardio = ++cardiotoxMlSeqRef.current;
+    const seqSol = ++solubilityMlSeqRef.current;
     setAdmetMlError(null);
     predictDiliMl(sm)
       .then(r => { if (diliMlSeqRef.current === seqDili) setDiliMl(r); })
@@ -1120,7 +1205,36 @@ export function HakaseAI() {
           setAdmetMlError(e instanceof Error ? e.message : String(e));
         }
       });
+    // CardioTox-ML — dedicated hERG RF; preferred over ADMET-AI hERG head
+    // when building the overlay (Wang/Karim 2016 patch-clamp-anchored).
+    predictCardiotox(sm)
+      .then(r => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(r); })
+      .catch(() => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(null); });
+    // Solubility-ML — surfaces logS for the ADMET panel; also feeds L2 PBPK
+    // dissolution. Silent fail leaves overlay's logS null (heuristic only).
+    predictSolubilityMl(sm)
+      .then(r => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(r); })
+      .catch(() => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(null); });
   }, [smiles, rdkitReady, molProps?.isValid]);
+
+  // ── ML overlay — single source of truth for L1 ML signals ──────────────
+  // Builds an `MlOverlay` once from all the cached ML responses; L1
+  // (runAdmetSimulation, runInVitroSimulation) consumes it instead of
+  // running the heuristic fallback when ML is available. The overlay is
+  // also passed into the cascade gate via SimResults/InVitroResults
+  // provenance, so the gate stops marking outputs as heuristic the moment
+  // L1 actually used ML. Stale/loading entries that are NOT `source === "ml"`
+  // are silently dropped by buildMlOverlay (NO silent coercion policy).
+  const mlOverlay = useMemo(
+    () => buildMlOverlay({
+      admet: admetMl,
+      cardiotox: cardiotoxMl,
+      dili: diliMl,
+      binding: bindingMl,
+      solubility: solubilityMl,
+    }),
+    [admetMl, cardiotoxMl, diliMl, bindingMl, solubilityMl],
+  );
 
   const cascadeGate = useMemo(
     () => {
@@ -1208,11 +1322,50 @@ export function HakaseAI() {
           note: `ML — ${cite}; pKd=${bindingMl.prediction.pKd_predicted.toFixed(2)}`,
         };
       }
-      return evaluateCascadeGate(simResults, targetSuggestions, overrides);
+      return evaluateCascadeGate(simResults, targetSuggestions, overrides, inVitroResults);
     },
-    [simResults, targetSuggestions, diliMl, admetMl, bindingMl],
+    [simResults, targetSuggestions, diliMl, admetMl, bindingMl, inVitroResults],
   );
   const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
+
+  // ── ML overlay upgrade effect ─────────────────────────────────────────────
+  // Handles the race condition where the user clicks Run before the async ML
+  // predictions (predictAdmetMl, predictCardiotox, predictDiliMl) have resolved.
+  // In that case runAdmetSimulation runs with an all-null overlay (pure heuristic),
+  // but simResults.mlEnhanced is false. When ML data arrives later mlOverlay
+  // updates (via useMemo), and this effect detects the upgrade opportunity:
+  //   1. simResults exists but was computed without ML (mlEnhanced === false)
+  //   2. mlOverlay now has at least one non-null ML field
+  // → Re-run both L1 sims so the displayed ADMET, hERG, CYP, and toxicity
+  //   outputs reflect the real ML predictions rather than the heuristic fallback.
+  // Guard: after the upgrade simResults.mlEnhanced becomes true, so the effect
+  // is a one-shot per compound (won't re-fire unless the SMILES changes).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!simResults || simResults.mlEnhanced) return;    // already ML or not run
+    if (!overlayHasAnyMl(mlOverlay)) return;             // ML still loading
+    if (!molProps?.isValid) return;
+    const upgraded = runAdmetSimulation(
+      molProps, smiles, molName || "Unnamed Molecule",
+      uniprotId, therapeuticArea,
+      bindingMl?.prediction?.Kd_nM ?? null,
+      mlOverlay,
+    );
+    setSimResults(upgraded);
+    const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+    const targetConfidence = matchedSuggestion?.confidence ?? null;
+    const ivUpgraded = runInVitroSimulation(
+      molProps, smiles, uniprotId, therapeuticArea,
+      offTargetScreenRun, targetConfidence,
+      bindingMl?.prediction?.Kd_nM ?? null,
+      mlOverlay,
+    );
+    setInVitroResults(ivUpgraded);
+  // Intentional: only mlOverlay in the dep array. We want exactly one
+  // re-run when ML data arrives — not on every other state change.
+  // The simResults.mlEnhanced guard prevents a second fire.
+  }, [mlOverlay]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Inline override form state — replaces window.prompt() which is silently
   // blocked inside sandboxed preview iframes (returns null with no UI).
   const [overrideFormOpen, setOverrideFormOpen] = useState(false);
@@ -1593,7 +1746,7 @@ export function HakaseAI() {
     // slot index moved. All `4` literals in flag/provenance writes below are
     // remapped to `3` to match the new slot.
     if (activeLayer === 3) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1808,7 +1961,7 @@ export function HakaseAI() {
         clearInterval(interval);
 
         if (activeLayer === 1) {
-          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
+          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
 
           if (fingerprintOn && tissueTypes.length > 0) {
             const tissueOrganMap: Record<string, string> = {
@@ -1835,9 +1988,12 @@ export function HakaseAI() {
           // matches (e.g. user typed an arbitrary UniProt manually).
           const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
           const targetConfidence = matchedSuggestion?.confidence ?? null;
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, offTargetScreenRun, targetConfidence, bindingMl?.prediction?.Kd_nM ?? null);
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, offTargetScreenRun, targetConfidence, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
           setInVitroResults(ivResults);
-          const l1Flags = computeLayer1Flags(ivResults);
+          // Pass structural alert result from the L1 ADMET simulation so that
+          // computeLayer1Flags can prepend PAINS / Brenk / Ames-ICH safety
+          // flags to the HAIOps panel. `simResults` is in state at this point.
+          const l1Flags = computeLayer1Flags(ivResults, simResults?.structuralAlerts ?? null);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
           prov1.databaseQueries = [
             { database: "RDKit.js", status: "success", version: "2024.03.5", resultCount: 1 },
@@ -1873,7 +2029,7 @@ export function HakaseAI() {
           // redesign. Trial design moved out of pre-clinical scope into
           // Hakase Clinical. The new L4 slot is Animal Cohort (handled by
           // the relocated runner above at `if (activeLayer === 4)`).
-          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
           const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
             bioavailF:       animalResults.formulationResult.formulatedF,
             humanHalfLifeHr: animalResults.humanHalfLife,
