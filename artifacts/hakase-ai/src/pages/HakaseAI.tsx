@@ -73,6 +73,13 @@ import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
+import { PeptideAnalysisPanel } from "@/components/PeptideAnalysisPanel";
+import { AntibodyAnalysisPanel } from "@/components/AntibodyAnalysisPanel";
+import {
+  detectModality, MODALITY_REGISTRY, getModalityMeta,
+  type Modality, type PeptideModification,
+  defaultPeptideModification, estimateModificationImpact,
+} from "@/lib/modalityRouter";
 import { DemoRunner } from "@/components/DemoRunner";
 import { MlAdmetCard } from "@/components/MlAdmetCard";
 import { WetLabAssayCard } from "@/components/WetLabAssayCard";
@@ -87,6 +94,8 @@ import {
   predictDiliMl,
   predictAdmetMl,
   predictCardiotox,
+  predictPeptide,
+  predictAntibody,
   type DiliMlResult,
   type MlAdmetResult,
   type CardiotoxResult,
@@ -96,7 +105,11 @@ import {
   type SolubilityMlResult,
   type AiBindingResult,
   type BindingMlResult,
+  type PeptideResult,
+  type AntibodyResult,
 } from "@/lib/aiService";
+import { parseFasta, validateSequence } from "@/components/PeptideAnalysisPanel";
+import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter";
 import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,6 +139,7 @@ import {
 // Patient Cohort + Trial code is preserved but gated unreachable.
 import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
 import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
+import { Layer2BiologicScaffold } from "@/components/Layer2BiologicScaffold";
 import { Layer3ExVivoScaffold } from "@/components/Layer3ExVivoScaffold";
 import {
   bootstrapIvieInputs, useIvieInputsAutosave,
@@ -240,6 +254,79 @@ export function HakaseAI() {
       uniprotId: "P01116",
     },
   ]);
+
+  const PEPTIDE_PROJECTS = [
+    {
+      name: "GLP-1 Agonist",
+      indication: "T2DM / Obesity",
+      indicationCode: "E11 - Type 2 diabetes",
+      molName: "HAK-PEP-GLP1",
+      sequence: "HAEGTFTSDVSSYLEGQAAKEFIAWLVKGR",
+      uniprotId: "P43220",
+    },
+    {
+      name: "PTH Analog",
+      indication: "Osteoporosis",
+      indicationCode: "M81 - Osteoporosis",
+      molName: "HAK-PEP-PTH",
+      sequence: "SVSEIQLMHNLGKHLNSMERVEWLRKKLQDVHNF",
+      uniprotId: "P01270",
+    },
+    {
+      name: "Cyclosporin A Analog",
+      indication: "Transplant / Autoimmune",
+      indicationCode: "T86 - Organ transplant rejection",
+      molName: "HAK-PEP-CYCLO",
+      // Cyclosporin A linear representation (11-mer cyclic peptide backbone)
+      sequence: "APAPFIPWFAMF",
+      uniprotId: "P62942",
+    },
+    {
+      name: "Defensin-Like AMP",
+      indication: "Antimicrobial / Wound",
+      indicationCode: "L08 - Anti-infective",
+      molName: "HAK-PEP-DEF1",
+      // Human β-defensin-1 fragment (28-mer, known antimicrobial activity)
+      sequence: "GNFLTGLGHRSDHYNKKICLGNRGIICF",
+      uniprotId: "P60022",
+    },
+  ];
+
+  // Antibody starter templates — real clinically-validated variable domain sequences.
+  // VH/VL are the variable regions only (Fv); full IgG1 constant regions not included.
+  const ANTIBODY_PROJECTS = [
+    {
+      name: "Trastuzumab (HER2)",
+      indication: "Breast Cancer (HER2+)",
+      indicationCode: "C50 – Breast Cancer (HER2+)",
+      molName: "HAK-AB-TRAST",
+      // Trastuzumab (Herceptin) variable domains — FDA-approved, HER2/ERBB2 target
+      vh: "EVQLVESGGGLVQPGGSLRLSCAASGFNIKDTYIHWVRQAPGKGLEWVARIYPTNGYTRYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCSRWGGDGFYAMDYWGQGTLVTVSS",
+      vl: "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
+      uniprotId: "P04626", // ERBB2
+    },
+    {
+      name: "Pembrolizumab (PD-1)",
+      indication: "NSCLC / Melanoma",
+      indicationCode: "C34.1 – Non-small-cell lung carcinoma",
+      molName: "HAK-AB-PEMB",
+      // Pembrolizumab (Keytruda) VH/VL — FDA-approved anti-PD1 checkpoint inhibitor
+      vh: "QVQLVQSGVEVKKPGASVKVSCKASGYTFTNYYMYWVRQAPGQGLEWMGGINPSNGGTNFNEKFKNRVTLTTDSSTTTAYMELKSLQFAVDTAVYYCARRDYRFDMGFDYWGQGTTVTVSS",
+      vl: "EIVLTQSPATLSLSPGERATLSCRASKGVSTSGYSYLHWYQQKPGQAPRLLIYLASYLESGVPARFSGSGSGTDFTLTISSLEPEDFAVYYCQHSRDLPLTFGGGTKVEIK",
+      uniprotId: "Q15116", // PDCD1
+    },
+    {
+      name: "Adalimumab (TNF-α)",
+      indication: "Rheumatoid Arthritis",
+      indicationCode: "M05 – Musculoskeletal inflammation",
+      molName: "HAK-AB-ADA",
+      // Adalimumab (Humira) VH/VL — top-selling anti-TNFα antibody
+      vh: "EVQLVESGGGLVQPGRSLRLSCAASGFTFDDYAMHWVRQAPGKGLEWVSAITWNSGHIDYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCAKVSYLSTASSLDYWGQGTLVTVSS",
+      vl: "DIQMTQSPSTLSASVGDRVTITCRASQSISNYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTEFTLTISSLQPDDFATYYCQQSYSTPPTFGQGTKVEIK",
+      uniprotId: "P01375", // TNF
+    },
+  ];
+
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [pgxOpen, setPgxOpen] = useState(false);
@@ -254,6 +341,36 @@ export function HakaseAI() {
   // empty SMILES short-circuits them. Re-entering a previously analyzed
   // compound rehydrates L2 Confirmation data from localStorage cache (see
   // `l2ConfirmationCache` effects below).
+  //
+  // l1Modality: controls whether Layer 1 operates in small-molecule (SMILES)
+  // mode or peptide (amino-acid sequence) mode. Peptide mode uses a dedicated
+  // property engine (peptide_properties.py) — completely separate from the
+  // RDKit / ADMET-AI / ChEMBL pipeline used for small molecules.
+  const [l1Modality, setL1Modality] = useState<Modality>("small_molecule");
+  useEffect(() => {
+    setSimStatus({
+      1: "idle",
+      2: "idle",
+      3: "idle",
+      4: "idle",
+    });
+    setActiveLayer(1);
+  }, [l1Modality]);
+  const [peptideSequence, setPeptideSequence] = useState("");
+  const [peptideCyclic, setPeptideCyclic] = useState(false);
+  const [peptideLoading, setPeptideLoading] = useState(false);
+  const [peptideError, setPeptideError] = useState<string | null>(null);
+  const [peptideResult, setPeptideResult] = useState<PeptideResult | null>(null);
+  const [peptideL2, setPeptideL2] = useState<PeptideL2Results | null>(null);
+  const [peptideFastaHeader, setPeptideFastaHeader] = useState<string | undefined>(undefined);
+  const [peptideMods, setPeptideMods] = useState<PeptideModification>(defaultPeptideModification());
+  const [showModPanel, setShowModPanel] = useState(false);
+  const [antibodyHeavy, setAntibodyHeavy] = useState("");
+  const [antibodyLight, setAntibodyLight] = useState("");
+  const [antibodyFormatHint, setAntibodyFormatHint] = useState("");
+  const [antibodyLoading, setAntibodyLoading] = useState(false);
+  const [antibodyError, setAntibodyError] = useState<string | null>(null);
+  const [antibodyResult, setAntibodyResult] = useState<AntibodyResult | null>(null);
   const [smiles, setSmiles] = useState("");
   const [activatedSmiles, setActivatedSmiles] = useState("");
   const [molName, setMolName] = useState("");
@@ -2089,6 +2206,106 @@ export function HakaseAI() {
       bindingOn, toxOn, fingerprintOn, tissueTypes,
       procovaEnabled, procovaVarManual, procovaVarReduction, procovaRatio, primaryEndpointType]);
 
+  // ── Auto-detect modality on paste ────────────────────────────────────────────
+  // When user pastes text into the SMILES input that looks like a peptide
+  // sequence (or vice versa), auto-switch the modality selector.
+  const handleSmartInput = useCallback((raw: string) => {
+    const det = detectModality(raw);
+    if (det.modality === "peptide" && det.confidence >= 0.70 && l1Modality !== "peptide") {
+      setL1Modality("peptide");
+      setPeptideSequence(raw.replace(/\s+/g, "").toUpperCase());
+      setSmiles("");
+    } else if (det.modality === "small_molecule" && det.confidence >= 0.70 && l1Modality !== "small_molecule") {
+      setL1Modality("small_molecule");
+      setSmiles(raw);
+      setPeptideSequence("");
+    } else if (l1Modality === "small_molecule") {
+      setSmiles(raw);
+    } else {
+      setPeptideSequence(raw.replace(/\s+/g, "").toUpperCase());
+    }
+  }, [l1Modality]);
+
+  // ── Peptide analysis runner ──────────────────────────────────────────────────
+  // Lifted from PeptideAnalysisPanel so the "Run" trigger lives in the left
+  // sidebar (consistent with the small-molecule flow) while the right panel
+  // stays dedicated to rendering results.
+  const runPeptideSimulation = useCallback(async () => {
+    const v = validateSequence(peptideSequence);
+    if (!v.ok) return;
+    setPeptideLoading(true);
+    setPeptideError(null);
+    setPeptideResult(null);
+    setSimProgress(0);
+    setSimStatus(prev => ({ ...prev, 1: "running" }));
+
+    let tick = 0;
+    const steps = 6;
+    const interval = setInterval(() => {
+      tick++;
+      setSimProgress(Math.min(99, (tick / steps) * 100));
+    }, 150);
+
+    try {
+      const res = await predictPeptide(peptideSequence, peptideCyclic);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      clearInterval(interval);
+      setSimProgress(100);
+      setPeptideResult(res);
+      // Bridge L1 peptide results into L2-compatible format
+      const l2 = preparePeptideL2(res, uniprotId, peptideMods);
+      setPeptideL2(l2);
+      // Unlock Layer 2 — a completed biologic L1 advances the layer stepper
+      // exactly like a small-molecule run does, so the Confirmation tab and
+      // the "Continue to Confirmation" handoff become reachable.
+      setSimStatus(prev => ({ ...prev, 1: "complete" }));
+    } catch (e: any) {
+      clearInterval(interval);
+      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+      setPeptideError(e?.message ?? "Peptide analysis failed");
+    } finally {
+      setPeptideLoading(false);
+    }
+  }, [peptideSequence, peptideCyclic, uniprotId, peptideMods]);
+
+  const runAntibodyAnalysis = useCallback(async () => {
+    const cleanSeq = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+    const h = cleanSeq(antibodyHeavy);
+    const l = cleanSeq(antibodyLight);
+    if (h.length < 70) {
+      setAntibodyError("Heavy / VHH chain must be at least 70 residues.");
+      return;
+    }
+    setAntibodyLoading(true);
+    setAntibodyError(null);
+    setAntibodyResult(null);
+    setSimProgress(0);
+    setSimStatus(prev => ({ ...prev, 1: "running" }));
+
+    let tick = 0;
+    const steps = 6;
+    const interval = setInterval(() => {
+      tick++;
+      setSimProgress(Math.min(99, (tick / steps) * 100));
+    }, 150);
+
+    try {
+      const res = await predictAntibody(h, l || undefined, antibodyFormatHint || undefined);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      clearInterval(interval);
+      setSimProgress(100);
+      setAntibodyResult(res);
+      // Unlock Layer 2 — completed antibody L1 advances the layer stepper.
+      setSimStatus(prev => ({ ...prev, 1: "complete" }));
+    } catch (e: any) {
+      clearInterval(interval);
+      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+      setAntibodyError(e?.message ?? "Antibody analysis failed");
+    } finally {
+      setAntibodyLoading(false);
+    }
+  }, [antibodyHeavy, antibodyLight, antibodyFormatHint]);
+
   const handleDiagenFetch = useCallback(() => {
     if (!diagenJobId.trim()) return;
     setDiagenLoading(true);
@@ -2520,6 +2737,73 @@ export function HakaseAI() {
                 </div>
               </div>
 
+              {/* Target Templates */}
+              <div className="flex-1 overflow-y-auto p-3">
+                <section>
+                  <div className="flex items-center gap-2 px-1 mb-3">
+                    <Database className="w-4 h-4 text-slate-500" />
+                    <span className="text-[12px] font-bold text-slate-300">Target Templates</span>
+                  </div>
+                  {l1Modality === "small_molecule" && (
+                    <div className="space-y-1.5">
+                      {savedProjects.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => loadSavedProject(proj)}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {l1Modality === "peptide" && (
+                    <div className="space-y-1.5">
+                      {PEPTIDE_PROJECTS.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => { setPeptideSequence(proj.sequence); setUniprotId(proj.uniprotId); setIndication(proj.indicationCode); setMolName(proj.molName); }}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {l1Modality === "antibody" && (
+                    <div className="space-y-1.5">
+                      {ANTIBODY_PROJECTS.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => {
+                            setAntibodyHeavy(proj.vh);
+                            setAntibodyLight(proj.vl);
+                            setUniprotId(proj.uniprotId);
+                            setIndication(proj.indicationCode);
+                            setMolName(proj.molName);
+                          }}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+
               {/* Starter Templates */}
               <div className="p-3 flex-1 overflow-y-auto">
                 <div className="flex items-center justify-between mb-2">
@@ -2801,18 +3085,253 @@ export function HakaseAI() {
                 </div>
 
                 <div className="p-5 space-y-5">
+                  {/* ── Modality selector ─────────────────────────────────── */}
+                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                    <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1 block">Modality</label>
+                    <div className="relative">
+                      <select
+                        value={l1Modality}
+                        onChange={(e) => setL1Modality(e.target.value as Modality)}
+                        className="w-full px-3 py-2 rounded bg-black/40 border border-white/10 text-[12px] font-semibold text-white outline-none focus:border-violet-500/50 appearance-none pr-8"
+                      >
+                        {MODALITY_REGISTRY.map((m) => (
+                          <option key={m.id} value={m.id} disabled={!m.available}>
+                            {m.label}{m.comingSoon ? " — coming soon" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
                   {/* 2.1 Primary Input */}
                   <section>
-                    <SectionHeader icon={Atom} label="Primary In Vitro Input" />
+                    <SectionHeader icon={Atom} label={l1Modality === "peptide" ? "Peptide Sequence Input" : l1Modality === "small_molecule" ? "Primary In Vitro Input" : `${getModalityMeta(l1Modality).label} Input`} />
                     <div className="space-y-3">
+                      {/* ── Peptide mode: sequence input in sidebar ───────── */}
+                      {l1Modality === "peptide" && (<>
+                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-2">
+                          <div className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider">Peptide Sequence</div>
+                          <textarea
+                            value={peptideSequence}
+                            onChange={e => setPeptideSequence(e.target.value.replace(/\s/g, "").toUpperCase())}
+                            placeholder="e.g. ACDEFGHIKLM — single-letter AA codes"
+                            rows={3}
+                            className="w-full bg-white/5 border border-white/10 text-white text-[11px] font-mono rounded px-2 py-1.5 resize-none focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                          />
+                          <div className="text-[10px] text-slate-600">
+                            {peptideSequence.length > 0 ? `${peptideSequence.length} residues · analysis in results panel →` : "Enter sequence, results appear in the panel on the right"}
+                          </div>
+                        </div>
+
+                        {/* ── Modification panel (collapsible) ─────────────── */}
+                        <button
+                          onClick={() => setShowModPanel(!showModPanel)}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] text-[10px] font-semibold text-slate-400 transition-colors"
+                        >
+                          <span>Modifications{peptideMods.cyclization !== "none" || peptideMods.nTermCap !== "none" || peptideMods.cTermCap !== "none" || peptideMods.dAminoAcidPositions.length > 0 || peptideMods.pegylationSite !== null || peptideMods.lipidationSite !== null ? " ●" : ""}</span>
+                          <ChevronDown className={`w-3 h-3 transition-transform ${showModPanel ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {showModPanel && (
+                          <div className="rounded-lg border border-violet-500/15 bg-violet-500/[0.02] p-3 space-y-3">
+                            {/* Terminal caps */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">N-terminal</div>
+                                <select
+                                  value={peptideMods.nTermCap}
+                                  onChange={e => setPeptideMods(p => ({ ...p, nTermCap: e.target.value as any }))}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="acetyl">Acetyl (Ac-)</option>
+                                  <option value="pyroglutamate">Pyroglutamate</option>
+                                </select>
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">C-terminal</div>
+                                <select
+                                  value={peptideMods.cTermCap}
+                                  onChange={e => setPeptideMods(p => ({ ...p, cTermCap: e.target.value as any }))}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="amide">Amide (-NH₂)</option>
+                                  <option value="ester">Ester</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Cyclization */}
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">Cyclization</div>
+                              <select
+                                value={peptideMods.cyclization}
+                                onChange={e => {
+                                  const v = e.target.value as any;
+                                  setPeptideMods(p => ({ ...p, cyclization: v }));
+                                  if (v !== "none") setPeptideCyclic(true);
+                                  else setPeptideCyclic(false);
+                                }}
+                                className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                              >
+                                <option value="none">Linear (no cyclization)</option>
+                                <option value="head_to_tail">Head-to-tail</option>
+                                <option value="disulfide">Disulfide bridge</option>
+                                <option value="staple">Hydrocarbon staple</option>
+                                <option value="lactam">Lactam bridge</option>
+                              </select>
+                            </div>
+
+                            {/* D-amino acid positions */}
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">D-amino acid positions <span className="text-slate-600 font-normal">(comma-separated, 1-indexed)</span></div>
+                              <Input
+                                value={peptideMods.dAminoAcidPositions.map(p => p + 1).join(", ")}
+                                onChange={e => {
+                                  const positions = e.target.value.split(",").map(s => parseInt(s.trim()) - 1).filter(n => !isNaN(n) && n >= 0);
+                                  setPeptideMods(p => ({ ...p, dAminoAcidPositions: positions }));
+                                }}
+                                placeholder="e.g. 2, 5, 8"
+                                className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                              />
+                            </div>
+
+                            {/* PEGylation + Lipidation row */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">PEGylation site</div>
+                                <Input
+                                  value={peptideMods.pegylationSite !== null ? String(peptideMods.pegylationSite + 1) : ""}
+                                  onChange={e => {
+                                    const v = parseInt(e.target.value) - 1;
+                                    setPeptideMods(p => ({ ...p, pegylationSite: isNaN(v) || v < 0 ? null : v }));
+                                  }}
+                                  placeholder="Position"
+                                  className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                                />
+                                {peptideMods.pegylationSite !== null && (
+                                  <select
+                                    value={peptideMods.pegMwDa}
+                                    onChange={e => setPeptideMods(p => ({ ...p, pegMwDa: Number(e.target.value) }))}
+                                    className="w-full mt-1 px-2 py-1 rounded bg-black/30 border border-white/10 text-[9px] text-white outline-none"
+                                  >
+                                    <option value={2000}>PEG 2 kDa</option>
+                                    <option value={5000}>PEG 5 kDa</option>
+                                    <option value={10000}>PEG 10 kDa</option>
+                                    <option value={20000}>PEG 20 kDa</option>
+                                    <option value={40000}>PEG 40 kDa</option>
+                                  </select>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">Lipidation</div>
+                                <select
+                                  value={peptideMods.lipidType}
+                                  onChange={e => {
+                                    const lt = e.target.value as any;
+                                    setPeptideMods(p => ({
+                                      ...p,
+                                      lipidType: lt,
+                                      lipidationSite: lt !== "none" ? (p.lipidationSite ?? 0) : null,
+                                    }));
+                                  }}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="palmitic">Palmitic acid (C16)</option>
+                                  <option value="myristic">Myristic acid (C14)</option>
+                                  <option value="stearic">Stearic acid (C18)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Modification impact preview */}
+                            {peptideSequence.length >= 2 && (peptideMods.cyclization !== "none" || peptideMods.nTermCap !== "none" || peptideMods.cTermCap !== "none" || peptideMods.dAminoAcidPositions.length > 0 || peptideMods.pegylationSite !== null || peptideMods.lipidType !== "none") && (() => {
+                              const impact = estimateModificationImpact(peptideSequence.length, peptideMods);
+                              return (
+                                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] p-2 space-y-1">
+                                  <div className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider">Estimated Impact</div>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-300">
+                                    <span>t½ ×{impact.halfLifeMultiplier}</span>
+                                    {impact.permeabilityMultiplier > 1 && <span>Perm ×{impact.permeabilityMultiplier}</span>}
+                                    <span>Stability: {impact.proteolyticStabilityGain}</span>
+                                    {impact.mwDelta > 0 && <span>+{(impact.mwDelta / 1000).toFixed(1)} kDa</span>}
+                                  </div>
+                                  {impact.notes.slice(0, 2).map((n, i) => (
+                                    <div key={i} className="text-[9px] text-slate-500 leading-relaxed">{n}</div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </>)}
+
+                      {/* ── Antibody mode: sequence inputs in sidebar ──────── */}
+                      {l1Modality === "antibody" && (<>
+                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-3">
+                          <div>
+                            <label className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider block mb-1">
+                              Heavy / VHH chain *
+                            </label>
+                            <textarea
+                              value={antibodyHeavy}
+                              onChange={(e) => setAntibodyHeavy(e.target.value)}
+                              placeholder="Paste heavy-chain sequence…"
+                              rows={3}
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">
+                              Light chain (optional)
+                            </label>
+                            <textarea
+                              value={antibodyLight}
+                              onChange={(e) => setAntibodyLight(e.target.value)}
+                              placeholder="Paste light-chain sequence…"
+                              rows={2}
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              value={antibodyFormatHint}
+                              onChange={(e) => setAntibodyFormatHint(e.target.value)}
+                              placeholder="Format hint (e.g. IgG1, scFv)"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => { setAntibodyHeavy("EVQLVESGGGLVQPGGSLRLSCAASGFNIKDTYIHWVRQAPGKGLEWVARIYPTNGYTRYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCSRWGGDGFYAMDYWGQGTLVTVSS"); setAntibodyLight("DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"); setAntibodyFormatHint("IgG1 (trastuzumab Fv)"); }}
+                              className="px-3 py-1.5 rounded-md border border-white/10 hover:bg-white/5 text-slate-300 text-[11px] transition-colors"
+                            >
+                              Load Example
+                            </button>
+                          </div>
+                        </div>
+                      </>)}
+
+                      {/* ── Small molecule mode: original SMILES input ─────── */}
+                      {l1Modality === "small_molecule" && (
                       <FieldGroup label="SMILES String" required hint="RDKit validated · MW 100–1500 Da">
                         <div id="demo-smiles-input" className="flex gap-2">
                           <div className="relative flex-1">
                             <Input
                               value={smiles}
                               onChange={e => setSmiles(e.target.value)}
+                              onPaste={e => {
+                                const pasted = e.clipboardData.getData("text");
+                                if (pasted.length > 3) {
+                                  e.preventDefault();
+                                  handleSmartInput(pasted);
+                                }
+                              }}
                               onKeyDown={e => { if (e.key === "Enter" && molProps?.isValid) handleAnalyzeMolecule(); }}
-                              placeholder="Enter SMILES notation..."
+                              placeholder="Enter SMILES or paste any sequence..."
                               className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-violet-500/60 focus:bg-white/8"
                             />
                             {smiles && (
@@ -2929,7 +3448,9 @@ export function HakaseAI() {
                           </div>
                         )}
                       </FieldGroup>
+                      )} {/* end small_molecule SMILES */}
 
+                      {l1Modality === "small_molecule" && (
                       <FieldGroup label="Molecule Name" hint={chemblCompoundName ? `ChEMBL: ${chemblCompoundName}` : "Auto-identified from ChEMBL"}>
                         <Input
                           value={molName}
@@ -2938,9 +3459,16 @@ export function HakaseAI() {
                           placeholder="e.g. Compound-XYZ-001"
                         />
                       </FieldGroup>
+                      )} {/* end small_molecule Molecule Name */}
                     </div>
                   </section>
 
+                  {/* ── Small-molecule-only configuration ────────────────────
+                       Target protein, molecule ML predictions, simulation
+                       options and batch config are all SMILES/RDKit-specific.
+                       Peptide and antibody modalities have their own inputs
+                       above and their target/antigen input lives in Layer 2. */}
+                  {l1Modality === "small_molecule" && (<>
                   <Separator className="bg-white/8" />
 
                   {/* 2.2 Target Protein */}
@@ -4204,6 +4732,7 @@ export function HakaseAI() {
                       </FieldGroup>
                     </div>
                   </CollapsibleSection>
+                  </>)}
                 </div>
 
                 {/* L1 → L2 Cascade Preview + Recommendations */}
@@ -4328,7 +4857,7 @@ export function HakaseAI() {
                       </div>
                     );
                   })()}
-                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                  {l1Modality === "small_molecule" && (<div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
                       <span className="text-[11px] font-semibold text-violet-300">L1 → L2 Cascade Preview</span>
@@ -4360,10 +4889,10 @@ export function HakaseAI() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div>)}
 
                   {/* L1 Recommendations */}
-                  {(() => {
+                  {l1Modality === "small_molecule" && (() => {
                     const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
                     if (!smiles)       recs.push({ text: "Enter a SMILES string to begin in vitro simulation.", level: "info" });
                     else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
@@ -4392,31 +4921,155 @@ export function HakaseAI() {
                   })()}
                 </div>
 
-                {/* Run Button */}
+                {/* Run Button — modality-aware, always pinned to the bottom of
+                    the input panel so every modality follows the same flow:
+                    configure inputs above → Run at the bottom → results right. */}
                 <div id="demo-run-l1" className="p-5 border-t border-white/8 mt-auto">
-                  <Button
-                    onClick={runSimulation}
-                    disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
-                    className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
-                  >
-                    {simStatus[1] === "running" ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
-                    ) : !rdkitReady ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
-                    ) : (
-                      <><Play className="w-4 h-4" /> Run In Vitro Simulation</>
-                    )}
-                  </Button>
-                  <p className="text-[10px] text-slate-600 text-center mt-2">
-                    {!rdkitReady ? "Initialising RDKit.js — please wait" : "Est. runtime: 5–30 seconds"}
-                  </p>
+                  {l1Modality === "small_molecule" && (<>
+                    <Button
+                      onClick={runSimulation}
+                      disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {simStatus[1] === "running" ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
+                      ) : !rdkitReady ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
+                      ) : (
+                        <><Play className="w-4 h-4" /> Run In Vitro Simulation</>
+                      )}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {!rdkitReady ? "Initialising RDKit.js — please wait" : "Est. runtime: 5–30 seconds"}
+                    </p>
+                  </>)}
+
+                  {l1Modality === "peptide" && (<>
+                    <Button
+                      onClick={runPeptideSimulation}
+                      disabled={peptideLoading || peptideSequence.trim().length < 2}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {peptideLoading
+                        ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
+                        : <><Play className="w-4 h-4" /> Run In Vitro Analysis</>}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {peptideSequence.trim().length < 2
+                        ? "Enter a peptide sequence (≥ 2 residues) above"
+                        : "Pure-sequence analytics · runs in under a second"}
+                    </p>
+                  </>)}
+
+                  {l1Modality === "antibody" && (<>
+                    <Button
+                      onClick={runAntibodyAnalysis}
+                      disabled={antibodyLoading || antibodyHeavy.replace(/[^A-Za-z]/g, "").length < 70}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {antibodyLoading
+                        ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
+                        : <><Play className="w-4 h-4" /> Run In Vitro Analysis</>}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {antibodyHeavy.replace(/[^A-Za-z]/g, "").length < 70
+                        ? "Heavy / VHH chain must be ≥ 70 residues"
+                        : "Pure-sequence developability engine · runs in under a second"}
+                    </p>
+                  </>)}
                 </div>
               </div>
               )}
 
               {/* Output Panel — Layer 1 */}
               <div id="demo-results" className="flex-1 overflow-y-auto p-5">
-                {simStatus[1] === "idle" && (
+
+                {/* ── Peptide modality: running animation ───────────────── */}
+                {l1Modality === "peptide" && simStatus[1] === "running" && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    </div>
+                    <div className="text-[14px] font-medium text-white">Running Peptide Analysis</div>
+                    <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
+                    <p className="text-[11px] text-slate-500">Physicochemical · Secondary structure · Proteolytic stability · Developability</p>
+                  </div>
+                )}
+
+                {/* ── Peptide modality: idle state ──────────────────────── */}
+                {l1Modality === "peptide" && simStatus[1] === "idle" && !peptideResult && !peptideError && (
+                  <div className="flex flex-col items-center justify-center h-full gap-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <Dna className="w-7 h-7 text-violet-400/50" />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[14px] font-medium text-slate-400">No peptide analysis yet</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Enter a peptide sequence on the left and run the analysis to see physicochemical properties, secondary structure, proteolytic stability and developability flags.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Peptide modality: show results panel ─────────────── */}
+                {l1Modality === "peptide" && simStatus[1] !== "running" && (peptideResult || peptideError) && (
+                  <PeptideAnalysisPanel
+                    sequence={peptideSequence}
+                    cyclic={peptideMods.cyclization !== "none"}
+                    loading={peptideLoading}
+                    error={peptideError}
+                    result={peptideResult}
+                    onClear={() => {
+                      setPeptideSequence("");
+                      setPeptideResult(null);
+                      setPeptideError(null);
+                      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+                    }}
+                  />
+                )}
+
+                {/* ── Antibody modality: running animation ──────────────── */}
+                {l1Modality === "antibody" && simStatus[1] === "running" && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    </div>
+                    <div className="text-[14px] font-medium text-white">Running Antibody Developability Analysis</div>
+                    <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
+                    <p className="text-[11px] text-slate-500">CDR localisation · Liability scan · TAP-style flags · Aggregation · Immunogenicity</p>
+                  </div>
+                )}
+
+                {/* ── Antibody modality: idle state ─────────────────────── */}
+                {l1Modality === "antibody" && simStatus[1] === "idle" && !antibodyResult && !antibodyError && (
+                  <div className="flex flex-col items-center justify-center h-full gap-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <Shield className="w-7 h-7 text-violet-400/50" />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[14px] font-medium text-slate-400">No antibody analysis yet</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Enter heavy chain (and optionally light chain) sequences on the left and run the analysis to see developability profile, CDR mapping, liabilities and stability outlook.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Antibody modality: show results panel ─────────────── */}
+                {l1Modality === "antibody" && simStatus[1] !== "running" && (antibodyResult || antibodyError) && (
+                  <AntibodyAnalysisPanel
+                    heavy={antibodyHeavy}
+                    light={antibodyLight}
+                    formatHint={antibodyFormatHint}
+                    loading={antibodyLoading}
+                    error={antibodyError}
+                    result={antibodyResult}
+                    onClear={() => { setAntibodyHeavy(""); setAntibodyLight(""); setAntibodyResult(null); setAntibodyError(null); setSimStatus(prev => ({ ...prev, 1: "idle" })); }}
+                  />
+                )}
+
+                {/* ── Small molecule modality: original L1 pipeline ─────── */}
+                {l1Modality === "small_molecule" && simStatus[1] === "idle" && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -4452,7 +5105,7 @@ export function HakaseAI() {
                   </div>
                 )}
 
-                {simStatus[1] === "running" && (
+                {l1Modality === "small_molecule" && simStatus[1] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
                     <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
                       <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
@@ -4463,7 +5116,7 @@ export function HakaseAI() {
                   </div>
                 )}
 
-                {simStatus[1] === "complete" && (
+                {l1Modality === "small_molecule" && simStatus[1] === "complete" && (
                   <>
                     <Layer1Results
                       smiles={smiles}
@@ -4492,6 +5145,7 @@ export function HakaseAI() {
                       targetSuggestions={targetSuggestions}
                       runningSelectivityScreen={runningSelectivityScreen}
                       handleRunOffTargetScreen={handleRunOffTargetScreen}
+                      extChEMBL={extChEMBL}
                       onSelectTarget={(uid) => {
                         uniprotManual.current = true;
                         setUniprotAutoMode(false);
@@ -4576,6 +5230,7 @@ export function HakaseAI() {
                   <span className="text-[10px] font-bold tracking-widest text-cyan-300 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30">
                     V2.0.0
                   </span>
+                  {l1Modality === "small_molecule" && (
                   <div className="flex items-center gap-0.5 rounded-full bg-white/5 border border-white/10 p-0.5">
                     <button
                       onClick={() => setConfirmationSubTrack("insilico")}
@@ -4598,8 +5253,30 @@ export function HakaseAI() {
                       <Microscope className="w-3 h-3" /> Ex-Vivo sub-track
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
+              {l1Modality !== "small_molecule" ? (
+                /* ── Biologic modalities — modality-aware L2 confirmation ──
+                   Peptides and antibodies do not use the small-molecule
+                   docking / PBPK / FEP toolchain. The biologic scaffold runs
+                   co-folding binding, class-based PK, immunogenicity and the
+                   falsifier registry instead. */
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <Layer2BiologicScaffold
+                    modality={l1Modality === "antibody" ? "antibody" : "peptide"}
+                    layer1Ready={l1Modality === "antibody" ? !!antibodyResult : !!peptideResult}
+                    peptideResult={peptideResult}
+                    antibodyResult={antibodyResult}
+                    peptideSequence={peptideSequence}
+                    peptideCyclic={peptideMods.cyclization !== "none"}
+                    antibodyHeavy={antibodyHeavy}
+                    antibodyLight={antibodyLight}
+                    onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                  />
+                </div>
+              ) : (
+              <>
               {/* v2.0.0 Confirmation orchestrator — compact strip; expand for
                   directive emission, falsifier check, override authoring, joint
                   output synthesis. */}
@@ -4640,6 +5317,8 @@ export function HakaseAI() {
                   />
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -9044,6 +9723,7 @@ function Layer1Results({
   targetSuggestions, onSelectTarget,
   runningSelectivityScreen = false,
   handleRunOffTargetScreen,
+  extChEMBL,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -9072,6 +9752,7 @@ function Layer1Results({
   onSelectTarget?: (uniprotId: string) => void;
   runningSelectivityScreen?: boolean;
   handleRunOffTargetScreen?: () => void;
+  extChEMBL?: import("@/lib/chemblActivity").ChEMBLMultiTargetResult | null;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
@@ -9823,6 +10504,8 @@ function Layer1Results({
           proteinName={proteinName}
           pdbId={pdbId}
           indication={indication}
+          simResults={simResults}
+          extChEMBL={extChEMBL}
         />
       )}
 

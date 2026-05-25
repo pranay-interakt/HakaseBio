@@ -676,48 +676,56 @@ export function runInVitroSimulation(
   if (hasValidatedTarget) {
     provenance.doseResponse_IC50 = effectiveKd_nM !== null ? "ml" : "heuristic";
   }
-  const ec50_nM: number | null = hasValidatedTarget
-    ? ic50_nM_raw * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2)
-    : null;
+  // EC50 — for a single-site competitive logistic dose-response the
+  // half-maximal concentration IS the IC50 by definition. The former
+  // SMILES-hash jitter multiplier had no physical meaning and is removed,
+  // so EC50 is now a defensible, deterministic value for any molecule.
+  const ec50_nM: number | null = ic50_nM;
 
+  // Hill coefficient — deterministic: base 1.0 (single-site mass action)
+  // with small, structure-based adjustments (extra aromatic rings, sp3
+  // content, a Michael-acceptor warhead → steeper slope). The former
+  // ±0.15 seeded-random term is removed so a molecule gives the same
+  // slope every run; the 1.0–1.5 range it now produces is physically
+  // sensible for an arbitrary new compound.
   const hillCoeffRaw = (() => {
     let h = 1.0;
     if (nArom >= 2) h += 0.15;
     if (fsp3 > 0.4) h += 0.1;
     if (pharm?.hasMichaelAcceptor) h += 0.3;
     if (rotBonds > 8) h -= 0.1;
-    return clamp(h + (r(3) - 0.5) * 0.3, 0.7, 3.0);
+    return clamp(h, 0.7, 3.0);
   })();
   const hillCoefficient: number | null = hasValidatedTarget ? hillCoeffRaw : null;
 
+  // Maximum inhibition (Emax) — deterministic. A competitive inhibitor
+  // approaches ~100 % effect at saturating dose; the former ±3 seeded-random
+  // term is removed. Structure adjustments stay deterministic.
   const maxInhibitionRaw = (() => {
     let m = 90;
     if (finalPIC50 > 7) m += 5;
     if (pharm?.hasMichaelAcceptor) m += 3;
     if (logP > 5) m -= 5;
-    return clamp(m + (r(4) - 0.5) * 6, 60, 100);
+    return clamp(m, 60, 100);
   })();
   const maxInhibition: number | null = hasValidatedTarget ? maxInhibitionRaw : null;
 
   // Curve only when target is validated; otherwise empty array (the UI's
   // dose-response chart renders its no-data state for length === 0).
   //
-  // Noise model: heteroscedastic Gaussian with σ = 4 % of Emax (maxInhibitionRaw).
-  // Uses Box-Muller transform on two independent seededRandom calls to yield
-  // N(0, 1), then scales by the heteroscedastic σ.  This more closely matches
-  // real plate-reader CVs (3–6 % at plateau) compared to the previous uniform
-  // ±1 % additive noise which underestimates variance at low concentrations.
+  // Clean predicted 4-parameter logistic (Hill) curve:
+  //   response = Emax / (1 + (IC50 / conc)^Hill)
+  // The former synthetic Box-Muller "plate-reader noise" is removed — a
+  // predicted curve must not masquerade as noisy measured data. Genuine
+  // uncertainty belongs in a confidence band derived from the IC50
+  // prediction error, not in fabricated scatter. The curve is now fully
+  // deterministic and well-formed for any molecule.
   const curve: DoseResponsePoint[] = [];
   if (hasValidatedTarget) {
-    const sigma = maxInhibitionRaw * 0.04; // heteroscedastic: 4 % of Emax
     for (let i = -2; i <= 5; i += 0.5) {
       const conc = Math.pow(10, i);
       const response = maxInhibitionRaw / (1 + Math.pow(ic50_nM_raw / conc, hillCoeffRaw));
-      // Box-Muller: two uniform samples → standard normal
-      const u1 = Math.max(1e-10, r(200 + i * 10));
-      const u2 = r(201 + i * 10);
-      const gaussianNoise = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      curve.push({ concentration: conc, response: clamp(response + gaussianNoise * sigma, 0, 100) });
+      curve.push({ concentration: conc, response: clamp(response, 0, 100) });
     }
   }
 

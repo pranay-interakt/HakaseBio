@@ -34,7 +34,8 @@
 import type { SimResults } from "./admet";
 import type { InVitroResults } from "./inVitroSim";
 import type { TargetSuggestion } from "./targetSuggestion";
-import { TIER_SCORE, type QualityTier } from "./sourceQuality";
+import { TIER_SCORE, makeCofoldedQuality, type QualityTier } from "./sourceQuality";
+import type { CofoldGateResult } from "./confidenceGate";
 
 const SAFETY_MIN_SCORE     = 0.6;
 const NON_SAFETY_MIN_AVG   = 0.6;
@@ -163,6 +164,13 @@ export function evaluateCascadeGate(
    * the caller to also remember to pass the matching `mlOverrides`).
    */
   inVitroResults: InVitroResults | null = null,
+  /**
+   * Optional co-folding confidence gate result from Stage 2b.
+   * When provided and the gate verdict is not "suppressed", adds a
+   * `cofolded_binding` entry to the quality detail map. The quality score
+   * is ipTM-interpolated via `makeCofoldedQuality()`.
+   */
+  cofoldGate: CofoldGateResult | null = null,
 ): CascadeGateResult {
   const detail = defaultDetail();
 
@@ -257,6 +265,20 @@ export function evaluateCascadeGate(
     if (ov?.available) {
       detail[k] = { tier: "ml", score: TIER_SCORE.ml, note: ov.note };
     }
+  }
+
+  // ── 3. Co-folding binding (ipTM-scaled quality tier) ──────────────────────
+  // When Stage 2b ran and the confidence gate did not suppress the affinity,
+  // add a non-safety `cofolded_binding` entry. Its score is ipTM-interpolated
+  // (0.45–0.70) so a high-ipTM result lifts the non-safety average; a marginal
+  // one barely helps — and a suppressed result is simply absent.
+  if (cofoldGate && cofoldGate.verdict !== "suppressed") {
+    const cq = makeCofoldedQuality("Stage 2b co-folding", cofoldGate.iptm);
+    detail["cofolded_binding"] = {
+      tier:  cq.tier,
+      score: cq.score,
+      note:  `Co-folding affinity (${cofoldGate.verdict}) — ipTM ${cofoldGate.iptm?.toFixed(3) ?? "N/A"}, quality score ${cq.score.toFixed(3)}`,
+    };
   }
 
   // Compute safety-min and non-safety-avg.

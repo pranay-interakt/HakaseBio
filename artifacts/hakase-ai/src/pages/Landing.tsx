@@ -598,7 +598,7 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["GNINA / Boltz-2 Docking",  "CNN-rescored docking + AlphaFold-3-equivalent co-folding — replaces classical Vina poses for receptors with no crystal structure."],
+                  ["Structure-Prediction Co-Folding",  "Deep-learning co-folding with binding-affinity prediction — replaces classical Vina poses for receptors with no crystal structure."],
                   ["FEP+ Refinement",          "Alchemical free-energy perturbation on GPU (RunPod, ~24 GPU-h). Replaces ML affinity prediction with physics-grounded ΔG."],
                   ["Whole-Body PBPK",          "18-compartment PBPK replacing the 2-compartment RK4 solver — species parameters from PK-Sim physiology atlas."],
                 ].map(([label, desc]) => (

@@ -24,11 +24,18 @@ import { computeL2DoseProjection, type L2DoseProjection, type L2InputParams } fr
 import {
   predictBindingMl, predictAdmetMl, predictCardiotox, predictProteinMl,
   runDockingToCompletion, runFepToCompletion,
+  runCofoldToCompletion,
   type BindingMlResult, type MlAdmetResult, type CardiotoxResult, type ProteinMlResult,
   type DockResult, type DockJobStatus,
   type FepResult, type FepJobStatus,
+  type CoFoldRequest, type CoFoldJobStatus, type CoFoldResult,
+  type CoFoldConfidence, type CoFoldAffinity,
 } from "./aiService";
 import { fetchUniProt, fetchPdbStructure, type PdbStructure } from "./proteinApi";
+import {
+  gateCofoldConfidence, extractGatedAffinity,
+  type CofoldGateResult, type CofoldGateVerdict, type GatedAffinity, type CofoldConfidencePolicy,
+} from "./confidenceGate";
 
 /** Resnames that should NOT count as "co-crystal ligand present" when ranking
  *  PDB candidates (waters/ions/buffers/cryoprotectants). Mirrors the backend
@@ -388,6 +395,176 @@ export function runStage2(): StageResult<never> {
   };
 }
 
+// ── Stage 2b — Co-folding (Boltz-2, opt-in, GPU-priced) ─────────────────────
+// Sibling of Stage 2 docking. Produces a structure-grounded binding affinity
+// from the deep-learning co-folding model. Opt-in because it requires a GPU
+// endpoint and is priced per-run. Same four honest statuses as every other stage.
+
+export interface Stage2bResult {
+  /** Full co-folding result from the GPU worker. */
+  cofold: CoFoldResult;
+  /** Confidence-gated affinity. Check gate.verdict before using numbers. */
+  gatedAffinity: GatedAffinity;
+  /** Raw confidence metrics from the co-folding model. */
+  confidence: CoFoldConfidence;
+  /** The confidence gate verdict and policy used. */
+  gate: CofoldGateResult;
+  /** Source provenance label. */
+  source: "cofolded";
+}
+
+/** Default Stage 2b stub used by Run-Full-Pipeline. Co-folding is opt-in from
+ *  its own card because each run costs ~$0.50–3.00 on GPU (varies by complex
+ *  size). Not auto-dispatched — user clicks "Run" on the Stage 2b card. */
+export function runStage2b(): StageResult<Stage2bResult> {
+  return {
+    stage: 2.5, name: "Co-folding",
+    status: "skipped",
+    reason: "Stage 2b co-folding is opt-in (GPU-priced) — not auto-run by Run-Full-Pipeline. Click the Run button on the Stage 2b card to dispatch.",
+  };
+}
+
+/** Dispatch a co-folding job for a small-molecule ligand against the L1 target.
+ *  Builds the CoFoldRequest from frozen L1 evidence, dispatches to the GPU
+ *  backend, confidence-gates the affinity, and returns the full result.
+ *
+ *  Per project policy: no fabricated structures or affinity. If the GPU backend
+ *  is unavailable or the job fails, StageResult.status="error" with the exact
+ *  upstream message. */
+export async function runStage2bCofold(
+  sim: SimResults,
+  opts: {
+    /** Target protein sequence (fetched from UniProt or supplied). */
+    targetSequence?: string;
+    /** Confidence policy override. */
+    confidencePolicy?: CofoldConfidencePolicy;
+    /** Diffusion samples (1–25). Default 1 for speed. */
+    diffusionSamples?: number;
+    /** Progress callback. */
+    onProgress?: (status: CoFoldJobStatus) => void;
+    /** Poll interval in ms. Default 8000. */
+    pollIntervalMs?: number;
+    /** Timeout in ms. Default 2h. */
+    timeoutMs?: number;
+  } = {},
+): Promise<StageResult<Stage2bResult>> {
+  const t0 = performance.now();
+
+  if (!sim.smiles) {
+    return {
+      stage: 2.5, name: "Co-folding",
+      status: "error",
+      reason: "No SMILES on L1 simResults — cannot define the ligand for co-folding.",
+      ranAt: new Date().toISOString(),
+    };
+  }
+  if (!sim.uniprotId || sim.uniprotId === "—") {
+    return {
+      stage: 2.5, name: "Co-folding",
+      status: "error",
+      reason: "No UniProt ID on L1 simResults — co-folding requires a target protein.",
+      ranAt: new Date().toISOString(),
+    };
+  }
+
+  // Resolve target sequence if not supplied
+  let targetSeq = opts.targetSequence;
+  if (!targetSeq) {
+    try {
+      const protein = await fetchUniProt(sim.uniprotId);
+      targetSeq = protein.sequence ?? undefined;
+      if (!targetSeq) {
+        return {
+          stage: 2.5, name: "Co-folding",
+          status: "error",
+          reason: `UniProt ${sim.uniprotId} returned no sequence — cannot build co-folding design.`,
+          ranAt: new Date().toISOString(),
+          durationMs: performance.now() - t0,
+        };
+      }
+    } catch (e: any) {
+      return {
+        stage: 2.5, name: "Co-folding",
+        status: "error",
+        reason: `Failed to fetch target sequence from UniProt ${sim.uniprotId}: ${e?.message ?? e}`,
+        ranAt: new Date().toISOString(),
+        durationMs: performance.now() - t0,
+      };
+    }
+  }
+
+  // Build the co-folding request
+  const cofoldReq: CoFoldRequest = {
+    name: `l2-cofold-${sim.molName || "compound"}-${sim.uniprotId}`,
+    entities: [
+      {
+        type: "protein",
+        id: "A",
+        sequence: targetSeq,
+      },
+      {
+        type: "ligand",
+        id: "B",
+        smiles: sim.smiles,
+      },
+    ],
+    options: {
+      diffusion_samples: opts.diffusionSamples ?? 1,
+      output_format: "mmcif",
+    },
+    affinity_binder: "B",
+  };
+
+  // Dispatch and poll
+  let final: CoFoldJobStatus;
+  try {
+    final = await runCofoldToCompletion(cofoldReq, {
+      pollIntervalMs: opts.pollIntervalMs ?? 8000,
+      timeoutMs: opts.timeoutMs ?? 2 * 3600_000,
+      onProgress: opts.onProgress,
+    });
+  } catch (e: any) {
+    return {
+      stage: 2.5, name: "Co-folding",
+      status: "error",
+      reason: `Co-folding job failed: ${e?.message ?? e}`,
+      ranAt: new Date().toISOString(),
+      durationMs: performance.now() - t0,
+    };
+  }
+
+  if (final.status === "failed" || !final.result) {
+    return {
+      stage: 2.5, name: "Co-folding",
+      status: "error",
+      reason: `Co-folding job failed: ${final.error ?? "unknown error"}`,
+      ranAt: new Date().toISOString(),
+      durationMs: performance.now() - t0,
+    };
+  }
+
+  const cofold = final.result;
+  const gatedAffinity = extractGatedAffinity(
+    cofold.affinity,
+    cofold.confidence,
+    opts.confidencePolicy,
+  );
+
+  return {
+    stage: 2.5, name: "Co-folding",
+    status: "wired",
+    ranAt:  new Date().toISOString(),
+    durationMs: performance.now() - t0,
+    result: {
+      cofold,
+      gatedAffinity,
+      confidence: cofold.confidence,
+      gate: gatedAffinity.gate,
+      source: "cofolded",
+    },
+  };
+}
+
 // ── Stage 3 — ML affinity + ADMET cross-check ───────────────────────────────
 export interface Stage3Result {
   binding_ml: {
@@ -426,6 +603,20 @@ export interface Stage3Result {
     agreement:           "strong" | "moderate" | "disagreement";
     note:                string;
   } | null;
+  /**
+   * Cross-comparison with Stage 2b co-folding affinity when available.
+   * Populated by passing the Stage 2b result to runStage3; null otherwise.
+   * Gate verdict is surfaced so downstream consumers know if the cofold
+   * number was full-confidence or down-weighted.
+   */
+  cofold_vs_ml: {
+    cofold_pKd:          number;
+    ml_pKd:              number;
+    delta_pKd:           number;
+    agreement:           "strong" | "moderate" | "disagreement";
+    gate_verdict:        CofoldGateVerdict;
+    note:                string;
+  } | null;
   admet_ml: {
     available:        boolean;
     source:           "ml" | "fallback" | "unavailable";
@@ -452,6 +643,8 @@ export async function runStage3(
   sim: SimResults,
   /** Optional Stage 2 Vina result — when provided, adds Vina↔ML cross-comparison. */
   stage2Result?: Stage2Result,
+  /** Optional Stage 2b co-folding result — when provided, adds cofold↔ML cross-comparison. */
+  stage2bResult?: Stage2bResult,
 ): Promise<StageResult<Stage3Result>> {
   const t0 = performance.now();
 
@@ -525,6 +718,36 @@ export async function runStage3(
     };
   }
 
+  // ── Cofold↔ML cross-comparison (populated when Stage 2b is available) ────
+  let cofold_vs_ml: Stage3Result["cofold_vs_ml"] = null;
+  if (
+    stage2bResult &&
+    stage2bResult.gatedAffinity.pKd !== null &&
+    stage2bResult.gate.verdict !== "suppressed" &&
+    binding_ml.pKd_predicted !== null
+  ) {
+    const cofoldPkd = stage2bResult.gatedAffinity.pKd;
+    const mlPkd     = binding_ml.pKd_predicted;
+    const delta     = Math.abs(cofoldPkd - mlPkd);
+    const agr: "strong" | "moderate" | "disagreement" =
+      delta < 0.5 ? "strong" : delta < 1.0 ? "moderate" : "disagreement";
+    const gv = stage2bResult.gate.verdict;
+    const confNote = gv === "downweighted" ? " (low interface confidence — treat delta with caution)" : "";
+    const noteMap = {
+      strong: `Co-folded pKd≈${cofoldPkd.toFixed(2)} and ML pKd=${mlPkd.toFixed(2)} agree within 0.5 log units — structure prediction and statistical model consistent${confNote}.`,
+      moderate: `Co-folded pKd≈${cofoldPkd.toFixed(2)} and ML pKd=${mlPkd.toFixed(2)} within 0.5–1.0 log units — acceptable divergence${confNote}.`,
+      disagreement: `Co-folded pKd≈${cofoldPkd.toFixed(2)} and ML pKd=${mlPkd.toFixed(2)} diverge by >${delta.toFixed(2)} log units — possible binding-mode artefact, scaffold outside ML training set, or co-folding interface artefact${confNote}.`,
+    };
+    cofold_vs_ml = {
+      cofold_pKd:          parseFloat(cofoldPkd.toFixed(3)),
+      ml_pKd:              parseFloat(mlPkd.toFixed(3)),
+      delta_pKd:           parseFloat(delta.toFixed(3)),
+      agreement:           agr,
+      gate_verdict:        gv,
+      note:                noteMap[agr],
+    };
+  }
+
   // ── ADMET-AI ML cross-check ───────────────────────────────────────────────
   let admet_ml: Stage3Result["admet_ml"] = {
     available: false, source: "unavailable", endpoint_count: 0,
@@ -587,6 +810,7 @@ export async function runStage3(
       log_disagreement,
       agreement_class,
       docking_vs_ml,
+      cofold_vs_ml,
       admet_ml,
       l1_admet_consistency: {
         absorption_l1: sim.admet.absorption,
@@ -945,9 +1169,11 @@ export type Stage8Result = L2DoseProjection;
 
 export function runStage8(
   sim: SimResults, iv: InVitroResults, params: L2InputParams,
+  /** Optional confidence-gated co-fold Ki (nM) from Stage 2b. Suppressed values must be null. */
+  cofoldKi_nM?: number | null,
 ): StageResult<Stage8Result> {
   const t0 = performance.now();
-  const r = computeL2DoseProjection(sim, iv, params);
+  const r = computeL2DoseProjection(sim, iv, params, cofoldKi_nM);
   return {
     stage: 8, name: "Therapeutic-index ranking",
     status: "wired",
@@ -997,6 +1223,8 @@ export interface Stage9Result {
     ml_vs_l1_agreement:      "strong" | "moderate" | "disagreement" | "unknown";
     /** Agreement between Vina pKd-equivalent and ML pKd, or null if Stage 2 was skipped. */
     vina_vs_ml_agreement:    "strong" | "moderate" | "disagreement" | null;
+    /** Agreement between co-fold pKd and ML pKd, or null if Stage 2b was skipped/suppressed. */
+    cofold_vs_ml_agreement:  "strong" | "moderate" | "disagreement" | null;
     /** ADMET-AI Chemprop hERG blocker probability (0–1). */
     admet_herg_prob:         number | null;
     /** ADMET-AI Ames mutagenicity probability (0–1). */
@@ -1012,6 +1240,31 @@ export interface Stage9Result {
     /** Stage 3 ADMET-AI internal consistency notes. */
     admet_consistency_notes: string[];
   };
+  /**
+   * Co-folding (Stage 2b) evidence block. Null when co-folding was not run.
+   * All numeric fields null when the confidence gate suppressed the affinity.
+   * Gate verdict and interface confidence are included for downstream auditing.
+   */
+  cofold_evidence: {
+    /** Co-fold-derived pKd, or null if suppressed. */
+    cofold_pKd:            number | null;
+    /** Co-fold-derived Ki (nM), or null if suppressed. */
+    cofold_Ki_nM:          number | null;
+    /** Co-fold-derived IC50 (µM), or null if suppressed. */
+    cofold_IC50_uM:        number | null;
+    /** ΔG from co-folding affinity head (kcal/mol), or null. */
+    cofold_dg_kcal_mol:    number | null;
+    /** Confidence gate verdict. */
+    gate_verdict:          CofoldGateVerdict;
+    /** Affinity propagation weight (0–1). */
+    gate_weight:           number;
+    /** Interface confidence (ipTM), or null if unavailable. */
+    iptm:                  number | null;
+    /** Ligand-region pLDDT, or null if unavailable. */
+    ligand_plddt:          number | null;
+    /** Human-readable gate reason. */
+    gate_reason:           string;
+  } | null;
   /**
    * Evidence quality tier for this handoff document.
    *   "low"      — only L1 heuristics available (no ML or docking ran)
@@ -1032,6 +1285,8 @@ export function runStage9(
   s3?: Stage3Result | undefined,
   /** Stage 4 result — used to populate cardiotox consensus in ml_evidence. */
   s4?: Stage4Result | undefined,
+  /** Stage 2b co-folding result — used to populate cofold_evidence block. */
+  s2b?: Stage2bResult | undefined,
 ): StageResult<Stage9Result> {
   const t0 = performance.now();
   if (!proj) {
@@ -1077,11 +1332,20 @@ export function runStage9(
   if (s4?.consensus_cardiac_risk === "Conflict") {
     flags.push("Cardiac risk conflict: L1 heuristic and CardioTox ML disagree — one signals High risk");
   }
+  // Flag cofold vs ML disagreement
+  if (s3?.cofold_vs_ml?.agreement === "disagreement") {
+    flags.push(`Co-folding vs ML binding disagreement: |pKd_cofold − pKd_ML| = ${s3.cofold_vs_ml.delta_pKd.toFixed(2)} log units`);
+  }
+  // Flag suppressed cofold (ran but interface confidence too low)
+  if (s2b && s2b.gate.verdict === "suppressed") {
+    flags.push(`Co-folding ran but affinity suppressed (interface confidence too low: ipTM=${s2b.gate.iptm?.toFixed(3) ?? "N/A"}) — not used in evidence.`);
+  }
 
   // Evidence tier: accumulate signals
   let evidenceScore = 0;
   if (mlB?.available)           evidenceScore += 2;  // BindingML ran
   if (s3?.docking_vs_ml)        evidenceScore += 2;  // Vina docking also ran
+  if (s3?.cofold_vs_ml)         evidenceScore += 2;  // Co-folding affinity also available
   if (mlA?.available)           evidenceScore += 1;  // ADMET-AI ran
   if (mlC?.available)           evidenceScore += 1;  // CardioTox ML ran
   if (fep)                      evidenceScore += 2;  // FEP ran
@@ -1124,6 +1388,7 @@ export function runStage9(
         binding_ad_in_domain:    mlB?.ad_in_domain ?? null,
         ml_vs_l1_agreement:      s3?.agreement_class ?? "unknown",
         vina_vs_ml_agreement:    s3?.docking_vs_ml?.agreement ?? null,
+        cofold_vs_ml_agreement:  s3?.cofold_vs_ml?.agreement ?? null,
         admet_herg_prob:         mlA?.herg_prob ?? null,
         admet_ames_prob:         mlA?.ames_prob ?? null,
         admet_dili_prob:         mlA?.dili_prob ?? null,
@@ -1132,6 +1397,17 @@ export function runStage9(
         consensus_cardiac_risk:  s4?.consensus_cardiac_risk ?? null,
         admet_consistency_notes: s3?.l1_admet_consistency.notes ?? [],
       },
+      cofold_evidence: s2b ? {
+        cofold_pKd:         s2b.gatedAffinity.pKd,
+        cofold_Ki_nM:       s2b.gatedAffinity.Ki_nM,
+        cofold_IC50_uM:     s2b.gatedAffinity.IC50_uM,
+        cofold_dg_kcal_mol: s2b.gatedAffinity.dg_kcal_mol,
+        gate_verdict:       s2b.gate.verdict,
+        gate_weight:        s2b.gate.weight,
+        iptm:               s2b.gate.iptm,
+        ligand_plddt:       s2b.gate.ligandPlddt,
+        gate_reason:        s2b.gate.reason,
+      } : null,
       evidence_tier,
       produced_at: new Date().toISOString(),
     },
@@ -1143,6 +1419,7 @@ export interface PipelineResults {
   s0?: StageResult<Stage0Result>;
   s1?: StageResult<Stage1Result>;
   s2?: StageResult<Stage2Result>;
+  s2b?: StageResult<Stage2bResult>;
   s3?: StageResult<Stage3Result>;
   s4?: StageResult<Stage4Result>;
   s5?: StageResult<Stage5Result>;
@@ -1161,13 +1438,18 @@ export async function runFullPipeline(
   out.s0 = runStage0(sim, iv);                 onProgress?.(0);
   out.s1 = await runStage1(sim);               onProgress?.(1);
   out.s2 = runStage2();                        onProgress?.(2);
+  out.s2b = runStage2b();                      // opt-in — skipped by default
   // Stage 3 now works for ALL targets (not gated on L1 catalog binding).
   // If Stage 2 Vina has already run (it's opt-in), pass it for cross-comparison.
-  const s2Result = out.s2.status === "wired" ? out.s2.result : undefined;
-  out.s3 = await runStage3(sim, s2Result);     onProgress?.(3);
+  // If Stage 2b co-folding has already run (also opt-in), pass it for cross-comparison.
+  const s2Result  = out.s2.status  === "wired" ? out.s2.result  : undefined;
+  const s2bResult = out.s2b.status === "wired" ? out.s2b.result : undefined;
+  out.s3 = await runStage3(sim, s2Result, s2bResult);  onProgress?.(3);
   out.s4 = await runStage4(sim, iv);           onProgress?.(4);
   out.s5 = runStage5();                        onProgress?.(5);
-  out.s8 = runStage8(sim, iv, params);         onProgress?.(8);
+  // Stage 8 — pass cofold Ki (confidence-gated) when available.
+  const cofoldKi = s2bResult?.gatedAffinity.Ki_nM ?? null;
+  out.s8 = runStage8(sim, iv, params, cofoldKi); onProgress?.(8);
 
   // Stage 6 needs the dose from Stage 8
   const projection = out.s8.result;
@@ -1194,13 +1476,14 @@ export async function runFullPipeline(
     onProgress?.(7);
   }
 
-  // Stage 9 now receives S3 and S4 results to populate the ml_evidence block
-  // and compute an evidence tier for the Pre-Confirmation Directive.
+  // Stage 9 now receives S3, S4, and S2b results to populate the ml_evidence
+  // and cofold_evidence blocks and compute an evidence tier.
   out.s9 = runStage9(
     sim, projection, out.s6.result, params,
     out.s5?.result,
     out.s3?.result,
     out.s4?.result,
+    s2bResult,
   );
   onProgress?.(9);
   return out;

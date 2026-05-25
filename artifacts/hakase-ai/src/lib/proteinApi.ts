@@ -8,6 +8,8 @@ export interface ProteinInfo {
   sequenceLength: number;
   activeSites: number;
   bindingSites: number;
+  /** Full amino-acid sequence from UniProt (one-letter codes), null when unavailable. */
+  sequence: string | null;
   pdbIds: string[];           // Experimental PDB cross-refs from UniProt
   alphafoldId: string | null; // AlphaFold DB entry ID (same as UniProt ID when available)
 }
@@ -94,8 +96,9 @@ export async function fetchUniProt(id: string): Promise<ProteinInfo> {
   // Organism
   const organism: string = data?.organism?.scientificName ?? "—";
 
-  // Sequence length
-  const sequenceLength: number = data?.sequence?.length ?? 0;
+  // Sequence
+  const sequence: string | null = typeof data?.sequence?.value === "string" ? data.sequence.value : null;
+  const sequenceLength: number = data?.sequence?.length ?? (sequence?.length ?? 0);
 
   // Features — active sites & binding sites
   const features: Array<{ type: string }> = data?.features ?? [];
@@ -117,6 +120,7 @@ export async function fetchUniProt(id: string): Promise<ProteinInfo> {
     name,
     gene,
     organism,
+    sequence,
     sequenceLength,
     activeSites,
     bindingSites,
