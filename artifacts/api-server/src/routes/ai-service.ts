@@ -1,7 +1,10 @@
 import { Router } from "express";
 
 const router = Router();
-const AI_SERVICE_URL = "http://localhost:8090";
+// AI_SERVICE_URL: override via env var when API server and AI service
+// run on different machines (e.g. DigitalOcean droplet vs RunPod pod).
+// Defaults to localhost for single-machine / docker-compose setups.
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://localhost:8090";
 
 router.post("/ai/admet", async (req, res) => {
   try {
@@ -181,6 +184,22 @@ router.post("/ai/peptide", async (req, res) => {
     res.status(502).json({ error: "AI service unavailable" });
   }
 });
+
+// L1 — Antibody-native developability engine
+router.post("/ai/antibody", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/antibody`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 
 // L2 Stage 2 — AutoDock Vina docking (async job submission + polling)
 router.post("/ai/dock", async (req, res) => {

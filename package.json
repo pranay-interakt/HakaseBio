@@ -6,7 +6,15 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+
+    "backend": "tsx scripts/start-backend.mts",
+    "frontend": "tsx scripts/start-frontend.mts",
+    "frontend:dev": "tsx scripts/start-frontend.mts dev",
+    "frontend:build": "tsx scripts/start-frontend.mts build",
+
+    "api-server": "cd artifacts/api-server && pnpm run dev",
+    "ai-service": "cd artifacts/ai-service && python main.py"
   },
   "private": true,
   "devDependencies": {
