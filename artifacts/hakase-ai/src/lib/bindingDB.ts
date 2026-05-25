@@ -1,3 +1,4 @@
+import { API_ROOT } from "./apiBase";
 // ── BindingDB Integration ──────────────────────────────────────────────────
 // Curated experimental binding affinity database (Johns Hopkins)
 // REST API: https://www.bindingdb.org/rest/json/
@@ -47,7 +48,7 @@ export async function fetchBindingDB(uniprotId: string): Promise<BindingDBResult
 
   try {
     // Proxy route handles CORS
-    const res = await fetch(`/api/bindingdb?uniprot=${encodeURIComponent(uniprotId)}`);
+    const res = await fetch(`${API_ROOT}/api/bindingdb?uniprot=${encodeURIComponent(uniprotId)}`);
     if (!res.ok) return { ...base, status: "error" };
     const json = await res.json();
 

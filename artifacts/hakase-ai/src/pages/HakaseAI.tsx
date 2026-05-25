@@ -146,6 +146,7 @@ import {
 } from "@/components/IvieInputsPanel";
 import { IvieOutputHandoffPage, type IvieHandoffSignOff } from "@/components/IvieOutputHandoffPage";
 import {
+import { API_ROOT } from "@/lib/apiBase";
   assessIvieTier, deriveSubstrateMode, hasEstimatedCells, hasAnyIvieData,
 } from "@/lib/ivieInputs";
 
@@ -1604,7 +1605,7 @@ export function HakaseAI() {
           .map(p => ({ time: p.time, conc: +p.conc.toFixed(2) }));
       }
 
-      const res = await fetch("/api/bio-analysis", {
+      const res = await fetch(`${API_ROOT}/api/bio-analysis`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1664,7 +1665,7 @@ export function HakaseAI() {
     opts.setStream("");
     opts.setReport(null);
     try {
-      const res = await fetch("/api/bio-analysis", {
+      const res = await fetch(`${API_ROOT}/api/bio-analysis`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...opts.body, focus: opts.focus }),
@@ -1749,7 +1750,7 @@ export function HakaseAI() {
     const placeholderIdx = history.length;
     setChatMessages(prev => [...prev, { role: "assistant" as const, content: "" }]);
     try {
-      const res = await fetch("/api/bio-chat", {
+      const res = await fetch(`${API_ROOT}/api/bio-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

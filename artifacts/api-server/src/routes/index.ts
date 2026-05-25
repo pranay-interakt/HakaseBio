@@ -13,6 +13,7 @@ import alphafoldDbRouter  from "./alphafold-db";  // structural template lookup
 import pubchemRouter      from "./pubchem";        // compound data + bioassays
 import opentargetsRouter  from "./opentargets";   // target-disease evidence
 import rcsbPdbRouter      from "./rcsb-pdb";       // crystal structure templates
+import fdaPsgRouter       from "./fda-psg";         // FDA PSG / BE intelligence
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(alphafoldDbRouter);   // /alphafold/*
 router.use(pubchemRouter);       // /pubchem/*
 router.use(opentargetsRouter);   // /opentargets/*
 router.use(rcsbPdbRouter);       // /rcsb/*
+router.use(fdaPsgRouter);        // /fda-psg/*
 
 export default router;

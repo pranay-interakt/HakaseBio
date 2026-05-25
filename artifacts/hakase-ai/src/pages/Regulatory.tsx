@@ -1,4 +1,5 @@
 import { NavBar } from "@/components/NavBar";
+import { FdaPsgPanel } from "@/components/FdaPsgPanel";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import screenshotL1 from "@assets/Screenshot_2026-03-17_at_0.16.53_1773692331159.png";
@@ -254,6 +255,43 @@ export function Regulatory() {
             <p className="text-[11px] text-slate-600 mt-3 text-center">L4 Regulatory Outlook · MABEL FIH dose · IND-enabling gate · Sealed PreClinicalPackage v2.0.0</p>
           </div>
         </div>
+      </section>
+
+      {/* ── FDA PSG / Bioequivalence Intelligence ── */}
+      <section id="fda-psg" className="max-w-6xl mx-auto px-6 py-20 border-b border-white/5 scroll-mt-20">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold">FDA · Bioequivalence Intelligence</div>
+            <h2 className="text-[28px] font-black tracking-tight text-white">Product-Specific Guidance Lookup</h2>
+          </div>
+        </div>
+
+        <p className="text-[14px] text-slate-400 mb-8 max-w-3xl leading-relaxed">
+          FDA publishes Product-Specific Guidances (PSGs) for every approved drug — specifying the exact bioequivalence study design,
+          dissolution methodology, and BCS classification context required to file an ANDA. Look up any reference drug below to see its
+          RLD status, TE code, recommended BE methodology, and direct links to the FDA PSG, Dissolution Methods, and Orange Book databases.
+          If you have run Hakase ADMET predictions, the predicted BCS class is carried over automatically.
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {[
+            { label: "~4,000+", desc: "Product-Specific Guidances published by FDA to date" },
+            { label: "80–125%", desc: "Standard bioequivalence window (90% CI on Cmax and AUC)" },
+            { label: "90–111%", desc: "Tighter window for Narrow Therapeutic Index (NTI) drugs" },
+          ].map(({ label, desc }) => (
+            <div key={label} className="rounded-xl border border-white/8 bg-white/2 p-5">
+              <div className="text-[28px] font-black text-blue-300 mb-1">{label}</div>
+              <div className="text-[12px] text-slate-400">{desc}</div>
+            </div>
+          ))}
+        </div>
+
+        <FdaPsgPanel />
       </section>
 
       {/* ── Why it matters ── */}

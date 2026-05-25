@@ -25,4 +25,8 @@ rdkit>=2023.9.1
 anarci
 
 # Optional GPU/async features
-# runpod>=1.6.0  # for FEP/cofolding RunPod workers
+# runpod>=1.6.0  # RunPod SDK (not required — dispatch uses raw HTTP)
+
+# GPU_PROVIDER=aws  → requires boto3
+# Install: pip install boto3
+# boto3>=1.34.0

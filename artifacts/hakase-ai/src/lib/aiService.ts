@@ -1,4 +1,5 @@
-const API_BASE = "/api/ai";
+import { API_ROOT } from "./apiBase";
+const API_BASE = `${API_ROOT}/api/ai`;
 
 export interface AiAdmetResult {
   smiles: string;
@@ -1450,6 +1451,70 @@ export interface PeptideSynthesis {
   provenance: string;
 }
 
+// ── New industry-standard preclinical readouts (backend v2) ─────────────────
+
+/** Net charge at 6 pH values for formulation / stability work. */
+export interface PeptideChargeProfile {
+  pH_4_0: number;
+  pH_5_0: number;
+  pH_6_0: number;
+  pH_7_4: number;
+  pH_8_0: number;
+  pH_9_0: number;
+}
+
+/** H-bond donor + acceptor count (Veber 2002). */
+export interface PeptideHbdHba {
+  hbd: number;
+  hba: number;
+}
+
+/** Serum / plasma stability profile and albumin-binding estimate. */
+export interface PeptideSerumStability {
+  albumin_binding_pct: number;
+  fbs_stability_class: string;
+  fbs_note: string;
+  assay_panel: string[];
+  provenance: string;
+  note: string;
+}
+
+/** MIC range estimate for AMP candidates (Wang et al. 2015, APD3). */
+export interface PeptideMicEstimate {
+  applicable: boolean;
+  predicted_mic_range_ug_ml?: string;
+  potency_class?: string;
+  predicted_spectrum?: string;
+  breakpoint_note?: string;
+  method?: string;
+  assay_required?: string;
+  provenance?: string;
+  note?: string;
+}
+
+/** Receptor-engagement potential from Boman + amphipathicity + charge score. */
+export interface PeptideReceptorEngagement {
+  receptor_engagement_score: number;
+  receptor_engagement_max: number;
+  engagement_tier: string;
+  signals: string[];
+  note: string;
+  provenance: string;
+}
+
+/** Reactive-site inventory for ADC, PEGylation, or probe conjugation. */
+export interface PeptideBioconjugation {
+  total_reactive_sites: number;
+  n_terminal: number;
+  lysine_positions: number[];
+  cysteine_positions: number[];
+  aspartate_positions: number[];
+  glutamate_positions: number[];
+  preferred_site: string;
+  chemistry_options: string[];
+  note: string;
+}
+
 export interface PeptideResult {
   sequence: string;
   cyclic: boolean;
@@ -1467,6 +1532,13 @@ export interface PeptideResult {
   aggregation: PeptideAggregation;
   immunogenicity: PeptideImmunogenicity;
   synthesis: PeptideSynthesis;
+  /** Industry-standard preclinical readouts (backend v2). */
+  charge_profile?: PeptideChargeProfile;
+  hbd_hba?: PeptideHbdHba;
+  serum_stability?: PeptideSerumStability;
+  mic_estimate?: PeptideMicEstimate;
+  receptor_engagement?: PeptideReceptorEngagement;
+  bioconjugation_sites?: PeptideBioconjugation;
   engine: string;
 }
 
@@ -1646,6 +1718,54 @@ export interface AntibodyManufacturability {
   note: string;
 }
 
+// ── New antibody developability readouts (backend v2) ─────────────────────
+
+/** Viscosity / self-association risk at high concentration (Shire 2004, Sharma 2014). */
+export interface AntibodyViscosityRisk {
+  risk: string;
+  risk_score: number;
+  drivers: string[];
+  concentration_concern: string;
+  assay_required: string;
+  provenance: string;
+  note: string;
+}
+
+/** Per-chain FcRn binding prediction result. */
+export interface AntibodyFcRnChain {
+  chain: string;
+  pI: number;
+  charge_pH7_4: number;
+  charge_pH6_0_approx: number;
+  fcrn_binding_score: "High" | "Moderate" | "Low";
+  verdict: string;
+}
+
+/** pH-based FcRn binding prediction for half-life estimation. */
+export interface AntibodyFcRnBinding {
+  per_chain: AntibodyFcRnChain[];
+  overall_fcrn_score: "High" | "Moderate" | "Low";
+  overall_verdict: string;
+  t_half_implication: string;
+  provenance: string;
+  assay_required: string;
+  note: string;
+}
+
+/** Per-CDR physicochemical composition with TAP-style flags. */
+export interface AntibodyCDRComposition {
+  cdr: string;
+  chain: string;
+  sequence: string;
+  length: number;
+  net_charge_pH7: number | null;
+  gravy: number | null;
+  aromaticity: number | null;
+  flags: string[];
+  tap_status: "PASS" | "AMBER" | "RED";
+  confidence: string;
+}
+
 export interface AntibodyResult {
   engine: string;
   modality: string;
@@ -1657,6 +1777,10 @@ export interface AntibodyResult {
   stability: AntibodyStability;
   manufacturability: AntibodyManufacturability;
   summary: AntibodySummary;
+  /** New industry-standard developability readouts (backend v2). */
+  viscosity_risk?: AntibodyViscosityRisk;
+  fcrn_binding?: AntibodyFcRnBinding;
+  cdr_composition?: AntibodyCDRComposition[];
   limitations: string;
 }
 

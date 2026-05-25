@@ -25,16 +25,19 @@ ARCHITECTURE
     • models every design concept as typed Python dataclasses
     • validates the design thoroughly so a broken job never reaches the GPU
     • builds the Boltz v1 YAML from the validated design
-    • dispatches to a RunPod Serverless GPU endpoint and polls until done
+    • dispatches to a GPU endpoint (RunPod / AWS / Azure) and polls until done
 
-  runpod_worker_boltz/  (the GPU side)
+  runpod_worker/  (the GPU side — same Docker image regardless of provider)
     • runs `boltz predict` and parses every output artifact
     • returns the strict JSON contract defined by CoFoldJobResult
+
+GPU provider is selected via GPU_PROVIDER env var (default: runpod).
+See gpu_dispatch.py and .env.example for credentials per provider.
 
 Honesty policy (identical to fep_runpod.py):
   - NO fabricated structures / confidence / affinity.
   - NO silent CPU fallback.
-  - RunPod / Boltz errors propagate verbatim.
+  - Provider errors propagate verbatim.
 
 Boltz-2 features fully exposed here:
   Constraints  : bond, pocket (+force), contact (+force)
@@ -68,6 +71,8 @@ from typing import Any, Optional
 
 import requests
 
+from models import gpu_dispatch
+
 try:
     from rdkit import Chem
     from rdkit import RDLogger
@@ -77,8 +82,6 @@ except Exception:  # noqa: BLE001
     _RDKIT = False
 
 
-RUNPOD_BASE = "https://api.runpod.ai/v2"
-RUNPOD_TIMEOUT_S = 30
 POLL_INTERVAL_S = 15
 POLL_DEADLINE_S = 2 * 3600      # 2-hour hard cap
 
@@ -115,12 +118,9 @@ def _env(key: str) -> Optional[str]:
 
 
 def cofolding_configured() -> tuple[bool, str]:
-    """Return (is_configured, reason_if_not). Called before every GPU dispatch."""
-    if not _env("RUNPOD_API_KEY"):
-        return False, "RUNPOD_API_KEY environment secret is not set"
-    if not _env("RUNPOD_BOLTZ_ENDPOINT_ID"):
-        return False, "RUNPOD_BOLTZ_ENDPOINT_ID environment secret is not set"
-    return True, ""
+    """Return (is_configured, reason_if_not). Delegates to gpu_dispatch so
+    this works regardless of which GPU_PROVIDER is active."""
+    return gpu_dispatch.is_configured("boltz")
 
 
 # ===========================================================================
@@ -1146,87 +1146,74 @@ def submit_cofold(raw_request: Any) -> dict:
 
 def _run_job(job_id: str, design: CoFoldDesign, yaml_text: str, needs_msa: bool) -> None:
     t0 = time.time()
-    _set(job_id, status="running", started_at=t0, progress="submitting to RunPod")
+    provider = gpu_dispatch.GPU_PROVIDER
+    _set(job_id, status="running", started_at=t0,
+         progress=f"submitting to {provider}")
     try:
-        api_key     = _env("RUNPOD_API_KEY")
-        endpoint_id = _env("RUNPOD_BOLTZ_ENDPOINT_ID")
-        if not api_key or not endpoint_id:
-            raise RuntimeError("RunPod credentials disappeared between submit and dispatch")
-
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         opts = design.options
 
+        # Scientific payload — identical regardless of GPU provider
         payload = {
-            "input": {
-                "boltz_yaml": yaml_text,
-                "job_name": design.name,
-                # Structure diffusion
-                "diffusion_samples":    opts["diffusion_samples"],
-                "recycling_steps":      opts["recycling_steps"],
-                "sampling_steps":       opts["sampling_steps"],
-                "step_scale":           opts["step_scale"],
-                "max_parallel_samples": opts["max_parallel_samples"],
-                # MSA
-                "use_msa_server":       needs_msa,
-                "max_msa_seqs":         opts["max_msa_seqs"],
-                "subsample_msa":        opts["subsample_msa"],
-                "num_subsampled_msa":   opts["num_subsampled_msa"],
-                # Physics / kernels
-                "use_potentials":       opts["use_potentials"],
-                "no_kernels":           opts["no_kernels"],
-                # Output
-                "output_format":        opts["output_format"],
-                "write_full_pae":       opts["write_full_pae"],
-                "write_full_pde":       opts["write_full_pde"],
-                # Affinity
-                "affinity_requested":           bool(design.affinity_binder),
-                "affinity_binder_type":         design.affinity_binder_type,
-                "affinity_mw_correction":       opts["affinity_mw_correction"],
-                "sampling_steps_affinity":      opts["sampling_steps_affinity"],
-                "diffusion_samples_affinity":   opts["diffusion_samples_affinity"],
-            }
+            "boltz_yaml": yaml_text,
+            "job_name": design.name,
+            # Structure diffusion
+            "diffusion_samples":    opts["diffusion_samples"],
+            "recycling_steps":      opts["recycling_steps"],
+            "sampling_steps":       opts["sampling_steps"],
+            "step_scale":           opts["step_scale"],
+            "max_parallel_samples": opts["max_parallel_samples"],
+            # MSA
+            "use_msa_server":       needs_msa,
+            "max_msa_seqs":         opts["max_msa_seqs"],
+            "subsample_msa":        opts["subsample_msa"],
+            "num_subsampled_msa":   opts["num_subsampled_msa"],
+            # Physics / kernels
+            "use_potentials":       opts["use_potentials"],
+            "no_kernels":           opts["no_kernels"],
+            # Output
+            "output_format":        opts["output_format"],
+            "write_full_pae":       opts["write_full_pae"],
+            "write_full_pde":       opts["write_full_pde"],
+            # Affinity
+            "affinity_requested":           bool(design.affinity_binder),
+            "affinity_binder_type":         design.affinity_binder_type,
+            "affinity_mw_correction":       opts["affinity_mw_correction"],
+            "sampling_steps_affinity":      opts["sampling_steps_affinity"],
+            "diffusion_samples_affinity":   opts["diffusion_samples_affinity"],
         }
 
-        run_url = f"{RUNPOD_BASE}/{endpoint_id}/run"
-        r = requests.post(run_url, headers=headers, json=payload, timeout=RUNPOD_TIMEOUT_S)
-        if r.status_code != 200:
-            raise RuntimeError(f"RunPod /run failed HTTP {r.status_code}: {r.text[:400]}")
-        runpod_job_id = r.json().get("id")
-        if not runpod_job_id:
-            raise RuntimeError(f"RunPod /run returned no id: {r.json()}")
-        _set(job_id, runpod_job_id=runpod_job_id, progress=f"queued on RunPod ({runpod_job_id})")
+        # 1. Submit — returns an opaque provider_job_id
+        provider_job_id = gpu_dispatch.submit(payload, "boltz")
+        _set(job_id, runpod_job_id=provider_job_id,
+             progress=f"queued on {provider} ({provider_job_id})")
 
-        status_url = f"{RUNPOD_BASE}/{endpoint_id}/status/{runpod_job_id}"
-        deadline = time.time() + POLL_DEADLINE_S
+        # 2. Poll until done, failed, or deadline exceeded
+        deadline    = time.time() + POLL_DEADLINE_S
         last_status = ""
         while time.time() < deadline:
             time.sleep(POLL_INTERVAL_S)
             try:
-                rs = requests.get(status_url, headers=headers, timeout=RUNPOD_TIMEOUT_S)
-            except requests.RequestException as e:
+                status, output, progress_msg = gpu_dispatch.poll(provider_job_id, "boltz")
+            except RuntimeError:
+                raise   # provider reported failure — propagate immediately
+            except Exception as e:
                 _set(job_id, progress=f"poll transient error ({type(e).__name__}); retrying")
                 continue
-            if rs.status_code != 200:
-                raise RuntimeError(f"RunPod /status failed HTTP {rs.status_code}: {rs.text[:300]}")
-            sdata = rs.json()
-            rp_status = sdata.get("status", "UNKNOWN")
-            if rp_status != last_status:
-                last_status = rp_status
-                _set(job_id, progress=f"RunPod status: {rp_status}")
-            if rp_status == "COMPLETED":
-                output = sdata.get("output")
-                if output is None:
-                    raise RuntimeError("RunPod COMPLETED but no output payload")
-                _store_result(job_id, output, runpod_job_id, yaml_text,
+
+            if progress_msg != last_status:
+                last_status = progress_msg
+                _set(job_id, progress=progress_msg)
+
+            if status == "done":
+                _store_result(job_id, output, provider_job_id, yaml_text,
                               bool(design.affinity_binder))
                 return
-            if rp_status in ("FAILED", "CANCELLED", "TIMED_OUT"):
-                err = sdata.get("error") or sdata.get("output") or "no error message"
-                raise RuntimeError(f"RunPod job {rp_status}: {err}")
+            # status == "running" → keep polling
 
         raise RuntimeError(
-            f"RunPod job {runpod_job_id} exceeded the {POLL_DEADLINE_S // 3600} h poll "
-            f"window without completing. It may still be running — check the RunPod console."
+            f"{provider} job {provider_job_id} exceeded the {POLL_DEADLINE_S // 3600} h "
+            f"poll window without completing. "
+            f"It may still be running — check your {provider} console."
         )
     except Exception as e:  # noqa: BLE001
         _set(job_id, status="failed", finished_at=time.time(),

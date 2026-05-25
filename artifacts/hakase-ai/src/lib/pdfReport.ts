@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
+import { API_ROOT } from "./apiBase";
 
 type Narrative = {
   executiveSummary?: string;
@@ -30,7 +31,7 @@ const fmt = (v: unknown, digits = 2): string => {
 
 async function fetchNarrative(input: Layer1ReportInput): Promise<Narrative> {
   try {
-    const res = await fetch("/api/report-narrative", {
+    const res = await fetch(`${API_ROOT}/api/report-narrative`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
