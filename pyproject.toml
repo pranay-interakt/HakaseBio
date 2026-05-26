@@ -1,0 +1,37 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "admet-ai>=2.0.1",
+    "fastapi>=0.135.3",
+    "numpy>=2.4.4",
+    "pandas>=3.0.2",
+    "pyarrow>=16.0.0",
+    "pytdc>=0.4.1",
+    "rdkit>=2026.3.1",
+    "requests>=2.33.1",
+    "scikit-learn>=1.8.0",
+    "torch>=2.11.0",
+    "transformers",
+    "uvicorn>=0.44.0",
+]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+explicit = true
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+
+[tool.uv]
+override-dependencies = [
+    "rdkit-pypi ; sys_platform == 'never'",
+]

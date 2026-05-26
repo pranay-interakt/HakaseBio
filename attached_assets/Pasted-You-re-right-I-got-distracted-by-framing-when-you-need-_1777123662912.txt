@@ -1,0 +1,81 @@
+You're right. I got distracted by framing when you need direction. Let me be direct.
+
+---
+
+## The Actual Strategic Problem
+
+Your code produces weak signals. Your platform pushes them through four layers automatically. The cascade is the product's core architecture, but **the cascade amplifies error, not insight.**
+
+Every L1 heuristic that feeds into L2 animal study configuration, L3 patient modeling, and L4 trial design carries uncertainty that compounds. You don't have a prediction problem. You have a **propagation of false confidence problem.**
+
+The critic spotted this. Your own scorecard confirmed it. Now you need to decide what to do about it.
+
+---
+
+## Three Options, No Framing
+
+**Option A: Keep the cascade, fix the inputs**
+
+Replace heuristic cores with real data or validated models where possible. ChEMBL for binding. External predictors for ADMET. Keep the architecture, improve the signal quality.
+
+- **Cost:** High. 4–6 weeks validation, API rewrites, potential model training.
+- **Risk:** If validation fails, you've burned time and still have weak inputs.
+- **Win condition:** R² > 0.6 on hERG/logP/Caco-2. Then you have a defensible predictor with a real cascade.
+
+**Option B: Keep the inputs, kill the auto-cascade**
+
+Heuristics stay. ChEMBL enrichment stays. But L1→L2→L3→L4 auto-configuration is gated or removed. Human review required at every layer transition. The tool becomes a hypothesis generator with workflow tracking, not an automated pipeline.
+
+- **Cost:** Medium. UI changes, gating logic, review workflows.
+- **Risk:** Slower user experience. Less "AI automation" appeal.
+- **Win condition:** Users trust outputs because they know a human signed off. Liability drops. You sell governance, not prediction.
+
+**Option C: Hybrid — tiered cascade**
+
+Auto-cascade when data quality is high (ChEMBL experimental anchors, high confidence). Force review when data is heuristic-only. The architecture adapts to signal strength rather than treating all inputs equally.
+
+- **Cost:** Medium-high. Data quality scoring, conditional routing, UI for two modes.
+- **Risk:** Complexity. Two user paths to maintain.
+- **Win condition:** Best of both. Speed when data supports it, safety when it doesn't.
+
+---
+
+## My Recommendation
+
+**Option C, but with a specific implementation:**
+
+1. **Data quality score per L1 output.** Not a prediction confidence — a *source quality* score.
+   - Experimental (ChEMBL, measured): 1.0
+   - Literature-derived (review articles, meta-analyses): 0.7
+   - Heuristic (your rules): 0.3
+
+2. **Cascade gate on minimum quality threshold.**
+   - L1→L2 requires average quality ≥ 0.6 across all critical outputs (binding, ADMET, safety).
+   - Below threshold: output is "triage-only," user must manually configure L2 or override with documented reason.
+
+3. **No auto-cascade for NO-GO compounds.** Regardless of quality score. NO-GO means stop unless human explicitly overrides.
+
+This is not about naming. This is about **structuring the product so it cannot make decisions it lacks data to support.**
+
+---
+
+## What to Build First
+
+| Order | Task | Why First |
+|---|---|---|
+| 1 | Add source-quality scoring to every L1 output | Foundation for everything else |
+| 2 | Implement cascade gate with threshold + override logging | Closes the propagation risk |
+| 3 | Rewrite ChEMBL API to expose n/range/species/assay-type | Improves quality score accuracy |
+| 4 | Surface off-target panel from existing similar-targets fetch | Uses infrastructure you already paid for |
+| 5 | Validation fork on 50 compounds | Decides whether to invest in real models or stay heuristic |
+
+---
+
+## The One Question You Need to Answer
+
+Do you have wet lab data for validation? Not "will you get it" — do you have it now?
+
+- **Yes:** Run the fork. It determines whether Option A is viable.
+- **No:** Skip validation. Build Option C with heuristic-only gating. Add validation to roadmap for funding.
+
+Everything else follows from this.

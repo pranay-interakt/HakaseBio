@@ -1,0 +1,27 @@
+That makes sense — build the product first, then update the documentation to honestly reflect what's implemented. Here are the specific things I'd recommend focusing on during development, organized by what matters most for making HAIOps real in the product:
+
+**For Gap 1 (Safety Flag Cascade) — the backbone:**
+
+Define a shared `SafetyFlags` data structure that travels with the cascade payload between layers. Something like a typed array of flag objects, each carrying: flag type (cardiac, hepatotoxicity, DDI, narrow margin, high-grade AE, subgroup disparity), origin layer, trigger metric and value, severity, and a human-readable summary. This structure should be part of the cascade data that Layer 1 passes to Layer 2, Layer 2 to Layer 3, and so on. In the UI, render these as persistent warning banners at the top of each downstream layer's results panel — the user should see "Cardiac Safety Flag (from Layer 1: hERG IC50 = 3.2 µM)" when they're looking at Layer 3 results.
+
+**For Gap 4 (Override Logging) — build this alongside Gap 1:**
+
+When a user clicks "Proceed to Layer 2" despite a NO-GO verdict, capture: the overridden verdict, timestamp, and ideally a reason field (even if optional). Store this in the cascade payload. In downstream layers, render a subtle but persistent annotation — something like an amber info bar: "Layer 2 results are based on an overridden Layer 1 NO-GO verdict." This should also appear in exports.
+
+**For Gap 2 (Mandatory Review Annotations) — on the GO/NO-GO card:**
+
+Add a "Review Required" badge to the verdict card that activates when any of the three triggers fire (hERG < 10 µM, structural alert confidence > 70%, CYP IC50 < 5 µM). The badge should list which specific triggers activated it. Consider whether this should block cascade advancement or just warn — I'd suggest warn-with-acknowledgment (a checkbox or button like "I have reviewed these findings") rather than a hard block, since hard blocks can frustrate users and you can still log the acknowledgment for audit purposes.
+
+**For Gap 3 (Provenance Metadata) — in the export pipeline:**
+
+Add a `provenance` object to the simulation result payload containing: simulation engine file hash or version string, RDKit.js version, timestamp, input source (manual/Diagen/API), and for each database queried — the database name, version or release, and query timestamp. In JSON export, include this as a top-level `_provenance` field. In PDF export, add a metadata footer section. This is the one that makes the 21 CFR Part 11 story real, so it's worth getting the data model right even if the UI rendering is simple.
+
+**For Gaps 5 and 6 — when you get to polish:**
+
+For graceful degradation, the key implementation detail is wrapping each database API call in a try/catch that returns a structured response with a `status` field (success/cached/unavailable) and a `staleness` timestamp if cached. The UI should show a small indicator next to any data section that used cached or unavailable data. For cross-source consistency, this only applies when both BindingDB and ChEMBL return IC50 data for the same compound-target pair in Layer 1 — display both values side by side and flag if they diverge by more than 10x.
+
+**One architectural suggestion across all gaps:**
+
+Consider defining the safety flags, provenance, and override data as a single `HAIOpsContext` object that wraps around the existing cascade payload. That way every layer receives and extends the same governance structure, rather than each gap being implemented as separate plumbing. It'll also make the export logic cleaner — one object to serialize for the audit chain.
+
+Let me know how the development goes, and when you're ready to update the HAIOps document I'll revise it to match what's actually built.

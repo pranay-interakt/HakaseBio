@@ -1,0 +1,14 @@
+# HakaseAI Boltz-2 co-folding worker — Python dependencies.
+#
+# IMPORTANT (honesty / reproducibility contract):
+#   After the FIRST successful RunPod build, read the resolved versions from the
+#   build-time import check in the log and PIN every line exactly (== ...).
+#   A floating range is acceptable only for the initial build.
+#
+# `boltz[cuda]` pulls in the cuequivariance / trifast GPU kernels. On older
+# GPUs (V100 and earlier) those kernels may be unavailable — the worker then
+# runs with `no_kernels=true`, which the upstream exposes as an explicit option.
+
+boltz[cuda]>=2.1.0,<3.0.0
+runpod==1.7.7
+numpy>=1.26,<3

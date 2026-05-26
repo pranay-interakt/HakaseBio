@@ -1,0 +1,424 @@
+This is an excellent and honest technical assessment. Let me search for any additional browser-callable APIs or lightweight alternatives that might reduce the server-side burden, then give you a clean, prioritized implementation roadmap.
+Based on the honest technical assessment and my search for browser-callable alternatives, here's your **realistic free-only implementation roadmap**, reordered by actual implementation effort and ROI.
+
+---
+
+## The Honest Landscape
+
+**Browser-callable (CORS-friendly, no server needed):**
+- ✅ **ToxRefDB/ToxValDB** — EPA CTX Hazard API v2 (`api-ccte.epa.gov`) 
+- ✅ **ChEMBL** — Existing integration, extend to animal PK filters
+- ✅ **AOP-Wiki** — `aopwiki.org/aops.json`, clean REST 
+- ✅ **CompTox Dashboard** — OPERA predictions now served via API (v2.7, Dec 2025) 
+
+**Requires server-side worker (Docker container on your infrastructure):**
+- 🔶 **ADMET-AI** (Greenstone) — Self-hostable via pip + Docker 
+- 🔶 **Admetica** (Datagrok) — Self-hostable via Docker with REST API 
+- 🔶 **PK-Sim/MoBi** — R worker container needed
+- 🔶 **OPERA standalone** — Java jar if not using CompTox API
+- 🔶 **nlmixr2/rxode2** — R worker for population variability
+
+---
+
+## Reordered Roadmap: By Actual Implementation Effort
+
+### 🟢 Quick Wins — Browser-Side Only (~1-2 days)
+
+#### 1. Real ToxRefDB Hazard Endpoints (Replaces Fake Success Badge)
+
+**EPA CTX Hazard API v2** — officially documented, production-ready 
+
+```typescript
+// chemblActivity.ts extension or new toxrefService.ts
+const CTX_HAZARD_BASE = 'https://api-ccte.epa.gov/ctx-api/v1/hazard';
+
+interface ToxRefAnimalData {
+  dtxsid: string;
+  studyType: 'chronic' | 'subchronic' | 'developmental' | 'reproductive';
+  species: 'rat' | 'mouse' | 'rabbit' | 'dog';
+  noael: number;  // mg/kg/day
+  loael: number;
+  criticalEffect: string;
+  duration: string;
+}
+
+async function getAnimalToxicity(dtxsid: string): Promise<ToxRefAnimalData[]> {
+  // EPA's CTX Python client pattern 
+  const response = await fetch(
+    `${CTX_HAZARD_BASE}/search/by-dtxsid/${dtxsid}?format=json`,
+    {
+      headers: {
+        'Accept': 'application/json',
+        // No API key required for public endpoints
+      }
+    }
+  );
+  
+  const data = await response.json();
+  
+  // Filter for animal studies only (exclude human/epidemiological)
+  return data.filter((record: any) => 
+    record.study_type?.includes('Animal') &&
+    ['rat', 'mouse', 'rabbit', 'dog'].includes(record.species?.toLowerCase())
+  ).map((record: any) => ({
+    dtxsid: record.dtxsid,
+    studyType: mapStudyType(record.study_type),
+    species: record.species.toLowerCase(),
+    noael: record.toxval_numeric,  // NOAEL or LOAEL depending on record
+    loael: record.toxval_numeric,  // Simplified; actual logic needs parsing
+    criticalEffect: record.critical_effect,
+    duration: record.study_duration_value + ' ' + record.study_duration_units
+  }));
+}
+
+// Batch search for multiple compounds
+async function batchAnimalToxicity(dtxsids: string[]): Promise<Map<string, ToxRefAnimalData[]>> {
+  const response = await fetch(`${CTX_HAZARD_BASE}/batch/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dtxsid: dtxsids })
+  });
+  // ... group by DTXSID
+}
+```
+
+**What this gives you:**
+- Real NOAEL/LOAEL values from 6,000+ animal studies (ToxRefDB) 
+- Species-specific hazard thresholds to compare against your PBPK-predicted Cmax
+- Study duration and critical effects for risk assessment context
+
+---
+
+#### 2. ChEMBL Animal PK Validation (Extends Existing Integration)
+
+Extend your existing `chemblActivity.ts` to query ADME assays with animal organisms:
+
+```typescript
+// Add to chemblService.ts
+async function getAnimalPKData(chemblId: string): Promise<AnimalPKRecord[]> {
+  const baseUrl = 'https://www.ebi.ac.uk/chembl/api/data';
+  
+  // Filter for ADME assays in animal species
+  const params = new URLSearchParams({
+    molecule_chembl_id: chemblId,
+    assay_type: 'A',  // ADME
+    target_organism__in: 'Rattus norvegicus,Canis lupus familiaris,Macaca fascicularis',
+    limit: '100'
+  });
+  
+  const response = await fetch(`${baseUrl}/activity.json?${params}`);
+  const data = await response.json();
+  
+  return data.activities.map((act: any) => ({
+    species: act.target_organism,
+    assayType: act.assay_type,
+    standardType: act.standard_type,  // AUC, Cmax, CL, t1/2, etc.
+    standardValue: act.standard_value,
+    standardUnit: act.standard_units,
+    relation: act.standard_relation  // '=', '<', '>' etc.
+  }));
+}
+```
+
+**Validation use case:**
+- After PK-Sim predicts rat AUC = 1500 ng·h/mL
+- Query ChEMBL for same/similar compound: found rat AUC = 1200-1800 ng·h/mL in 3 studies
+- Confidence score: HIGH (prediction within 2-fold of real animal data)
+
+---
+
+#### 3. AOP-Wiki for Behavioral Fingerprinting Key Events
+
+**AOP-Wiki REST API** — maps molecular initiating events to adverse outcomes 
+
+```typescript
+const AOP_WIKI_BASE = 'https://aopwiki.org/api';
+
+interface KeyEvent {
+  id: number;
+  title: string;
+  biologicalProcess: string;
+  molecularInitiatingEvent: boolean;
+}
+
+async function getAOPsForStressor(chemicalName: string): Promise<AOP[]> {
+  // Search AOPs by stressor (chemical)
+  const response = await fetch(
+    `${AOP_WIKI_BASE}/stressors?search=${encodeURIComponent(chemicalName)}`
+  );
+  const stressors = await response.json();
+  
+  // Get full AOP details including key events
+  const aopDetails = await Promise.all(
+    stressors.map((s: any) => 
+      fetch(`${AOP_WIKI_BASE}/aops/${s.aop_id}`).then(r => r.json())
+    )
+  );
+  
+  return aopDetails.map((aop: any) => ({
+    aopId: aop.id,
+    title: aop.title,
+    keyEvents: aop.key_events.map((ke: any) => ({
+      id: ke.id,
+      title: ke.title,
+      eventType: ke.type  // Molecular Initiating Event, Key Event, Adverse Outcome
+    })),
+    speciesApplicability: aop.species_applicability  // rat, mouse, human, etc.
+  }));
+}
+
+// Behavioral/CNS specific filtering
+function filterCNSAOPs(aops: AOP[]): AOP[] {
+  const cnsKeywords = ['neuro', 'brain', 'behavior', 'seizure', 'cognition', 'motor'];
+  return aops.filter(aop => 
+    cnsKeywords.some(kw => 
+      aop.title.toLowerCase().includes(kw) ||
+      aop.keyEvents.some(ke => ke.title.toLowerCase().includes(kw))
+    )
+  );
+}
+```
+
+**Integration with your behavioral fingerprinting:**
+- Your compound hits GABA-A receptor in ToxCast assay
+- AOP-Wiki query: finds AOP 12 "GABA-A receptor antagonism leading to seizures"
+- Key events: MIE (GABA binding) → KE1 (Cl- channel disruption) → KE2 (neuronal hyperexcitability) → AO (seizures)
+- Species applicability: rat, mouse (your animal models)
+- **Predictive power:** If your compound is GABA-A antagonist, seizure risk in rat behavioral studies is elevated
+
+---
+
+### 🟡 Medium Effort — Server-Side Worker Required (~1 week)
+
+#### 4. Self-Hosted ADMET Prediction API
+
+**Option A: ADMET-AI (Greenstone Bio)**
+- Free, open-source, MIT license 
+- 50+ ADMET endpoints via Chemprop models
+- Self-hostable as Docker container
+
+```dockerfile
+# Dockerfile for ADMET-AI worker
+FROM python:3.10-slim
+
+WORKDIR /app
+RUN pip install admet-ai[web]
+
+COPY . .
+EXPOSE 5000
+
+CMD ["admet_ai", "web", "--port", "5000"]
+```
+
+```python
+# FastAPI wrapper for your ai-service
+from fastapi import FastAPI
+from admet_ai import ADMETModel
+import redis  # for caching
+
+app = FastAPI()
+model = ADMETModel()
+cache = redis.Redis(host='redis', port=6379)
+
+@app.post("/predict/admet")
+async def predict_admet(smiles: str):
+    # Check cache first
+    cached = cache.get(f"admet:{smiles}")
+    if cached:
+        return json.loads(cached)
+    
+    # Predict
+    preds = model.predict(smiles=smiles)
+    
+    # Cache for 24 hours
+    cache.setex(f"admet:{smiles}", 86400, json.dumps(preds))
+    
+    return preds
+```
+
+**Option B: Admetica (Datagrok)**
+- Also MIT license, Docker-ready 
+- REST API with Swagger docs
+- Includes Novartis-trained models
+
+```bash
+# From their repo
+cd admetica_web
+./setup.sh  # Builds Docker, exposes port 8080
+```
+
+**Recommendation:** Start with ADMET-AI — simpler deployment, proven at Greenstone's live site.
+
+---
+
+#### 5. EPA CompTox API for OPERA Predictions (Browser-Callable!)
+
+**Critical discovery:** EPA CompTox Dashboard v2.7 (Dec 2025) now serves OPERA predictions directly via API . No need to host OPERA locally unless you need bulk offline processing.
+
+```typescript
+// Direct from EPA's CTX Chemical API
+const COMPTOX_API = 'https://api-ccte.epa.gov/ctx-api/v1/chemical';
+
+async function getOperaPredictions(dtxsid: string) {
+  const response = await fetch(
+    `${COMPTOX_API}/detail/by-dtxsid/${dtxsid}?format=json`
+  );
+  const data = await response.json();
+  
+  // OPERA predictions embedded in chemical detail
+  return {
+    logP: data.operas?.find((o: any) => o.property === 'LogP')?.value,
+    logS: data.operas?.find((o: any) => o.property === 'LogS')?.value,
+    bp: data.operas?.find((o: any) => o.property === 'BP')?.value,
+    vp: data.operas?.find((o: any) => o.property === 'VP')?.value,
+    biodegradation: data.operas?.find((o: any) => o.property === 'Biodegradation')?.value,
+    bioaccumulation: data.operas?.find((o: any) => o.property === 'Bioaccumulation')?.value
+    // ... 20+ endpoints available
+  };
+}
+```
+
+**Note:** The search result indicates OPERA v2.8 was deployed in Dec 2025 with updated calculation reports . The API should reflect these updates.
+
+---
+
+### 🔴 Heavy Lift — R Worker Container (~2-3 weeks)
+
+#### 6. PK-Sim/MoBi via R Worker (When You Need Regulatory-Grade PBPK)
+
+**Architecture:**
+```
+Browser/Frontend → Your API Gateway → ai-service (Python) → R Worker (Docker) → PK-Sim CLI
+```
+
+**R Worker Dockerfile:**
+```dockerfile
+FROM rocker/r-ver:4.3
+
+# Install system deps for ospsuite
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev libssl-dev libxml2-dev \
+    mono-runtime mono-devel  # PK-Sim requires Mono on Linux
+
+# Install R packages
+RUN R -e "install.packages(c('ospsuite', 'tlf', 'jsonlite', 'plumber'))"
+
+# Copy PK-Sim templates and R API script
+COPY pk-sim-templates/ /app/templates/
+COPY r-api.R /app/
+
+EXPOSE 8000
+CMD ["R", "-e", "pr::pr_run(pr::pr('/app/r-api.R'), port=8000, host='0.0.0.0')"]
+```
+
+**R API (plumber):**
+```r
+#* @post /predict/rat-pk
+#* @param smiles:character
+#* @param solubility:numeric
+#* @param permeability:numeric
+#* @param clint:numeric
+#* @param fup:numeric
+#* @param logP:numeric
+function(smiles, solubility, permeability, clint, fup, logP) {
+  library(ospsuite)
+  
+  # Load rat template
+  sim <- loadSimulation("/app/templates/rat_template.pkml")
+  
+  # Set parameters
+  setParameterValuesByPath("Compound|Lipophilicity", as.numeric(logP), simulation = sim)
+  setParameterValuesByPath("Compound|Solubility", as.numeric(solubility), simulation = sim)
+  setParameterValuesByPath("Compound|SpecificIntestinalPermeability", as.numeric(permeability), simulation = sim)
+  setParameterValuesByPath("Compound|IntrinsicClearance", as.numeric(clint), simulation = sim)
+  setParameterValuesByPath("Compound|FractionUnbound", 1 - as.numeric(fup), simulation = sim)
+  
+  # Run
+  results <- runSimulation(sim)
+  
+  # Extract
+  list(
+    auc = calculateAUC(results, "Organism|PeripheralVenousBlood|Plasma|Concentration"),
+    cmax = calculateCmax(results, "Organism|PeripheralVenousBlood|Plasma|Concentration"),
+    tmax = calculateTmax(results, "Organism|PeripheralVenousBlood|Plasma|Concentration"),
+    brain_cmax = calculateCmax(results, "Organism|Brain|Intracellular|Concentration"),
+    clearance = calculateClearance(results),
+    vd = calculateVolumeOfDistribution(results)
+  )
+}
+```
+
+**Python proxy in ai-service:**
+```python
+import requests
+from fastapi import FastAPI
+
+app = FastAPI()
+R_WORKER_URL = "http://pk-sim-worker:8000"
+
+@app.post("/predict/animal-pk")
+async def predict_animal_pk(compound_data: CompoundInput):
+    # Call R worker
+    response = requests.post(f"{R_WORKER_URL}/predict/rat-pk", json=compound_data.dict())
+    pk_results = response.json()
+    
+    # Enrich with browser-callable validation data
+    toxref_data = await get_toxref_data(compound_data.dtxsid)
+    chembl_validation = await get_chembl_animal_pk(compound_data.chembl_id)
+    
+    return {
+        "pbpk_prediction": pk_results,
+        "historical_animal_toxicity": toxref_data,
+        "experimental_animal_pk": chembl_validation,
+        "safety_margin": calculate_margin(pk_results.cmax, toxref_data.noael)
+    }
+```
+
+---
+
+## Final Integration Architecture (All Free)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  BROWSER / FRONTEND                                         │
+│  • AOP-Wiki queries (direct)                                │
+│  • ChEMBL animal PK lookup (direct)                         │
+│  • ToxRefDB hazard display (direct via EPA API)             │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  AI-SERVICE (Python/FastAPI)                                │
+│  • Compound input validation                                │
+│  • Caches (Redis)                                           │
+│  • Orchestrates workers                                     │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ ADMET-AI    │ │ EPA CompTox │ │ PK-Sim R    │
+│ Worker      │ │ Proxy       │ │ Worker      │
+│ (Docker)    │ │ (Browser    │ │ (Docker)    │
+│             │ │  fallback)  │ │             │
+│ 50+ ADMET   │ │ OPERA preds │ │ PBPK sim    │
+│ endpoints   │ │ 20+ endpoints│ │ rat/dog/monkey│
+└─────────────┘ └─────────────┘ └─────────────┘
+```
+
+---
+
+## Recommended Implementation Order
+
+| Priority | Feature | Effort | Impact |
+|----------|---------|--------|--------|
+| 1 | **ToxRefDB real hazard data** | 2 hours | Replaces fake badge with real NOAEL/LOAEL |
+| 2 | **ChEMBL animal PK filter** | 4 hours | Validates PBPK against real measurements |
+| 3 | **AOP-Wiki CNS mapping** | 3 hours | Links behavioral fingerprints to adverse outcomes |
+| 4 | **ADMET-AI self-hosted** | 2 days | 50+ ADMET endpoints, cache-friendly |
+| 5 | **EPA CompTox OPERA proxy** | 1 day | 20+ physicochemical/ADME predictions |
+| 6 | **PK-Sim R worker** | 1 week | Regulatory-grade PBPK (defer until needed) |
+
+This gives you **real animal-relevant data** in the browser within a day, and **self-hosted prediction power** within a week — all at $0 licensing cost.
+
+Want me to write the complete TypeScript service files for the 🟢 quick wins, or the Docker Compose for the 🟡 medium-effort workers?

@@ -1,0 +1,21 @@
+The 100% Zero-Lab Software Ingestion Flow[ SMILES String ]
+        │
+        ▼
+┌────────────────────────────────────────┐
+│      Layer 1: IN-VITRO TWIN            │  ◄── Cell-Level AI Predictor (Chemprop/DeepDTA)
+│ (Predicts IC50, basic ADMET properties)│
+└─────────────┬──────────────────────────┘
+              │ (Data hands off seamlessly to Layer 2)
+              ▼
+┌────────────────────────────────────────┐
+│   Layer 2: CONFIRMATION WRAPPER        │  ◄── The Cross-Validation Engine
+│ [Physics-Based]  ◄──►  [Tissue-Level]  │      Compares atomic docking against virtual 
+│  (AutoDock Vina)       (Virtual Organ) │      organ systems (GTEx/Tabula Sapiens).
+└─────────────┬──────────────────────────┘
+              │ (Validates structural alignment)
+              ▼
+┌────────────────────────────────────────┐
+│      Layer 3: ANIMAL COHORT TWIN       │  ◄── Whole-Body Physiology Simulator
+│  (Davies & Morris multi-species PBPK)  │      Calculates NOAEL and HED via software.
+└────────────────────────────────────────┘
+1. What "Ex-Vivo" Actually Means in Your SystemBecause you are not using physical human tissue slices or physical organ-on-a-chip hardware, your Ex-Vivo sub-track is a computational simulation of a multi-cellular tissue environment.The Blueprint: It takes your Stage 1 descriptors and Stage 2 AutoDock structural poses, and maps them against virtual human tissue expression baselines using your lib/gtexClient.ts and Tabula Sapiens data streams.The Mechanism: Instead of measuring real chemical leakage on a plastic chip, your software simulates tissue-specific selectivity [1.3]. It predicts how a specific organ structure (like a virtual liver or kidney) will respond based on its baseline gene and protein expression profiles.2. The Core Scientific Defense of a Zero-Lab SystemWhen a platform is 100% software, regulators (like the FDA under the Modernization Act 2.0) will look for how your computational models cross-verify each other so they aren't just "guessing." Your system achieves this through Orthogonal Validation:Atomic-Scale Validation (In-Silico Stream): Stage 2 (AutoDock Vina) uses physics, geometry, and thermodynamics to calculate exactly how a molecule physically fits into a 3D protein pocket shell.Tissue-Scale Validation (Ex-Vivo Stream): Stage 3 and 4 use biological datasets and machine learning to look at how that same target behaves inside a simulated human organ environment.The Cross-Stream Alignment (\(\Delta _{div}\)): Your platform is scientifically defensible because it calculates the variance between these two independent software streams. If physics-based docking and biological tissue-expression models both agree on the molecule's behavior, the compound is cleared to proceed.3. Adjusting Your Platform Product IdentityTo ensure your documentation, code notes, and user manual are perfectly aligned with this 100% software model, your team should adjust how these layers are described:Layer 1 (In-Vitro Twin): The Cellular-Scale AI Simulator.Layer 2 (Confirmation): The Structural & Tissue-Scale Cross-Validation Gate.Layer 3 (Animal Twin): The Organism-Scale Whole-Body Physiology Simulator.

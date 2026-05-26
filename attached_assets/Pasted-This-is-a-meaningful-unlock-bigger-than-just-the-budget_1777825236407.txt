@@ -1,0 +1,89 @@
+This is a meaningful unlock — bigger than just the budget line item. Walking through the dictionary against the four-layer architecture:
+
+## What we get
+
+The customer-tier schema gives us full access to the structured tables that aren't in the open subset:
+
+**For L1 (ADMET reference)**
+- `drug_calculated_properties` — full physchem (logP, PSA, refractivity, polarizability, rotatable bonds, acceptor/donor counts, pKa). Calibration cohort for our descriptor-based engines.
+- `drug_experimental_properties` — measured (water solubility, melting/boiling point, hydrophobicity, isoelectric point, logS, etc.). Ground truth for marketed drugs.
+- `drug_predicted_admet_properties` — DrugBank's own ADMET predictions. Useful as a third independent predictor to triangulate against `admet-ml` and SwissADME-style tools.
+- `binding_properties` — measured drug-protein binding strength values.
+
+**For L2 (PBPK calibration corpus — the big one)**
+The `structured_pharmacology_*` family is what we needed. Per drug, with dose/route/form/age/sex context:
+- Clearance (`structured_pharmacology_clearances`)
+- Half-life (`structured_pharmacology_half_lives`)
+- Volume of distribution (`structured_pharmacology_volume_of_distributions`)
+- Bioavailability (`structured_pharmacology_bioavailabilities`)
+- Cmax / Tmax / AUC
+- Protein binding
+- Route of elimination
+- LD50 (`structured_pharmacology_median_lethal_dosages`)
+
+Each has value/min/max + normalized fields + dose context. This is a far better PBPK validation cohort than PK-DB alone — on the order of ~1,000+ marketed drugs with paired PK parameters vs. PK-DB's ~50. Our L2 PBPK kernel calibration story changes from "best effort" to "calibrated against the marketed-drug corpus."
+
+**For L3 (the surrogate calibration story changes)**
+- `metabolites` + `reactions` + `reaction_elements` + `reaction_enzymes` — biotransformation pathways with metabolite SMILES, activity, and major-vs-minor flags. Direct input into the IVIVE story.
+- `pathways` (SMPDB-linked) — pathway context for QSP-style L2 work.
+- `bio_entities` + `polypeptides` + `binding_properties` + `inhibition_clinically_sig` — target / enzyme / transporter / carrier full reference. Replaces a lot of what we were stitching from ChEMBL + IUPHAR.
+- `gene_regulations`, `metabolite_regulations`, `protein_regulations` — regulation directionality.
+
+**For L3 DILI training set (this directly addresses the v1.1 issue #2)**
+- `structured_blackbox_warnings` with kind/recommendation/management/sex/age fields
+- `structured_adverse_effects` with admin/usage/event/sex/age fields  
+- `structured_contraindications`
+- `structured_pim_warnings` (Beers / potentially inappropriate medications)
+
+DILIrank gives us ~700 compounds with adjudicated severity. Subsetting DrugBank's structured hepatotox annotations (boxed warnings tagged hepatic, AEs with hepatic events, contraindications referencing hepatic function) realistically gets us to a 2,000–3,000-compound DILI training set, properly stratified. The "DILI dataset is small" risk in the v1.1 spec is materially reduced.
+
+**For L4 / safety / regulatory cross-reference**
+- `structured_drug_interactions` with severity, evidence_level, management, action — best DDI corpus available; replaces what we'd otherwise build from FAERS + literature.
+- `structured_indications` — approved indications with off-label, OTC, country, dose-form context.
+- `clinical_trials` family — full ClinicalTrials.gov mirroring with sponsors, phases, eligibility, interventions linked to drugs.
+- `orphan_designations`, `patents`, `exclusivity_protected_indication` — regulatory state.
+- `external_identifiers` — clean cross-walks to UNII, RxNorm, ChEMBL, PubChem (this matters for the model registry's compound-identity story).
+
+## What changes per layer
+
+**L1.** `drug-reference-ml` becomes a real service — we can finally do "your compound is structurally similar to {marketed drug}, here's its measured ADMET" with a defensible reference, not a best-guess analog match. Existing `admet-ml` (Chemprop) gains a third independent triangulation point in `drug_predicted_admet_properties`.
+
+**L2.** PBPK kernel calibration is the highest-leverage win. Pull the ~1,000+ marketed-drug PK records with paired (Cl, Vd, t½, F) and recalibrate `lib/pbpk.ts` against them. This is exactly the project the architecture doc called out as "the single highest-leverage L3 engineering project of Year 1." It now sits at L2 and is unblocked. Conservative fold-error on novel chemotypes should tighten meaningfully.
+
+**L3.** Three things change:
+1. The DILI training set roughly triples. `dili-ml` accuracy ceiling moves up.
+2. Metabolite/reaction tables let us predict major metabolites with provenance, which feeds back into L1 (parent + active metabolite ADMET) and L2 (metabolite-PBPK).
+3. The "predict marketed-drug analogs" pattern at T1 retrieval becomes much richer — Tanimoto match against DrugBank's full set instead of just ChEMBL.
+
+**L4.** Better analog-based priors on tox liabilities (boxed warnings ranked by mechanism), and the IND-handoff package can now carry "structurally similar marketed drugs and their post-market safety profile" as a meaningful field, not a stub.
+
+**Boundary / Clinical.** `external_identifiers` cleans up the SEND→FHIR mapping for compound identity. `clinical_trials` mirroring helps Clinical's own protocol intelligence work but lives on the Clinical side, not Bio.
+
+## What changes in our docs
+
+Concrete edits across the existing set:
+
+- **Architecture research doc (HakaseBio_4Layer_Architecture_Research.docx) §3.1.1.** DrugBank "tiered: full data commercial license required" — flip to "commercial license held; full structured pharmacology + ADMET reference available." Move the licensing-blocker note to historical.
+- **Architecture research doc §3.3 "Top 3 datasets to license."** DrugBank #1 is done. JUMP-CP and pharma-grade ADME panel become Top-2.
+- **L3 spec v1.1 (in progress) §6.2 (Tox / DILI label sets) and §13.2 (DILI dataset is small).** Add DrugBank as primary DILI training source; expand training-cohort-size discussion; lower the §13.2 risk severity.
+- **L3 spec v1.1 §10 build order.** Stage 2 (DILI-ML) gets a different training-data assembly story — DILIrank + LTKB + DrugBank's structured hepatotox subset, properly de-duplicated.
+- **HAIOps playbook §7.2 / §7.3.** DrugBank moves to a primary L1/L2 reference data source; add it to the layer-specific stack additions.
+- **HAIOps playbook §10.1 (vendor lock-in risk).** L1/L2 commercial dependency is no longer "needed." L3 vendor risk story unchanged (organoid data is still where the lock-in lives).
+
+## One thing to flag about licence terms
+
+DrugBank's customer-tier licence typically allows use in our pipeline but restricts redistribution of the structured tables to downstream clients. We can use the data to train our models, calibrate our kernels, and surface derived insights ("predicted ADMET, calibrated against marketed-drug reference cohort"); we cannot ship `structured_pharmacology_*` rows verbatim out to a client tenant or expose them via an open API. The Compliance Swarm needs an explicit licence-aware emission filter on outputs that touch DrugBank-derived fields. Worth confirming the exact terms with whoever owns the contract — the dictionary doesn't carry the licence text.
+
+## Proposed next step
+
+Three options on how to land this:
+
+**(a) Fold DrugBank into the L3 spec v1.1 I'm about to write** and add a tracked-changes update to the architecture research doc + HAIOps playbook. Single integrated revision pass. About a half-day of doc work.
+
+**(b) Write a focused "DrugBank Integration Plan" companion doc** — which tables wire into which `lib/` modules at which layer, the licence-aware emission rules, the recalibration plan for `lib/pbpk.ts`, the expanded DILI training assembly, the model-registry implications. Plus the v1.1 + tracked-changes updates. About a day's work.
+
+**(c) Both, in stages.** Land the v1.1 first (we already agreed on it), then the DrugBank integration plan as a second deliverable once Stages 1–2 of the L3 build are running. Keeps each artifact focused.
+
+I'd recommend (b). The DrugBank unlock is big enough to deserve its own integration plan — there's a real engineering project in recalibrating the PBPK kernel against the marketed-drug corpus, and it's higher-leverage than several of the L3 stages we were planning to ship next. Plus the licence-aware emission discipline needs to be specified before anyone wires the first table.
+
+Which way do you want to go?

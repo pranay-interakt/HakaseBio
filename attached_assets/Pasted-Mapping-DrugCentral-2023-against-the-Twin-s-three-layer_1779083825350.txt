@@ -1,0 +1,100 @@
+Mapping DrugCentral 2023 against the Twin's three layers and the IVIVE/safety tracks. Tight inventory below, then operational notes and what I'd recommend doing next.## What DrugCentral actually contains (2023 release, ~4,995 drugs / 152,476 products)
+
+**Chemistry layer**
+
+- SMILES, InChI, SDF (V2000 + V3000), CAS, INN
+- Substructure + similarity search
+- Active pharmaceutical ingredients table
+- Salt/ester forms, development codes
+
+**Target / pharmacology layer**
+
+- ~724 mechanism-of-action targets, UniProt accession + Swissprot ID + gene symbol + organism + target class
+- ~20,000 bioactivity datapoints (potency values vs targets)
+- Pharmacologic action vocabulary: MeSH, FDA EPC/MoA/PE, ChEBI
+- ATC classification
+- LINCS L1000 cross-link (transcriptomic perturbation signatures by compound)
+
+**Clinical layer**
+
+- ~14,300 on- and off-label indications, mapped to SNOMED-CT and OMOP
+- ~27,000 contraindications
+- Drug-drug interactions (DDIs)
+- Full text of FDA drug labels (searchable)
+- Regulatory approval flags: FDA, EMA, PMDA (separable CSVs)
+
+**PK / dosing layer**
+
+- Standardized pharmacokinetic descriptors per drug (clearance, half-life, bioavailability, Vd, protein binding) — pulled from labels and curated literature
+- Approved doses, routes, and formulation/product metadata (FDA Orange Book linkage)
+
+**Safety / pharmacovigilance layer**
+
+- ~340,000 FAERS adverse-event scores
+- Stratified by sex (M / F), pediatric (FAERS_PED, 1 day–17y), geriatric (FAERS_GER, 65+)
+
+**Veterinary layer**
+
+- 193 veterinary drugs, 1,664 indications across 34 species, FDA Green Book linkage
+- 1,492 product records, 1,805 vet bioactivities, 804 vet targets
+
+**Cross-reference hub**
+
+- Xrefs to DrugBank, PubChem, ChEMBL, RxNorm, UNII, NDC, KEGG, MeSH, UMLS, OMOP, SNOMED-CT — DrugCentral is unusually clean as a join key
+
+## Mapping to the BioDigital Twin
+
+**Layer 1 — Cellular-scale AI sim**
+
+- Structures (SMILES/SDF) → direct compound input
+- Bioactivity table → labelled affinity ground-truth for L1 prediction QC
+- LINCS L1000 perturbation signatures → cellular-scale readouts the L1 sim should reproduce on the right cell lines (this is the most underused asset for L1)
+- MoA target list (UniProt → gene) → anchors L1 hit identification
+- ATC + pharmacologic action → class-median priors per the Zero-Lab Evidence Ladder
+
+**Layer 2 — Structural + tissue cross-validation gate**
+
+- UniProt accessions → pull AlphaFold / PDB structures for the AutoDock arm
+- Target class taxonomy (kinase / GPCR / ion channel / etc.) → docking parameter selection
+- Bioactivity Ki/IC50 values → "known-good" comparator to gate docking outputs
+- LINCS tissue/cell-line coverage joins to GTEx / Tabula Sapiens for the tissue-expression arm — gives the L2 stream-independence claim more anchors
+
+**Layer 3 — Organism-scale PBPK**
+
+- PK descriptors → calibration set for PBPK parameter ranges
+- Approved dose × route × formulation → human-side ground truth for NOAEL / HED / MABEL workflows
+- Indication mapped to SNOMED-CT/OMOP → disease-context selection for organism simulation
+- Veterinary species PK + dose → rare cross-species translation signal (cattle, dog, cat, equine) — useful for inter-species PBPK scaling and IVIVE
+
+**Safety + reviewer gate (per safety_outputs_state policy)**
+
+- FAERS sex/peds/geri tables → regression-shaped data to upgrade hERG, hepatotox, bioactivation, CYP-panel heuristics
+- Contraindications + DDIs + off-label uses → reviewer-gate evidence packet before any animal-advancement recommendation
+- Label text → black-box warnings and boxed warnings extraction
+
+**IVIVE engine**
+
+- PK descriptors + clinical PK from labels are literally the public-PK reference set IVIVE recalibrates against. This is the cleanest pre-packaged public IVIVE training/eval seed available — better than scraping individual SPL labels.
+
+## Cross-module reuse
+
+- **Hakase RIM** — FDA/EMA/PMDA approval CSVs + full label text + ATC + xrefs feeds the GCC cartridge's foreign-inbound flow (Indian/Turkish/Korean manufacturers entering GCC frequently need US/EU label proof points)
+- **Hakase SARD** — "approved" flag + indication + xrefs lets you quickly separate live-market from shelved/discontinued candidates and bridge into the patent backbone via DrugBank/PubChem IDs
+
+## Access + ingestion notes
+
+- **License**: CC BY-SA 4.0 — share-alike attaches. Treat DrugCentral as an external ground-truth reference. Anything redistributed that includes DrugCentral content needs attribution + SA. Models *trained on* it for internal scoring are the grey zone — get a one-page legal read before shipping anything that exposes raw DrugCentral fields to customers.
+- **Best ingestion path**: PostgreSQL dump (v14.5, dated 2023-11-01) mirrored locally. There's also a public Postgres at `unmtid-dbs.net:5433` (drugman/dosage) and a DockerHub image — use those for prototyping, not production.
+- **Auxiliary files worth grabbing separately**: `drug.target.interaction.tsv.gz`, `structures.molV3.sdf.gz`, the three approved-drug CSVs, the SMILES/InChI TSV.
+- **Refresh cadence**: roughly biennial (2017 → 2018 → 2021 → 2023). Plan a yearly diff job.
+- **Evidence-ladder rung**: LITERATURE — sits in the L1 IVIVE/PK reference pool, not the IN-HOUSE rung.
+- **Federation policy**: read-only public source, no tenant data involved — safe under your privacy-first rule, no opt-in flows required.
+
+Want me to formalize this as a `hakase_drugcentral_inventory_v0_1.md` workspace doc with explicit field-to-consumer mappings and an ingestion checklist, or fold it into the existing Hakase RIM / Twin data inventories?Sources:
+- [DrugCentral home](https://drugcentral.org/)
+- [DrugCentral About](https://drugcentral.org/about)
+- [DrugCentral Download (dump, TSVs, SDFs, approved CSVs)](https://drugcentral.org/download)
+- [DrugCentral License — CC BY-SA 4.0](https://drugcentral.org/privacy)
+- [DrugCentral 2023 NAR paper (Avram et al.)](https://academic.oup.com/nar/article/51/D1/D1276/6885038)
+- [Exploring DrugCentral: from molecular structures to clinical effects (PMC10692006)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10692006/)
+- [BioClients DrugCentral schema/ops reference](https://github.com/jeremyjyang/BioClients/blob/master/doc/drugcentral.md)

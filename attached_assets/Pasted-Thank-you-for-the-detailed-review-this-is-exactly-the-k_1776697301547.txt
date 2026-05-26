@@ -1,0 +1,578 @@
+Thank you for the detailed review — this is exactly the kind of reality check needed before shipping. Let me fix the errors and provide corrected, verified implementations for the three quick wins.
+
+---
+
+## Corrected Quick Wins (Shippable Today)
+
+### 1. ToxRefDB Hazard Endpoints — Fixed Path + API Key
+
+**Corrected EPA CCTE API:**
+```typescript
+// services/toxrefService.ts — CORRECTED
+const CCTE_BASE = 'https://api-ccte.epa.gov';  // No /ctx-api/v1 prefix
+
+interface ToxRefAnimalRecord {
+  dtxsid: string;
+  studyType: string;
+  species: string;
+  noael: number | null;
+  loael: number | null;
+  criticalEffect: string;
+  exposureRoute: string;
+  duration: string;
+}
+
+class ToxRefService {
+  private apiKey: string;
+  
+  constructor() {
+    this.apiKey = process.env.CCTE_API_KEY || '';  // Required, free at api-ccte.epa.gov
+    if (!this.apiKey) {
+      console.warn('CCTE_API_KEY not set — calls will rate-limit or 403');
+    }
+  }
+
+  async getAnimalHazard(dtxsid: string): Promise<ToxRefAnimalRecord[]> {
+    // Correct path: /hazard/search/by-dtxsid/{dtxsid}
+    const response = await fetch(
+      `${CCTE_BASE}/hazard/search/by-dtxsid/${dtxsid}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'x-api-key': this.apiKey,  // Required for sustained use
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) return [];  // No data for this compound
+      throw new Error(`ToxRefDB error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Filter for animal studies with NOAEL/LOAEL values
+    return data
+      .filter((record: any) => 
+        record.toxval_type?.match(/NOAEL|LOAEL/i) &&
+        ['rat', 'mouse', 'rabbit', 'dog'].includes(record.species?.toLowerCase())
+      )
+      .map((record: any) => ({
+        dtxsid: record.dtxsid,
+        studyType: record.study_type || 'unknown',
+        species: record.species.toLowerCase(),
+        noael: record.toxval_type === 'NOAEL' ? record.toxval_numeric : null,
+        loael: record.toxval_type === 'LOAEL' ? record.toxval_numeric : null,
+        criticalEffect: record.critical_effect || 'Not specified',
+        exposureRoute: record.exposure_route || 'oral',
+        duration: `${record.study_duration_value || '?'} ${record.study_duration_units || ''}`
+      }));
+  }
+
+  // No batch endpoint — loop per compound
+  async getBatchAnimalHazard(dtxsids: string[]): Promise<Map<string, ToxRefAnimalRecord[]>> {
+    const results = new Map();
+    
+    // Sequential to avoid rate limits; parallel with Promise.all if you add throttling
+    for (const dtxsid of dtxsids) {
+      const hazards = await this.getAnimalHazard(dtxsid);
+      results.set(dtxsid, hazards);
+    }
+    
+    return results;
+  }
+}
+
+export const toxrefService = new ToxRefService();
+```
+
+**Environment setup:**
+```bash
+# .env.local / .env.production
+CCTE_API_KEY=your-free-key-from-api-ccte-epa-gov
+```
+
+---
+
+### 2. OPERA Predictions via Existing CompTox Call — Leverage toxcast.ts
+
+You're already calling CompTox chemical detail. OPERA predictions are embedded in that same response:
+
+```typescript
+// Add to existing toxcast.ts or new operaService.ts
+interface OperaPrediction {
+  property: string;
+  value: number;
+  unit: string | null;
+  confidence: number | null;  // OPERA emits AD (Applicability Domain) scores
+}
+
+async function getOperaPredictions(dtxsid: string): Promise<OperaPrediction[]> {
+  // Reuse your existing CompTox base URL and API key pattern
+  const response = await fetch(
+    `${COMPTOX_BASE}/chemical/detail/search/by-dtxsid/${dtxsid}`,
+    {
+      headers: {
+        'Accept': 'application/json',
+        'x-api-key': process.env.COMPTOX_API_KEY,  // Same key as ToxRefDB
+      }
+    }
+  );
+  
+  const data = await response.json();
+  
+  // OPERA predictions nested in chemical detail
+  const operaData = data.operas || data.calculated_properties?.opera || [];
+  
+  return operaData.map((op: any) => ({
+    property: op.property_name || op.name,
+    value: parseFloat(op.value),
+    unit: op.unit,
+    confidence: op.ad_score || op.confidence || null  // Surface this to UI!
+  }));
+}
+
+// High-value endpoints for animal translation
+const PRIORITY_OPERA_ENDPOINTS = [
+  'LogP',           // Distribution
+  'LogS',           // Solubility
+  'BP',             // Boiling point (volatility)
+  'VP',             // Vapor pressure (inhalation risk)
+  'Bioaccumulation', // Animal tissue retention
+  'Biodegradation',  // Environmental/elimination
+  'Clint',          // Hepatic clearance (if available)
+  'Fu',             // Fraction unbound (if available)
+];
+```
+
+**UI integration — feed the Confidence Threshold slider:**
+```typescript
+// In your prediction display component
+function PredictionBadge({ prediction }: { prediction: OperaPrediction }) {
+  const confidence = prediction.confidence || 0;
+  
+  return (
+    <div className={`prediction-badge ${confidence > 0.7 ? 'high' : confidence > 0.4 ? 'medium' : 'low'}`}>
+      <span className="property">{prediction.property}</span>
+      <span className="value">{prediction.value.toPrecision(3)}</span>
+      {prediction.unit && <span className="unit">{prediction.unit}</span>}
+      <span className="confidence" title={`AD Score: ${confidence}`}>
+        {confidence > 0.7 ? '●●●' : confidence > 0.4 ? '●●○' : '●○○'}
+      </span>
+    </div>
+  );
+}
+```
+
+---
+
+### 3. ChEMBL Animal PK — Corrected Filter Pattern
+
+```typescript
+// services/chemblAnimalService.ts — CORRECTED
+const CHEMBL_BASE = 'https://www.ebi.ac.uk/chembl/api/data';
+
+interface AnimalPKRecord {
+  assayId: string;
+  species: string;
+  assayType: string;  // 'A' = ADME
+  standardType: string;  // 'AUC', 'Cmax', 'CL', 't1/2', etc.
+  standardValue: number;
+  standardUnits: string;
+  relation: string;  // '=', '<', '>'
+  compoundName: string;
+}
+
+class ChemblAnimalService {
+  async getAnimalPKByCompound(chemblId: string): Promise<AnimalPKRecord[]> {
+    // Correct pattern: filter /activity by molecule_chembl_id, then filter client-side
+    // ChEMBL's __in filter is unreliable on target_organism
+    const params = new URLSearchParams({
+      molecule_chembl_id: chemblId,
+      assay_type: 'A',  // ADME only
+      limit: '100',
+    });
+    
+    const response = await fetch(`${CHEMBL_BASE}/activity.json?${params}`);
+    const data = await response.json();
+    
+    // Client-side filter for animal species
+    const animalSpecies = ['Rattus norvegicus', 'Canis lupus familiaris', 'Macaca fascicularis'];
+    
+    return data.activities
+      ?.filter((act: any) => 
+        animalSpecies.includes(act.target_organism) &&
+        act.standard_value !== null  // Skip qualitative records
+      )
+      .map((act: any) => ({
+        assayId: act.assay_chembl_id,
+        species: act.target_organism,
+        assayType: act.assay_type,
+        standardType: act.standard_type,
+        standardValue: parseFloat(act.standard_value),
+        standardUnits: act.standard_units,
+        relation: act.standard_relation,
+        compoundName: act.molecule_name || chemblId
+      })) || [];
+  }
+
+  // Alternative: filter by assay organism first (more reliable)
+  async getAnimalPKByAssayOrganism(chemblId: string, organism: string): Promise<AnimalPKRecord[]> {
+    // Step 1: Find ADME assays for this organism
+    const assayParams = new URLSearchParams({
+      assay_organism: organism,
+      assay_type: 'A',
+      molecule_chembl_id: chemblId,
+      limit: '50',
+    });
+    
+    const assayResponse = await fetch(`${CHEMBL_BASE}/assay.json?${assayParams}`);
+    const assayData = await assayResponse.json();
+    
+    if (!assayData.assays?.length) return [];
+    
+    // Step 2: Fetch activities for these specific assays
+    const assayIds = assayData.assays.map((a: any) => a.assay_chembl_id).join(',');
+    const activityParams = new URLSearchParams({
+      assay_chembl_id__in: assayIds,
+      limit: '100',
+    });
+    
+    const activityResponse = await fetch(`${CHEMBL_BASE}/activity.json?${activityParams}`);
+    const activityData = await activityResponse.json();
+    
+    return activityData.activities?.map((act: any) => ({
+      assayId: act.assay_chembl_id,
+      species: organism,
+      assayType: act.assay_type,
+      standardType: act.standard_type,
+      standardValue: parseFloat(act.standard_value),
+      standardUnits: act.standard_units,
+      relation: act.standard_relation,
+      compoundName: act.molecule_name || chemblId
+    })) || [];
+  }
+
+  // Convenience: try rat first, fallback to dog, then monkey
+  async getBestAnimalPK(chemblId: string): Promise<AnimalPKRecord[]> {
+    const speciesPriority = ['Rattus norvegicus', 'Canis lupus familiaris', 'Macaca fascicularis'];
+    
+    for (const species of speciesPriority) {
+      const records = await this.getAnimalPKByAssayOrganism(chemblId, species);
+      if (records.length > 0) return records;
+    }
+    
+    return [];
+  }
+}
+
+export const chemblAnimalService = new ChemblAnimalService();
+```
+
+---
+
+### 4. AOP-Wiki — Static Mirror (Not Live REST)
+
+**Corrected approach:** Monthly XML dump, parsed to JSON, served as static file.
+
+```bash
+# One-time setup script (run monthly via cron or GitHub Action)
+curl -L https://aopwiki.org/downloads/aop-wiki-xml.zip -o aop-wiki-xml.zip
+unzip aop-wiki-xml.zip
+# Parse XML to JSON, filter for stressor-chemical mappings
+python3 scripts/parse_aop_xml.py --input aop-wiki.xml --output public/data/aop-wiki.json
+```
+
+**Parser (Python):**
+```python
+# scripts/parse_aop_xml.py
+import xml.etree.ElementTree as ET
+import json
+import sys
+import argparse
+
+def parse_aop_xml(input_path, output_path):
+    tree = ET.parse(input_path)
+    root = tree.getroot()
+    
+    aops = []
+    
+    for aop in root.findall('.//aop'):
+        aop_id = aop.get('id')
+        title = aop.findtext('title', '')
+        
+        # Species applicability
+        species = []
+        for sp in aop.findall('.//species-apply/species'):
+            species.append(sp.text)
+        
+        # Key events
+        key_events = []
+        for ke in aop.findall('.//key-event'):
+            ke_id = ke.get('id')
+            ke_title = ke.findtext('title', '')
+            ke_type = 'MIE' if ke.get('mie') == 'true' else 'KE' if ke.get('ao') != 'true' else 'AO'
+            key_events.append({
+                'id': ke_id,
+                'title': ke_title,
+                'type': ke_type
+            })
+        
+        # Stressors (chemicals)
+        stressors = []
+        for st in aop.findall('.//chemical/stressor'):
+            stressors.append({
+                'name': st.findtext('name', ''),
+                'casrn': st.findtext('casrn', '')
+            })
+        
+        aops.append({
+            'id': aop_id,
+            'title': title,
+            'speciesApplicability': species,
+            'keyEvents': key_events,
+            'stressors': stressors
+        })
+    
+    with open(output_path, 'w') as f:
+        json.dump(aops, f, indent=2)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--output', required=True)
+    args = parser.parse_args()
+    parse_aop_xml(args.input, args.output)
+```
+
+**Browser-side service:**
+```typescript
+// services/aopWikiService.ts — reads static JSON, no CORS issues
+interface AOP {
+  id: string;
+  title: string;
+  speciesApplicability: string[];
+  keyEvents: KeyEvent[];
+  stressors: { name: string; casrn: string }[];
+}
+
+interface KeyEvent {
+  id: string;
+  title: string;
+  type: 'MIE' | 'KE' | 'AO';  // Molecular Initiating Event, Key Event, Adverse Outcome
+}
+
+class AOPWikiService {
+  private aops: AOP[] | null = null;
+  
+  async loadAOPs(): Promise<AOP[]> {
+    if (this.aops) return this.aops;
+    
+    // Static JSON file, checked into repo or built at deploy time
+    const response = await fetch('/data/aop-wiki.json');
+    this.aops = await response.json();
+    return this.aops;
+  }
+  
+  async findAOPsByStressor(chemicalName: string): Promise<AOP[]> {
+    const aops = await this.loadAOPs();
+    const lowerName = chemicalName.toLowerCase();
+    
+    return aops.filter(aop => 
+      aop.stressors.some(s => 
+        s.name.toLowerCase().includes(lowerName) ||
+        s.casrn === chemicalName  // If you have CASRN
+      )
+    );
+  }
+  
+  async findCNSAOPs(chemicalName: string): Promise<AOP[]> {
+    const matches = await this.findAOPsByStressor(chemicalName);
+    const cnsKeywords = ['neuro', 'brain', 'behavior', 'seizure', 'cognition', 'motor', 'gaba', 'nmda', 'dopamine'];
+    
+    return matches.filter(aop => 
+      cnsKeywords.some(kw => aop.title.toLowerCase().includes(kw)) ||
+      aop.keyEvents.some(ke => cnsKeywords.some(kw => ke.title.toLowerCase().includes(kw)))
+    );
+  }
+  
+  // For behavioral fingerprinting: map assay hits to AOP key events
+  async mapAssaysToAOPs(assayHits: string[]): Promise<AOP[]> {
+    const aops = await this.loadAOPs();
+    
+    return aops.filter(aop => 
+      aop.keyEvents.some(ke => 
+        assayHits.some(hit => ke.title.toLowerCase().includes(hit.toLowerCase()))
+      )
+    );
+  }
+}
+
+export const aopWikiService = new AOPWikiService();
+```
+
+**Build-time integration:**
+```json
+// package.json scripts
+{
+  "build": "npm run update-aop && next build",
+  "update-aop": "curl -L https://aopwiki.org/downloads/aop-wiki-xml.zip -o /tmp/aop.zip && unzip -o /tmp/aop.zip -d /tmp/aop && python3 scripts/parse_aop_xml.py --input /tmp/aop/aop-wiki.xml --output public/data/aop-wiki.json"
+}
+```
+
+---
+
+## Integration in Your Existing UI
+
+### Updated Layer 2 Provenance Bar
+
+```typescript
+// components/AnimalPredictionCard.tsx
+import { toxrefService } from '@/services/toxrefService';
+import { chemblAnimalService } from '@/services/chemblAnimalService';
+import { aopWikiService } from '@/services/aopWikiService';
+
+interface AnimalPredictionProps {
+  compound: {
+    dtxsid: string;
+    chemblId: string;
+    name: string;
+    smiles: string;
+  };
+  pbpkPrediction: {
+    ratCmax: number;
+    ratAUC: number;
+  };
+}
+
+export function AnimalPredictionCard({ compound, pbpkPrediction }: AnimalPredictionProps) {
+  const [hazards, setHazards] = useState<ToxRefAnimalRecord[]>([]);
+  const [validationPK, setValidationPK] = useState<AnimalPKRecord[]>([]);
+  const [cnsAOPs, setCnsAOPs] = useState<AOP[]>([]);
+  
+  useEffect(() => {
+    // Parallel fetch of all three quick wins
+    Promise.all([
+      toxrefService.getAnimalHazard(compound.dtxsid),
+      chemblAnimalService.getBestAnimalPK(compound.chemblId),
+      aopWikiService.findCNSAOPs(compound.name)
+    ]).then(([h, v, a]) => {
+      setHazards(h);
+      setValidationPK(v);
+      setCnsAOPs(a);
+    });
+  }, [compound]);
+  
+  // Calculate safety margin
+  const ratNOAEL = hazards.find(h => h.species === 'rat' && h.noael)?.noael;
+  const safetyMargin = ratNOAEL ? ratNOAEL / pbpkPrediction.ratCmax : null;
+  
+  return (
+    <div className="animal-prediction-card">
+      {/* ToxRefDB: Real hazard data */}
+      <div className="provenance-section">
+        <h4>Animal Hazard Data (ToxRefDB)</h4>
+        {hazards.length > 0 ? (
+          <div className="hazard-badges">
+            {hazards.map(h => (
+              <span key={`${h.studyType}-${h.species}`} className="badge real-data">
+                {h.species}: {h.noael ? `NOAEL ${h.noael} mg/kg` : `LOAEL ${h.loael} mg/kg`}
+                <small>{h.criticalEffect}</small>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="badge no-data">No historical animal data</span>
+        )}
+      </div>
+      
+      {/* ChEMBL: Validation against real PK */}
+      <div className="provenance-section">
+        <h4>Experimental Animal PK (ChEMBL)</h4>
+        {validationPK.length > 0 ? (
+          <div className="validation-table">
+            {validationPK.map(pk => (
+              <div key={pk.assayId} className="pk-row">
+                <span>{pk.species.replace('Rattus norvegicus', 'Rat').replace('Canis lupus familiaris', 'Dog')}</span>
+                <span>{pk.standardType}: {pk.standardValue} {pk.standardUnits}</span>
+                <span className="confidence">Measured</span>
+              </div>
+            ))}
+            {/* Comparison row */}
+            {validationPK.some(pk => pk.standardType === 'AUC') && (
+              <div className="comparison-row">
+                <span>PBPK Predicted AUC: {pbpkPrediction.ratAUC.toFixed(1)}</span>
+                <span className={Math.abs(pbpkPrediction.ratAUC - validationPK.find(p => p.standardType === 'AUC')!.standardValue) < 2 ? 'match' : 'warn'}>
+                  {Math.abs(pbpkPrediction.ratAUC - validationPK.find(p => p.standardType === 'AUC')!.standardValue) < 2 ? 'Within 2-fold' : 'Deviation >2-fold'}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="badge no-data">No experimental PK data</span>
+        )}
+      </div>
+      
+      {/* AOP-Wiki: Behavioral biology */}
+      <div className="provenance-section">
+        <h4>Behavioral Relevance (AOP-Wiki)</h4>
+        {cnsAOPs.length > 0 ? (
+          <div className="aop-links">
+            {cnsAOPs.slice(0, 3).map(aop => (
+              <div key={aop.id} className="aop-card">
+                <a href={`https://aopwiki.org/aops/${aop.id}`} target="_blank" rel="noopener">
+                  AOP {aop.id}: {aop.title}
+                </a>
+                <div className="key-events">
+                  {aop.keyEvents.map(ke => (
+                    <span key={ke.id} className={`ke-badge ${ke.type}`}>
+                      {ke.type}: {ke.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="badge no-data">No mapped adverse outcome pathways</span>
+        )}
+      </div>
+      
+      {/* Safety margin calculation */}
+      {safetyMargin && (
+        <div className={`safety-banner ${safetyMargin > 10 ? 'safe' : safetyMargin > 1 ? 'caution' : 'unsafe'}`}>
+          Safety Margin (NOAEL / Predicted Cmax): {safetyMargin.toFixed(1)}x
+          {safetyMargin > 10 ? ' — Favorable' : safetyMargin > 1 ? ' — Monitor closely' : ' — Below NOAEL!'}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Environment Configuration
+
+```bash
+# .env.local
+CCTE_API_KEY=your-free-key-from-api-ccte.epa.gov
+COMPTOX_API_KEY=same-as-ccte  # Same key works for both
+
+# No additional keys needed for ChEMBL or AOP-Wiki (static)
+```
+
+---
+
+## Summary of Corrections Applied
+
+| Issue | Original | Corrected |
+|-------|----------|-----------|
+| **EPA API path** | `https://api-ccte.epa.gov/ctx-api/v1/hazard/...` | `https://api-ccte.epa.gov/hazard/...` |
+| **API key** | "No API key required" | `x-api-key` header required, free registration |
+| **Batch endpoint** | `POST /hazard/batch/search` | Loop `GET /hazard/search/by-dtxsid/{dtxsid}` per compound |
+| **AOP-Wiki REST** | Live `https://aopwiki.org/api/...` | Static JSON mirror from monthly XML dump |
+| **ChEMBL filter** | `target_organism__in=...` | Client-side filter or `assay_organism=` pre-filter |
+| **OPERA access** | Standalone Java app | Embedded in CompTox chemical-detail API (already partially called) |
+
+This gives you **three shippable quick wins** with zero new infrastructure, corrected API paths, and honest data provenance for your Layer 2 bar.

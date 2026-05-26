@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0.0",
+  "compound": {
+    "smiles": "BIOLOGIC:mAb-XR-001",
+    "inchiKey": null,
+    "molecularWeight": 148000,
+    "chemblId": null,
+    "preferredName": "mAb-XR-001 (anti-IL17A)"
+  },
+  "inVitro": {
+    "hergIc50UM": null,
+    "caco2Permeability": null,
+    "plasmaProteinBindingFraction": null,
+    "primaryTargetUniprot": "Q16552",
+    "primaryTargetGeneSymbol": "IL17A",
+    "primaryTargetIc50nM": 0.18
+  },
+  "inSilico": {
+    "humanProjectedCmaxNgPerMl": null,
+    "humanProjectedAucNgHPerMl": null,
+    "humanProjectedHalfLifeHours": 504.0,
+    "humanProjectedClearanceLPerHPerKg": 0.00018,
+    "freeEnergyDdgKcalPerMol": null,
+    "freeEnergyUncertaintyKcalPerMol": null
+  },
+  "animalCohort": {
+    "speciesId": "cynomolgus",
+    "speciesDisplayName": "Cynomolgus Monkey",
+    "studyTypeId": "4-week-tox-iv",
+    "studyTypeLabel": "4-week repeat-dose IV toxicology (interim)",
+    "routeOfAdministration": "intravenous",
+    "noaelMgPerKg": 50,
+    "mtdMgPerKg": 100,
+    "fihDoseMg": 7.0,
+    "fihDoseMgPerKg": 0.1,
+    "hedBsaMgPerKg": 16.13,
+    "hedPbpkMgPerKg": 12.50,
+    "safetyMarginNoael": 4.0,
+    "overallRisk": "high",
+    "toxicityFlags": [
+      {
+        "organ": "Immune",
+        "risk": "high",
+        "finding": "Cytokine release at 5× NOAEL — first-in-class agonist concern",
+        "ichReference": "ICH S6(R1)"
+      }
+    ],
+    "formulation": {
+      "formulationType": "IV solution (sterile, aqueous, pH 6.5)",
+      "bcsClass": null
+    },
+    "indEnablingComplete": false
+  },
+  "cypTransporterPanel": null,
+  "clearanceFractions": null,
+  "provenance": {
+    "emittedAt": "2026-05-04T12:10:00Z",
+    "emitterEngine": "HakaseBioDigitalTwin",
+    "emitterVersion": "1.0.0",
+    "l1EngineVersion": null,
+    "l2EngineVersion": "PK-Sim 11.2 (mAb module)",
+    "l4EngineVersion": "HakaseAnimalTox 1.0.0",
+    "databaseQueries": [
+      { "database": "PK-DB", "status": "success", "timestamp": "2026-05-04T12:08:11Z", "resultCount": 4 },
+      { "database": "OpenTargets", "status": "success", "timestamp": "2026-05-04T12:08:30Z", "resultCount": 1 }
+    ],
+    "warnings": [
+      "Biologic — L1 ADMET-ML small-molecule probes are not applicable; in-vitro panel intentionally null.",
+      "§6.1.a CYP/transporter panel not applicable to a mAb — DDI cocktail arm should be skipped, not mock-filled.",
+      "§6.1.b clearance fractions not applicable to a mAb (cleared by reticulo-endothelial proteolysis) — Special-Pop renal/hepatic stratification not meaningful.",
+      "indEnablingComplete = false: 90-day chronic-tox + repro/dev studies still in progress. Phase 1 emit requires explicit override-with-justification.",
+      "First-in-class agonist with cytokine-release signal — MABEL starting dose method strongly recommended; safety factor ≥ 100 advised."
+    ]
+  }
+}

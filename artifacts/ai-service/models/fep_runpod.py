@@ -43,15 +43,113 @@ action and the RunPod-side job_id is recorded in the warning trail).
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
+import tempfile
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 from typing import Optional
 
+import requests as _req
+
 from models import gpu_dispatch
+
+# ── Local GPU execution (GPU_PROVIDER=local) ─────────────────────────────────
+# Used when the backend runs directly on a GPU machine (RunPod Pod, etc.)
+# Runs OpenMM + OpenFF Sage + TIES-MD via subprocess in a temp directory.
+
+RT_KCAL = 0.5922  # k_B * T at 298 K in kcal/mol
+_LOCAL_ENGINE = "OpenMM 8.x + OpenFF Sage 2.2 + TIES-MD (local GPU)"
+_LOCAL_FF     = "openff-2.2.0"
+
+
+def _fetch_pdb(pdb_id: str, dest: Path) -> None:
+    url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
+    r = _req.get(url, timeout=30)
+    r.raise_for_status()
+    dest.write_bytes(r.content)
+
+
+def _smiles_to_mol2(smiles: str, name: str, out: Path) -> None:
+    res = subprocess.run(
+        ["obabel", f"-:{smiles}", "-omol2", f"-O{out}", "--gen3d", f"--title={name}"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"obabel failed: {res.stderr[-500:]}")
+
+
+def _run_fep_locally(payload: dict) -> dict:
+    """Run a TIES-MD FEP calculation directly on the local GPU."""
+    lig_a  = payload["ligand_a_smiles"]
+    lig_b  = payload["ligand_b_smiles"]
+    pdb_id = payload["pdb_id"]
+    n_lam  = int(payload.get("n_lambda_windows", 12))
+    n_rep  = int(payload.get("n_replicas", 3))
+    ns_win = float(payload.get("ns_per_window", 5.0))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+        receptor = work / f"{pdb_id}.pdb"
+        _fetch_pdb(pdb_id, receptor)
+
+        mol_a = work / "lig_a.mol2"
+        mol_b = work / "lig_b.mol2"
+        _smiles_to_mol2(lig_a, "LIG_A", mol_a)
+        _smiles_to_mol2(lig_b, "LIG_B", mol_b)
+
+        out_json = work / "results.json"
+        cmd = [
+            "ties_ana",
+            "--engine", "openmm",
+            "--legs", "bound", "free",
+            "--lambdas", str(n_lam),
+            "--reps",    str(n_rep),
+            "--ns",      str(ns_win),
+            "--lig_a",   str(mol_a),
+            "--lig_b",   str(mol_b),
+            "--protein", str(receptor),
+            "--output",  str(out_json),
+            "--workdir", str(work / "ties_run"),
+        ]
+        t0 = time.time()
+        res = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=int(ns_win * n_lam * n_rep * 600 + 3600),
+        )
+        elapsed = (time.time() - t0) / 60.0
+        if res.returncode != 0:
+            raise RuntimeError(f"TIES-MD failed:\n{res.stderr[-2000:]}")
+        if not out_json.exists():
+            raise RuntimeError("TIES-MD produced no results.json")
+
+        raw = json.loads(out_json.read_text())
+        ddg     = float(raw["ddG"])
+        ddg_err = float(raw.get("ddG_err", raw.get("ddG_uncertainty", 0.0)))
+        windows = [
+            {
+                "lambda":          float(w["lambda"]),
+                "dG_kcal_mol":     float(w["dG"]),
+                "stderr_kcal_mol": float(w.get("err", w.get("stderr", 0.0))),
+            }
+            for w in raw.get("windows", [])
+        ]
+        return {
+            "ddg_kcal_mol":            ddg,
+            "ddg_uncertainty_kcalmol": ddg_err,
+            "ddg_kT":                  ddg / RT_KCAL,
+            "windows":                 windows,
+            "wallclock_minutes":       elapsed,
+            "gpu_minutes":             elapsed,
+            "engine_version":          _LOCAL_ENGINE,
+            "force_field":             _LOCAL_FF,
+            "warnings":                [],
+        }
 
 
 # Poll every 30 s; FEP runs can take many hours.
@@ -197,6 +295,14 @@ def _run_job(
             "n_replicas":       n_replicas,
             "ns_per_window":    ns_per_window,
         }
+
+        # ── LOCAL: run directly on this machine's GPU ──────────────────────
+        if provider == "local":
+            _set(job_id, runpod_job_id="local",
+                 progress="running TIES-MD on local GPU")
+            output = _run_fep_locally(payload)
+            _store_result(job_id, output, "local")
+            return
 
         # 1. Submit — returns an opaque provider_job_id
         provider_job_id = gpu_dispatch.submit(payload, "fep")

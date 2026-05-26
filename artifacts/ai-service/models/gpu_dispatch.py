@@ -4,7 +4,8 @@ GPU job dispatcher — provider-agnostic submit / poll layer.
 All GPU-intensive jobs (FEP, Boltz-2 co-folding) go through this module.
 Pick your provider by setting ONE env var:
 
-    GPU_PROVIDER=runpod    # default — RunPod Serverless
+    GPU_PROVIDER=local     # run directly on this machine's GPU (RunPod Pod, any GPU server)
+    GPU_PROVIDER=runpod    # RunPod Serverless API (separate worker endpoint)
     GPU_PROVIDER=aws       # AWS SageMaker Async Inference
     GPU_PROVIDER=azure     # Azure ML Managed Online Endpoint
 
@@ -27,7 +28,15 @@ import requests
 # Provider selection
 # ---------------------------------------------------------------------------
 
-GPU_PROVIDER: str = os.environ.get("GPU_PROVIDER", "runpod").lower()
+# Auto-detect if CUDA/local GPU is available
+def has_local_gpu() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+GPU_PROVIDER: str = os.environ.get("GPU_PROVIDER", "local" if has_local_gpu() else "runpod").lower()
 HTTP_TIMEOUT: int = 30  # seconds per individual HTTP call
 
 # Map provider_key ("fep" | "boltz") → the env var that holds the endpoint
@@ -83,6 +92,12 @@ def is_configured(provider_key: str) -> tuple[bool, str]:
     Returns:
         (True, "") if ready, or (False, human-readable reason) if not.
     """
+    # local: no credentials needed — just needs GPU on the machine
+    if GPU_PROVIDER == "local":
+        if not has_local_gpu():
+            return False, "Local CUDA/GPU is not available on this machine."
+        return True, ""
+
     if GPU_PROVIDER not in _CRED_ENV:
         return False, (
             f"GPU_PROVIDER={GPU_PROVIDER!r} is not recognised. "
