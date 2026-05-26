@@ -9,7 +9,7 @@ import {
   type FingerprintInfo,
   getRDKitInstance,
 } from "@/lib/chemistry";
-import { runAdmetSimulation, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
+import { runAdmetSimulation, arbitrateGoNogo, type SimResults, type ToxicityAlert, type OrganRisk, type AdmetScores, type BindingEstimate, type LipinskiAnalysis } from "@/lib/admet";
 import { fetchCompoundFromApi, type ApiSource } from "@/lib/apiImport";
 import {
   fetchUniProt, fetchPdbStructure, fetchAlphaFoldFull,
@@ -38,7 +38,8 @@ import { fetchPharmGKB, type PharmGKBResult } from "@/lib/pharmgkb";
 import { fetchDisGeNET, type DisGeNETGeneResult } from "@/lib/disgeNet";
 import { fetchGnomAD, type GnomADResult } from "@/lib/gnomad";
 import { fetchEcotox, type ECOTOXResult } from "@/lib/ecotox";
-import { suggestTargets, convertChEMBLHitsToSuggestions, isValidUniprotAccession, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { suggestTargets, convertChEMBLHitsToSuggestions, convertMlPanelToSuggestions, isValidUniprotAccession, type TargetSuggestion } from "@/lib/targetSuggestion";
+import { predictPolypharmacologyPanel, type MlTargetPrediction } from "@/lib/mlPolypharmacology";
 import { detectPharmacophores } from "@/lib/chemistry";
 import { fetchChEMBLTargets } from "@/lib/chemblTargetLookup";
 import { tierChipClasses, tierLabel, shouldSuppressEstimate } from "@/lib/sourceQuality";
@@ -52,7 +53,7 @@ import {
   freezeL1EvidencePointer,
 } from "@/lib/confirmationEngine";
 import { derivePhase1Defaults, evaluateINDGate, shouldApplyMabelBias } from "@/lib/phase1Planner";
-import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage } from "@workspace/preclinical-handoff";
+import { asEvidencePointer, type ConfirmationEvidenceBlock, type PreClinicalPackageV2_0_0, type PreClinicalPackage, type EvidenceChain, type ChainHash, EMPTY_EVIDENCE_CHAIN, chainHash, shortHash } from "@workspace/preclinical-handoff";
 import type { L2DoseProjection } from "@/lib/l2DoseProjection";
 import { makeL2CacheKey, loadCachedL2, saveCachedL2 } from "@/lib/l2ConfirmationCache";
 import { buildPreClinicalPackage } from "@/lib/preClinicalPackage";
@@ -72,8 +73,17 @@ import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
 import { MolViewer3D_Docking } from "./MolViewer3D_Docking";
 import { ExternalDbPanel } from "@/components/ExternalDbPanel";
+import { PeptideAnalysisPanel } from "@/components/PeptideAnalysisPanel";
+import { AntibodyAnalysisPanel } from "@/components/AntibodyAnalysisPanel";
+import {
+  detectModality, MODALITY_REGISTRY, getModalityMeta,
+  type Modality, type PeptideModification,
+  defaultPeptideModification, estimateModificationImpact,
+} from "@/lib/modalityRouter";
 import { DemoRunner } from "@/components/DemoRunner";
 import { MlAdmetCard } from "@/components/MlAdmetCard";
+import { WetLabAssayCard } from "@/components/WetLabAssayCard";
+import { WetLabReportView } from "@/components/WetLabReportView";
 import {
   predictProtein,
   predictProteinMl,
@@ -83,15 +93,24 @@ import {
   predictBindingMl,
   predictDiliMl,
   predictAdmetMl,
+  predictCardiotox,
+  predictPeptide,
+  predictAntibody,
   type DiliMlResult,
   type MlAdmetResult,
+  type CardiotoxResult,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
   type SolubilityMlResult,
   type AiBindingResult,
   type BindingMlResult,
+  type PeptideResult,
+  type AntibodyResult,
 } from "@/lib/aiService";
+import { parseFasta, validateSequence } from "@/components/PeptideAnalysisPanel";
+import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter";
+import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,6 +139,7 @@ import {
 // Patient Cohort + Trial code is preserved but gated unreachable.
 import { HIDE_PATIENT_TRIAL_LAYERS } from "@/lib/layerArchitecture";
 import { Layer2InSilicoScaffold } from "@/components/Layer2InSilicoScaffold";
+import { Layer2BiologicScaffold } from "@/components/Layer2BiologicScaffold";
 import { Layer3ExVivoScaffold } from "@/components/Layer3ExVivoScaffold";
 import {
   bootstrapIvieInputs, useIvieInputsAutosave,
@@ -158,7 +178,7 @@ export function HakaseAI() {
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
   // L2 Confirmation hosts two sub-tracks: in-silico (existing scaffold) and ex-vivo (existing scaffold).
   const [confirmationSubTrack, setConfirmationSubTrack] = useState<"insilico" | "exvivo">("insilico");
-  // P0 IVIVE wet-lab inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
+  // P0 IVIVE substrate inputs — cross-species fu_p, fu_mic, B/P. Survives reload via localStorage.
   const [ivieInputs, setIvieInputs] = useState(bootstrapIvieInputs);
   useIvieInputsAutosave(ivieInputs);
   // L2 → L3 handoff gate. When true, the IVIVE Output / Animal Cohort Handoff
@@ -185,6 +205,7 @@ export function HakaseAI() {
   });
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [inputPanelOpen, setInputPanelOpen] = useState(true);
   const [lightMode, setLightMode] = useState(false);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer" | "docking">("cinematic");
@@ -203,15 +224,6 @@ export function HakaseAI() {
   const [apiLoading, setApiLoading] = useState(false);
   const [apiResult, setApiResult] = useState<{ name: string; smiles: string; mw: string; sourceId?: string } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [projImportOpen, setProjImportOpen] = useState(false);
-  const [projImportSource, setProjImportSource] = useState("clinicaltrials");
-  const [projImportId, setProjImportId] = useState("");
-  const [projImportLoading, setProjImportLoading] = useState(false);
-  const [projImportResult, setProjImportResult] = useState<{
-    name: string; indication: string; phase: string; sponsor: string;
-    enrollment?: number | null; nctId?: string | null;
-    abstract?: string;
-  } | null>(null);
   // Starter templates that pre-populate the Layer 1 form. They are *not*
   // saved runs — clicking one only loads SMILES / target / indication and
   // resets all simulation results, so we must not display fabricated
@@ -242,6 +254,79 @@ export function HakaseAI() {
       uniprotId: "P01116",
     },
   ]);
+
+  const PEPTIDE_PROJECTS = [
+    {
+      name: "GLP-1 Agonist",
+      indication: "T2DM / Obesity",
+      indicationCode: "E11 - Type 2 diabetes",
+      molName: "HAK-PEP-GLP1",
+      sequence: "HAEGTFTSDVSSYLEGQAAKEFIAWLVKGR",
+      uniprotId: "P43220",
+    },
+    {
+      name: "PTH Analog",
+      indication: "Osteoporosis",
+      indicationCode: "M81 - Osteoporosis",
+      molName: "HAK-PEP-PTH",
+      sequence: "SVSEIQLMHNLGKHLNSMERVEWLRKKLQDVHNF",
+      uniprotId: "P01270",
+    },
+    {
+      name: "Cyclosporin A Analog",
+      indication: "Transplant / Autoimmune",
+      indicationCode: "T86 - Organ transplant rejection",
+      molName: "HAK-PEP-CYCLO",
+      // Cyclosporin A linear representation (11-mer cyclic peptide backbone)
+      sequence: "APAPFIPWFAMF",
+      uniprotId: "P62942",
+    },
+    {
+      name: "Defensin-Like AMP",
+      indication: "Antimicrobial / Wound",
+      indicationCode: "L08 - Anti-infective",
+      molName: "HAK-PEP-DEF1",
+      // Human β-defensin-1 fragment (28-mer, known antimicrobial activity)
+      sequence: "GNFLTGLGHRSDHYNKKICLGNRGIICF",
+      uniprotId: "P60022",
+    },
+  ];
+
+  // Antibody starter templates — real clinically-validated variable domain sequences.
+  // VH/VL are the variable regions only (Fv); full IgG1 constant regions not included.
+  const ANTIBODY_PROJECTS = [
+    {
+      name: "Trastuzumab (HER2)",
+      indication: "Breast Cancer (HER2+)",
+      indicationCode: "C50 – Breast Cancer (HER2+)",
+      molName: "HAK-AB-TRAST",
+      // Trastuzumab (Herceptin) variable domains — FDA-approved, HER2/ERBB2 target
+      vh: "EVQLVESGGGLVQPGGSLRLSCAASGFNIKDTYIHWVRQAPGKGLEWVARIYPTNGYTRYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCSRWGGDGFYAMDYWGQGTLVTVSS",
+      vl: "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
+      uniprotId: "P04626", // ERBB2
+    },
+    {
+      name: "Pembrolizumab (PD-1)",
+      indication: "NSCLC / Melanoma",
+      indicationCode: "C34.1 – Non-small-cell lung carcinoma",
+      molName: "HAK-AB-PEMB",
+      // Pembrolizumab (Keytruda) VH/VL — FDA-approved anti-PD1 checkpoint inhibitor
+      vh: "QVQLVQSGVEVKKPGASVKVSCKASGYTFTNYYMYWVRQAPGQGLEWMGGINPSNGGTNFNEKFKNRVTLTTDSSTTTAYMELKSLQFAVDTAVYYCARRDYRFDMGFDYWGQGTTVTVSS",
+      vl: "EIVLTQSPATLSLSPGERATLSCRASKGVSTSGYSYLHWYQQKPGQAPRLLIYLASYLESGVPARFSGSGSGTDFTLTISSLEPEDFAVYYCQHSRDLPLTFGGGTKVEIK",
+      uniprotId: "Q15116", // PDCD1
+    },
+    {
+      name: "Adalimumab (TNF-α)",
+      indication: "Rheumatoid Arthritis",
+      indicationCode: "M05 – Musculoskeletal inflammation",
+      molName: "HAK-AB-ADA",
+      // Adalimumab (Humira) VH/VL — top-selling anti-TNFα antibody
+      vh: "EVQLVESGGGLVQPGRSLRLSCAASGFTFDDYAMHWVRQAPGKGLEWVSAITWNSGHIDYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCAKVSYLSTASSLDYWGQGTLVTVSS",
+      vl: "DIQMTQSPSTLSASVGDRVTITCRASQSISNYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTEFTLTISSLQPDDFATYYCQQSYSTPPTFGQGTKVEIK",
+      uniprotId: "P01375", // TNF
+    },
+  ];
+
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [pgxOpen, setPgxOpen] = useState(false);
@@ -256,6 +341,36 @@ export function HakaseAI() {
   // empty SMILES short-circuits them. Re-entering a previously analyzed
   // compound rehydrates L2 Confirmation data from localStorage cache (see
   // `l2ConfirmationCache` effects below).
+  //
+  // l1Modality: controls whether Layer 1 operates in small-molecule (SMILES)
+  // mode or peptide (amino-acid sequence) mode. Peptide mode uses a dedicated
+  // property engine (peptide_properties.py) — completely separate from the
+  // RDKit / ADMET-AI / ChEMBL pipeline used for small molecules.
+  const [l1Modality, setL1Modality] = useState<Modality>("small_molecule");
+  useEffect(() => {
+    setSimStatus({
+      1: "idle",
+      2: "idle",
+      3: "idle",
+      4: "idle",
+    });
+    setActiveLayer(1);
+  }, [l1Modality]);
+  const [peptideSequence, setPeptideSequence] = useState("");
+  const [peptideCyclic, setPeptideCyclic] = useState(false);
+  const [peptideLoading, setPeptideLoading] = useState(false);
+  const [peptideError, setPeptideError] = useState<string | null>(null);
+  const [peptideResult, setPeptideResult] = useState<PeptideResult | null>(null);
+  const [peptideL2, setPeptideL2] = useState<PeptideL2Results | null>(null);
+  const [peptideFastaHeader, setPeptideFastaHeader] = useState<string | undefined>(undefined);
+  const [peptideMods, setPeptideMods] = useState<PeptideModification>(defaultPeptideModification());
+  const [showModPanel, setShowModPanel] = useState(false);
+  const [antibodyHeavy, setAntibodyHeavy] = useState("");
+  const [antibodyLight, setAntibodyLight] = useState("");
+  const [antibodyFormatHint, setAntibodyFormatHint] = useState("");
+  const [antibodyLoading, setAntibodyLoading] = useState(false);
+  const [antibodyError, setAntibodyError] = useState<string | null>(null);
+  const [antibodyResult, setAntibodyResult] = useState<AntibodyResult | null>(null);
   const [smiles, setSmiles] = useState("");
   const [activatedSmiles, setActivatedSmiles] = useState("");
   const [molName, setMolName] = useState("");
@@ -355,8 +470,35 @@ export function HakaseAI() {
   const [diliMl, setDiliMl] = useState<DiliMlResult | null>(null);
   const diliMlSeqRef = useRef(0);
   const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
+  const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
-  const [therapeuticArea, setTherapeuticArea] = useState("Oncology");
+  // CardioTox-ML (Wang/Karim 2016 hERG RF) — the dedicated hERG classifier
+  // is preferred over the ADMET-AI hERG head when building the L1 ML overlay
+  // (it's trained specifically on the patch-clamp-anchored Wang dataset).
+  // Cached in HakaseAI state so L1, L2 Stage 4, and the safety-flag engine
+  // share one prediction per SMILES rather than fetching three times.
+  const [cardiotoxMl, setCardiotoxMl] = useState<CardiotoxResult | null>(null);
+  const cardiotoxMlSeqRef = useRef(0);
+  const [solubilityMl, setSolubilityMl] = useState<SolubilityMlResult | null>(null);
+  const solubilityMlSeqRef = useRef(0);
+  // Empty string ("") is the canonical "no therapeutic area selected" value.
+  // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
+  // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
+  // override, no TA-specific off-target panel). This prevents silent
+  // coercion to "Oncology" for off-catalog molecules like α-tocopherol.
+  const [therapeuticArea, setTherapeuticArea] = useState<string>("");
+  // Provenance for therapeuticArea so the UI can honestly show whether the
+  // current value was auto-predicted, manually picked, or simply not yet
+  // determined. Avoids silently presenting any preset as a prediction when
+  // no inference ever ran. Source string is shown to the user.
+  //   "none"     — initial state OR auto-prediction returned nothing usable
+  //   "auto"     — predicted from the top target's curated area
+  //   "manual"   — user picked from the dropdown
+  //   "no-match" — top target found, but its area didn't map to any preset
+  const [taProvenance, setTaProvenance] = useState<{
+    kind: "none" | "auto" | "manual" | "no-match";
+    source?: string;
+  }>({ kind: "none" });
   const [admetOn, setAdmetOn] = useState(true);
   const [bindingOn, setBindingOn] = useState(true);
   const [toxOn, setToxOn] = useState(true);
@@ -489,11 +631,15 @@ export function HakaseAI() {
   const [targetSuggOpen, setTargetSuggOpen] = useState(false);
   const [chemblLookupLoading, setChemblLookupLoading] = useState(false);
   const [chemblSuggestions, setChemblSuggestions] = useState<TargetSuggestion[]>([]);
-  // Raw ChEMBL hits (with measured pIC50 values) — separate from the
-  // UI-shaped TargetSuggestion[] so the in-vitro selectivity engine can
-  // operate on measured ratios instead of pattern-match heuristics.
-  const [chemblHits, setChemblHits] = useState<import("@/lib/chemblTargetLookup").ChEMBLTargetHit[]>([]);
   const chemblLookupRef = useRef<string>("");
+  // ML-predicted polypharmacology panel — only fetched when ChEMBL similarity
+  // returned zero hits AND the molecule is genuinely novel.  Runs Binding-ML
+  // in parallel against a diverse-class DrugCentral shortlist so off-class
+  // scaffolds (anti-oxidants, GPCR ligands, ion-channel modulators) don't
+  // collapse onto kinase-only catalogue suggestions.  Stale-request guard.
+  const [mlPanelSuggestions, setMlPanelSuggestions] = useState<TargetSuggestion[]>([]);
+  const [mlPanelLoading, setMlPanelLoading] = useState(false);
+  const mlPanelRef = useRef<string>("");
   const [chemblCompoundName, setChemblCompoundName] = useState<string | null>(null);
   const [chemblCompoundId, setChemblCompoundId] = useState<string | null>(null);
   const molNameManual = useRef(false);
@@ -530,7 +676,6 @@ export function HakaseAI() {
       // suggestion chips, not silently write a UniProt ID into the field.
       setUniprotId("");
       setChemblSuggestions([]);
-      setChemblHits([]);
       setProteinInfo(null);
       setProteinError(null);
       setAlphafoldData(null);
@@ -543,14 +688,12 @@ export function HakaseAI() {
   useEffect(() => {
     if (!activatedMolProps?.isValid || !activatedSmiles) {
       setChemblSuggestions([]);
-      setChemblHits([]);
       return;
     }
     const currentSmiles = activatedSmiles;
     chemblLookupRef.current = currentSmiles;
     molNameManual.current = false;
     setChemblSuggestions([]);
-    setChemblHits([]);
     setChemblCompoundName(null);
     setChemblCompoundId(null);
     setChemblLookupLoading(true);
@@ -571,20 +714,13 @@ export function HakaseAI() {
           if (result.targets.length > 0) {
             const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
             setChemblSuggestions(converted.length > 0 ? converted : []);
-            // Stash the raw measured hits so the in-vitro selectivity engine
-            // can compute real IC50 ratios rather than the lipophilicity heuristic.
-            setChemblHits(result.targets);
           }
         } else {
           setChemblSuggestions([]);
-          setChemblHits([]);
         }
       })
       .catch(() => {
-        if (chemblLookupRef.current === currentSmiles) {
-          setChemblSuggestions([]);
-          setChemblHits([]);
-        }
+        if (chemblLookupRef.current === currentSmiles) setChemblSuggestions([]);
       })
       .finally(() => {
         if (chemblLookupRef.current === currentSmiles) setChemblLookupLoading(false);
@@ -592,18 +728,77 @@ export function HakaseAI() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activatedSmiles, activatedMolProps?.isValid]);
 
+  // ML-predicted polypharmacology panel — fires ONLY when:
+  //   (a) ChEMBL lookup has returned (we're past loading), AND
+  //   (b) ChEMBL returned zero usable hits, AND
+  //   (c) the pharmacophore catalogue's top hit confidence is < 0.65
+  // This is the "truly novel scaffold" path — when the molecule has no
+  // chemical neighbours in ChEMBL and doesn't trigger the kinase-biased
+  // SMARTS rules strongly, we fall back to a real ML Kd panel against a
+  // diverse DrugCentral shortlist instead of returning canned kinase
+  // suggestions.  Predictions carry applicability-domain banding so the
+  // user sees when a hit is out-of-distribution.
+  useEffect(() => {
+    const sm = activatedSmiles.trim();
+    if (!sm || !activatedMolProps?.isValid) {
+      setMlPanelSuggestions([]);
+      return;
+    }
+    if (chemblLookupLoading) return;  // wait for ChEMBL to settle first
+    if (chemblSuggestions.length > 0) {
+      // ChEMBL had something — no need to ML-panel
+      setMlPanelSuggestions([]);
+      return;
+    }
+    const topHeurConf = heuristicSuggestions.length > 0
+      ? Math.max(...heuristicSuggestions.map(s => s.confidence))
+      : 0;
+    if (topHeurConf >= 0.65) {
+      // Pharmacophore catalogue already gives a strong-confidence hit;
+      // the ML panel would be redundant noise.
+      setMlPanelSuggestions([]);
+      return;
+    }
+    // Novel scaffold path — fire the panel.
+    mlPanelRef.current = sm;
+    setMlPanelLoading(true);
+    predictPolypharmacologyPanel(sm, { minPKd: 5.5, topN: 6 })
+      .then((panel: MlTargetPrediction[]) => {
+        if (mlPanelRef.current !== sm) return;
+        setMlPanelSuggestions(convertMlPanelToSuggestions(panel));
+      })
+      .catch(() => {
+        if (mlPanelRef.current === sm) setMlPanelSuggestions([]);
+      })
+      .finally(() => {
+        if (mlPanelRef.current === sm) setMlPanelLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activatedSmiles, activatedMolProps?.isValid, chemblLookupLoading, chemblSuggestions.length, heuristicSuggestions]);
+
   // Combined suggestion list — fully dynamic, no hard cap.
-  // Order: every ChEMBL hit first (real measured / similarity binding evidence
-  // for THIS molecule), then heuristic catalogue matches that aren't already
-  // surfaced by ChEMBL (deduped by UniProt ID). The heuristic side is already
-  // confidence-filtered upstream by `suggestTargets`, so the combined length
-  // naturally tracks how informative the molecule actually is.
+  // Order:
+  //   1. ChEMBL hits (real measured / similarity binding evidence — top tier)
+  //   2. ML-predicted polypharmacology panel (DeepDTA-GBM against DrugCentral —
+  //      ML tier, surfaces ONLY when ChEMBL was empty + pharmacophore weak)
+  //   3. Pharmacophore catalogue matches (deterministic SMARTS — structural tier)
+  // Deduped by UniProt ID at each merge step so the same target never appears
+  // twice. The heuristic side is already confidence-filtered upstream.
   const targetSuggestions = useMemo<TargetSuggestion[]>(() => {
-    if (chemblSuggestions.length === 0) return heuristicSuggestions;
-    const chemblIds = new Set(chemblSuggestions.map(s => s.uniprotId));
-    const fallbacks = heuristicSuggestions.filter(h => !chemblIds.has(h.uniprotId));
-    return [...chemblSuggestions, ...fallbacks];
-  }, [chemblSuggestions, heuristicSuggestions]);
+    const seen = new Set<string>();
+    const merged: TargetSuggestion[] = [];
+    const push = (list: TargetSuggestion[]) => {
+      for (const s of list) {
+        if (seen.has(s.uniprotId)) continue;
+        seen.add(s.uniprotId);
+        merged.push(s);
+      }
+    };
+    push(chemblSuggestions);
+    push(mlPanelSuggestions);
+    push(heuristicSuggestions);
+    return merged;
+  }, [chemblSuggestions, mlPanelSuggestions, heuristicSuggestions]);
 
   // ── Auto-sync top target suggestion → UniProt field ───────────────────────
   // Per project no-preload policy: auto-mode starts OFF. The Target UniProt ID
@@ -615,11 +810,27 @@ export function HakaseAI() {
   const uniprotManual = useRef(false);
   const [uniprotAutoMode, setUniprotAutoMode] = useState(false);
 
+  // ── Effect 1: TA preset auto-prediction ───────────────────────────────────
+  // Predicts the therapeutic-area preset from the top target suggestion's
+  // annotated `area`. Decoupled from UniProt-ID propagation (Effect 2 below)
+  // so a manual TA selection cannot accidentally suppress UniProt auto-fill.
   useEffect(() => {
-    if (!uniprotAutoMode) return;
-    if (uniprotManual.current) return;
+    if (taProvenance.kind === "manual") return;
     const top = targetSuggestions[0];
-    if (!top) return;
+    if (!top) {
+      // No target suggestions yet — clear TA back to "not selected" instead
+      // of leaving a stale value lingering. Triggered for SMILES the
+      // catalogue can't match (e.g. antioxidants like α-tocopherol — no
+      // kinase/GPCR/NR hit). Downstream engines treat "" as neutral.
+      if (therapeuticArea !== "") setTherapeuticArea("");
+      if (taProvenance.kind !== "none") setTaProvenance({ kind: "none" });
+      return;
+    }
+    // Static map for ambiguous multi-area annotations. Keys are exact strings
+    // produced by targetSuggestion.ts. NOTE: "ChEMBL" intentionally NOT mapped
+    // — letting it silently coerce to Oncology violates the no-fake-data
+    // policy (ChEMBL exact-match without a curated area should fall through
+    // to the regex fallback or be marked no-match).
     const areaMap: Record<string, string> = {
       "Oncology": "Oncology", "Oncology (CML)": "Oncology", "Oncology (Prostate) / Endocrinology": "Oncology",
       "Oncology (Breast) / Endocrinology": "Oncology", "Oncology / Angiogenesis": "Oncology",
@@ -632,24 +843,50 @@ export function HakaseAI() {
       "Hematology / Autoimmune": "Immunology",
       "Infectious Disease / Immunology": "Infectious Disease",
       "Pain / Inflammation": "Immunology",
-      "ChEMBL": "Oncology",
     };
+    const sourceLabel = top.geneName ? `${top.geneName} (${top.uniprotId})` : top.uniprotId;
     const mapped = areaMap[top.area];
-    if (mapped) setTherapeuticArea(mapped);
-    else {
+    if (mapped) {
+      setTherapeuticArea(mapped);
+      setTaProvenance({ kind: "auto", source: sourceLabel });
+    } else {
       const fallback = top.area.split(/\s*[\/·]\s*/)[0].trim();
       const validAreas = ["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"];
       const match = validAreas.find(v => fallback.toLowerCase().startsWith(v.toLowerCase()));
-      if (match) setTherapeuticArea(match);
-    }
-    if (top.uniprotId !== uniprotId && isValidUniprotAccession(top.uniprotId)) {
-      setUniprotId(top.uniprotId);
-      setProteinInfo(null);
-      setProteinError(null);
-      setAlphafoldData(null);
+      if (match) {
+        setTherapeuticArea(match);
+        setTaProvenance({ kind: "auto", source: sourceLabel });
+      } else {
+        // Target found but its area string doesn't map to any of the 7
+        // valid TA presets. Clear TA to "" (not selected) so we don't show
+        // a stale preset that isn't backed by the molecule, and surface the
+        // mismatch in the provenance chip.
+        if (therapeuticArea !== "") setTherapeuticArea("");
+        setTaProvenance({ kind: "no-match", source: `${sourceLabel} → "${top.area}"` });
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions]);
+
+  // ── Effect 2: UniProt ID auto-propagation ─────────────────────────────────
+  // Strictly gated by `uniprotAutoMode` (the explicit "Auto-match" toggle)
+  // and `uniprotManual.current` (set when the user types/picks a UniProt).
+  // Independent of TA-prediction state so a manual TA selection cannot block
+  // UniProt fill. Re-runs when the toggle flips so enabling auto-mode after
+  // suggestions arrive still triggers propagation.
+  useEffect(() => {
+    if (!uniprotAutoMode) return;
+    if (uniprotManual.current) return;
+    const top = targetSuggestions[0];
+    if (!top) return;
+    if (top.uniprotId === uniprotId) return;
+    if (!isValidUniprotAccession(top.uniprotId)) return;
+    setUniprotId(top.uniprotId);
+    setProteinInfo(null);
+    setProteinError(null);
+    setAlphafoldData(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSuggestions, uniprotAutoMode]);
   // ─────────────────────────────────────────────────────────────────────
 
   // ── UniProt explicit fetch ─────────────────────────────────────────────────
@@ -915,42 +1152,138 @@ export function HakaseAI() {
 
   const [simResults,    setSimResults]    = useState<SimResults | null>(null);
   const [inVitroResults, setInVitroResults] = useState<InVitroResults | null>(null);
-  // When ChEMBL hits arrive AFTER the in-vitro sim has already produced a
-  // heuristic selectivity panel, recompute selectivity from the measured
-  // ratios and patch the result in place — same shape, real data.
-  useEffect(() => {
-    if (!inVitroResults || chemblHits.length === 0) return;
-    // Skip if selectivity is already chembl-measured to avoid loops.
-    if (inVitroResults.selectivity.dataSource === "chembl_measured") return;
-    // Defer to next tick so the import isn't pulled at top-level type cycle.
-    import("@/lib/chemblSelectivity").then(({ computeChEMBLSelectivity }) => {
-      const sel = computeChEMBLSelectivity(uniprotId, chemblHits);
-      if (!sel.dataAvailable) return;
-      setInVitroResults((prev) => prev ? {
-        ...prev,
-        selectivity: {
-          ...prev.selectivity,
-          kinaseSelectivityScore: sel.selectivityScore,
-          offTargetHits: sel.offTargetHits,
-          totalTargetsTested: sel.totalTargetsTested,
-          selectivityClass: sel.selectivityClass,
-          topOffTargets: sel.topOffTargets.map(o => ({
-            name: o.name,
-            ic50_nM: o.ic50_nM,
-            selectivityRatio: o.selectivityRatio,
-            uniprotId: o.uniprotId,
-            similarityPct: o.similarityPct,
-            fromSimilarity: o.fromSimilarity,
-          })),
-          dataSource: "chembl_measured",
-          rationale: sel.rationale,
-        },
-      } : prev);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chemblHits, inVitroResults?.selectivity.dataSource, uniprotId]);
   const [cohortResults, setCohortResults] = useState<CohortResults | null>(null);
   const [trialResults,  setTrialResults]  = useState<TrialResults | null>(null);
+
+  const [offTargetScreenRun, setOffTargetScreenRun] = useState(false);
+  const [runningSelectivityScreen, setRunningSelectivityScreen] = useState(false);
+
+  // Stale-results guard: when the user edits the SMILES away from the value
+  // the L1 simulation was computed for, clear simResults / inVitroResults so
+  // the Directional ADMET radar, organ-risk panels, and dose-response curve
+  // stop showing numbers from the previous compound while the live Lipinski
+  // card (which is recomputed from molProps on every keystroke) shows the new
+  // one. Without this, the radar looks "hardcoded" because it never updates
+  // until the user explicitly clicks Run.
+  useEffect(() => {
+    const current = smiles.trim();
+    if (simResults && simResults.smiles.trim() !== current) {
+      setSimResults(null);
+      setInVitroResults(null);
+      setOffTargetScreenRun(false);
+    }
+  }, [smiles, simResults]);
+
+  const handleRunOffTargetScreen = () => {
+    if (!molProps || !smiles || !uniprotId) return;
+    setRunningSelectivityScreen(true);
+    setTimeout(() => {
+      setOffTargetScreenRun(true);
+      setRunningSelectivityScreen(false);
+      
+      const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+      const targetConfidence = matchedSuggestion?.confidence ?? null;
+      const ivResults = runInVitroSimulation(
+        molProps,
+        smiles,
+        uniprotId,
+        therapeuticArea,
+        true,
+        targetConfidence,
+        bindingMl?.prediction?.Kd_nM ?? null,
+        mlOverlay,
+      );
+      setInVitroResults(ivResults);
+    }, 1200);
+  };
+
+  // ── Evidence Hash Chain (May 2026) ──────────────────────────────────────
+  // Tamper-evident SHA-256 chain across L1 → L2 → IVIVE → L3 → L4. Each
+  // stage's hash folds the previous hash into its input, so any post-hoc
+  // edit to an upstream block invalidates every downstream hash. Surfaced
+  // as 8-char badges on the stepper. See lib/preclinical-handoff/hashChain.ts.
+  //
+  // L1 → L3 are recomputed reactively here from in-state payloads. L4 is
+  // computed in `FirstInHumanPanel` (where the v1 PreClinicalPackage is
+  // built via useMemo) and reported back via `onL4HashChange` so the
+  // upstream chain anchors what the planner actually consumed.
+  //
+  // A monotonically incrementing token prevents an older recomputation from
+  // overwriting a newer one (mirrors the L1 ML stale-request guard pattern).
+  // On hash failure the chain is set to all-null and `chainError` carries
+  // the failure reason — we surface invalidity rather than silently retain
+  // stale hashes (anti-fabrication invariant).
+  const [evidenceChain, setEvidenceChain] = useState<EvidenceChain>(EMPTY_EVIDENCE_CHAIN);
+  // Two error channels so an upstream success doesn't clobber an L4 failure
+  // and vice versa. The stepper surfaces whichever is non-null (L4 takes
+  // precedence because a broken L4 means the bundle can't be exported).
+  const [chainErrorUpstream, setChainErrorUpstream] = useState<string | null>(null);
+  const [chainErrorL4, setChainErrorL4] = useState<string | null>(null);
+  const chainError = chainErrorL4 ?? chainErrorUpstream;
+  const evidenceChainTokenRef = useRef(0);
+  useEffect(() => {
+    const token = ++evidenceChainTokenRef.current;
+    let cancelled = false;
+    void (async () => {
+      try {
+        let l1: ChainHash | null = null;
+        let l2: ChainHash | null = null;
+        let ivive: ChainHash | null = null;
+        let l3: ChainHash | null = null;
+        if (simResults || inVitroResults) {
+          l1 = await chainHash(null, { simResults, inVitroResults });
+        }
+        if (l1 && confirmationBlock) {
+          l2 = await chainHash(l1, confirmationBlock);
+        }
+        if (l2 && iviveHandoffSignOff) {
+          ivive = await chainHash(l2, iviveHandoffSignOff);
+        }
+        if (ivive && animalResults) {
+          l3 = await chainHash(ivive, animalResults);
+        }
+        if (cancelled || token !== evidenceChainTokenRef.current) return;
+        setChainErrorUpstream(null);
+        setEvidenceChain((prev) => {
+          // L4 invalidation is parent-authoritative: any change to L3 (incl.
+          // a numerically different non-null hash) MUST null the L4 hash so
+          // a stale L4 cannot survive an upstream rebuild while the user is
+          // off Layer 4 (the child effect that owns L4 only runs when the
+          // panel is mounted). The child will recompute on next mount/run.
+          const l4 = l3 && prev.l3 === l3 ? prev.l4 : null;
+          if (prev.l1 === l1 && prev.l2 === l2 && prev.ivive === ivive && prev.l3 === l3 && prev.l4 === l4) {
+            return prev;
+          }
+          // Parent-authoritative L4 invalidation also clears any stale L4
+          // error: if the L3 anchor changed, the child's prior failure no
+          // longer describes the current state.
+          if (l4 === null) setChainErrorL4(null);
+          return { schemaVersion: prev.schemaVersion, l1, l2, ivive, l3, l4 };
+        });
+      } catch (err) {
+        if (cancelled || token !== evidenceChainTokenRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("[evidenceChain] hash recomputation failed", err);
+        // Fail loud, not silent: clear the upstream chain so a stale
+        // tamper-evident hash isn't left visible after canonicalization
+        // rejected the input. L4 follows automatically (depends on L3).
+        setChainErrorUpstream(`Evidence chain unavailable — ${msg}`);
+        setEvidenceChain(EMPTY_EVIDENCE_CHAIN);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [simResults, inVitroResults, confirmationBlock, iviveHandoffSignOff, animalResults]);
+
+  // L4 hash is reported by FirstInHumanPanel (which owns the package useMemo).
+  // Stable callback so the child's effect doesn't re-fire on every parent render.
+  const reportL4Hash = useCallback((l4: ChainHash | null) => {
+    setEvidenceChain((prev) => (prev.l4 === l4 ? prev : { ...prev, l4 }));
+  }, []);
+  const reportL4Error = useCallback((msg: string | null) => {
+    setChainErrorL4((prev) => (prev === msg ? prev : msg));
+  }, []);
 
   // ── Cascade gate (L1 → L2) ───────────────────────────────────────────────
   // Auto-cascade is permitted only when:
@@ -968,17 +1301,57 @@ export function HakaseAI() {
     if (!sm || !rdkitReady || !molProps?.isValid) {
       setDiliMl(null);
       setAdmetMl(null);
+      setAdmetMlError(null);
+      setCardiotoxMl(null);
+      setSolubilityMl(null);
       return;
     }
     const seqDili = ++diliMlSeqRef.current;
     const seqAdmet = ++admetMlSeqRef.current;
+    const seqCardio = ++cardiotoxMlSeqRef.current;
+    const seqSol = ++solubilityMlSeqRef.current;
+    setAdmetMlError(null);
     predictDiliMl(sm)
       .then(r => { if (diliMlSeqRef.current === seqDili) setDiliMl(r); })
       .catch(() => { if (diliMlSeqRef.current === seqDili) setDiliMl(null); });
     predictAdmetMl(sm)
-      .then(r => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(r); })
-      .catch(() => { if (admetMlSeqRef.current === seqAdmet) setAdmetMl(null); });
+      .then(r => { if (admetMlSeqRef.current === seqAdmet) { setAdmetMl(r); setAdmetMlError(null); } })
+      .catch(e => {
+        if (admetMlSeqRef.current === seqAdmet) {
+          setAdmetMl(null);
+          setAdmetMlError(e instanceof Error ? e.message : String(e));
+        }
+      });
+    // CardioTox-ML — dedicated hERG RF; preferred over ADMET-AI hERG head
+    // when building the overlay (Wang/Karim 2016 patch-clamp-anchored).
+    predictCardiotox(sm)
+      .then(r => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(r); })
+      .catch(() => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(null); });
+    // Solubility-ML — surfaces logS for the ADMET panel; also feeds L2 PBPK
+    // dissolution. Silent fail leaves overlay's logS null (heuristic only).
+    predictSolubilityMl(sm)
+      .then(r => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(r); })
+      .catch(() => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(null); });
   }, [smiles, rdkitReady, molProps?.isValid]);
+
+  // ── ML overlay — single source of truth for L1 ML signals ──────────────
+  // Builds an `MlOverlay` once from all the cached ML responses; L1
+  // (runAdmetSimulation, runInVitroSimulation) consumes it instead of
+  // running the heuristic fallback when ML is available. The overlay is
+  // also passed into the cascade gate via SimResults/InVitroResults
+  // provenance, so the gate stops marking outputs as heuristic the moment
+  // L1 actually used ML. Stale/loading entries that are NOT `source === "ml"`
+  // are silently dropped by buildMlOverlay (NO silent coercion policy).
+  const mlOverlay = useMemo(
+    () => buildMlOverlay({
+      admet: admetMl,
+      cardiotox: cardiotoxMl,
+      dili: diliMl,
+      binding: bindingMl,
+      solubility: solubilityMl,
+    }),
+    [admetMl, cardiotoxMl, diliMl, bindingMl, solubilityMl],
+  );
 
   const cascadeGate = useMemo(
     () => {
@@ -998,11 +1371,63 @@ export function HakaseAI() {
         };
       }
       if (admetMl && admetMl.source === "ml" && admetMl.ml_available) {
-        const eng = admetMl.model_info?.engine ?? "Chemprop ADMET";
-        overrides.absorption_admet = {
-          available: true,
-          note: `ML — ${eng}; Caco-2 + HIA + bioavailability heads`,
-        };
+        const eng = admetMl.model_info?.engine ?? "ADMET-AI v2";
+        const sx = admetMl.structured;
+        // Strict numeric guard: reject null, undefined, strings, NaN, and ±Inf.
+        // A malformed ML payload must NOT silently upgrade the quality tier
+        // (project policy: NO silent coercion).
+        const finite = (v: unknown): boolean =>
+          typeof v === "number" && Number.isFinite(v);
+        const finiteHits = (bucket: Record<string, { value: unknown } | undefined> | undefined) =>
+          Object.values(bucket ?? {}).filter(e => finite(e?.value)).length;
+
+        // ADMET-AI absorption bucket → absorption_admet (non-safety, partial OK).
+        const absHits = finiteHits(sx.absorption);
+        if (absHits > 0) {
+          overrides.absorption_admet = {
+            available: true,
+            note: `ML — ${eng}; Caco-2 + HIA + P-gp + bioavailability heads (${absHits} endpoints)`,
+          };
+        }
+        // ADMET-AI toxicity.hERG → hERG (substitute for hard-rule logP heuristic).
+        // SAFETY_KEY — single endpoint, finite probability required.
+        const hergVal = sx.toxicity?.hERG?.value;
+        if (finite(hergVal)) {
+          overrides.hERG = {
+            available: true,
+            note: `ML — ${eng} hERG channel blockade head; p(blocker)=${(hergVal as number).toFixed(2)}`,
+          };
+        }
+        // ADMET-AI metabolism (CYP1A2/2C9/2C19/2D6/3A4_Veith) → cyp_panel.
+        // SAFETY_KEY: require ALL FIVE isoforms present and finite before
+        // upgrading. Partial CYP coverage is not sufficient evidence to flip
+        // a safety-critical tier (per architect review).
+        const REQUIRED_CYP = ["CYP1A2_Veith", "CYP2C9_Veith", "CYP2C19_Veith", "CYP2D6_Veith", "CYP3A4_Veith"];
+        const cypBucket = sx.metabolism ?? {};
+        const cypPresent = REQUIRED_CYP.filter(k => finite(cypBucket[k]?.value)).length;
+        if (cypPresent === REQUIRED_CYP.length) {
+          overrides.cyp_panel = {
+            available: true,
+            note: `ML — ${eng}; full 5-isoform CYP inhibition panel (Veith dataset: 1A2/2C9/2C19/2D6/3A4)`,
+          };
+        }
+        // ADMET-AI distribution (BBB/PPBR/VDss) → distribution_admet (non-safety).
+        const distHits = finiteHits(sx.distribution);
+        if (distHits > 0) {
+          overrides.distribution_admet = {
+            available: true,
+            note: `ML — ${eng}; BBB_Martins + PPBR_AZ + VDss_Lombardo heads (${distHits} endpoints)`,
+          };
+        }
+        // ADMET-AI excretion (Clearance/Half_Life) → metabolism_admet (non-safety).
+        // (UI naming: "metabolism_admet" covers downstream PK clearance signals.)
+        const exHits = finiteHits(sx.excretion);
+        if (exHits > 0) {
+          overrides.metabolism_admet = {
+            available: true,
+            note: `ML — ${eng}; Clearance_Hepatocyte_AZ + Half_Life_Obach heads (${exHits} endpoints)`,
+          };
+        }
       }
       if (bindingMl && bindingMl.source === "ml" && bindingMl.prediction.pKd_predicted !== null) {
         const tr = bindingMl.model_info?.training;
@@ -1014,11 +1439,50 @@ export function HakaseAI() {
           note: `ML — ${cite}; pKd=${bindingMl.prediction.pKd_predicted.toFixed(2)}`,
         };
       }
-      return evaluateCascadeGate(simResults, targetSuggestions, overrides);
+      return evaluateCascadeGate(simResults, targetSuggestions, overrides, inVitroResults);
     },
-    [simResults, targetSuggestions, diliMl, admetMl, bindingMl],
+    [simResults, targetSuggestions, diliMl, admetMl, bindingMl, inVitroResults],
   );
   const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
+
+  // ── ML overlay upgrade effect ─────────────────────────────────────────────
+  // Handles the race condition where the user clicks Run before the async ML
+  // predictions (predictAdmetMl, predictCardiotox, predictDiliMl) have resolved.
+  // In that case runAdmetSimulation runs with an all-null overlay (pure heuristic),
+  // but simResults.mlEnhanced is false. When ML data arrives later mlOverlay
+  // updates (via useMemo), and this effect detects the upgrade opportunity:
+  //   1. simResults exists but was computed without ML (mlEnhanced === false)
+  //   2. mlOverlay now has at least one non-null ML field
+  // → Re-run both L1 sims so the displayed ADMET, hERG, CYP, and toxicity
+  //   outputs reflect the real ML predictions rather than the heuristic fallback.
+  // Guard: after the upgrade simResults.mlEnhanced becomes true, so the effect
+  // is a one-shot per compound (won't re-fire unless the SMILES changes).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!simResults || simResults.mlEnhanced) return;    // already ML or not run
+    if (!overlayHasAnyMl(mlOverlay)) return;             // ML still loading
+    if (!molProps?.isValid) return;
+    const upgraded = runAdmetSimulation(
+      molProps, smiles, molName || "Unnamed Molecule",
+      uniprotId, therapeuticArea,
+      bindingMl?.prediction?.Kd_nM ?? null,
+      mlOverlay,
+    );
+    setSimResults(upgraded);
+    const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+    const targetConfidence = matchedSuggestion?.confidence ?? null;
+    const ivUpgraded = runInVitroSimulation(
+      molProps, smiles, uniprotId, therapeuticArea,
+      offTargetScreenRun, targetConfidence,
+      bindingMl?.prediction?.Kd_nM ?? null,
+      mlOverlay,
+    );
+    setInVitroResults(ivUpgraded);
+  // Intentional: only mlOverlay in the dep array. We want exactly one
+  // re-run when ML data arrives — not on every other state change.
+  // The simResults.mlEnhanced guard prevents a second fire.
+  }, [mlOverlay]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Inline override form state — replaces window.prompt() which is silently
   // blocked inside sandboxed preview iframes (returns null with no UI).
   const [overrideFormOpen, setOverrideFormOpen] = useState(false);
@@ -1037,7 +1501,11 @@ export function HakaseAI() {
     const abs = simResults.admet.absorption;
     const logP = simResults.lipinski.logP;
     const mw = simResults.lipinski.mw;
-    const goNogo = simResults.goNogo;
+    // Use arbitrated Go/No-Go when in-vitro results are available; fall back to
+    // ADMET-only goNogo otherwise (inVitroResults may not be computed yet).
+    const goNogo = inVitroResults
+      ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
+      : simResults.goNogo;
 
     if (!l2ManualOverride.current.species) {
       if (tox > 0.6) setAnimalSpecies("dog_beagle");
@@ -1065,7 +1533,7 @@ export function HakaseAI() {
     l2ManualOverride.current = { species: false, study: false, route: false, formulation: false };
     setL2AutoConfigured(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simResults]);
+  }, [simResults, inVitroResults]);
 
   const [haIOpsCtx, setHAIOpsCtx] = useState<HAIOpsContext>(createHAIOpsContext());
   const safetyFlags = haIOpsCtx.flags;
@@ -1356,7 +1824,27 @@ export function HakaseAI() {
   }, [savedProjects]);
 
   const runSimulation = useCallback(async () => {
-    if (!molProps?.isValid) return;
+    // Guard: invalid SMILES previously bailed silently, leaving stale
+    // simResults from the prior compound. The Directional ADMET radar then
+    // looked "hardcoded" because the user had no signal that the run never
+    // executed. Surface an explicit alert so the failure is visible, and
+    // clear stale L1 outputs so downstream panels don't show numbers from
+    // the previous molecule.
+    if (!molProps?.isValid) {
+      // Only alert once RDKit has actually rejected the SMILES (molProps !== null
+      // and isValid === false). While molProps is null we're still in the 250 ms
+      // debounce window — bail silently rather than flash a false-positive error.
+      if (smiles.trim().length > 0 && molProps && molProps.isValid === false) {
+        setSimResults(null);
+        setInVitroResults(null);
+        alert(
+          "SMILES is invalid — RDKit could not parse this structure.\n\n" +
+          "Check the notation (valences, ring closures, aromaticity) and try again. " +
+          "The Directional ADMET radar and other L1 panels will stay empty until a valid SMILES is provided."
+        );
+      }
+      return;
+    }
 
     setSidebarOpen(false);
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
@@ -1375,7 +1863,7 @@ export function HakaseAI() {
     // slot index moved. All `4` literals in flag/provenance writes below are
     // remapped to `3` to match the new slot.
     if (activeLayer === 3) {
-      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+      const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
       const seedStr = layer1.smiles + animalSpecies + animalStudyType;
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1384,6 +1872,20 @@ export function HakaseAI() {
         setSimProgress(Math.min(99, (tick / steps) * 100));
         if (tick >= steps) {
           clearInterval(interval2);
+          // RF#1 / §9 step 1 (code-review fix): enforce the binding
+          // precondition at the call site so the user gets an actionable
+          // banner instead of an opaque thrown error. Animal sim cannot
+          // back-calculate a therapeutic dose without an on-target IC50.
+          if (!layer1.binding) {
+            setSimProgress(0);
+            setSimStatus(prev => ({ ...prev, 4: "idle" }));
+            alert(
+              "Animal cohort simulation requires a validated on-target binding estimate.\n\n" +
+              "L1 returned binding=null because the selected UniProt is not in the validated catalog. " +
+              "Pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK) before advancing to L4 animal."
+            );
+            return;
+          }
           const results = runAnimalCohortSimulation(layer1, animalSpecies, animalStudyType, animalRoute, animalFormulation, seedH);
           setAnimalResults(results);
           // computeLayer2Flags is named for the legacy slot index; under the
@@ -1500,7 +2002,7 @@ export function HakaseAI() {
     if (!HIDE_PATIENT_TRIAL_LAYERS && false && activeLayer === 3) {
       // Dead code (HIDE_PATIENT_TRIAL_LAYERS=true keeps `false &&` unreachable);
       // non-null assertions satisfy TS without affecting runtime behaviour.
-      const layer1 = simResults ?? runAdmetSimulation(molProps!, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+      const layer1 = simResults ?? runAdmetSimulation(molProps!, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null);
       const seedStr = layer1.smiles + String(cohortSize[0]);
       let seedH = 0;
       for (let i = 0; i < seedStr.length; i++) seedH = (seedH * 31 + seedStr.charCodeAt(i)) >>> 0;
@@ -1576,7 +2078,7 @@ export function HakaseAI() {
         clearInterval(interval);
 
         if (activeLayer === 1) {
-          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
 
           if (fingerprintOn && tissueTypes.length > 0) {
             const tissueOrganMap: Record<string, string> = {
@@ -1596,16 +2098,19 @@ export function HakaseAI() {
           }
 
           setSimResults(results);
-          // Forward measured ChEMBL hits so the selectivity panel uses real
-          // IC50 ratios when the data is already loaded. If chemblHits is
-          // still empty (lookup in flight), the sim falls back to the heuristic
-          // panel and a follow-up effect will re-run the sim once data arrives.
-          const ivResults = runInVitroSimulation(
-            molProps, smiles, uniprotId, therapeuticArea,
-            chemblHits.length > 0 ? chemblHits : undefined,
-          );
+          // Look up the auto-match confidence for the chosen UniProt so the
+          // simulator can treat any High-confidence (≥ 0.65) suggestion as
+          // a validated target for dose-response generation — not just the
+          // hard-coded allow-list. Falls back to null when no suggestion
+          // matches (e.g. user typed an arbitrary UniProt manually).
+          const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+          const targetConfidence = matchedSuggestion?.confidence ?? null;
+          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, offTargetScreenRun, targetConfidence, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
           setInVitroResults(ivResults);
-          const l1Flags = computeLayer1Flags(ivResults);
+          // Pass structural alert result from the L1 ADMET simulation so that
+          // computeLayer1Flags can prepend PAINS / Brenk / Ames-ICH safety
+          // flags to the HAIOps panel. `simResults` is in state at this point.
+          const l1Flags = computeLayer1Flags(ivResults, simResults?.structuralAlerts ?? null);
           const prov1 = createProvenance("inVitroSim.ts", "browser", smiles);
           prov1.databaseQueries = [
             { database: "RDKit.js", status: "success", version: "2024.03.5", resultCount: 1 },
@@ -1641,7 +2146,7 @@ export function HakaseAI() {
           // redesign. Trial design moved out of pre-clinical scope into
           // Hakase Clinical. The new L4 slot is Animal Cohort (handled by
           // the relocated runner above at `if (activeLayer === 4)`).
-          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea);
+          const layer1 = simResults ?? runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
           const l2pkFallback: L2PkOverrides | undefined = animalResults ? {
             bioavailF:       animalResults.formulationResult.formulatedF,
             humanHalfLifeHr: animalResults.humanHalfLife,
@@ -1701,6 +2206,106 @@ export function HakaseAI() {
       bindingOn, toxOn, fingerprintOn, tissueTypes,
       procovaEnabled, procovaVarManual, procovaVarReduction, procovaRatio, primaryEndpointType]);
 
+  // ── Auto-detect modality on paste ────────────────────────────────────────────
+  // When user pastes text into the SMILES input that looks like a peptide
+  // sequence (or vice versa), auto-switch the modality selector.
+  const handleSmartInput = useCallback((raw: string) => {
+    const det = detectModality(raw);
+    if (det.modality === "peptide" && det.confidence >= 0.70 && l1Modality !== "peptide") {
+      setL1Modality("peptide");
+      setPeptideSequence(raw.replace(/\s+/g, "").toUpperCase());
+      setSmiles("");
+    } else if (det.modality === "small_molecule" && det.confidence >= 0.70 && l1Modality !== "small_molecule") {
+      setL1Modality("small_molecule");
+      setSmiles(raw);
+      setPeptideSequence("");
+    } else if (l1Modality === "small_molecule") {
+      setSmiles(raw);
+    } else {
+      setPeptideSequence(raw.replace(/\s+/g, "").toUpperCase());
+    }
+  }, [l1Modality]);
+
+  // ── Peptide analysis runner ──────────────────────────────────────────────────
+  // Lifted from PeptideAnalysisPanel so the "Run" trigger lives in the left
+  // sidebar (consistent with the small-molecule flow) while the right panel
+  // stays dedicated to rendering results.
+  const runPeptideSimulation = useCallback(async () => {
+    const v = validateSequence(peptideSequence);
+    if (!v.ok) return;
+    setPeptideLoading(true);
+    setPeptideError(null);
+    setPeptideResult(null);
+    setSimProgress(0);
+    setSimStatus(prev => ({ ...prev, 1: "running" }));
+
+    let tick = 0;
+    const steps = 6;
+    const interval = setInterval(() => {
+      tick++;
+      setSimProgress(Math.min(99, (tick / steps) * 100));
+    }, 150);
+
+    try {
+      const res = await predictPeptide(peptideSequence, peptideCyclic);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      clearInterval(interval);
+      setSimProgress(100);
+      setPeptideResult(res);
+      // Bridge L1 peptide results into L2-compatible format
+      const l2 = preparePeptideL2(res, uniprotId, peptideMods);
+      setPeptideL2(l2);
+      // Unlock Layer 2 — a completed biologic L1 advances the layer stepper
+      // exactly like a small-molecule run does, so the Confirmation tab and
+      // the "Continue to Confirmation" handoff become reachable.
+      setSimStatus(prev => ({ ...prev, 1: "complete" }));
+    } catch (e: any) {
+      clearInterval(interval);
+      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+      setPeptideError(e?.message ?? "Peptide analysis failed");
+    } finally {
+      setPeptideLoading(false);
+    }
+  }, [peptideSequence, peptideCyclic, uniprotId, peptideMods]);
+
+  const runAntibodyAnalysis = useCallback(async () => {
+    const cleanSeq = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+    const h = cleanSeq(antibodyHeavy);
+    const l = cleanSeq(antibodyLight);
+    if (h.length < 70) {
+      setAntibodyError("Heavy / VHH chain must be at least 70 residues.");
+      return;
+    }
+    setAntibodyLoading(true);
+    setAntibodyError(null);
+    setAntibodyResult(null);
+    setSimProgress(0);
+    setSimStatus(prev => ({ ...prev, 1: "running" }));
+
+    let tick = 0;
+    const steps = 6;
+    const interval = setInterval(() => {
+      tick++;
+      setSimProgress(Math.min(99, (tick / steps) * 100));
+    }, 150);
+
+    try {
+      const res = await predictAntibody(h, l || undefined, antibodyFormatHint || undefined);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      clearInterval(interval);
+      setSimProgress(100);
+      setAntibodyResult(res);
+      // Unlock Layer 2 — completed antibody L1 advances the layer stepper.
+      setSimStatus(prev => ({ ...prev, 1: "complete" }));
+    } catch (e: any) {
+      clearInterval(interval);
+      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+      setAntibodyError(e?.message ?? "Antibody analysis failed");
+    } finally {
+      setAntibodyLoading(false);
+    }
+  }, [antibodyHeavy, antibodyLight, antibodyFormatHint]);
+
   const handleDiagenFetch = useCallback(() => {
     if (!diagenJobId.trim()) return;
     setDiagenLoading(true);
@@ -1747,91 +2352,6 @@ export function HakaseAI() {
       setDiagenLoading(false);
     }, delay);
   }, [diagenJobId, diagenMode]);
-
-  const handleProjFetch = useCallback(async () => {
-    const id = projImportId.trim();
-    if (!id) return;
-    setProjImportLoading(true);
-    setProjImportResult(null);
-
-    function ctgParsePhase(phases: string[] | string | null | undefined): string {
-      if (!phases) return "Unknown";
-      const arr = Array.isArray(phases) ? phases : [phases];
-      const p = arr[0] ?? "";
-      return p.replace(/^PHASE_?/i, "Phase ").replace(/_/g, " ").trim() || "Unknown";
-    }
-
-    try {
-      if (projImportSource === "clinicaltrials") {
-        // ── ClinicalTrials.gov v2 API — fetch by NCT ID ──────────────────────
-        const nctId = id.toUpperCase().replace(/\s/g, "");
-        const res = await fetch(
-          `https://clinicaltrials.gov/api/v2/studies/${nctId}?format=json`,
-        );
-        if (!res.ok) throw new Error(`Study ${nctId} not found on ClinicalTrials.gov (${res.status})`);
-        const data = await res.json();
-        const ps = data.protocolSection ?? {};
-        const id_mod   = ps.identificationModule ?? {};
-        const cond_mod = ps.conditionsModule ?? {};
-        const des_mod  = ps.designModule ?? {};
-        const spon_mod = ps.sponsorCollaboratorsModule ?? {};
-        setProjImportResult({
-          name:       id_mod.briefTitle ?? nctId,
-          indication: (cond_mod.conditions ?? [])[0] ?? "Unknown",
-          phase:      ctgParsePhase(des_mod.phases),
-          sponsor:    spon_mod.leadSponsor?.name ?? "Unknown",
-          enrollment: des_mod.enrollmentInfo?.count ?? null,
-          nctId,
-        });
-
-      } else if (projImportSource === "pubmed") {
-        // ── NCBI E-utilities — fetch PubMed article by PMID ─────────────────
-        const pmid = id.replace(/\D/g, "");
-        if (!pmid) throw new Error("Enter a valid PubMed ID (numbers only)");
-        const res = await fetch(
-          `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmid}&retmode=json`,
-        );
-        if (!res.ok) throw new Error(`PubMed: failed to fetch PMID ${pmid} (${res.status})`);
-        const data = await res.json();
-        const article = (data.result ?? {})[pmid] as Record<string, any> | undefined;
-        if (!article || article.error) throw new Error(`PubMed: article ${pmid} not found`);
-        const firstAuthor = (article.authors as any[])?.[0]?.name ?? "Unknown";
-        setProjImportResult({
-          name:       article.title ?? `PubMed PMID ${pmid}`,
-          indication: article.source ?? "Journal Article",
-          phase:      "Literature",
-          sponsor:    `${firstAuthor} · ${article.source ?? ""}`,
-          abstract:   article.sortpubdate ?? undefined,
-        });
-
-      } else if (projImportSource === "ehr") {
-        // EHR/Epic — simulated (requires institutional OAuth integration)
-        await new Promise(r => setTimeout(r, 600));
-        const mock: Record<string, { name: string; indication: string; phase: string; sponsor: string; enrollment: number }> = {
-          "pat-001":   { name: "EGFR-T790M Cohort",      indication: "Non-small-cell lung carcinoma", phase: "Real-World Evidence", sponsor: "Internal EHR",  enrollment: 142 },
-          "pat-002":   { name: "HER2+ Breast Cohort",    indication: "Breast Cancer (HER2+)",         phase: "Real-World Evidence", sponsor: "Internal EHR",  enrollment: 87 },
-          "study-007": { name: "GI Toxicity Assessment", indication: "Colorectal Cancer",             phase: "Observational",       sponsor: "Site LIMS",     enrollment: 63 },
-        };
-        const hit = mock[id.toLowerCase()];
-        setProjImportResult(hit ?? { name: `EHR Study ${id.toUpperCase()}`, indication: "Oncology", phase: "Real-World Evidence", sponsor: "EHR Import" });
-
-      } else {
-        // LIMS — simulated (requires institutional API key)
-        await new Promise(r => setTimeout(r, 600));
-        const mock: Record<string, { name: string; indication: string; phase: string; sponsor: string; enrollment: number }> = {
-          "lims-2024-001": { name: "Compound Library Screen A", indication: "Oncology",         phase: "Pre-clinical", sponsor: "Internal R&D",  enrollment: 0 },
-          "lims-2024-012": { name: "ADMET Panel Q1-2024",       indication: "Multiple targets", phase: "Pre-clinical", sponsor: "DMPK Dept.",    enrollment: 0 },
-        };
-        const hit = mock[id.toLowerCase()];
-        setProjImportResult(hit ?? { name: `LIMS Study ${id.toUpperCase()}`, indication: "Drug Discovery", phase: "Pre-clinical", sponsor: "Internal R&D" });
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Import failed — check the ID and try again.";
-      setProjImportResult({ name: "Import Error", indication: msg, phase: "—", sponsor: "—" });
-    } finally {
-      setProjImportLoading(false);
-    }
-  }, [projImportSource, projImportId]);
 
   const handleApiFetch = useCallback(async () => {
     if (!apiCompoundId.trim()) return;
@@ -1883,6 +2403,19 @@ export function HakaseAI() {
     // Reset to Layer 1 so the user starts from the beginning
     setActiveLayer(1);
   }, []);
+
+  const createProjectFromImport = useCallback((data: { name: string; smiles: string; uniprotId?: string; indication?: string; indicationCode?: string }) => {
+    const proj = {
+      name: data.name || "Imported Molecule",
+      indication: data.indication || "—",
+      indicationCode: data.indicationCode || "—",
+      molName: data.name || "Imported",
+      smiles: data.smiles,
+      uniprotId: data.uniprotId || "",
+    };
+    setSavedProjects(p => [proj, ...p]);
+    loadSavedProject(proj);
+  }, [loadSavedProject]);
 
   const toggleTissue = (tissue: string) => {
     setTissueTypes(prev =>
@@ -1959,6 +2492,15 @@ export function HakaseAI() {
         </div>
 
         {/* Layer Stepper */}
+        {chainError && (
+          <div
+            role="alert"
+            title={chainError}
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-950/40 border border-rose-700/50 text-rose-300 max-w-[420px] truncate"
+          >
+            ⚠ {chainError}
+          </div>
+        )}
         <div id="demo-layer-nav" className="flex items-center gap-1 mx-auto">
           {([1, 2, 3, 4] as Layer[]).map((layer, i) => {
             const Icon = layerIcons[i];
@@ -2000,6 +2542,25 @@ export function HakaseAI() {
                   )}
                   <Icon className="w-3.5 h-3.5" />
                   {layerLabels[i]}
+                  {/* Evidence Hash Chain badge — short SHA-256 of the sealed
+                      block at this stage. Surfaces tamper-evident provenance
+                      next to the stepper checkmark. "—" while the stage hasn't
+                      sealed yet. See lib/preclinical-handoff/hashChain.ts. */}
+                  {(() => {
+                    const h = layer === 1 ? evidenceChain.l1
+                      : layer === 2 ? evidenceChain.l2
+                      : layer === 3 ? evidenceChain.l3
+                      : evidenceChain.l4;
+                    if (!h) return null;
+                    return (
+                      <span
+                        title={`Evidence hash (SHA-256) — ${h}`}
+                        className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-tight bg-slate-800/80 text-slate-400 border border-slate-700"
+                      >
+                        {shortHash(h)}
+                      </span>
+                    );
+                  })()}
                 </button>
                 {i < 3 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
@@ -2036,6 +2597,14 @@ export function HakaseAI() {
                           <Microscope className="w-3 h-3" />
                         </div>
                         IVIVE
+                        {evidenceChain.ivive && (
+                          <span
+                            title={`Evidence hash (SHA-256) — ${evidenceChain.ivive}`}
+                            className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-tight bg-slate-800/80 text-slate-400 border border-slate-700"
+                          >
+                            {shortHash(evidenceChain.ivive)}
+                          </span>
+                        )}
                       </button>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
                     </>
@@ -2092,8 +2661,8 @@ export function HakaseAI() {
             {activeLayer < 4 && (
               <button
                 onClick={() => {
-                  const verdict = activeLayer === 1 && inVitroResults
-                    ? (inVitroResults.overallRisk === "High" ? "NO-GO" : inVitroResults.overallRisk === "Moderate" ? "WATCH" : "GO")
+                  const verdict = activeLayer === 1 && simResults && inVitroResults
+                    ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
                     : "GO";
                   if (verdict === "NO-GO") {
                     setHAIOpsCtx(prev => addOverride(prev, {
@@ -2168,6 +2737,73 @@ export function HakaseAI() {
                 </div>
               </div>
 
+              {/* Target Templates */}
+              <div className="flex-1 overflow-y-auto p-3">
+                <section>
+                  <div className="flex items-center gap-2 px-1 mb-3">
+                    <Database className="w-4 h-4 text-slate-500" />
+                    <span className="text-[12px] font-bold text-slate-300">Target Templates</span>
+                  </div>
+                  {l1Modality === "small_molecule" && (
+                    <div className="space-y-1.5">
+                      {savedProjects.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => loadSavedProject(proj)}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {l1Modality === "peptide" && (
+                    <div className="space-y-1.5">
+                      {PEPTIDE_PROJECTS.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => { setPeptideSequence(proj.sequence); setUniprotId(proj.uniprotId); setIndication(proj.indicationCode); setMolName(proj.molName); }}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {l1Modality === "antibody" && (
+                    <div className="space-y-1.5">
+                      {ANTIBODY_PROJECTS.map((proj) => (
+                        <button
+                          key={proj.name}
+                          onClick={() => {
+                            setAntibodyHeavy(proj.vh);
+                            setAntibodyLight(proj.vl);
+                            setUniprotId(proj.uniprotId);
+                            setIndication(proj.indicationCode);
+                            setMolName(proj.molName);
+                          }}
+                          className="w-full text-left px-3 py-2.5 rounded-lg border border-white/5 hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all group"
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+
               {/* Starter Templates */}
               <div className="p-3 flex-1 overflow-y-auto">
                 <div className="flex items-center justify-between mb-2">
@@ -2211,126 +2847,193 @@ export function HakaseAI() {
                   <Plus className="w-3 h-3" /> New Project
                 </button>
 
-                {/* Import via API */}
-                <div className="mt-2 border border-white/8 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => { setProjImportOpen(v => !v); setProjImportResult(null); }}
-                    className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-white/3 transition-colors"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Globe className="w-3 h-3 text-violet-400" />
-                      <span className="text-[11px] text-slate-400">Import via API</span>
-                    </div>
-                    {projImportOpen ? <ChevronUp className="w-3 h-3 text-slate-600" /> : <ChevronDown className="w-3 h-3 text-slate-600" />}
-                  </button>
+                {/* ─── Import a molecule (creates a new project) ─── */}
+                <div className="mt-3 space-y-2">
+                  <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-1">
+                    Import Molecule
+                  </div>
 
-                  {projImportOpen && (
-                    <div className="px-2.5 pb-2.5 space-y-2 border-t border-white/6">
-                      {/* Source */}
-                      <div className="pt-2">
-                        <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1.5">Source</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {[
-                            { id: "clinicaltrials", label: "ClinicalTrials" },
-                            { id: "ehr",            label: "EHR / Epic" },
-                            { id: "lims",           label: "LIMS" },
-                            { id: "pubmed",         label: "PubMed" },
-                          ].map(src => (
-                            <button
-                              key={src.id}
-                              onClick={() => { setProjImportSource(src.id); setProjImportResult(null); setProjImportId(""); }}
-                              className={`py-1 px-2 rounded text-[10px] font-medium border transition-all text-left ${
-                                projImportSource === src.id
-                                  ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
-                                  : "border-white/8 text-slate-500 hover:border-white/20"
-                              }`}
-                            >
-                              {src.label}
-                            </button>
-                          ))}
+                  {/* 1. Import Structure File */}
+                  <MolFileUpload
+                    onLoaded={(sm, nm) => createProjectFromImport({ name: nm || "Imported Structure", smiles: sm })}
+                  />
+
+                  {/* 2. Import from Diagen */}
+                  <div className="border border-violet-500/30 rounded-lg overflow-hidden bg-violet-950/20">
+                    <button
+                      onClick={() => { setDiagenOpen(v => !v); setDiagenResult(null); }}
+                      className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-violet-500/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-4 h-4 rounded bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shrink-0">
+                          <Dna className="w-2.5 h-2.5 text-white" />
                         </div>
+                        <div className="text-[10px] font-semibold text-violet-200 truncate">Import from Diagen</div>
                       </div>
-
-                      {/* ID input */}
-                      <div>
-                        <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">
-                          {projImportSource === "clinicaltrials" ? "NCT Number" : projImportSource === "pubmed" ? "PMID" : "Study / Record ID"}
-                        </div>
-                        <div className="flex gap-1">
-                          <Input
-                            value={projImportId}
-                            onChange={e => { setProjImportId(e.target.value); setProjImportResult(null); }}
-                            onKeyDown={e => e.key === "Enter" && handleProjFetch()}
-                            placeholder={projImportSource === "clinicaltrials" ? "NCT04292899" : projImportSource === "pubmed" ? "36150754" : projImportSource === "ehr" ? "PAT-001" : "LIMS-2024-001"}
-                            className="bg-white/5 border-white/10 text-white text-[11px] focus:border-violet-500/60 h-7"
-                          />
-                          <button
-                            onClick={handleProjFetch}
-                            disabled={!projImportId.trim() || projImportLoading}
-                            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 text-[10px] font-medium transition-all"
-                          >
-                            {projImportLoading ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : <Download className="w-2.5 h-2.5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Result */}
-                      {projImportResult && (
-                        <div className={`rounded-lg p-2.5 space-y-1.5 border ${projImportResult.name === "Import Error" ? "bg-red-500/5 border-red-500/20" : "bg-emerald-500/5 border-emerald-500/20"}`}>
-                          <div className={`text-[11px] font-semibold leading-snug ${projImportResult.name === "Import Error" ? "text-red-300" : "text-emerald-300"}`}>{projImportResult.name}</div>
-                          {projImportResult.name === "Import Error" ? (
-                            <div className="text-[10px] text-red-400">{projImportResult.indication}</div>
-                          ) : (
-                            <>
-                              <div className="text-[10px] text-slate-400 leading-snug">{projImportResult.indication}</div>
-                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-slate-600">
-                                <span>{projImportResult.phase}</span>
-                                <span>{projImportResult.sponsor}</span>
-                                {projImportResult.enrollment != null && projImportResult.enrollment > 0 && (
-                                  <span>n={projImportResult.enrollment.toLocaleString()}</span>
-                                )}
-                              </div>
+                      {diagenOpen ? <ChevronUp className="w-3 h-3 text-violet-400" /> : <ChevronDown className="w-3 h-3 text-violet-400" />}
+                    </button>
+                    {diagenOpen && (
+                      <div className="px-2.5 pb-2.5 space-y-2 border-t border-violet-500/15">
+                        <div className="pt-2">
+                          <div className="text-[9px] text-slate-500 mb-1 uppercase tracking-wider">Mode</div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {([
+                              { id: "sync",    label: "Sync"    },
+                              { id: "batch",   label: "Batch"   },
+                              { id: "cascade", label: "Cascade" },
+                            ] as const).map(m => (
                               <button
-                                onClick={() => {
-                                  if (projImportResult.indication && projImportResult.indication !== "—") {
-                                    setIndication(projImportResult.indication);
-                                  }
-                                  if (projImportResult.phase && projImportResult.phase !== "—" && projImportResult.phase !== "Literature" && projImportResult.phase !== "Unknown") {
-                                    setTrialPhase(projImportResult.phase);
-                                  }
-                                  if (projImportResult.enrollment && projImportResult.enrollment > 0) {
-                                    setTargetSampleSize(String(projImportResult.enrollment));
-                                  }
-                                  setSavedProjects(prev => [{
-                                    name: projImportResult.name,
-                                    indication: projImportResult.indication,
-                                    indicationCode: projImportResult.indication,
-                                    molName: "Imported",
-                                    smiles: "",
-                                    uniprotId: "",
-                                    layers: 0,
-                                    goNogo: "WATCH" as const,
-                                    qed: 0,
-                                    binding: "—",
-                                    responderRate: null,
-                                    successProb: null,
-                                    lastRun: "Just now",
-                                  }, ...prev]);
-                                  setActiveLayer(1);
-                                  setProjImportOpen(false);
-                                  setProjImportResult(null);
-                                  setProjImportId("");
-                                }}
-                                className="w-full flex items-center justify-center gap-1 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[10px] font-medium transition-all"
+                                key={m.id}
+                                onClick={() => { setDiagenMode(m.id); setDiagenResult(null); }}
+                                className={`py-1 px-1 rounded text-[9px] font-semibold border transition-all ${
+                                  diagenMode === m.id
+                                    ? "bg-violet-600/20 border-violet-500/50 text-violet-200"
+                                    : "border-white/8 text-slate-500 hover:border-violet-500/25"
+                                }`}
                               >
-                                <CheckCircle2 className="w-2.5 h-2.5" /> Use — Load into Simulation
+                                {m.label}
                               </button>
-                            </>
-                          )}
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div>
+                          <div className="text-[9px] text-slate-500 mb-1 uppercase tracking-wider">
+                            {diagenMode === "batch" ? "Batch Job ID" : "Molecule ID"}
+                          </div>
+                          <div className="flex gap-1">
+                            <Input
+                              value={diagenJobId}
+                              onChange={e => { setDiagenJobId(e.target.value); setDiagenResult(null); }}
+                              onKeyDown={e => e.key === "Enter" && handleDiagenFetch()}
+                              placeholder={diagenMode === "batch" ? "DGN-BATCH-…" : "DGN-MOL-0047"}
+                              className="bg-white/5 border-violet-500/20 text-white text-[11px] focus:border-violet-500/60 h-7"
+                            />
+                            <button
+                              onClick={handleDiagenFetch}
+                              disabled={!diagenJobId.trim() || diagenLoading}
+                              className="flex items-center gap-1 px-2 rounded bg-violet-600/30 border border-violet-500/40 text-violet-200 hover:bg-violet-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
+                            >
+                              {diagenLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                        {diagenResult && (
+                          <div className="bg-violet-500/5 border border-violet-500/25 rounded p-2 space-y-1.5">
+                            <div className="text-[10px] font-semibold text-violet-200 truncate">{diagenResult.name}</div>
+                            <div className="text-[9px] text-slate-500 truncate">Target: {diagenResult.targetName}</div>
+                            <button
+                              onClick={() => {
+                                createProjectFromImport({
+                                  name: diagenResult.name,
+                                  smiles: diagenResult.smiles,
+                                  uniprotId: diagenResult.uniprotId,
+                                });
+                                setDiagenOpen(false);
+                                setDiagenResult(null);
+                              }}
+                              className="w-full flex items-center justify-center gap-1 py-1 rounded bg-violet-600/25 border border-violet-500/40 text-violet-200 hover:bg-violet-600/35 text-[10px] font-semibold"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Create Project
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Import via API */}
+                  <div className="border border-white/8 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => { setApiImportOpen(v => !v); setApiResult(null); }}
+                      className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-white/3 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Globe className="w-3 h-3 text-violet-400 shrink-0" />
+                        <span className="text-[10px] font-semibold text-slate-300 truncate">Import via API</span>
+                      </div>
+                      {apiImportOpen ? <ChevronUp className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+                    </button>
+                    {apiImportOpen && (
+                      <div className="px-2.5 pb-2.5 space-y-2 border-t border-white/6">
+                        <div className="pt-2">
+                          <div className="text-[9px] text-slate-500 mb-1 uppercase tracking-wider">Source</div>
+                          <div className="grid grid-cols-2 gap-1">
+                            {([
+                              { id: "chembl",  label: "ChEMBL"  },
+                              { id: "pubchem", label: "PubChem" },
+                              { id: "unichem", label: "UniChem" },
+                              { id: "zinc",    label: "ZINC"    },
+                            ] as { id: ApiSource; label: string }[]).map(src => (
+                              <button
+                                key={src.id}
+                                onClick={() => { setApiSource(src.id); setApiResult(null); setApiError(null); setApiCompoundId(""); }}
+                                className={`py-1 px-1 rounded text-[10px] font-medium border transition-all ${
+                                  apiSource === src.id
+                                    ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                                    : "border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-400"
+                                }`}
+                              >
+                                {src.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 mb-1 uppercase tracking-wider">Compound ID / Name</div>
+                          <div className="flex gap-1">
+                            <Input
+                              value={apiCompoundId}
+                              onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); setApiError(null); }}
+                              onKeyDown={e => e.key === "Enter" && handleApiFetch()}
+                              placeholder={
+                                apiSource === "chembl"  ? "CHEMBL25 / aspirin"  :
+                                apiSource === "pubchem" ? "CID / name"          :
+                                apiSource === "unichem" ? "ChEMBL ID"           :
+                                                          "ZINC ID"
+                              }
+                              className="bg-white/5 border-white/10 text-white text-[11px] focus:border-violet-500/60 h-7"
+                            />
+                            <button
+                              onClick={handleApiFetch}
+                              disabled={!apiCompoundId.trim() || apiLoading}
+                              className="flex items-center gap-1 px-2 rounded bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
+                            >
+                              {apiLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                        {apiError && (
+                          <div className="bg-red-500/5 border border-red-500/20 rounded p-2 flex items-start gap-1.5">
+                            <AlertTriangle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
+                            <div className="text-[10px] text-red-300 leading-tight">{apiError}</div>
+                          </div>
+                        )}
+                        {apiResult && (
+                          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded p-2 space-y-1.5">
+                            <div className="text-[10px] font-semibold text-emerald-300 truncate">{apiResult.name}</div>
+                            {apiResult.sourceId && (
+                              <div className="text-[9px] text-slate-600 font-mono truncate">{apiResult.sourceId}</div>
+                            )}
+                            <button
+                              onClick={() => {
+                                createProjectFromImport({ name: apiResult.name, smiles: apiResult.smiles });
+                                setApiImportOpen(false);
+                                setApiResult(null);
+                              }}
+                              className="w-full flex items-center justify-center gap-1 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[10px] font-semibold"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Create Project
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Load from CSV */}
+                  <BatchCsvUpload
+                    onSelected={(sm, nm) => createProjectFromImport({ name: nm || "Imported (CSV)", smiles: sm })}
+                  />
                 </div>
               </div>
             </>
@@ -2343,29 +3046,292 @@ export function HakaseAI() {
           {/* Layer 1 — In Vitro Digital Twin */}
           {activeLayer === 1 && !iviveHandoffOpen && (
             <div className="flex-1 flex overflow-hidden">
-              {/* Input Panel */}
-              <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col">
+              {/* Input Panel — collapsible */}
+              {!inputPanelOpen && (
+                <div className="w-10 border-r border-white/8 bg-[#0d0f17]/60 flex flex-col items-center py-3 shrink-0">
+                  <button
+                    onClick={() => setInputPanelOpen(true)}
+                    className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-violet-300 transition-colors"
+                    title="Expand input panel"
+                  >
+                    <Menu className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="mt-3 flex flex-col items-center gap-2">
+                    <TestTube2 className="w-4 h-4 text-violet-400/70" />
+                    <div
+                      className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                    >
+                      Layer 1 Input
+                    </div>
+                  </div>
+                </div>
+              )}
+              {inputPanelOpen && (
+              <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col shrink-0">
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <TestTube2 className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 1 — In Vitro Digital Twin</h2>
+                    <h2 className="text-[15px] font-semibold text-white flex-1">Layer 1 — In Vitro Digital Twin</h2>
+                    <button
+                      onClick={() => setInputPanelOpen(false)}
+                      className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-slate-300 transition-colors"
+                      title="Hide input panel"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                    </button>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure in vitro structure and simulation parameters</p>
                 </div>
 
                 <div className="p-5 space-y-5">
+                  {/* ── Modality selector ─────────────────────────────────── */}
+                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                    <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1 block">Modality</label>
+                    <div className="relative">
+                      <select
+                        value={l1Modality}
+                        onChange={(e) => setL1Modality(e.target.value as Modality)}
+                        className="w-full px-3 py-2 rounded bg-black/40 border border-white/10 text-[12px] font-semibold text-white outline-none focus:border-violet-500/50 appearance-none pr-8"
+                      >
+                        {MODALITY_REGISTRY.map((m) => (
+                          <option key={m.id} value={m.id} disabled={!m.available}>
+                            {m.label}{m.comingSoon ? " — coming soon" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
                   {/* 2.1 Primary Input */}
                   <section>
-                    <SectionHeader icon={Atom} label="Primary In Vitro Input" />
+                    <SectionHeader icon={Atom} label={l1Modality === "peptide" ? "Peptide Sequence Input" : l1Modality === "small_molecule" ? "Primary In Vitro Input" : `${getModalityMeta(l1Modality).label} Input`} />
                     <div className="space-y-3">
+                      {/* ── Peptide mode: sequence input in sidebar ───────── */}
+                      {l1Modality === "peptide" && (<>
+                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-2">
+                          <div className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider">Peptide Sequence</div>
+                          <textarea
+                            value={peptideSequence}
+                            onChange={e => setPeptideSequence(e.target.value.replace(/\s/g, "").toUpperCase())}
+                            placeholder="e.g. ACDEFGHIKLM — single-letter AA codes"
+                            rows={3}
+                            className="w-full bg-white/5 border border-white/10 text-white text-[11px] font-mono rounded px-2 py-1.5 resize-none focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                          />
+                          <div className="text-[10px] text-slate-600">
+                            {peptideSequence.length > 0 ? `${peptideSequence.length} residues · analysis in results panel →` : "Enter sequence, results appear in the panel on the right"}
+                          </div>
+                        </div>
+
+                        {/* ── Modification panel (collapsible) ─────────────── */}
+                        <button
+                          onClick={() => setShowModPanel(!showModPanel)}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] text-[10px] font-semibold text-slate-400 transition-colors"
+                        >
+                          <span>Modifications{peptideMods.cyclization !== "none" || peptideMods.nTermCap !== "none" || peptideMods.cTermCap !== "none" || peptideMods.dAminoAcidPositions.length > 0 || peptideMods.pegylationSite !== null || peptideMods.lipidationSite !== null ? " ●" : ""}</span>
+                          <ChevronDown className={`w-3 h-3 transition-transform ${showModPanel ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {showModPanel && (
+                          <div className="rounded-lg border border-violet-500/15 bg-violet-500/[0.02] p-3 space-y-3">
+                            {/* Terminal caps */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">N-terminal</div>
+                                <select
+                                  value={peptideMods.nTermCap}
+                                  onChange={e => setPeptideMods(p => ({ ...p, nTermCap: e.target.value as any }))}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="acetyl">Acetyl (Ac-)</option>
+                                  <option value="pyroglutamate">Pyroglutamate</option>
+                                </select>
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">C-terminal</div>
+                                <select
+                                  value={peptideMods.cTermCap}
+                                  onChange={e => setPeptideMods(p => ({ ...p, cTermCap: e.target.value as any }))}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="amide">Amide (-NH₂)</option>
+                                  <option value="ester">Ester</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Cyclization */}
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">Cyclization</div>
+                              <select
+                                value={peptideMods.cyclization}
+                                onChange={e => {
+                                  const v = e.target.value as any;
+                                  setPeptideMods(p => ({ ...p, cyclization: v }));
+                                  if (v !== "none") setPeptideCyclic(true);
+                                  else setPeptideCyclic(false);
+                                }}
+                                className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                              >
+                                <option value="none">Linear (no cyclization)</option>
+                                <option value="head_to_tail">Head-to-tail</option>
+                                <option value="disulfide">Disulfide bridge</option>
+                                <option value="staple">Hydrocarbon staple</option>
+                                <option value="lactam">Lactam bridge</option>
+                              </select>
+                            </div>
+
+                            {/* D-amino acid positions */}
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">D-amino acid positions <span className="text-slate-600 font-normal">(comma-separated, 1-indexed)</span></div>
+                              <Input
+                                value={peptideMods.dAminoAcidPositions.map(p => p + 1).join(", ")}
+                                onChange={e => {
+                                  const positions = e.target.value.split(",").map(s => parseInt(s.trim()) - 1).filter(n => !isNaN(n) && n >= 0);
+                                  setPeptideMods(p => ({ ...p, dAminoAcidPositions: positions }));
+                                }}
+                                placeholder="e.g. 2, 5, 8"
+                                className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                              />
+                            </div>
+
+                            {/* PEGylation + Lipidation row */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">PEGylation site</div>
+                                <Input
+                                  value={peptideMods.pegylationSite !== null ? String(peptideMods.pegylationSite + 1) : ""}
+                                  onChange={e => {
+                                    const v = parseInt(e.target.value) - 1;
+                                    setPeptideMods(p => ({ ...p, pegylationSite: isNaN(v) || v < 0 ? null : v }));
+                                  }}
+                                  placeholder="Position"
+                                  className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                                />
+                                {peptideMods.pegylationSite !== null && (
+                                  <select
+                                    value={peptideMods.pegMwDa}
+                                    onChange={e => setPeptideMods(p => ({ ...p, pegMwDa: Number(e.target.value) }))}
+                                    className="w-full mt-1 px-2 py-1 rounded bg-black/30 border border-white/10 text-[9px] text-white outline-none"
+                                  >
+                                    <option value={2000}>PEG 2 kDa</option>
+                                    <option value={5000}>PEG 5 kDa</option>
+                                    <option value={10000}>PEG 10 kDa</option>
+                                    <option value={20000}>PEG 20 kDa</option>
+                                    <option value={40000}>PEG 40 kDa</option>
+                                  </select>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-slate-500 font-semibold mb-1">Lipidation</div>
+                                <select
+                                  value={peptideMods.lipidType}
+                                  onChange={e => {
+                                    const lt = e.target.value as any;
+                                    setPeptideMods(p => ({
+                                      ...p,
+                                      lipidType: lt,
+                                      lipidationSite: lt !== "none" ? (p.lipidationSite ?? 0) : null,
+                                    }));
+                                  }}
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="palmitic">Palmitic acid (C16)</option>
+                                  <option value="myristic">Myristic acid (C14)</option>
+                                  <option value="stearic">Stearic acid (C18)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Modification impact preview */}
+                            {peptideSequence.length >= 2 && (peptideMods.cyclization !== "none" || peptideMods.nTermCap !== "none" || peptideMods.cTermCap !== "none" || peptideMods.dAminoAcidPositions.length > 0 || peptideMods.pegylationSite !== null || peptideMods.lipidType !== "none") && (() => {
+                              const impact = estimateModificationImpact(peptideSequence.length, peptideMods);
+                              return (
+                                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] p-2 space-y-1">
+                                  <div className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider">Estimated Impact</div>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-300">
+                                    <span>t½ ×{impact.halfLifeMultiplier}</span>
+                                    {impact.permeabilityMultiplier > 1 && <span>Perm ×{impact.permeabilityMultiplier}</span>}
+                                    <span>Stability: {impact.proteolyticStabilityGain}</span>
+                                    {impact.mwDelta > 0 && <span>+{(impact.mwDelta / 1000).toFixed(1)} kDa</span>}
+                                  </div>
+                                  {impact.notes.slice(0, 2).map((n, i) => (
+                                    <div key={i} className="text-[9px] text-slate-500 leading-relaxed">{n}</div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </>)}
+
+                      {/* ── Antibody mode: sequence inputs in sidebar ──────── */}
+                      {l1Modality === "antibody" && (<>
+                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-3">
+                          <div>
+                            <label className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider block mb-1">
+                              Heavy / VHH chain *
+                            </label>
+                            <textarea
+                              value={antibodyHeavy}
+                              onChange={(e) => setAntibodyHeavy(e.target.value)}
+                              placeholder="Paste heavy-chain sequence…"
+                              rows={3}
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">
+                              Light chain (optional)
+                            </label>
+                            <textarea
+                              value={antibodyLight}
+                              onChange={(e) => setAntibodyLight(e.target.value)}
+                              placeholder="Paste light-chain sequence…"
+                              rows={2}
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              value={antibodyFormatHint}
+                              onChange={(e) => setAntibodyFormatHint(e.target.value)}
+                              placeholder="Format hint (e.g. IgG1, scFv)"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => { setAntibodyHeavy("EVQLVESGGGLVQPGGSLRLSCAASGFNIKDTYIHWVRQAPGKGLEWVARIYPTNGYTRYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCSRWGGDGFYAMDYWGQGTLVTVSS"); setAntibodyLight("DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"); setAntibodyFormatHint("IgG1 (trastuzumab Fv)"); }}
+                              className="px-3 py-1.5 rounded-md border border-white/10 hover:bg-white/5 text-slate-300 text-[11px] transition-colors"
+                            >
+                              Load Example
+                            </button>
+                          </div>
+                        </div>
+                      </>)}
+
+                      {/* ── Small molecule mode: original SMILES input ─────── */}
+                      {l1Modality === "small_molecule" && (
                       <FieldGroup label="SMILES String" required hint="RDKit validated · MW 100–1500 Da">
                         <div id="demo-smiles-input" className="flex gap-2">
                           <div className="relative flex-1">
                             <Input
                               value={smiles}
                               onChange={e => setSmiles(e.target.value)}
+                              onPaste={e => {
+                                const pasted = e.clipboardData.getData("text");
+                                if (pasted.length > 3) {
+                                  e.preventDefault();
+                                  handleSmartInput(pasted);
+                                }
+                              }}
                               onKeyDown={e => { if (e.key === "Enter" && molProps?.isValid) handleAnalyzeMolecule(); }}
-                              placeholder="Enter SMILES notation..."
+                              placeholder="Enter SMILES or paste any sequence..."
                               className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-violet-500/60 focus:bg-white/8"
                             />
                             {smiles && (
@@ -2482,7 +3448,9 @@ export function HakaseAI() {
                           </div>
                         )}
                       </FieldGroup>
+                      )} {/* end small_molecule SMILES */}
 
+                      {l1Modality === "small_molecule" && (
                       <FieldGroup label="Molecule Name" hint={chemblCompoundName ? `ChEMBL: ${chemblCompoundName}` : "Auto-identified from ChEMBL"}>
                         <Input
                           value={molName}
@@ -2491,292 +3459,16 @@ export function HakaseAI() {
                           placeholder="e.g. Compound-XYZ-001"
                         />
                       </FieldGroup>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <MolFileUpload onLoaded={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
-                        <BatchCsvUpload onSelected={(sm, nm) => { setSmiles(sm); if (nm) setMolName(nm); }} />
-                      </div>
-
-                      {/* ── Diagen Integration ── */}
-                      <div className="border border-violet-500/30 rounded-lg overflow-hidden bg-violet-950/20">
-                        <button
-                          onClick={() => { setDiagenOpen(v => !v); setDiagenResult(null); }}
-                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-violet-500/5 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shrink-0">
-                              <Dna className="w-3 h-3 text-white" />
-                            </div>
-                            <div className="text-left">
-                              <div className="text-[11px] font-semibold text-violet-200">Import from Diagen AI</div>
-                              <div className="text-[9px] text-violet-400/70 leading-tight">Generate → Simulate pipeline</div>
-                            </div>
-                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/20 text-violet-300 border-violet-500/30 ml-1">Hakase Ecosystem</Badge>
-                          </div>
-                          {diagenOpen ? <ChevronUp className="w-3.5 h-3.5 text-violet-400" /> : <ChevronDown className="w-3.5 h-3.5 text-violet-400" />}
-                        </button>
-
-                        {diagenOpen && (
-                          <div className="px-3 pb-3 space-y-3 border-t border-violet-500/15">
-                            {/* Mode selector */}
-                            <div className="pt-3">
-                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Integration Mode</div>
-                              <div className="grid grid-cols-3 gap-1">
-                                {([
-                                  { id: "sync",    label: "Synchronous",  hint: "Single · <30s" },
-                                  { id: "batch",   label: "Async Batch",  hint: "Webhook · ~2m" },
-                                  { id: "cascade", label: "Cascade",      hint: "L1→L2→L3" },
-                                ] as const).map(m => (
-                                  <button
-                                    key={m.id}
-                                    onClick={() => { setDiagenMode(m.id); setDiagenResult(null); }}
-                                    className={`py-1.5 px-2 rounded text-center border transition-all ${
-                                      diagenMode === m.id
-                                        ? "bg-violet-600/20 border-violet-500/50 text-violet-200"
-                                        : "border-white/8 text-slate-500 hover:border-violet-500/25"
-                                    }`}
-                                  >
-                                    <div className="text-[10px] font-semibold">{m.label}</div>
-                                    <div className="text-[9px] text-slate-600 mt-0.5">{m.hint}</div>
-                                  </button>
-                                ))}
-                              </div>
-                              {diagenMode === "cascade" && (
-                                <div className="mt-2 text-[10px] text-violet-400/70 flex items-center gap-1.5 bg-violet-500/5 rounded px-2 py-1.5 border border-violet-500/15">
-                                  <Zap className="w-3 h-3 shrink-0" />
-                                  Cascade mode runs L1 → L2 → L3 automatically. Results propagate across all layers.
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Job / Molecule ID */}
-                            <div>
-                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
-                                {diagenMode === "batch" ? "Batch Job ID" : "Molecule ID"}
-                                <span className="ml-2 text-slate-600 normal-case">e.g. DGN-MOL-0047</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
-                                  <Input
-                                    value={diagenJobId}
-                                    onChange={e => { setDiagenJobId(e.target.value); setDiagenResult(null); }}
-                                    onKeyDown={e => e.key === "Enter" && handleDiagenFetch()}
-                                    placeholder={diagenMode === "batch" ? "DGN-BATCH-2024-Q1" : "DGN-MOL-0047"}
-                                    className="bg-white/5 border-violet-500/20 text-white text-[12px] pl-7 focus:border-violet-500/60"
-                                  />
-                                </div>
-                                <button
-                                  onClick={handleDiagenFetch}
-                                  disabled={!diagenJobId.trim() || diagenLoading}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/30 border border-violet-500/40 text-violet-200 hover:bg-violet-600/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
-                                >
-                                  {diagenLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                                  {diagenLoading ? "Fetching…" : "Fetch"}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Result */}
-                            {diagenResult && (
-                              <div className="bg-violet-500/5 border border-violet-500/25 rounded-lg p-3 space-y-2.5">
-                                {/* Header */}
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <div className="text-[12px] font-semibold text-violet-200">{diagenResult.name}</div>
-                                    <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">{diagenResult.smiles.slice(0, 40)}…</div>
-                                    <div className="text-[10px] text-slate-600 mt-0.5">MW: {diagenResult.mw} · Target: {diagenResult.targetName}</div>
-                                  </div>
-                                </div>
-
-                                {/* Pre-scores from Diagen */}
-                                <div className="grid grid-cols-3 gap-1.5">
-                                  {[
-                                    { label: "QED", val: diagenResult.qed.toFixed(2), good: diagenResult.qed > 0.6 },
-                                    { label: "SA Score", val: diagenResult.sa.toFixed(1), good: diagenResult.sa < 4 },
-                                    { label: "Binding", val: diagenResult.bindingAffinity, good: true },
-                                  ].map(({ label, val, good }) => (
-                                    <div key={label} className="bg-white/5 rounded px-2 py-1.5 text-center border border-white/5">
-                                      <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
-                                      <div className={`text-[11px] font-semibold mt-0.5 ${good ? "text-emerald-400" : "text-yellow-400"}`}>{val}</div>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* ADMET mini-bars */}
-                                <div>
-                                  <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1.5">Diagen ADMET Pre-scores</div>
-                                  <div className="space-y-1">
-                                    {(["absorption","distribution","metabolism","excretion","toxicity"] as const).map(k => (
-                                      <div key={k} className="flex items-center gap-2">
-                                        <span className="text-[9px] text-slate-500 w-16 capitalize">{k}</span>
-                                        <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
-                                          <div
-                                            className={`h-full rounded-full ${diagenResult.admet[k] >= 0.7 ? "bg-emerald-500" : "bg-yellow-500"}`}
-                                            style={{ width: `${diagenResult.admet[k] * 100}%` }}
-                                          />
-                                        </div>
-                                        <span className="text-[9px] text-slate-500 w-6 text-right">{diagenResult.admet[k].toFixed(2)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex gap-2 pt-1 border-t border-violet-500/15">
-                                  <button
-                                    onClick={() => {
-                                      setSmiles(diagenResult.smiles);
-                                      setMolName(diagenResult.name);
-                                      setUniprotId(diagenResult.uniprotId);
-                                      setDiagenOpen(false);
-                                      setDiagenResult(null);
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-violet-600/25 border border-violet-500/40 text-violet-200 hover:bg-violet-600/35 text-[11px] font-semibold transition-all"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" /> Import All Fields
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setSmiles(diagenResult.smiles);
-                                      setMolName(diagenResult.name);
-                                      setDiagenOpen(false);
-                                      setDiagenResult(null);
-                                    }}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white text-[11px] transition-all"
-                                  >
-                                    SMILES only
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* API Import */}
-                      <div className="border border-white/8 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => { setApiImportOpen(v => !v); setApiResult(null); }}
-                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/3 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-3.5 h-3.5 text-violet-400" />
-                            <span className="text-[11px] font-semibold text-slate-300">Import via API</span>
-                            <Badge className="text-[9px] px-1.5 py-0 bg-violet-500/10 text-violet-400 border-violet-500/20">ChEMBL · PubChem · ZINC · UniChem</Badge>
-                          </div>
-                          {apiImportOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
-                        </button>
-
-                        {apiImportOpen && (
-                          <div className="px-3 pb-3 space-y-3 border-t border-white/6">
-                            {/* Source selector */}
-                            <div className="pt-3">
-                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">Source Database</div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {([
-                                  { id: "chembl",  label: "ChEMBL",  hint: "CHEMBL25" },
-                                  { id: "pubchem", label: "PubChem", hint: "CID 3672 or name" },
-                                  { id: "unichem", label: "UniChem", hint: "CHEMBL ID" },
-                                  { id: "zinc",    label: "ZINC",    hint: "ZINC ID" },
-                                ] as { id: ApiSource; label: string; hint: string }[]).map(src => (
-                                  <button
-                                    key={src.id}
-                                    onClick={() => { setApiSource(src.id); setApiResult(null); setApiError(null); setApiCompoundId(""); }}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
-                                      apiSource === src.id
-                                        ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
-                                        : "border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-400"
-                                    }`}
-                                  >
-                                    {src.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Compound ID input */}
-                            <div>
-                              <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
-                                Compound ID / Name
-                                <span className="ml-2 text-slate-600 normal-case">
-                                  e.g.&nbsp;
-                                  {apiSource === "chembl"  ? "CHEMBL25 or aspirin"    :
-                                   apiSource === "pubchem" ? "2244 or ibuprofen"       :
-                                   apiSource === "unichem" ? "CHEMBL25 (ChEMBL ID)"   :
-                                                            "ZINC000003594435"}
-                                </span>
-                              </div>
-                              <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
-                                  <Input
-                                    value={apiCompoundId}
-                                    onChange={e => { setApiCompoundId(e.target.value); setApiResult(null); setApiError(null); }}
-                                    onKeyDown={e => e.key === "Enter" && handleApiFetch()}
-                                    placeholder={
-                                      apiSource === "chembl"  ? "CHEMBL ID or drug name…"   :
-                                      apiSource === "pubchem" ? "CID number or drug name…"   :
-                                      apiSource === "unichem" ? "ChEMBL ID (e.g. CHEMBL25)…" :
-                                                               "ZINC ID…"
-                                    }
-                                    className="bg-white/5 border-white/10 text-white text-[12px] pl-7 focus:border-violet-500/60"
-                                  />
-                                </div>
-                                <button
-                                  onClick={handleApiFetch}
-                                  disabled={!apiCompoundId.trim() || apiLoading}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
-                                >
-                                  {apiLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                                  {apiLoading ? "Fetching…" : "Fetch"}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Error */}
-                            {apiError && (
-                              <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
-                                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
-                                <div className="text-[11px] text-red-300">{apiError}</div>
-                              </div>
-                            )}
-
-                            {/* Result */}
-                            {apiResult && (
-                              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="text-[11px] font-semibold text-emerald-300">{apiResult.name}</div>
-                                      {apiResult.sourceId && (
-                                        <span className="text-[9px] text-slate-600 font-mono">{apiResult.sourceId}</span>
-                                      )}
-                                    </div>
-                                    <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">{apiResult.smiles}</div>
-                                    <div className="text-[10px] text-slate-600 mt-0.5">MW: {apiResult.mw}</div>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      setSmiles(apiResult.smiles);
-                                      setMolName(apiResult.name);
-                                      setApiImportOpen(false);
-                                      setApiResult(null);
-                                    }}
-                                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-[11px] font-medium transition-all"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    Use
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      )} {/* end small_molecule Molecule Name */}
                     </div>
                   </section>
 
+                  {/* ── Small-molecule-only configuration ────────────────────
+                       Target protein, molecule ML predictions, simulation
+                       options and batch config are all SMILES/RDKit-specific.
+                       Peptide and antibody modalities have their own inputs
+                       above and their target/antigen input lives in Layer 2. */}
+                  {l1Modality === "small_molecule" && (<>
                   <Separator className="bg-white/8" />
 
                   {/* 2.2 Target Protein */}
@@ -3597,10 +4289,50 @@ export function HakaseAI() {
                         )}
                       </div>
 
-                      <FieldGroup label="Therapeutic Area Preset">
-                        <Select value={therapeuticArea} onValueChange={setTherapeuticArea}>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400">Therapeutic Area Preset</span>
+                          {(() => {
+                            // Subtle provenance chip — keeps the dropdown looking
+                            // "complete" (default value always visible) while
+                            // still honestly signalling whether the value was
+                            // predicted, manually picked, or just the literal
+                            // initial default. Hover for the source.
+                            const chip = (() => {
+                              if (taProvenance.kind === "auto") return {
+                                label: "Auto", title: `Predicted from top target: ${taProvenance.source ?? "—"}`,
+                                cls: "bg-violet-500/10 border-violet-500/30 text-violet-300",
+                              };
+                              if (taProvenance.kind === "manual") return {
+                                label: "Manual", title: "Selected by user",
+                                cls: "bg-slate-500/10 border-slate-500/30 text-slate-300",
+                              };
+                              if (taProvenance.kind === "no-match") return {
+                                label: "No match", title: `No TA preset matches ${taProvenance.source ?? "top target"} — pick one manually if needed`,
+                                cls: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+                              };
+                              return {
+                                label: "Not predicted", title: "No therapeutic area inferred — engines run with neutral (no TA-specific) modifiers",
+                                cls: "bg-slate-500/10 border-slate-500/30 text-slate-400",
+                              };
+                            })();
+                            return (
+                              <span title={chip.title}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${chip.cls}`}>
+                                {chip.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <Select
+                          value={therapeuticArea}
+                          onValueChange={(v) => {
+                            setTherapeuticArea(v);
+                            setTaProvenance({ kind: "manual" });
+                          }}
+                        >
                           <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60">
-                            <SelectValue />
+                            <SelectValue placeholder="— Not predicted —" />
                           </SelectTrigger>
                           <SelectContent className="bg-[#1a1d2b] border-white/10 text-white">
                             {["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"].map(a => (
@@ -3608,7 +4340,7 @@ export function HakaseAI() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </FieldGroup>
+                      </div>
                     </div>
                   </section>
 
@@ -3750,22 +4482,134 @@ export function HakaseAI() {
                             )}
                           </div>
 
-                          {/* Placeholder ADMET sections — model scaffolding made
-                              visible so the user knows where future models will
-                              land. Kept intentionally minimal (no fake data). */}
-                          {[
-                            { name: "Distribution", note: "PPB, V_d, BBB" },
-                            { name: "Metabolism", note: "CYP3A4 / 2D6 / 2C9 inhibition, CL_int" },
-                            { name: "Toxicity", note: "Ames mutagenicity, hepatotoxicity (cardiotox already wired)" },
-                          ].map(({ name, note }) => (
-                            <div key={name} className="flex items-center justify-between border-t border-white/5 pt-2 opacity-50">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wider">{name}</span>
-                                <span className="text-[9px] text-slate-600">{note}</span>
+                          {/* ADMET-AI compact summary — one tile per bucket
+                              showing the worst-flagged endpoint. Real ML values
+                              from `admetMl.structured` (no fake data; tiles
+                              degrade to "Awaiting SMILES" / "Loading…" / "ML
+                              unavailable" / "No endpoints" honestly). The full
+                              5-axis panel lives lower at #ml-admet-detail. */}
+                          {(() => {
+                            const sx = admetMl?.structured;
+                            const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+                            const probTone = (p: number) =>
+                              p < 0.3 ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
+                              : p < 0.6 ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/5"
+                              : "text-red-400 border-red-500/30 bg-red-500/5";
+                            const labelFor = (p: number) => (p < 0.3 ? "Low" : p < 0.6 ? "Moderate" : "High");
+
+                            type Flag = { headline: string; sub: string; tone: string } | null;
+
+                            const distFlag = (): Flag => {
+                              if (!sx) return null;
+                              const bbb = sx.distribution?.BBB_Martins?.value;
+                              const ppb = sx.distribution?.PPBR_AZ?.value;
+                              const vd  = sx.distribution?.VDss_Lombardo?.value;
+                              if (!finite(bbb) && !finite(ppb) && !finite(vd)) return null;
+                              if (finite(bbb)) {
+                                const cls = bbb >= 0.5 ? "BBB-penetrant" : "BBB-restricted";
+                                const tone = bbb >= 0.5 ? "text-violet-300 border-violet-500/30 bg-violet-500/5"
+                                                        : "text-slate-300 border-white/10 bg-white/5";
+                                const extra = finite(ppb) ? ` · PPB ${(ppb * 100).toFixed(0)}%` : "";
+                                return { headline: `${cls} (${bbb.toFixed(2)})`, sub: `BBB_Martins${extra}`, tone };
+                              }
+                              const parts: string[] = [];
+                              if (finite(ppb)) parts.push(`PPB ${(ppb * 100).toFixed(0)}%`);
+                              if (finite(vd)) parts.push(`Vd ${vd.toFixed(2)} L/kg`);
+                              return { headline: parts[0] ?? "—", sub: parts.slice(1).join(" · ") || "PPBR_AZ / VDss_Lombardo",
+                                       tone: "text-slate-300 border-white/10 bg-white/5" };
+                            };
+
+                            const metFlag = (): Flag => {
+                              if (!sx) return null;
+                              const isos = ["CYP1A2_Veith","CYP2C9_Veith","CYP2C19_Veith","CYP2D6_Veith","CYP3A4_Veith"];
+                              const hits = isos
+                                .map(k => ({ k, v: sx.metabolism?.[k]?.value }))
+                                .filter((e): e is { k: string; v: number } => finite(e.v));
+                              if (hits.length === 0) return null;
+                              const worst = hits.reduce((a, b) => (b.v > a.v ? b : a));
+                              const iso = worst.k.replace("_Veith", "");
+                              const verdict = worst.v >= 0.5 ? `${iso} inhibitor` : `Clean CYP panel`;
+                              const sub = worst.v >= 0.5
+                                ? `worst of ${hits.length}/5 isoforms`
+                                : `${iso} max p=${worst.v.toFixed(2)} across ${hits.length}/5`;
+                              return { headline: `${verdict} (${worst.v.toFixed(2)})`, sub, tone: probTone(worst.v) };
+                            };
+
+                            const toxFlag = (): Flag => {
+                              if (!sx) return null;
+                              const keys = [
+                                { k: "hERG", l: "hERG" },
+                                { k: "AMES", l: "AMES" },
+                                { k: "DILI", l: "DILI" },
+                                { k: "ClinTox", l: "ClinTox" },
+                                { k: "Carcinogens_Lagunin", l: "Carcinogenicity" },
+                                { k: "Skin_Reaction", l: "Skin sensitization" },
+                              ];
+                              const hits = keys
+                                .map(({ k, l }) => ({ l, v: sx.toxicity?.[k]?.value }))
+                                .filter((e): e is { l: string; v: number } => finite(e.v));
+                              if (hits.length === 0) return null;
+                              const worst = hits.reduce((a, b) => (b.v > a.v ? b : a));
+                              const verdict = worst.v >= 0.5 ? `${worst.l} ${labelFor(worst.v).toLowerCase()} risk` : `Clean tox panel`;
+                              const sub = worst.v >= 0.5
+                                ? `worst of ${hits.length} safety endpoints`
+                                : `${worst.l} max p=${worst.v.toFixed(2)} across ${hits.length}`;
+                              return { headline: `${verdict} (${worst.v.toFixed(2)})`, sub, tone: probTone(worst.v) };
+                            };
+
+                            const rows: Array<{ name: string; note: string; flag: Flag }> = [
+                              { name: "Distribution", note: "BBB · PPB · Vd",       flag: distFlag() },
+                              { name: "Metabolism",   note: "CYP1A2/2C9/2C19/2D6/3A4 inhibition", flag: metFlag() },
+                              { name: "Toxicity",     note: "hERG · AMES · DILI · ClinTox · carc · skin", flag: toxFlag() },
+                            ];
+
+                            const noSmiles = !smiles.trim();
+                            const invalid = !!(smiles.trim() && rdkitReady && molProps && !molProps.isValid);
+                            const transportFail = !!smiles.trim() && !invalid && !admetMl && !!admetMlError;
+                            const loading = !!smiles.trim() && !invalid && !admetMl && !admetMlError;
+                            const mlDown  = !!admetMl && admetMl.ml_available === false;
+
+                            const placeholder = (msg: string, tone = "text-slate-600") =>
+                              <span className={`text-[9px] italic ${tone}`}>{msg}</span>;
+
+                            return (
+                              <div className="border-t border-white/5 pt-2.5 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ADMET-AI summary</span>
+                                  <a href="#ml-admet-detail" className="text-[9px] text-violet-300/80 hover:text-violet-200 transition-colors">
+                                    Full 5-axis panel ↓
+                                  </a>
+                                </div>
+                                {rows.map(({ name, note, flag }) => (
+                                  <div key={name} className="flex items-center justify-between gap-2 py-1">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">{name}</span>
+                                      <span className="text-[9px] text-slate-600 truncate">{note}</span>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      {noSmiles ? placeholder("Awaiting SMILES")
+                                        : invalid ? placeholder("SMILES invalid", "text-amber-400/80")
+                                        : transportFail ? placeholder(`Service unreachable: ${admetMlError}`, "text-red-400/80")
+                                        : mlDown ? placeholder(admetMl?.error ?? "ML unavailable", "text-amber-400/80")
+                                        : loading ? placeholder("Loading…")
+                                        : !flag ? placeholder("No endpoints returned", "text-amber-400/80")
+                                        : (
+                                          <span className={`inline-flex flex-col items-end gap-0.5 px-1.5 py-1 rounded border ${flag.tone}`}>
+                                            <span className="text-[10px] font-mono font-semibold leading-none">{flag.headline}</span>
+                                            <span className="text-[8px] text-slate-500 leading-none">{flag.sub}</span>
+                                          </span>
+                                        )}
+                                    </div>
+                                  </div>
+                                ))}
+                                {admetMl?.model_info?.engine && admetMl.ml_available && (
+                                  <div className="text-[8px] text-slate-700 font-mono leading-tight pt-0.5">
+                                    {admetMl.model_info.engine}
+                                  </div>
+                                )}
                               </div>
-                              <span className="text-[9px] text-slate-600 italic">More models coming</span>
-                            </div>
-                          ))}
+                            );
+                          })()}
                         </div>
                       );
                     })()}
@@ -3888,12 +4732,17 @@ export function HakaseAI() {
                       </FieldGroup>
                     </div>
                   </CollapsibleSection>
+                  </>)}
                 </div>
 
                 {/* L1 → L2 Cascade Preview + Recommendations */}
                 <div className="px-5 pb-3 space-y-3">
-                  {/* Stage-Gate Cascade Decision (always visible — surfaces the gate verdict) */}
-                  {(() => {
+                  {/* Stage-Gate Cascade Decision — only meaningful AFTER an L1
+                      simulation has produced outputs to gate against. Before
+                      a molecule is run, the gate would render with default
+                      heuristic-tier scores and falsely demand a stage-gate
+                      review for a compound that doesn't exist yet. */}
+                  {simResults && (() => {
                     const g = cascadeGate;
                     const passed = g.canAutoCascade;
                     const overridden = !!cascadeOverride;
@@ -4008,7 +4857,7 @@ export function HakaseAI() {
                       </div>
                     );
                   })()}
-                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                  {l1Modality === "small_molecule" && (<div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
                       <span className="text-[11px] font-semibold text-violet-300">L1 → L2 Cascade Preview</span>
@@ -4022,6 +4871,17 @@ export function HakaseAI() {
                         ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`             : "pending"],
                         ["Toxicity",   simResults ? `${(simResults.admet.toxicity   * 100).toFixed(0)}%`             : "pending"],
                         ["Go/No-Go",   simResults ? simResults.goNogo                                                 : "pending"],
+                        // RF#7 / §9 step 12: surface the cascade-gate
+                        // evidence tier so the user sees the auto-cascade
+                        // decision (heuristic / structural / inferred / ml /
+                        // measured) and the source-quality floor that
+                        // justified it. Plain heuristics block auto-cascade.
+                        // RF#7 / §9 step 12: surface the safety-min source-
+                        // quality floor (0.5 heuristic / 0.6 structural /
+                        // 0.7 ml / 0.8 measured) so the auto-cascade decision
+                        // is interpretable. The detailed per-output tiers
+                        // live in the cascade-gate panel below.
+                        ["Cascade gate", simResults ? `safety-min ${cascadeGate.safetyMinScore.toFixed(2)} · ${cascadeGate.canAutoCascade ? "auto-cascade allowed" : "manual override required"}` : "pending"],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1">
                           <span className="text-slate-500">{k}</span>
@@ -4029,10 +4889,10 @@ export function HakaseAI() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </div>)}
 
                   {/* L1 Recommendations */}
-                  {(() => {
+                  {l1Modality === "small_molecule" && (() => {
                     const recs: Array<{text: string; level: "warn" | "ok" | "info"}> = [];
                     if (!smiles)       recs.push({ text: "Enter a SMILES string to begin in vitro simulation.", level: "info" });
                     else if (!uniprotId) recs.push({ text: "Add a UniProt ID for binding affinity and selectivity scoring.", level: "info" });
@@ -4061,30 +4921,155 @@ export function HakaseAI() {
                   })()}
                 </div>
 
-                {/* Run Button */}
+                {/* Run Button — modality-aware, always pinned to the bottom of
+                    the input panel so every modality follows the same flow:
+                    configure inputs above → Run at the bottom → results right. */}
                 <div id="demo-run-l1" className="p-5 border-t border-white/8 mt-auto">
-                  <Button
-                    onClick={runSimulation}
-                    disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
-                    className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
-                  >
-                    {simStatus[1] === "running" ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
-                    ) : !rdkitReady ? (
-                      <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
-                    ) : (
-                      <><Play className="w-4 h-4" /> Run In Vitro Simulation</>
-                    )}
-                  </Button>
-                  <p className="text-[10px] text-slate-600 text-center mt-2">
-                    {!rdkitReady ? "Initialising RDKit.js — please wait" : "Est. runtime: 5–30 seconds"}
-                  </p>
+                  {l1Modality === "small_molecule" && (<>
+                    <Button
+                      onClick={runSimulation}
+                      disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {simStatus[1] === "running" ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
+                      ) : !rdkitReady ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Loading chemistry engine…</>
+                      ) : (
+                        <><Play className="w-4 h-4" /> Run In Vitro Simulation</>
+                      )}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {!rdkitReady ? "Initialising RDKit.js — please wait" : "Est. runtime: 5–30 seconds"}
+                    </p>
+                  </>)}
+
+                  {l1Modality === "peptide" && (<>
+                    <Button
+                      onClick={runPeptideSimulation}
+                      disabled={peptideLoading || peptideSequence.trim().length < 2}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {peptideLoading
+                        ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
+                        : <><Play className="w-4 h-4" /> Run In Vitro Analysis</>}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {peptideSequence.trim().length < 2
+                        ? "Enter a peptide sequence (≥ 2 residues) above"
+                        : "Pure-sequence analytics · runs in under a second"}
+                    </p>
+                  </>)}
+
+                  {l1Modality === "antibody" && (<>
+                    <Button
+                      onClick={runAntibodyAnalysis}
+                      disabled={antibodyLoading || antibodyHeavy.replace(/[^A-Za-z]/g, "").length < 70}
+                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                    >
+                      {antibodyLoading
+                        ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
+                        : <><Play className="w-4 h-4" /> Run In Vitro Analysis</>}
+                    </Button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                      {antibodyHeavy.replace(/[^A-Za-z]/g, "").length < 70
+                        ? "Heavy / VHH chain must be ≥ 70 residues"
+                        : "Pure-sequence developability engine · runs in under a second"}
+                    </p>
+                  </>)}
                 </div>
               </div>
+              )}
 
               {/* Output Panel — Layer 1 */}
               <div id="demo-results" className="flex-1 overflow-y-auto p-5">
-                {simStatus[1] === "idle" && (
+
+                {/* ── Peptide modality: running animation ───────────────── */}
+                {l1Modality === "peptide" && simStatus[1] === "running" && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    </div>
+                    <div className="text-[14px] font-medium text-white">Running Peptide Analysis</div>
+                    <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
+                    <p className="text-[11px] text-slate-500">Physicochemical · Secondary structure · Proteolytic stability · Developability</p>
+                  </div>
+                )}
+
+                {/* ── Peptide modality: idle state ──────────────────────── */}
+                {l1Modality === "peptide" && simStatus[1] === "idle" && !peptideResult && !peptideError && (
+                  <div className="flex flex-col items-center justify-center h-full gap-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <Dna className="w-7 h-7 text-violet-400/50" />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[14px] font-medium text-slate-400">No peptide analysis yet</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Enter a peptide sequence on the left and run the analysis to see physicochemical properties, secondary structure, proteolytic stability and developability flags.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Peptide modality: show results panel ─────────────── */}
+                {l1Modality === "peptide" && simStatus[1] !== "running" && (peptideResult || peptideError) && (
+                  <PeptideAnalysisPanel
+                    sequence={peptideSequence}
+                    cyclic={peptideMods.cyclization !== "none"}
+                    loading={peptideLoading}
+                    error={peptideError}
+                    result={peptideResult}
+                    onClear={() => {
+                      setPeptideSequence("");
+                      setPeptideResult(null);
+                      setPeptideError(null);
+                      setSimStatus(prev => ({ ...prev, 1: "idle" }));
+                    }}
+                  />
+                )}
+
+                {/* ── Antibody modality: running animation ──────────────── */}
+                {l1Modality === "antibody" && simStatus[1] === "running" && (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    </div>
+                    <div className="text-[14px] font-medium text-white">Running Antibody Developability Analysis</div>
+                    <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
+                    <p className="text-[11px] text-slate-500">CDR localisation · Liability scan · TAP-style flags · Aggregation · Immunogenicity</p>
+                  </div>
+                )}
+
+                {/* ── Antibody modality: idle state ─────────────────────── */}
+                {l1Modality === "antibody" && simStatus[1] === "idle" && !antibodyResult && !antibodyError && (
+                  <div className="flex flex-col items-center justify-center h-full gap-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <Shield className="w-7 h-7 text-violet-400/50" />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[14px] font-medium text-slate-400">No antibody analysis yet</div>
+                        <div className="text-[11px] text-slate-600 mt-1 max-w-xs">Enter heavy chain (and optionally light chain) sequences on the left and run the analysis to see developability profile, CDR mapping, liabilities and stability outlook.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Antibody modality: show results panel ─────────────── */}
+                {l1Modality === "antibody" && simStatus[1] !== "running" && (antibodyResult || antibodyError) && (
+                  <AntibodyAnalysisPanel
+                    heavy={antibodyHeavy}
+                    light={antibodyLight}
+                    formatHint={antibodyFormatHint}
+                    loading={antibodyLoading}
+                    error={antibodyError}
+                    result={antibodyResult}
+                    onClear={() => { setAntibodyHeavy(""); setAntibodyLight(""); setAntibodyResult(null); setAntibodyError(null); setSimStatus(prev => ({ ...prev, 1: "idle" })); }}
+                  />
+                )}
+
+                {/* ── Small molecule modality: original L1 pipeline ─────── */}
+                {l1Modality === "small_molecule" && simStatus[1] === "idle" && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -4120,7 +5105,7 @@ export function HakaseAI() {
                   </div>
                 )}
 
-                {simStatus[1] === "running" && (
+                {l1Modality === "small_molecule" && simStatus[1] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
                     <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
                       <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
@@ -4131,26 +5116,8 @@ export function HakaseAI() {
                   </div>
                 )}
 
-                {simStatus[1] === "complete" && (
+                {l1Modality === "small_molecule" && simStatus[1] === "complete" && (
                   <>
-                    {/* 3D Viewer launcher — always visible after simulation */}
-                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/8">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">View 3D</span>
-                      {(["cinematic","scientific","explorer"] as const).map((mode) => {
-                        const labels = { cinematic: "Cinematic", scientific: "Scientific", explorer: "Explorer" };
-                        const icons = { cinematic: "🎬", scientific: "🔬", explorer: "🧬" };
-                        return (
-                          <button
-                            key={mode}
-                            onClick={() => { setViewer3DMode(mode); setViewer3DOpen(true); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:border-violet-500/50 hover:bg-violet-500/10 transition-all group"
-                          >
-                            <span className="text-base">{icons[mode]}</span>
-                            <span className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300 transition-colors">{labels[mode]}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
                     <Layer1Results
                       smiles={smiles}
                       molProps={molProps}
@@ -4174,6 +5141,20 @@ export function HakaseAI() {
                       onAcknowledgeFlags={() => setHAIOpsCtx(prev => acknowledgeReview(prev))}
                       topTarget={targetSuggestions[0] ?? null}
                       therapeuticArea={therapeuticArea}
+                      onCloseInputPanel={() => setInputPanelOpen(false)}
+                      targetSuggestions={targetSuggestions}
+                      runningSelectivityScreen={runningSelectivityScreen}
+                      handleRunOffTargetScreen={handleRunOffTargetScreen}
+                      extChEMBL={extChEMBL}
+                      onSelectTarget={(uid) => {
+                        uniprotManual.current = true;
+                        setUniprotAutoMode(false);
+                        setUniprotId(uid);
+                        setPdbId("");
+                        setPdbStructure(null);
+                        setProteinInfo(null);
+                        setProteinError(null);
+                      }}
                     />
                     {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
                       <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
@@ -4184,7 +5165,7 @@ export function HakaseAI() {
                       onAcknowledge={() => setHAIOpsCtx(prev => acknowledgeReview(prev))}
                     />
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL1?.databaseQueries ?? []).some(q => q.database === w.database))} />
-                    <CrossSourceConsistencyCheck simIC50_uM={inVitroResults ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
+                    <CrossSourceConsistencyCheck simIC50_uM={inVitroResults?.doseResponse.ic50_nM != null ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
                     {provenanceL1 && <ProvenanceFooter provenance={provenanceL1} layer={1} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
@@ -4249,6 +5230,7 @@ export function HakaseAI() {
                   <span className="text-[10px] font-bold tracking-widest text-cyan-300 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30">
                     V2.0.0
                   </span>
+                  {l1Modality === "small_molecule" && (
                   <div className="flex items-center gap-0.5 rounded-full bg-white/5 border border-white/10 p-0.5">
                     <button
                       onClick={() => setConfirmationSubTrack("insilico")}
@@ -4271,8 +5253,30 @@ export function HakaseAI() {
                       <Microscope className="w-3 h-3" /> Ex-Vivo sub-track
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
+              {l1Modality !== "small_molecule" ? (
+                /* ── Biologic modalities — modality-aware L2 confirmation ──
+                   Peptides and antibodies do not use the small-molecule
+                   docking / PBPK / FEP toolchain. The biologic scaffold runs
+                   co-folding binding, class-based PK, immunogenicity and the
+                   falsifier registry instead. */
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <Layer2BiologicScaffold
+                    modality={l1Modality === "antibody" ? "antibody" : "peptide"}
+                    layer1Ready={l1Modality === "antibody" ? !!antibodyResult : !!peptideResult}
+                    peptideResult={peptideResult}
+                    antibodyResult={antibodyResult}
+                    peptideSequence={peptideSequence}
+                    peptideCyclic={peptideMods.cyclization !== "none"}
+                    antibodyHeavy={antibodyHeavy}
+                    antibodyLight={antibodyLight}
+                    onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                  />
+                </div>
+              ) : (
+              <>
               {/* v2.0.0 Confirmation orchestrator — compact strip; expand for
                   directive emission, falsifier check, override authoring, joint
                   output synthesis. */}
@@ -4286,7 +5290,7 @@ export function HakaseAI() {
                 }}
                 forceExpandSignal={confirmationExpandSignal}
               />
-              {/* IVIVE Wet-Lab Inputs panel was relocated to the L2 → L3
+              {/* IVIVE Substrate Inputs panel was relocated to the L2 → L3
                   IVIVE Output / Animal Cohort Handoff page (May 2026). The
                   substrate now lives at the handoff because that's where it
                   gates progression to L3. L2 In-Silico still reads whatever
@@ -4313,6 +5317,8 @@ export function HakaseAI() {
                   />
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -4367,7 +5373,7 @@ export function HakaseAI() {
                             <Row label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
                             <Row label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
                             <Row label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
-                            <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? simResults.binding.primaryKi.toFixed(1) : "—"} />
+                            <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults?.binding ? simResults.binding.primaryKi.toFixed(1) : "—"} />
                             <Row label="Plasma fu (%)"       source="L1 PPB sim"                 value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
                             <Row label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
                             <Row label="L1 Go / No-Go"       source="L1 cascade gate"            value={simResults ? simResults.goNogo : "—"} />
@@ -4499,7 +5505,7 @@ export function HakaseAI() {
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">IVIVE Substrate</span>
                             {ivieHasData && anyAuto && (
                               <span
-                                title="One or more IVIVE values are literature midpoints (auto-filled from species defaults), not measured CRO data. See the 'Substrate mode' row below for the exact breakdown."
+                                title="One or more IVIVE cells are Lombardo / Smith CLASS-MEDIAN anchors, not LITERATURE or IN-HOUSE values. See the 'Substrate mode' row below for the exact breakdown."
                                 className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
                               >
                                 Auto-filled
@@ -4512,13 +5518,13 @@ export function HakaseAI() {
                             )}
                           </div>
                           <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.03] px-3 py-1">
-                            <Row label="Cross-species rule" source="measured fu_p + B/P, human + ≥1 preclinical"
+                            <Row label="Cross-species rule" source="LITERATURE or IN-HOUSE fu_p + B/P, human + ≥1 preclinical"
                                  value={tierA ? (tierA.crossSpeciesRuleSatisfied ? "MET" : "UNMET") : "—"} />
                             <Row label="Substrate mode"     source="current ivieInputs provenance"
                                  value={
-                                   substrateMode === "measured"       ? "Measured (CRO)"
-                                   : substrateMode === "auto-estimated" ? "All auto-filled (literature)"
-                                   : substrateMode === "mixed"          ? "Partial auto (some CRO, some literature)"
+                                   substrateMode === "measured"       ? "LITERATURE or IN-HOUSE"
+                                   : substrateMode === "auto-estimated" ? "All CLASS-MEDIAN (Lombardo / Smith)"
+                                   : substrateMode === "mixed"          ? "Mixed (LITERATURE/IN-HOUSE + CLASS-MEDIAN)"
                                    : "—"
                                  } />
                             <Row label="Completion"         source="cells filled / total"
@@ -4531,17 +5537,17 @@ export function HakaseAI() {
                               <>
                                 <Row label="Signed at"          source="ISO 8601"        value={iviveHandoffSignOff.signedAt} />
                                 <Row label="Sign-off substrate" source="captured at sign-off"
-                                     value={iviveHandoffSignOff.substrateMode === "measured" ? "Measured (CRO)"
-                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "All auto-filled (literature)"
-                                          : "Partial auto (some CRO, some literature)"} />
+                                     value={iviveHandoffSignOff.substrateMode === "measured" ? "LITERATURE or IN-HOUSE"
+                                          : iviveHandoffSignOff.substrateMode === "auto-estimated" ? "All CLASS-MEDIAN (Lombardo / Smith)"
+                                          : "Mixed (LITERATURE/IN-HOUSE + CLASS-MEDIAN)"} />
                               </>
                             )}
                           </div>
                           {ivieHasData && anyAuto && (
                             <p className="mt-1.5 px-1 text-[10px] text-orange-300/90 leading-relaxed">
                               ⚠ L3 study design + L4 FIH dose will be tagged{" "}
-                              <span className="font-semibold">"estimated substrate"</span> in the audit trail
-                              and cannot be used for IND submission without re-running on measured CRO data.
+                              <span className="font-semibold">"class-median substrate"</span> in the audit trail
+                              and cannot be used for IND submission without re-running on LITERATURE or IN-HOUSE data.
                             </p>
                           )}
                           {iviveHandoffSignOff && substrateMode && iviveHandoffSignOff.substrateMode !== substrateMode && (
@@ -4753,7 +5759,13 @@ export function HakaseAI() {
                     </section>
                   )}
 
-                  {/* L1 → L4 Cascade Applied (L2 / L3 are scaffolds — animal sim consumes L1 directly) */}
+                  {/* L1 → L3 Cascade banner (animal panel). The cascade *engine*
+                      currently feeds L1 in vitro outputs directly into the
+                      L3 animal sim — L2 confirmation is a parallel scaffold,
+                      not a hard gate in the data path. The user-facing
+                      "Advance to Confirmation (L2)" button on the L1 card
+                      is the recommended human review step before this
+                      banner's animal results should be trusted for L4. */}
                   <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
@@ -4877,6 +5889,9 @@ export function HakaseAI() {
               confirmationBlock={confirmationBlock}
               inVitroResults={inVitroResults}
               mlAdmet={admetMl}
+              parentL3Hash={evidenceChain.l3}
+              onL4HashChange={reportL4Hash}
+              onL4HashError={reportL4Error}
             />
           )}
 
@@ -6480,7 +7495,7 @@ function BatchCsvUpload({ onSelected }: { onSelected: (smiles: string, name?: st
 
       {open && rows.length > 0 && (
         <div ref={panelRef}
-          className="absolute left-0 top-full mt-1 z-50 w-72 bg-[#0f1117] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          className="absolute left-0 top-full mt-1 z-50 w-full min-w-[200px] max-w-[224px] bg-[#0f1117] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
           <div className="px-3 py-2 border-b border-white/8 flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-300">{rows.length} compounds — click to load</span>
             <div className="flex gap-2">
@@ -6711,7 +7726,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[13px] font-bold text-white">{targetName}</div>
-              <div className="text-[9px] text-slate-500">{targetArea ?? "—"}</div>
+              <div className="text-[9px] text-slate-500">{(targetArea && targetArea.trim()) || "— Not predicted —"}</div>
             </div>
             <div className="text-right">
               <div className={`text-[14px] font-bold tabular-nums ${(targetConfidence ?? 0) >= 0.65 ? "text-emerald-400" : (targetConfidence ?? 0) >= 0.35 ? "text-amber-400" : "text-red-400"}`}>
@@ -6755,7 +7770,9 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Key Metrics</div>
           {iv && (
             <>
-              <AiMiniBar label="IC50" value={iv.doseResponse.ic50_nM} max={1000} color={iv.doseResponse.ic50_nM < 100 ? "emerald" : iv.doseResponse.ic50_nM < 500 ? "amber" : "red"} />
+              {iv.doseResponse.ic50_nM != null
+                ? <AiMiniBar label="IC50" value={iv.doseResponse.ic50_nM} max={1000} color={iv.doseResponse.ic50_nM < 100 ? "emerald" : iv.doseResponse.ic50_nM < 500 ? "amber" : "red"} />
+                : <div className="text-[9px] text-slate-500">IC50 — no validated target</div>}
               <AiMiniBar label="Caco-2 Papp" value={iv.permeability.caco2Papp} max={60} color={iv.permeability.caco2Class === "High" ? "emerald" : iv.permeability.caco2Class === "Moderate" ? "amber" : "red"} />
               <AiMiniBar label="hERG IC50" value={iv.herg.ic50_uM} max={100} color={iv.herg.riskCategory === "Low" ? "emerald" : iv.herg.riskCategory === "Moderate" ? "amber" : "red"} />
             </>
@@ -6763,7 +7780,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           {!iv && sim && (
             <>
               <AiMiniBar label="Absorption" value={(sim.admet.absorption) * 100} max={100} color={sim.admet.absorption >= 0.7 ? "emerald" : "amber"} />
-              <AiMiniBar label="QED" value={sim.qed * 100} max={100} color={sim.qed > 0.5 ? "emerald" : "amber"} />
+              <AiMiniBar label="QED (approx)" value={sim.qed_approx * 100} max={100} color={sim.qed_approx > 0.5 ? "emerald" : "amber"} />
               <AiMiniBar label="Toxicity Risk" value={sim.admet.toxicity * 100} max={100} color={sim.admet.toxicity < 0.3 ? "emerald" : sim.admet.toxicity < 0.6 ? "amber" : "red"} />
             </>
           )}
@@ -6774,7 +7791,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           {[
             { l: "Go/No-Go", v: sim.goNogo, good: sim.goNogo === "GO" },
             { l: "Lipinski", v: `${sim.lipinski.violations}/4 viol.`, good: sim.lipinski.violations <= 1 },
-            { l: "QED", v: sim.qed.toFixed(2), good: sim.qed > 0.5 },
+            { l: "QED~", v: sim.qed_approx.toFixed(2), good: sim.qed_approx > 0.5 },
             { l: "SA Score", v: sim.saScore.toFixed(1), good: sim.saScore <= 4 },
           ].map(m => (
             <div key={m.l} className={`rounded-lg px-2.5 py-2 text-center border ${m.good ? "border-emerald-500/15 bg-emerald-500/5" : "border-red-500/15 bg-red-500/5"}`}>
@@ -7589,7 +8606,19 @@ function RegulatoryInsightCard({
   };
 
   // ── openFDA live data ─────────────────────────────────────────────────
-  const [fdaLabelData, setFdaLabelData] = useState<Record<string, boolean>>({});
+  // `fdaLabelData[drug]` carries BOTH whether openFDA actually has a label
+  // record for that generic name (`exists`) AND whether the label has a boxed
+  // warning. We need `exists` separately so the UI can hide unverified drug
+  // names entirely instead of silently displaying upstream fabrications next
+  // to a misleading "LIVE · openFDA Labels" badge.
+  //
+  // `fdaLabelStatus` distinguishes "fetch finished and openFDA has nothing"
+  // from "fetch failed (network / 429 / 5xx)" so the UI can show an honest
+  // error chip instead of falsely claiming there are no precedents.
+  type FdaLabelRow    = { exists: boolean; boxed: boolean };
+  type FdaLabelStatus = "idle" | "loading" | "success" | "error";
+  const [fdaLabelData, setFdaLabelData]     = useState<Record<string, FdaLabelRow>>({});
+  const [fdaLabelStatus, setFdaLabelStatus] = useState<FdaLabelStatus>("idle");
   const [fdaFaers, setFdaFaers]         = useState<Array<{ term: string; count: number; rate: number }>>([]);
   const [fdaTotalReports, setFdaTotalReports] = useState(0);
   const [fdaDrugs, setFdaDrugs]         = useState<Record<string, { appNumber: string; reviewType: string; approvalYear?: string }>>({});
@@ -7598,23 +8627,49 @@ function RegulatoryInsightCard({
   const drugsKey        = allSimilarDrugs.join(",");
 
   useEffect(() => {
+    setFdaLabelStatus("idle");
+    setFdaLabelData({});
     if (!drugsKey) return;
     const drugs = drugsKey.split(",").filter(Boolean);
     if (drugs.length === 0) return;
     const firstDrug = drugs[0];
 
+    // AbortController + 8s timeout so a hung openFDA call does not leave the
+    // UI stuck on "Verifying…" forever. The cleanup also guards against
+    // stale writes when drugsKey / layer change rapidly (older promises
+    // resolving after a newer effect has already started).
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 8000);
+    let cancelled    = false;
+
     if (layer === 1) {
+      setFdaLabelStatus("loading");
       Promise.all(
         drugs.slice(0, 4).map(drug => {
           const enc = encodeURIComponent(drug.toLowerCase());
-          return fetch(`https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${enc}"&limit=1`)
-            .then(r => r.ok ? r.json() : null).catch(() => null)
-            .then(data => ({ drug, boxed: !!(data?.results?.[0]?.boxed_warning) }));
+          return fetch(`https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${enc}"&limit=1`, { signal: controller.signal })
+            .then((r): Promise<{ ok: boolean; data: unknown }> | { ok: boolean; data: unknown } => {
+              // Distinguish "openFDA returned no rows" (404 from /drug/label is
+              // openFDA's no-results response) from a true transport failure.
+              if (r.status === 404) return { ok: true,  data: null };
+              if (!r.ok)            return { ok: false, data: null };
+              return r.json().then((data: unknown) => ({ ok: true, data }));
+            })
+            .then(({ ok, data }) => {
+              const row = (data as { results?: Array<{ boxed_warning?: unknown }> } | null)?.results?.[0];
+              return { drug, ok, exists: !!row, boxed: !!row?.boxed_warning };
+            })
+            .catch(() => ({ drug, ok: false, exists: false, boxed: false }));
         })
       ).then(results => {
-        const map: Record<string, boolean> = {};
-        results.forEach(({ drug, boxed }) => { map[drug] = boxed; });
+        if (cancelled) return;
+        const map: Record<string, FdaLabelRow> = {};
+        results.forEach(({ drug, exists, boxed }) => { map[drug] = { exists, boxed }; });
         setFdaLabelData(map);
+        // If every single fetch failed at the transport layer, surface an
+        // error rather than falsely reporting "no verified precedents".
+        const allFailed = results.length > 0 && results.every(r => !r.ok);
+        setFdaLabelStatus(allFailed ? "error" : "success");
       });
     }
 
@@ -7651,6 +8706,12 @@ function RegulatoryInsightCard({
         setFdaDrugs(map);
       });
     }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layer, drugsKey]);
   // ─────────────────────────────────────────────────────────────────────
@@ -7747,27 +8808,56 @@ function RegulatoryInsightCard({
             </div>
           </div>
 
-          {/* Precedent drugs — with live openFDA drug label boxed-warning badge */}
-          {sr?.similarDrugs && sr.similarDrugs.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
-                {Object.keys(fdaLabelData).length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
-                )}
+          {/* Precedent drugs — only render names that openFDA actually has a
+              label record for. The upstream `similarDrugs` list comes from a
+              curated UniProt → drug map (with a curated TA fallback), but we
+              still verify each name against openFDA before display so the
+              "LIVE" badge is truthful and so any future drift in the upstream
+              catalog (e.g. a misspelling or a withdrawn drug) does not leak
+              fabricated precedents into the regulatory panel. */}
+          {sr?.similarDrugs && sr.similarDrugs.length > 0 && (() => {
+            const verified = sr.similarDrugs.filter(d => fdaLabelData[d]?.exists);
+            // Honest status mapping:
+            //   loading → "Verifying with openFDA…", show all candidate names dimmed
+            //   error   → show all candidate names with an "openFDA unreachable" chip (do NOT claim no precedents)
+            //   success + 0 verified → show explicit "no openFDA-verified precedents" message and hide names
+            //   success + ≥1 verified → "LIVE · openFDA Labels" badge, show only verified names
+            if (fdaLabelStatus === "success" && verified.length === 0) {
+              return (
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Approved Precedent Drugs (Same Class)</div>
+                  <div className="text-[10px] text-slate-500 italic">No openFDA-verified precedent drugs in this class.</div>
+                </div>
+              );
+            }
+            const namesToShow = fdaLabelStatus === "success" ? verified : sr.similarDrugs;
+            return (
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Approved Precedent Drugs (Same Class)</div>
+                  {fdaLabelStatus === "loading" && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-slate-500/10 text-slate-400 border border-slate-500/20 font-mono">Verifying with openFDA…</span>
+                  )}
+                  {fdaLabelStatus === "error" && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">openFDA unreachable — names unverified</span>
+                  )}
+                  {fdaLabelStatus === "success" && verified.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {namesToShow.map(d => (
+                    <span key={d} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] ${fdaLabelStatus === "success" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-white/5 border-white/10 text-slate-400"}`}>
+                      {d}
+                      {fdaLabelData[d]?.boxed === true && (
+                        <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {sr.similarDrugs.map(d => (
-                  <span key={d} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-300">
-                    {d}
-                    {fdaLabelData[d] === true && (
-                      <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
@@ -8629,7 +9719,11 @@ function Layer1Results({
   uniprotId, pdbId, alphafoldPlddt, proteinName,
   bindingOn, toxOn, confidenceThreshold,
   safetyFlags, flagsAcknowledged, onAcknowledgeFlags,
-  topTarget, therapeuticArea,
+  topTarget, therapeuticArea, onCloseInputPanel,
+  targetSuggestions, onSelectTarget,
+  runningSelectivityScreen = false,
+  handleRunOffTargetScreen,
+  extChEMBL,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -8653,9 +9747,38 @@ function Layer1Results({
   onAcknowledgeFlags?: () => void;
   topTarget?: TargetSuggestion | null;
   therapeuticArea?: string;
+  onCloseInputPanel?: () => void;
+  targetSuggestions?: TargetSuggestion[];
+  onSelectTarget?: (uniprotId: string) => void;
+  runningSelectivityScreen?: boolean;
+  handleRunOffTargetScreen?: () => void;
+  extChEMBL?: import("@/lib/chemblActivity").ChEMBLMultiTargetResult | null;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [wetLabView, setWetLabView] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const molName = simResults?.molName ?? "";
+
+  const handleGeneratePdf = async () => {
+    if (pdfGenerating) return;
+    setPdfGenerating(true);
+    try {
+      const { generateLayer1Report } = await import("@/lib/pdfReport");
+      await generateLayer1Report({
+        smiles,
+        indication,
+        molProps: molProps as unknown as Record<string, unknown> | null,
+        simResults: simResults as unknown as Record<string, unknown> | null,
+        inVitroResults: inVitroResults as unknown as Record<string, unknown> | null,
+      });
+    } catch (err) {
+      console.error("[Layer1 PDF] generation failed", err);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   const iv = inVitroResults;
   const goColor = !iv ? "emerald" : iv.overallRisk === "Low" ? "emerald" : iv.overallRisk === "Moderate" ? "yellow" : "red";
@@ -8682,10 +9805,18 @@ function Layer1Results({
               )}
             </div>
             <p className="text-[13px] text-white font-medium">
-              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Animal Studies" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
+              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Confirmation (L2)" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Confidence Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+              {/* RF#5 / §9 step 10: was "Confidence Score". Renamed to
+                  "Composite Heuristic Score" because the underlying number
+                  is a weighted blend of physchem heuristics (QED, SA,
+                  rule-of-5, ADMET sub-scores) — NOT a calibrated probability
+                  of clinical success. The qualifier "(heuristic blend, not
+                  calibrated)" sits inline so the demo audience cannot
+                  read it as a Bayesian posterior. */}
+              Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+              <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend, not calibrated)</span>
               <span className="text-slate-600 ml-2">HAIOps Governed</span>
             </p>
           </div>
@@ -8693,7 +9824,7 @@ function Layer1Results({
             <div className="text-[11px] text-slate-500 mb-2">Key metrics</div>
             <div className="flex gap-1.5 flex-wrap justify-end">
               {iv && [
-                { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
+                { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—" },
                 { l: "Perm", v: iv.permeability.caco2Class },
                 { l: "hERG", v: iv.herg.riskCategory },
               ].map(m => (
@@ -8704,12 +9835,16 @@ function Layer1Results({
         </div>
         <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "IC50",         val: iv ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
+            { label: "IC50",         val: iv?.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
             { label: "Caco-2",       val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
             { label: "CLint",        val: iv ? `${iv.metabolicStability.microsomalCLint.toFixed(1)} µL/min/mg` : "—", good: iv?.metabolicStability.microsomalClass !== "Unstable" },
             { label: "fu%",          val: iv ? `${iv.plasmaProteinBinding.fuPercent.toFixed(1)}%` : "—", good: (iv?.plasmaProteinBinding.fuPercent ?? 0) > 5 },
             { label: "hERG IC50",    val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
-            { label: "TI",           val: iv ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
+            // RF#12 / §9 step 11: TI is not computable when ic50_nM is null
+            // (no validated on-target). Inv simulator emits TI=0 in that
+            // case as a structural placeholder; suppress the display rather
+            // than show "0×" which reads as a real measurement.
+            { label: "TI",           val: iv?.doseResponse.ic50_nM != null ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
           ].map(({ label, val, good }) => (
             <div key={label}>
               <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
@@ -8719,12 +9854,14 @@ function Layer1Results({
         </div>
       </div>
 
-      {/* Confidence threshold warning */}
+      {/* Composite heuristic score threshold warning (was "confidence
+          threshold" — see §9 step 10). The number is a heuristic blend, not
+          a posterior probability, so the warning copy avoids "confidence". */}
       {simResults && simResults.confidence < confidenceThreshold[0] && (
         <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
           <div className="text-[10px] text-amber-300 leading-relaxed">
-            <span className="font-semibold">Below confidence threshold</span> — simulation confidence {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold.
+            <span className="font-semibold">Below composite-score threshold</span> — composite heuristic score {(simResults.confidence * 100).toFixed(1)}% is under your {(confidenceThreshold[0] * 100).toFixed(0)}% threshold (heuristic blend of QED, SA, rule-of-5, ADMET — not a calibrated posterior).
           </div>
         </div>
       )}
@@ -8755,19 +9892,103 @@ function Layer1Results({
 
       {/* ML-Enhanced ADMET Tab */}
       {activeTab === "ml-admet" && (
-        <MlAdmetCard smiles={smiles} heuristicAdmet={simResults?.admet ?? null} />
+        <div id="ml-admet-detail" className="scroll-mt-24">
+          <MlAdmetCard smiles={smiles} heuristicAdmet={simResults?.admet ?? null} />
+        </div>
       )}
 
       {/* Dose-Response Tab */}
       {activeTab === "dose-response" && iv && (
         <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-[12px] font-semibold text-slate-300">Dose-Response Curve</h3>
-            <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
-              {iv.doseResponse.potencyClass} Potency
-            </Badge>
+            <div className="flex items-center gap-2">
+              {/* Wet-lab view toggle — only meaningful when a curve exists */}
+              {iv.doseResponse.curve.length > 0 && iv.doseResponse.ic50_nM != null && (
+                <div className="inline-flex rounded-md border border-white/10 overflow-hidden text-[10px]">
+                  <button
+                    onClick={() => setWetLabView(false)}
+                    className={`px-2.5 py-1 transition-colors ${!wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Sleek
+                  </button>
+                  <button
+                    onClick={() => setWetLabView(true)}
+                    className={`px-2.5 py-1 transition-colors border-l border-white/10 ${wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                    title="Wet-lab style assay report (raw RLU + 4PL fit + plate controls)"
+                  >
+                    Wet-Lab View
+                  </button>
+                </div>
+              )}
+              {/* RF#12 / §9 step 11: potencyClass is nullable when ic50_nM
+                  is null (no validated target). When present, surface the TA
+                  convention used so the user knows whether "High" means kinase
+                  <100 nM, GPCR <50 nM, etc. */}
+              {iv.doseResponse.potencyClass !== null ? (
+                <Badge className={`text-[9px] ${iv.doseResponse.potencyClass === "High" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.doseResponse.potencyClass === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
+                  {iv.doseResponse.potencyClass} Potency{iv.doseResponse.potencyConvention ? ` · ${iv.doseResponse.potencyConvention}` : ""}
+                </Badge>
+              ) : (
+                <Badge className="text-[9px] bg-white/5 text-slate-400">
+                  Potency — no validated target
+                </Badge>
+              )}
+            </div>
           </div>
-          <svg viewBox="0 0 400 200" className="w-full h-auto">
+
+          {/* Wet-lab view — replaces the sleek curve + metrics + viability block when toggled on */}
+          {wetLabView && iv.doseResponse.ic50_nM != null && iv.doseResponse.hillCoefficient != null && iv.doseResponse.maxInhibition != null && (
+            <WetLabAssayCard
+              smiles={smiles}
+              ic50_nM={iv.doseResponse.ic50_nM}
+              hillCoefficient={iv.doseResponse.hillCoefficient}
+              maxInhibition_pct={iv.doseResponse.maxInhibition}
+              therapeuticArea={therapeuticArea}
+            />
+          )}
+          {!wetLabView && (
+          <>
+          {iv.doseResponse.curve.length === 0 ? (
+            // Anti-fabrication: no synthetic curve when target isn't validated.
+            // Render a compact, informative empty state instead of a giant blank chart.
+            // When the molecule HAS a high-confidence (≥0.65) auto-matched target
+            // but the user hasn't selected it yet, surface a one-click CTA so they
+            // don't have to scroll back to the Target panel — addresses repeated
+            // friction where users paste a SMILES, hit Run, and see "no curve"
+            // without realising a validated suggestion is sitting one panel up.
+            (() => {
+              const topValidated = (targetSuggestions ?? []).find(s => s.confidence >= 0.65);
+              return (
+                <div className="flex flex-col items-center justify-center py-10 px-4 bg-white/[0.02] rounded-lg border border-white/5">
+                  <TrendingUp className="w-8 h-8 text-slate-700 mb-2" />
+                  <div className="text-[12px] text-slate-400 font-medium">Dose-response curve unavailable</div>
+                  {topValidated && !uniprotId && onSelectTarget ? (
+                    <>
+                      <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
+                        A high-confidence target was auto-matched for this molecule but isn't selected yet.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onSelectTarget(topValidated.uniprotId)}
+                        className="mt-3 px-3 py-1.5 text-[10px] rounded-md bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25 transition-colors"
+                        title="Set this UniProt as the target, then re-run the simulation to generate the curve"
+                      >
+                        Use {topValidated.geneName ?? topValidated.uniprotId} ({topValidated.uniprotId}) · {(topValidated.confidence * 100).toFixed(0)}% conf
+                      </button>
+                      <div className="text-[9px] text-slate-600 mt-2 text-center">Then re-run the simulation to generate the curve.</div>
+                    </>
+                  ) : (
+                    <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
+                      No data is fabricated for unvalidated targets. Try a validated UniProt
+                      (e.g. <span className="font-mono text-violet-400">P00533</span> · EGFR) to see the curve.
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+          <svg viewBox="0 0 400 200" className="w-full h-auto max-w-[560px] mx-auto block">
             <defs>
               <linearGradient id="drGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
@@ -8794,19 +10015,24 @@ function Layer1Results({
                   {pts.map((p, i) => (
                     <circle key={i} cx={toX(p.concentration)} cy={toY(p.response)} r="2" fill="#8b5cf6" />
                   ))}
-                  <line x1={toX(iv.doseResponse.ic50_nM)} y1={20} x2={toX(iv.doseResponse.ic50_nM)} y2={180} stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" />
-                  <text x={toX(iv.doseResponse.ic50_nM)} y={16} fill="#f59e0b" fontSize="8" textAnchor="middle">IC50 = {iv.doseResponse.ic50_nM.toFixed(1)} nM</text>
+                  {iv.doseResponse.ic50_nM != null && (
+                    <>
+                      <line x1={toX(iv.doseResponse.ic50_nM)} y1={20} x2={toX(iv.doseResponse.ic50_nM)} y2={180} stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" />
+                      <text x={toX(iv.doseResponse.ic50_nM)} y={16} fill="#f59e0b" fontSize="8" textAnchor="middle">IC50 = {iv.doseResponse.ic50_nM.toFixed(1)} nM</text>
+                    </>
+                  )}
                 </>
               );
             })()}
             <text x="220" y="198" fill="#64748b" fontSize="8" textAnchor="middle">Concentration (nM, log scale)</text>
           </svg>
+          )}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { l: "IC50", v: `${iv.doseResponse.ic50_nM.toFixed(1)} nM` },
-              { l: "EC50", v: `${iv.doseResponse.ec50_nM.toFixed(1)} nM` },
-              { l: "Hill Coefficient", v: iv.doseResponse.hillCoefficient.toFixed(2) },
-              { l: "Max Inhibition", v: `${iv.doseResponse.maxInhibition.toFixed(1)}%` },
+              { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "no validated target" },
+              { l: "EC50", v: iv.doseResponse.ec50_nM != null ? `${iv.doseResponse.ec50_nM.toFixed(1)} nM` : "—" },
+              { l: "Hill Coefficient", v: iv.doseResponse.hillCoefficient != null ? iv.doseResponse.hillCoefficient.toFixed(2) : "—" },
+              { l: "Max Inhibition", v: iv.doseResponse.maxInhibition != null ? `${iv.doseResponse.maxInhibition.toFixed(1)}%` : "—" },
             ].map(m => (
               <div key={m.l} className="bg-white/5 rounded-lg p-2.5 text-center">
                 <div className="text-[9px] text-slate-500 uppercase">{m.l}</div>
@@ -8818,10 +10044,12 @@ function Layer1Results({
             <div className="text-[10px] font-semibold text-slate-400 mb-2">Cell Viability ({iv.cellViability.cellLine})</div>
             <div className="grid grid-cols-3 gap-3">
               <div><div className="text-[9px] text-slate-500">CC50</div><div className="text-[12px] font-semibold text-white">{iv.cellViability.cc50_uM.toFixed(1)} µM</div></div>
-              <div><div className="text-[9px] text-slate-500">Therapeutic Index</div><div className={`text-[12px] font-semibold ${iv.cellViability.therapeuticIndex > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.therapeuticIndex.toFixed(0)}×</div></div>
+              <div><div className="text-[9px] text-slate-500">Therapeutic Index</div>{iv.doseResponse.ic50_nM != null ? <div className={`text-[12px] font-semibold ${iv.cellViability.therapeuticIndex > 30 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.therapeuticIndex.toFixed(0)}×</div> : <div className="text-[10px] text-slate-500 italic">no validated target</div>}</div>
               <div><div className="text-[9px] text-slate-500">Viability @10µM</div><div className={`text-[12px] font-semibold ${iv.cellViability.viabilityAt10uM > 80 ? "text-emerald-400" : "text-red-400"}`}>{iv.cellViability.viabilityAt10uM.toFixed(0)}%</div></div>
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 
@@ -8955,8 +10183,37 @@ function Layer1Results({
                   {iv.selectivity.selectivityClass}
                 </Badge>
               </div>
-              <div className="text-[24px] font-bold text-white mb-1">{(iv.selectivity.kinaseSelectivityScore * 100).toFixed(0)}<span className="text-[12px] text-slate-400">%</span></div>
-              <div className="text-[9px] text-slate-500 mb-2">{iv.selectivity.offTargetHits} off-target hits / {iv.selectivity.totalTargetsTested} tested</div>
+              {iv.selectivity.kinaseSelectivityScore != null && iv.selectivity.totalTargetsTested != null ? (
+                <>
+                  <div className="text-[24px] font-bold text-white mb-1">{(iv.selectivity.kinaseSelectivityScore * 100).toFixed(0)}<span className="text-[12px] text-slate-400">%</span></div>
+                  <div className="text-[9px] text-slate-500 mb-2">{iv.selectivity.offTargetHits} off-target hits / {iv.selectivity.totalTargetsTested} tested</div>
+                </>
+              ) : (
+                // RF#3 / RF#4: no real off-target panel run → refuse to
+                // emit a fabricated "tested against N" denominator. Let the
+                // user explicitly invoke a live kinome screening projection!
+                <>
+                  <div className="text-[14px] font-semibold text-slate-300 mb-1">—</div>
+                  <div className="text-[9px] text-slate-500 mb-2">No off-target panel run — selectivity not computable</div>
+                  <button
+                    onClick={() => handleRunOffTargetScreen?.()}
+                    disabled={runningSelectivityScreen}
+                    className="w-full mt-1 px-2.5 py-1.5 rounded text-[9px] font-bold tracking-wider uppercase transition-all duration-300 border bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+                  >
+                    {runningSelectivityScreen ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
+                        Screening Kinome...
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-3 h-3 text-sky-400" />
+                        Run Kinome Screening
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
           {iv.selectivity.topOffTargets.length > 0 && (
@@ -9199,13 +10456,58 @@ function Layer1Results({
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
           <Download className="w-3.5 h-3.5" /> Export PNG
         </Button>
-        <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
-          <FileText className="w-3.5 h-3.5" /> PDF Report
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGeneratePdf}
+          disabled={pdfGenerating || !inVitroResults}
+          className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5 disabled:opacity-50"
+          title={!inVitroResults ? "Run the simulation first" : "Generate PDF report (Claude-authored narrative + charts)"}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          {pdfGenerating ? "Generating…" : "PDF Report"}
         </Button>
         <Button variant="outline" size="sm" className="border-white/10 text-slate-400 hover:text-white text-[11px] gap-1.5">
           <Download className="w-3.5 h-3.5" /> Export JSON
         </Button>
       </div>
+
+      {/* Comprehensive Wet-Lab Report — full-screen, Markdown + LaTeX */}
+      {inVitroResults && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <Button
+            onClick={() => {
+              onCloseInputPanel?.();
+              setReportOpen(true);
+            }}
+            className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-[12px] font-semibold gap-2 px-5 py-2.5 shadow-lg shadow-violet-500/20"
+            title="Generate the comprehensive wet-lab assay report (full-screen, Markdown + LaTeX)"
+          >
+            <FileText className="w-4 h-4" />
+            Generate Comprehensive Wet-Lab Report
+          </Button>
+          <div className="text-[10px] text-slate-500">
+            Corporate-ready report · §1 Document Control → §15 Signatures · 4PL · Z′-factor · 95% CI
+          </div>
+        </div>
+      )}
+      {inVitroResults && (
+        <WetLabReportView
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          smiles={smiles}
+          molName={molName}
+          molProps={molProps}
+          iv={inVitroResults}
+          therapeuticArea={therapeuticArea}
+          uniprotId={uniprotId}
+          proteinName={proteinName}
+          pdbId={pdbId}
+          indication={indication}
+          simResults={simResults}
+          extChEMBL={extChEMBL}
+        />
+      )}
 
       <RegulatoryInsightCard layer={1} indication={indication} simResults={simResults} />
       <SimulationDataSources
@@ -9351,19 +10653,19 @@ function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molPr
 function BindingHeatmap({ binding, uniprotId }: { binding: BindingEstimate | null; uniprotId: string }) {
   const metrics = ["Kd (nM)", "Ki (nM)", "IC50 (nM)", "Selectivity"];
 
+  // RF#1 / §9 step 1 (code-review fix): when L1 binding is null (off-catalog
+  // UniProt) the heatmap previously rendered three hardcoded EGFR/HER2/HER3
+  // rows that read as real Kd/Ki/IC50 measurements — exactly the fake-data
+  // class the audit removes. Render an empty state instead.
   const primaryLabel = binding ? `${binding.targetName} (${uniprotId})` : "Primary Target";
-  const rows = binding
+  const rows: { label: string; vals: number[] }[] = binding
     ? [
         { label: primaryLabel, vals: [binding.primaryKd, binding.primaryKi, binding.primaryIC50, binding.selectivity] },
         ...binding.offTargets.map(o => ({
           label: o.name, vals: [o.kd, o.ki, o.ic50, o.selectivity],
         })),
       ]
-    : [
-        { label: "EGFR (P00533)", vals: [12.4,  8.9,   15.2,  4.20] },
-        { label: "HER2 (P04626)", vals: [180.3, 210.4, 195.8, 0.07] },
-        { label: "HER3 (P21860)", vals: [890.2, 1024.1, 940.5, 0.01] },
-      ];
+    : [];
 
   const getColor = (val: number, col: number) => {
     if (col === 3) return val > 2 ? "#22c55e" : val > 0.5 ? "#eab308" : "#ef4444";
@@ -9483,8 +10785,8 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
   const toxLevel  = toxAlerts.some(a => a.severity === "High") ? "High" : toxAlerts.some(a => a.severity === "Medium") ? "Medium" : "Low";
   const base = simResults
     ? {
-        qed: simResults.qed, toxLevel,
-        binding: `${simResults.binding.primaryKd.toFixed(1)} nM`,
+        qed: simResults.qed_approx, toxLevel,
+        binding: simResults.binding ? `${simResults.binding.primaryKd.toFixed(1)} nM` : "no validated target",
         composite: simResults.confidence,
       }
     : { qed: 0.72, toxLevel: "Low", binding: "12.4 nM", composite: 0.81 };
@@ -10820,6 +12122,9 @@ function FirstInHumanPanel({
   confirmationBlock,
   inVitroResults,
   mlAdmet,
+  parentL3Hash,
+  onL4HashChange,
+  onL4HashError,
 }: {
   hasL3: boolean;
   animalResults: any;
@@ -10829,6 +12134,10 @@ function FirstInHumanPanel({
   confirmationBlock: ConfirmationEvidenceBlock | null;
   inVitroResults: InVitroResults | null;
   mlAdmet: MlAdmetResult | null;
+  /** L3 hash to fold into the L4 seal — null until L3 is sealed. */
+  parentL3Hash: ChainHash | null;
+  onL4HashChange: (h: ChainHash | null) => void;
+  onL4HashError: (msg: string | null) => void;
 }) {
   const plannerHandleRef = useRef<Phase1PlannerHandle | null>(null);
   const registerPlannerHandle = useCallback((h: Phase1PlannerHandle) => {
@@ -10873,6 +12182,41 @@ function FirstInHumanPanel({
         : undefined,
     });
   }, [hasL3, animalResults, simResults, molName, mlAdmet, inVitroResults]);
+
+  // L4 evidence-chain seal — fold parent L3 hash into the built v1 package.
+  // Reports the hash up to HakaseAI's chain state. Null when either the L3
+  // anchor or the package itself isn't ready (anti-fabrication: no L3 anchor
+  // means no L4 seal is honest to claim).
+  const l4SealTokenRef = useRef(0);
+  useEffect(() => {
+    const token = ++l4SealTokenRef.current;
+    if (!parentL3Hash || !pkg) {
+      // L4 isn't sealable right now; clear both the hash AND any stale
+      // error from a previous attempt so the alert channel doesn't show
+      // an irrelevant historical failure.
+      onL4HashChange(null);
+      onL4HashError(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const l4 = await chainHash(parentL3Hash, pkg);
+        if (cancelled || token !== l4SealTokenRef.current) return;
+        onL4HashChange(l4);
+        onL4HashError(null);
+      } catch (err) {
+        if (cancelled || token !== l4SealTokenRef.current) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("[evidenceChain] L4 hash failed", err);
+        onL4HashChange(null);
+        onL4HashError(`L4 evidence hash unavailable — ${msg}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [parentL3Hash, pkg, onL4HashChange, onL4HashError]);
 
   if (!hasL3 || !animalResults) {
     return (

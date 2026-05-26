@@ -13,7 +13,7 @@ import sklearn.linear_model  # noqa: F401
 import sklearn.model_selection  # noqa: F401
 import sklearn.pipeline  # noqa: F401
 import sklearn.preprocessing  # noqa: F401
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -65,6 +65,9 @@ from models.patient_line import (
 )
 from models import docking_vina
 from models import fep_runpod
+from models import cofolding
+from models.peptide_properties import predict_peptide_properties
+from models.antibody_properties import predict_antibody_properties
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -385,6 +388,61 @@ def api_predict_protein(req: ProteinRequest):
         raise HTTPException(status_code=500, detail=f"Protein analysis failed: {str(e)}")
 
 
+class PeptideRequest(BaseModel):
+    sequence: str
+    cyclic: bool = False
+
+
+@app.post("/predict/peptide")
+def api_predict_peptide(req: PeptideRequest):
+    """Layer 1 — Peptide-native property engine.
+
+    Accepts a single-letter amino acid sequence (standard + modified residues)
+    and returns physicochemical, stability, permeability, AMP, and
+    developability predictions computed purely from published formulae
+    (Kyte-Doolittle, Guruprasad, Ikai, Boman, Eisenberg, Chou-Fasman).
+
+    No external API calls — runs in-process, sub-millisecond.
+    """
+    try:
+        return sanitize(predict_peptide_properties(req.sequence, req.cyclic))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Peptide analysis failed: {str(e)}")
+
+
+class AntibodyRequest(BaseModel):
+    heavy_chain: str
+    light_chain: str | None = None
+    format_hint: str | None = None
+
+
+@app.post("/predict/antibody")
+def api_predict_antibody(req: AntibodyRequest):
+    """Layer 1 — Antibody-native developability engine.
+
+    Accepts a heavy-chain (or VHH / single-domain / scFv) sequence and an
+    optional light-chain sequence, and returns a developability profile:
+    chain-type and format inference, CDR localisation, a deterministic CDR
+    liability scan (glycosylation, deamidation, isomerisation, oxidation,
+    free cysteine), Therapeutic-Antibody-Profiler-style developability flags,
+    aggregation-prone regions and a coarse immunogenicity screen.
+
+    All values are computed from published, citable rules — no external API
+    calls, no fabrication. Anything that cannot be derived honestly (e.g. a
+    calibrated humanness score) is returned as null with an explicit note.
+    """
+    try:
+        return sanitize(predict_antibody_properties(
+            req.heavy_chain, req.light_chain, req.format_hint,
+        ))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Antibody analysis failed: {str(e)}")
+
+
 class DockingRequest(BaseModel):
     smiles: str
     pdb_id: str
@@ -507,6 +565,84 @@ def api_fep_submit(req: FepRequest):
 @app.get("/predict/fep/status/{job_id}")
 def api_fep_status(job_id: str):
     job = fep_runpod.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    return sanitize(job)
+
+
+# ---------------------------------------------------------------------------
+# L2 Stage 2b — Biologics Co-Folding (AlphaFold3-class structure + affinity)
+#
+# Boltz-2 (MIT license) co-folds an arbitrary biomolecular complex — proteins,
+# peptides, DNA, RNA, ligands, ions, modified residues, covalent bonds — and
+# predicts a binding affinity for ligand binders. This extends the platform
+# beyond small-molecule-only scope to peptide / antibody / nucleic-acid
+# modalities. AlphaFold 3 itself is non-commercial-only and is intentionally
+# NOT used as a backend here; see models/cofolding.py for the rationale.
+# ---------------------------------------------------------------------------
+
+@app.get("/predict/cofold/config")
+def api_cofold_config():
+    """Report whether the Boltz-2 RunPod GPU backend is configured.
+
+    Returned to the UI so the Run button can be disabled with an honest
+    message when credentials are missing — the design builder + validation
+    still work without a GPU."""
+    ok, reason = cofolding.cofolding_configured()
+    return {
+        "configured": ok,
+        "reason": reason if not ok else None,
+        "engine": cofolding.ENGINE,
+        "engine_label": cofolding.ENGINE_LABEL,
+    }
+
+
+@app.post("/predict/cofold/validate")
+def api_cofold_validate(req: dict = Body(...)):
+    """Validate a biologics co-folding design and return the generated Boltz
+    YAML plus a cost/runtime summary. Runs with NO GPU — lets clients iterate
+    on a design for free before paying for a prediction."""
+    try:
+        design = cofolding.validate_design(req)
+        yaml_text, needs_msa = cofolding.build_boltz_yaml(design)
+        summary = cofolding.summarize_design(design)
+        return sanitize({
+            "valid": True,
+            "boltz_yaml": yaml_text,
+            "uses_msa_server": needs_msa,
+            "summary": summary,
+            "engine": cofolding.ENGINE_LABEL,
+        })
+    except cofolding.CoFoldValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Co-folding validation failed: {type(e).__name__}: {e}")
+
+
+@app.post("/predict/cofold")
+def api_cofold_submit(req: dict = Body(...)):
+    """Submit a biologics co-folding job to the Boltz-2 RunPod GPU endpoint.
+
+    Asynchronous: returns job_id immediately. Poll
+    GET /predict/cofold/status/{job_id} for progress + result.
+
+    The design is validated and the Boltz YAML is built BEFORE any GPU is
+    used. If the GPU backend is unconfigured this returns 503 with the exact
+    missing-secret name; per project policy no structure is fabricated."""
+    try:
+        return sanitize(cofolding.submit_cofold(req))
+    except cofolding.CoFoldValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        # GPU backend not configured — endpoint exists, backend intentionally absent.
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Co-folding submission failed: {type(e).__name__}: {e}")
+
+
+@app.get("/predict/cofold/status/{job_id}")
+def api_cofold_status(job_id: str):
+    job = cofolding.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
     return sanitize(job)

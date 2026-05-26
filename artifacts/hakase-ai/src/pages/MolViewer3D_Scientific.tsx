@@ -442,7 +442,7 @@ export function MolViewer3D_Scientific({ smiles, molName: propMolName }: { smile
             {/* Quick metrics */}
             <div className="grid grid-cols-4 gap-1.5 mt-3">
               {[
-                { label: "QED", val: molProps ? molProps.qed.toFixed(2) : "—", color: "text-emerald-400" },
+                { label: "QED~", val: molProps ? molProps.qed_approx.toFixed(2) : "—", color: "text-emerald-400" },
                 { label: "logP", val: molProps ? String(molProps.logP) : "—", color: "text-blue-400" },
                 { label: "TPSA", val: molProps ? String(molProps.tpsa) : "—", color: "text-violet-400" },
                 { label: "HBD", val: molProps ? String(molProps.hbd) : "—", color: "text-amber-400" },

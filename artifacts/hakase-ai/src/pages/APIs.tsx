@@ -177,9 +177,9 @@ const DATABASES: DBEntry[] = [
     provider: "Centers for Disease Control and Prevention (CDC)",
     type: "Clinical / Epidemiological",
     color: "blue",
-    description: "Published summary statistics from the National Health and Nutrition Examination Survey 2017–2020 Pre-Pandemic cycle, covering physiological parameters for realistic virtual patient generation.",
+    description: "Published summary statistics from the National Health and Nutrition Examination Survey 2017–2020 Pre-Pandemic cycle. Used as a human reference distribution for L3 → L4 allometric scaling and FIH dose bracketing — not for cohort fabrication.",
     dataPoints: "~15,000 U.S. participants, 2017–2020",
-    usedFor: ["Virtual patient cohort generation (age, weight, height, eGFR, ALT, sex distributions)", "PBPK parameter sampling (body weight, organ volume scaling)", "Renal and hepatic function distribution for PK variability modeling", "Subgroup stratification (sex, BMI, age brackets)"],
+    usedFor: ["Human reference physiology for allometric scaling (BW, eGFR, ALT, albumin)", "PBPK parameter scaling from animal species → human-equivalent dose", "Reference renal/hepatic function distribution for FIH dose bracketing", "Subgroup descriptors (sex, BMI, age) for IND clinical-pharmacology package"],
     url: "https://wwwn.cdc.gov/nchs/nhanes/",
     license: "Public domain — U.S. Government data",
     updateFreq: "Biennial survey cycles",
@@ -250,37 +250,37 @@ const ENGINES: EngineEntry[] = [
   {
     name: "ADMET Prediction Engine",
     color: "violet",
-    layer: "Layer 1 — In Vitro Digital Twin",
-    description: "Browser-side cheminformatics engine computing drug-likeness filters and toxicity risk from molecular descriptors without any server call or data transmission.",
-    capabilities: ["Lipinski Rule-of-5 (MW, LogP, HBD, HBA violations)", "Veber oral bioavailability filters (TPSA, RotBonds)", "QED (Quantitative Estimate of Drug-likeness, 0–1)", "Synthetic Accessibility Score (1–10 scale)", "ADMET composite score with flagged structural alerts", "Ames mutagenicity and hERG cardiotoxicity risk scoring"],
+    layer: "Layer 1 — In Vitro Twin",
+    description: "Browser-side cheminformatics + ML-augmented ADMET. RDKit.js descriptors with QSAR cross-checks; ML predictions tagged with source-quality tier and surfaced with confidence intervals. SMILES never leaves the browser.",
+    capabilities: ["Lipinski Rule-of-5 (MW, LogP, HBD, HBA violations)", "Veber oral bioavailability filters (TPSA, RotBonds)", "QED (Quantitative Estimate of Drug-likeness, 0–1)", "Synthetic Accessibility Score (1–10 scale)", "ML-augmented A·D·M·E·T composite with confidence intervals", "Ames mutagenicity and hERG cardiotoxicity risk scoring"],
   },
   {
-    name: "PBPK Simulation Engine",
+    name: "Confirmation Pipeline (10-Stage In-Silico)",
     color: "blue",
-    layer: "Layer 1–2 — In Vitro + Patient Cohort Twin",
-    description: "Physiologically-based pharmacokinetic compartmental model running in the browser, simulating concentration–time profiles using patient physiological parameters scaled from NHANES distributions.",
-    capabilities: ["Oral absorption (first-pass, bioavailability estimation)", "1- and 2-compartment distribution models", "Hepatic clearance (intrinsic CLh, fu scaling)", "Renal clearance (eGFR-adjusted)", "Cmax, Tmax, AUC, t½ prediction", "Multi-dose accumulation simulation"],
+    layer: "Layer 2 — Confirmation Layer",
+    description: "Server-side 10-stage in-silico confirmation pipeline. Ingests the L1 EvidencePointer (frozen at Stage 0) and walks it through structural confirmation, opt-in physics-grounded refinement, and pharmacology projection — sealed into a v2.0.0 ConfirmationBlock.",
+    capabilities: ["ESM2 protein druggability + pocket detection", "AutoDock Vina 1.2.7 docking with OpenBabel + RDKit prep", "ML affinity + ADMET cross-check vs L1", "Selectivity panel + cardiotox cross-check", "Opt-in alchemical FEP refinement on RunPod GPU", "PBPK projection → QSP/PD coupling → TI ranking", "Sealed ConfirmationEvidenceBlock v2.0.0"],
   },
   {
-    name: "Pharmacodynamic (PD) Model",
+    name: "Ex-Vivo Evidence Ingestion",
     color: "blue",
-    layer: "Layer 2 — Patient Cohort Twin",
-    description: "Emax Hill-equation sigmoidal dose–response model parameterised using ChEMBL bioactivity data, computing target coverage curves and response probability across dose levels.",
-    capabilities: ["Emax sigmoidal exposure–response relationship", "EC50 and Hill coefficient (n) from ChEMBL", "Target coverage % at simulated Cmax", "Resistance penalty modeling (Rb1/p16 pathway)", "Selectivity ratio assessment (on-target vs off-targets)", "PK/PD link (Cmax-driven vs AUC-driven response)"],
+    layer: "Layer 2 — Confirmation Layer (Ex-Vivo Sub-Track)",
+    description: "Structured ingestion of substrate-side evidence — literature values (DOI / PMID for this compound or a Tanimoto ≥ 0.4 congener) and in-house values (bench / CRO measurement with assay method + lab + date). Promotes the row tier to LITERATURE or IN-HOUSE — both satisfy the IVIVE cross-species rule and trump downstream ML tiers in the cascade gate. Every entry is HAIOps-traceable with operator and provenance.",
+    capabilities: ["Literature substrate ingestion (CVCL accession + DOI/PMID)", "In-house substrate ingestion (CVCL + bench/CRO IC50 + assay method)", "fu_p, fu_mic, B/P substrate cells across 5 species", "Class-median fallback (Lombardo 2018 / Smith 2010) with explicit CLASS-MEDIAN tagging", "Source-quality tier promotion (ML/structural → literature or in-house)"],
   },
   {
-    name: "Virtual Patient Cohort Engine",
-    color: "blue",
-    layer: "Layer 2 — Patient Cohort Twin",
-    description: "Monte Carlo sampler generating realistic virtual patient populations using published NHANES physiological parameter distributions, enabling population PK simulation and subgroup analysis.",
-    capabilities: ["Up to 500 virtual patients per simulation", "NHANES-derived weight, age, eGFR, ALT, sex distributions", "Responder / non-responder classification by PK/PD threshold", "Subgroup stratification (sex, age, BMI, organ function)", "Kaplan–Meier progression-free survival approximation", "Adverse event rate scaling by exposure"],
+    name: "Animal Cohort PBPK Engine",
+    color: "amber",
+    layer: "Layer 3 — Animal Cohort",
+    description: "Multi-species two-compartment PBPK with RK4 integration across rat, dog, and monkey. BCS-aware FDA-IIG formulation engine and allometric scaling per ICH M3(R2) — including 1/10 NOAEL safety factor and bootstrap CIs on the human-equivalent dose.",
+    capabilities: ["Species-specific Vd, CL, protein binding (PK-Sim physiology)", "Six FDA-IIG-compliant formulation classes (BCS-aware)", "Allometric scaling: BW^0.75 for CL, BW^1.0 for Vd", "ICH M3(R2) safety factor (1/10 NOAEL) for HED", "External cross-validation (ToxCast · ToxRefDB · ECOTOX)", "ChEMBL animal-PK range checks"],
   },
   {
-    name: "Clinical Trial Simulator",
+    name: "Phase 1 Planner & IND Gate",
     color: "emerald",
-    layer: "Layer 3 — Trial Digital Twin",
-    description: "End-to-end clinical trial design and outcome simulator using log-rank test power calculations and survival modeling to estimate trial success probability, optimal sample size, cost, and duration.",
-    capabilities: ["Statistical power calculation (Schoenfeld formula)", "Phase I/II/III adaptive trial design support", "Enrollment trajectory modeling (ramp-up, plateaus)", "Synthetic control arm generation", "Cost estimation (Phase I–III per-patient rates)", "GO/NO-GO success probability (12%–92% calibrated range)", "FDA path classification (Standard, Breakthrough, Accelerated, Orphan)"],
+    layer: "Layer 4 — First-In-Human Readiness",
+    description: "Derives a defensible MABEL-biased FIH starting dose, evaluates the IND-enabling gate (GLP tox · CMC · IB · Pre-IND), and seals every upstream piece of evidence into a regulator-ingestible PreClinicalPackage v2.0.0. Not a clinical-trial simulator.",
+    capabilities: ["MABEL-biased starting dose (FDA 2005 / EMA 2017)", "evaluateINDGate — GLP tox · CMC · IB · Pre-IND check", "derivePhase1Defaults — cohort sizing, escalation, stopping", "Designation eligibility (Fast Track, Orphan, Breakthrough)", "Sealed PreClinicalPackage v2.0.0 with HAIOps provenance", "Tamper-evident regulator-ingestible bundle"],
   },
 ];
 
@@ -509,16 +509,21 @@ export function APIs() {
           </div>
         </section>
 
-        {/* ── Section 3: Browser Engines ── */}
+        {/* ── Section 3: Computation Engines ── */}
         <section>
           <div className="flex items-center gap-3 mb-2">
             <div className="w-1 h-6 rounded-full bg-emerald-500" />
-            <h2 className="text-[22px] font-bold text-white">In-Browser Simulation Engines</h2>
+            <h2 className="text-[22px] font-bold text-white">Computation Engines</h2>
           </div>
-          <p className="text-[14px] text-slate-500 mb-8 pl-5">Scientific computation engines that run entirely in your browser. No data is sent to any server — all calculations happen client-side.</p>
+          <p className="text-[14px] text-slate-500 mb-8 pl-5">L1 runs in your browser on RDKit.js (WASM). L2 / L3 / L4 run server-side on fingerprints and structured evidence — SMILES never leaves the browser, and the AI Service only ever sees fingerprint hashes.</p>
 
           <div className="space-y-4">
-            {ENGINES.map(eng => (
+            {ENGINES.map(eng => {
+              const isClient = eng.layer.startsWith("Layer 1");
+              const runtime = isClient
+                ? { label: "Browser · SMILES never transmitted", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }
+                : { label: "Server-side · Fingerprints + evidence only", cls: "bg-blue-500/10 text-blue-300 border-blue-500/20" };
+              return (
               <div key={eng.name} className={`border ${COLOR_BORDER[eng.color]} rounded-xl overflow-hidden bg-white/[0.015]`}>
                 <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between gap-4">
                   <div>
@@ -528,7 +533,7 @@ export function APIs() {
                     </div>
                     <div className="text-[11px] text-slate-600 pl-[18px]">{eng.layer}</div>
                   </div>
-                  <span className="text-[9px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">Client-side · No data egress</span>
+                  <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full border shrink-0 ${runtime.cls}`}>{runtime.label}</span>
                 </div>
                 <div className="px-5 py-4 grid md:grid-cols-[1fr_1fr] gap-6">
                   <p className="text-[13px] text-slate-300 leading-relaxed">{eng.description}</p>
@@ -542,7 +547,8 @@ export function APIs() {
                   </ul>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -569,9 +575,9 @@ export function APIs() {
                 },
                 {
                   step: "03",
-                  label: "Simulation & Calibration",
+                  label: "Confirmation, Animal Cohort & FIH Readiness",
                   color: "emerald",
-                  items: ["ADMET engine (client-side)", "PBPK simulation (client-side)", "FAERS signal calibration", "Trial success modeling"],
+                  items: ["L1 ADMET (browser, RDKit.js + ML)", "L2 Confirmation pipeline (server, ESM2 → Vina → opt-in FEP)", "L3 Animal Cohort PBPK + allometric (ICH M3(R2))", "L4 Phase 1 Planner — MABEL · IND gate · sealed PreClinicalPackage v2.0.0"],
                 },
               ].map(({ step, label, color, items }) => (
                 <div key={step}>
@@ -596,7 +602,7 @@ export function APIs() {
         {/* CTA */}
         <div className="border border-white/8 rounded-2xl p-8 bg-white/[0.015] text-center">
           <h3 className="text-[20px] font-bold text-white mb-2">See it in action</h3>
-          <p className="text-[14px] text-slate-500 mb-6 max-w-lg mx-auto">Run a full simulation to watch all APIs and engines work together — from molecule lookup to trial outcome in minutes.</p>
+          <p className="text-[14px] text-slate-500 mb-6 max-w-lg mx-auto">Run a full simulation to watch all APIs and engines work together — from molecule lookup to a sealed, IND-ready PreClinicalPackage in minutes.</p>
           <button
             onClick={() => navigate("/login")}
             className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-[14px] transition-colors"

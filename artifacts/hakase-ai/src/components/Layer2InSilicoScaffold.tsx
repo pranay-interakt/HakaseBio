@@ -22,7 +22,7 @@ interface Layer2InSilicoScaffoldProps {
   layer1Ready: boolean;
   simResults: SimResults | null;
   inVitroResults: InVitroResults | null;
-  /** P0 IVIVE wet-lab inputs (cross-species fu_p, fu_mic, B/P).
+  /** P0 IVIVE substrate inputs (cross-species fu_p, fu_mic, B/P).
    *  When supplied, human values are merged into the L2 params right before
    *  invoking the pipeline — form overrides still win. */
   ivieInputs?: IvieWetLabInputs;
@@ -70,7 +70,7 @@ const L2_STAGES: StageDef[] = [
       { name: "AutoDock Vina 1.2.7",   note: "Apache 2.0 — classical docking, runs locally via subprocess" },
       { name: "OpenBabel 3.1.1",       note: "GPL-2 — receptor & ligand PDBQT preparation" },
       { name: "RDKit 2026.3.1",        note: "BSD-3 — ligand 3D embedding + UFF energy minimisation" },
-      { name: "GNINA / Boltz-2",       note: "OOS — CNN-rescored docking + AF3-equiv co-folding (GPU)" },
+      { name: "Deep-learning co-folding", note: "OOS — structure-prediction + affinity co-folding (GPU)" },
     ],
   },
   {
@@ -431,7 +431,7 @@ function MiniLineChart({ data, xKey, yKey, color, height = 80 }: {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults, ivieInputs, onContinue, onComplete, onProjectionReady }: Layer2InSilicoScaffoldProps) {
-  // Merge IVIVE wet-lab inputs into L2 params at run-time.
+  // Merge IVIVE substrate inputs into L2 params at run-time.
   // Precedence: explicit form override > IVIVE measured value > L1 fallback.
   const mergeIvie = (p: L2InputParams): L2InputParams => {
     if (!ivieInputs) return p;
@@ -507,7 +507,16 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         case 0: setOne("s0", runStage0(simResults, inVitroResults)); break;
         case 1: setOne("s1", await runStage1(simResults)); break;
         case 2: setOne("s2", await runStage2Docking(simResults)); break;
-        case 3: setOne("s3", await runStage3(simResults)); break;
+        case 3: {
+          // Stage 3 now works for ALL targets (including off-catalog). It runs
+          // ML binding + ADMET-AI for any UniProt. The L1↔ML agreement check
+          // is simply skipped when L1 catalog binding is not available.
+          // Pass Stage 2 Vina result for the physics↔ML cross-comparison when
+          // docking has already been run via the Stage 2 "Run" button.
+          const s2r = results.s2?.status === "wired" ? results.s2.result : undefined;
+          setOne("s3", await runStage3(simResults, s2r));
+          break;
+        }
         case 4: setOne("s4", await runStage4(simResults, inVitroResults)); break;
         case 5: {
           // Stage 5 is opt-in and requires explicit Ligand B + PDB ID + cost confirmation
@@ -537,6 +546,9 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
         }
         case 6: setOne("s6", runStage6(simResults, inVitroResults, params, stage8DosePerAdmin())); break;
         case 7: {
+          // Stage 7 now works with or without L1 catalog binding — it prefers
+          // the ML pKd from Stage 3 when available, falls back to L1 heuristic
+          // Ki, and uses a labeled fallback default when neither is available.
           const pk = results.s6?.result;
           const fu = results.s8?.result?.fu_fraction;
           if (!pk || !fu) {
@@ -545,11 +557,27 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               reason: "Run Stage 6 (PBPK) and Stage 8 (TI) first — Stage 7 needs the PK curve and a valid fu.",
             } as StageResult<any>);
           } else {
-            setOne("s7", runStage7(simResults, pk, fu));
+            // Pass ML Kd from Stage 3 (preferred) — null if Stage 3 hasn't run
+            const mlKd = results.s3?.result?.binding_ml.available
+              ? results.s3.result.binding_ml.Kd_nM
+              : null;
+            setOne("s7", runStage7(simResults, pk, fu, mlKd));
           }
           break;
         }
         case 8: {
+          // RF#1 / §9 step 1 (code-review fix): L2 dose projection requires
+          // an L1 binding estimate (primaryKi). When the target UniProt is
+          // off-catalog, sim.binding is null and computeL2DoseProjection
+          // throws. Surface this as a friendly stage-error instead of a
+          // runtime overlay.
+          if (!simResults.binding) {
+            setOne("s8", {
+              stage: 8, name: "Dose projection", status: "error",
+              reason: "L2 dose projection requires an L1 binding estimate. The selected UniProt is not in the validated catalog — pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK).",
+            } as StageResult<any>);
+            break;
+          }
           const r = runStage8(simResults, inVitroResults, mergeIvie(params));
           setOne("s8", r);
           if (r.status === "wired") {
@@ -567,6 +595,17 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
 
   const runFull = async () => {
     if (!simResults || !inVitroResults) return;
+    // RF#1 / §9 step 1 (code-review fix): runFullPipeline drives stages 3,
+    // 7, 8, and tissue-selectivity which all throw on null binding. Block
+    // the full-pipeline run upfront and tell the user why.
+    if (!simResults.binding) {
+      alert(
+        "L2 pipeline requires a validated on-target binding estimate.\n\n" +
+        "L1 returned binding=null because the selected UniProt is not in the validated catalog. " +
+        "Pick a curated target (EGFR, HER2, KRAS, BRAF, BTK, JAK2, ABL1, ALK) before running the full L2 pipeline."
+      );
+      return;
+    }
     setPipelineRunning(true);
     setResults({});
     try {
@@ -648,12 +687,12 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
               <L1OutputRow label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
               <L1OutputRow label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
               <L1OutputRow label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
-              <L1OutputRow label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults ? `${simResults.binding.primaryKi.toFixed(1)}` : "—"} />
+              <L1OutputRow label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults?.binding ? `${simResults.binding.primaryKi.toFixed(1)}` : "—"} />
               <L1OutputRow label="hERG IC50 (µM)"      source="L1 in-vitro sim"            value={inVitroResults ? `${inVitroResults.herg.ic50_uM.toFixed(2)}` : "—"} />
               <L1OutputRow label="Plasma fu (%)"       source="L1 PPB sim"                  value={inVitroResults ? `${inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2)}` : "—"} />
               <L1OutputRow label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? `${inVitroResults.permeability.caco2Papp.toFixed(1)}` : "—"} />
               <L1OutputRow label="Microsomal CLint"    source="L1 metabolic stability"      value={inVitroResults ? `${inVitroResults.metabolicStability.microsomalCLint.toFixed(0)} µL/min/mg` : "—"} />
-              <L1OutputRow label="Off-target hits"     source="L1 selectivity panel"        value={inVitroResults ? `${inVitroResults.selectivity.offTargetHits} / ${inVitroResults.selectivity.totalTargetsTested}` : "—"} />
+              <L1OutputRow label="Off-target hits"     source="L1 selectivity panel"        value={inVitroResults && inVitroResults.selectivity.offTargetHits !== null && inVitroResults.selectivity.totalTargetsTested !== null ? `${inVitroResults.selectivity.offTargetHits} / ${inVitroResults.selectivity.totalTargetsTested}` : "no off-target panel"} />
               <L1OutputRow label="L1 Go / No-Go"       source="L1 cascade gate"             value={simResults ? simResults.goNogo : "—"} />
             </div>
           </section>
@@ -753,7 +792,7 @@ export function Layer2InSilicoScaffold({ layer1Ready, simResults, inVitroResults
                           <span className="text-slate-500">TPSA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.tpsa.toFixed(0)}</span>
                           <span className="text-slate-500">HBD/HBA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.hbd}/{r.rdkit_descriptors.hba}</span>
                           <span className="text-slate-500">RotB</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.rotBonds}</span>
-                          <span className="text-slate-500">QED · SA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.qed.toFixed(2)} · {r.rdkit_descriptors.saScore.toFixed(2)}</span>
+                          <span className="text-slate-500">QED~ · SA</span><span className="text-cyan-300 font-mono text-right">{r.rdkit_descriptors.qed_approx.toFixed(2)} · {r.rdkit_descriptors.saScore.toFixed(2)}</span>
                         </div>
                         <div className="flex gap-2 pt-1">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${r.rule_of_5.pass ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/8" : "border-amber-500/30 text-amber-300 bg-amber-500/8"}`}>RoF {r.rule_of_5.pass ? "pass" : `${r.rule_of_5.violations} viol.`}</span>

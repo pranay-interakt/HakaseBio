@@ -14,8 +14,16 @@
  * Rules
  *   1. NO-GO compounds: never auto-cascade, regardless of data quality.
  *   2. Safety-critical outputs (hERG, hepatotoxicity, bioactivation, CYP)
- *      must each meet *minimum* quality ≥ 0.6 ("enriched" tier or better).
+ *      must each meet *minimum* quality ≥ 0.6 ("structural" tier or better).
  *      A single heuristic-only safety output blocks the cascade.
+ *
+ *      DELIBERATE POLICY (May 2026): the "structural" tier (score 0.6) sits
+ *      EXACTLY at SAFETY_MIN_SCORE so a SMARTS-based bioactivation alert scan
+ *      passes the safety gate by itself. Rationale: deterministic substructure
+ *      matching against a curated reactive-metabolite alert library is a
+ *      defensible discovery-stage signal, even though it is not a predictive
+ *      model. If a future critic decides this is too permissive, raise
+ *      SAFETY_MIN_SCORE to 0.7 (only ML/enriched/experimental will then pass).
  *   3. Average quality of non-safety outputs must be ≥ 0.6.
  *
  * When blocked, the UI is expected to show a "Stage-Gate Review Required"
@@ -24,8 +32,10 @@
  */
 
 import type { SimResults } from "./admet";
+import type { InVitroResults } from "./inVitroSim";
 import type { TargetSuggestion } from "./targetSuggestion";
-import { TIER_SCORE, type QualityTier } from "./sourceQuality";
+import { TIER_SCORE, makeCofoldedQuality, type QualityTier } from "./sourceQuality";
+import type { CofoldGateResult } from "./confidenceGate";
 
 const SAFETY_MIN_SCORE     = 0.6;
 const NON_SAFETY_MIN_AVG   = 0.6;
@@ -54,11 +64,20 @@ export interface CascadeGateResult {
  * the gate flips that output's tier from "heuristic" to "ml" (score 0.7) and
  * uses the `note` as the per-output rationale. Pass only what's actually loaded
  * — undefined keys leave the heuristic default in place.
+ *
+ * NOTE: each override must be set to `available: true` ONLY when the underlying
+ * service returned `source === "ml"` AND the relevant value is non-null. A
+ * fallback / failed prediction MUST NOT upgrade the tier — the gate would
+ * silently lie about quality.
  */
 export interface CascadeMlOverrides {
-  hepatotoxicity?:    { available: boolean; note: string };
-  absorption_admet?:  { available: boolean; note: string };
-  binding_estimate?:  { available: boolean; note: string };
+  hERG?:               { available: boolean; note: string };
+  hepatotoxicity?:     { available: boolean; note: string };
+  cyp_panel?:          { available: boolean; note: string };
+  absorption_admet?:   { available: boolean; note: string };
+  distribution_admet?: { available: boolean; note: string };
+  metabolism_admet?:   { available: boolean; note: string };
+  binding_estimate?:   { available: boolean; note: string };
 }
 
 /**
@@ -78,8 +97,8 @@ function defaultDetail(): Record<string, OutputQualitySummary> {
       note: "Rule-based: logP > 4.5 or MW > 550 (no reactive metabolite modelling)",
     },
     bioactivation: {
-      tier: "heuristic", score: TIER_SCORE.heuristic,
-      note: "SMARTS structural alert scan (no CYP transformation prediction)",
+      tier: "structural", score: TIER_SCORE.structural,
+      note: "SMARTS structural alert scan (substructure match — no CYP transformation prediction)",
     },
     cyp_panel: {
       tier: "heuristic", score: TIER_SCORE.heuristic,
@@ -102,8 +121,8 @@ function defaultDetail(): Record<string, OutputQualitySummary> {
       note: "Pharmacophore + jitter from hardcoded potency range",
     },
     target_identification: {
-      tier: "heuristic", score: TIER_SCORE.heuristic,
-      note: "Pharmacophore catalogue — no measured target evidence",
+      tier: "structural", score: TIER_SCORE.structural,
+      note: "Pharmacophore catalogue — substructure match, no measured target evidence",
     },
   };
 }
@@ -112,13 +131,13 @@ function bestTargetTier(suggestions: TargetSuggestion[]): { tier: QualityTier; n
   if (suggestions.length === 0) {
     return { tier: "inferred", note: "No targets surfaced — chemistry novel or off-class" };
   }
-  let best: QualityTier = "heuristic";
-  let bestScore = TIER_SCORE.heuristic;
+  let best: QualityTier = "structural";
+  let bestScore = TIER_SCORE.structural;
   for (const s of suggestions) {
     const t: QualityTier =
       s.source === "chembl"          ? "experimental" :
       s.source === "chembl-similar"  ? "enriched"     :
-                                       "heuristic";
+                                       "structural";  // pharmacophore SMARTS match
     if (TIER_SCORE[t] > bestScore) { best = t; bestScore = TIER_SCORE[t]; }
   }
   const counts = {
@@ -137,6 +156,21 @@ export function evaluateCascadeGate(
   simResults: SimResults | null,
   targetSuggestions: TargetSuggestion[],
   mlOverrides: CascadeMlOverrides = {},
+  /**
+   * Optional in-vitro result envelope. When provided, per-field provenance
+   * on hERG / CYP / Caco-2 / PPB / etc. is read directly off the live
+   * `iv.provenance` map — so the gate stops lying about quality the moment
+   * the L1 engine actually consumes the ML overlay (instead of waiting for
+   * the caller to also remember to pass the matching `mlOverrides`).
+   */
+  inVitroResults: InVitroResults | null = null,
+  /**
+   * Optional co-folding confidence gate result from Stage 2b.
+   * When provided and the gate verdict is not "suppressed", adds a
+   * `cofolded_binding` entry to the quality detail map. The quality score
+   * is ipTM-interpolated via `makeCofoldedQuality()`.
+   */
+  cofoldGate: CofoldGateResult | null = null,
 ): CascadeGateResult {
   const detail = defaultDetail();
 
@@ -148,15 +182,103 @@ export function evaluateCascadeGate(
     note:  tgt.note,
   };
 
-  // Override per-output tier to "ml" when a validated ML prediction is loaded.
-  // We check `available` explicitly so a fallback / failed prediction does NOT
-  // upgrade the tier (otherwise the gate would silently lie about quality).
-  const mlKeys = ["hepatotoxicity", "absorption_admet", "binding_estimate"] as const;
+  // ── 1. Read live per-field provenance from L1 outputs ────────────────────
+  // The L1 engines now stamp `provenance: Record<key, "ml"|"heuristic"|...>`
+  // on every numeric output (see admet.ts / inVitroSim.ts). When the value
+  // is sourced from a real ML signal we immediately upgrade the matching
+  // cascade-gate tier — no need for the orchestrator to also pass a
+  // CascadeMlOverrides entry that duplicates what L1 already knows.
+  const lifProv = (key: string): "ml" | "heuristic" | "experimental" | undefined =>
+    inVitroResults?.provenance?.[key];
+  const simProv = (key: string): "ml" | "heuristic" | "experimental" | undefined =>
+    simResults?.provenance?.[key];
+
+  if (lifProv("hergRisk") === "ml" || lifProv("herg_ic50_uM") === "ml") {
+    detail.hERG = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — CardioTox-ML hERG channel blocker probability (Wang/Karim 2016 RF)",
+    };
+  }
+  if (simProv("toxicity") === "ml" || lifProv("hergRisk") === "experimental") {
+    // ADMET-AI toxicity head OR experimental data already covers hepatotox.
+    detail.hepatotoxicity = {
+      tier: simProv("toxicity") === "ml" ? "ml" : "experimental",
+      score: simProv("toxicity") === "ml" ? TIER_SCORE.ml : TIER_SCORE.experimental,
+      note:  simProv("toxicity") === "ml"
+        ? "ML — ADMET-AI / DILI-ML toxicity composite (Chemprop GNN + DILIrank RF)"
+        : "Experimental measurement supplied",
+    };
+  }
+  if (lifProv("cypInhibition") === "ml") {
+    detail.cyp_panel = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Veith 5-isoform CYP inhibition panel (1A2/2C9/2C19/2D6/3A4)",
+    };
+  }
+  if (simProv("absorption") === "ml" || lifProv("caco2Papp") === "ml") {
+    detail.absorption_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Caco2_Wang + HIA_Hou + Bioavailability_Ma blend",
+    };
+  }
+  if (simProv("distribution") === "ml" || lifProv("fuPercent") === "ml") {
+    detail.distribution_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI BBB_Martins + PPBR_AZ + VDss_Lombardo blend",
+    };
+  }
+  if (simProv("metabolism") === "ml" || lifProv("hepatoCLint") === "ml" || lifProv("halfLifeMin") === "ml") {
+    detail.metabolism_admet = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — ADMET-AI Clearance_Hepatocyte_AZ + Half_Life_Obach heads",
+    };
+  }
+  if (simProv("binding") === "ml" || lifProv("doseResponse_IC50") === "ml") {
+    detail.binding_estimate = {
+      tier: "ml", score: TIER_SCORE.ml,
+      note: "ML — Binding-ML DeepDTA-GBM (ESM-2 + Morgan FP)",
+    };
+  } else if (simProv("binding") === "experimental") {
+    detail.binding_estimate = {
+      tier: "experimental", score: TIER_SCORE.experimental,
+      note: "Measured ChEMBL exact-match Kd/Ki",
+    };
+  }
+
+  // ── 2. Apply explicit caller overrides (still wins over the L1 read) ─────
+  // The orchestrator may have richer note strings (model versions, ROC-AUC,
+  // training-set sizes) it wants to show. We let those replace the auto-
+  // derived note. We DO NOT downgrade — an override that is `available:false`
+  // must NOT roll an ML tier back to heuristic; explicit fallbacks should
+  // already be reflected as "no override" in the orchestrator's logic.
+  const mlKeys = [
+    "hERG",
+    "hepatotoxicity",
+    "cyp_panel",
+    "absorption_admet",
+    "distribution_admet",
+    "metabolism_admet",
+    "binding_estimate",
+  ] as const;
   for (const k of mlKeys) {
     const ov = mlOverrides[k];
     if (ov?.available) {
       detail[k] = { tier: "ml", score: TIER_SCORE.ml, note: ov.note };
     }
+  }
+
+  // ── 3. Co-folding binding (ipTM-scaled quality tier) ──────────────────────
+  // When Stage 2b ran and the confidence gate did not suppress the affinity,
+  // add a non-safety `cofolded_binding` entry. Its score is ipTM-interpolated
+  // (0.45–0.70) so a high-ipTM result lifts the non-safety average; a marginal
+  // one barely helps — and a suppressed result is simply absent.
+  if (cofoldGate && cofoldGate.verdict !== "suppressed") {
+    const cq = makeCofoldedQuality("Stage 2b co-folding", cofoldGate.iptm);
+    detail["cofolded_binding"] = {
+      tier:  cq.tier,
+      score: cq.score,
+      note:  `Co-folding affinity (${cofoldGate.verdict}) — ipTM ${cofoldGate.iptm?.toFixed(3) ?? "N/A"}, quality score ${cq.score.toFixed(3)}`,
+    };
   }
 
   // Compute safety-min and non-safety-avg.

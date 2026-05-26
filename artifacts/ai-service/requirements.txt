@@ -1,0 +1,28 @@
+# HakaseAI — AI service dependencies
+# Install with: pip install -r requirements.txt
+# rdkit must be installed separately: conda install -c conda-forge rdkit
+#   or: pip install rdkit
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+requests>=2.31.0
+httpx>=0.27.0
+
+# rdkit — install via conda (preferred) or pip:
+#   conda install -c conda-forge rdkit
+#   pip install rdkit
+# Required by: admet.py, molecular_properties.py, binding_ml.py, solubility_ml.py
+rdkit>=2023.9.1
+
+# Antibody numbering — ANARCI (BSD-3, Dunbar & Deane 2016; commercial-safe).
+# Enables EXACT IMGT CDR numbering in the antibody engine. Also needs the HMMER
+# binary:  conda install -c bioconda hmmer   (or)   apt-get install hmmer
+# If ANARCI or HMMER is absent, the antibody engine automatically falls back to
+# its motif-anchored CDR heuristic — so this dependency is optional.
+anarci
+
+# Optional GPU/async features
+# runpod>=1.6.0  # for FEP/cofolding RunPod workers

@@ -1,28 +1,8 @@
-import { useState, useCallback, useEffect, useMemo, useRef, createContext, useContext } from "react";
+import { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { MolViewer3D_Cinematic } from "./MolViewer3D_Cinematic";
 import { MolViewer3D_Scientific } from "./MolViewer3D_Scientific";
 import { MolViewer3D_Explorer } from "./MolViewer3D_Explorer";
-import {
-  evaluateMolecule,
-  validateSmiles,
-  compositeScore,
-  bindingScoreFromNanomolar,
-  resolvePubChem,
-  getChEMBLById,
-  searchChEMBLByName,
-  getBindingMeasurements,
-  getUniProt,
-  lookupPdb,
-  structuresForUniprot,
-  type MolecularProfile,
-  type SmilesValidation,
-  type UniProtEntry,
-  type ChEMBLCompound,
-  type PubChemCompound,
-  type BindingMeasurement,
-  type AlertHit,
-} from "@/lib/chem";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

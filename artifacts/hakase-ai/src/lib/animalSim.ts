@@ -328,8 +328,22 @@ export function runAnimalCohortSimulation(
   const tmax  = routeOfAdmin === "IV" ? 0.08 : Math.log(ka / ke) / (ka - ke);
 
   // ── Therapeutic dose estimation from IC50/EC50 ────────────────────────────
-  // Use binding estimate (nM) → back-calculate dose for ~10× IC50 Cmax
-  const bindingNm = binding.primaryIC50 > 0 ? binding.primaryIC50 : 50;
+  // Use binding estimate (nM) → back-calculate dose for ~10× IC50 Cmax.
+  // RF#1 / §9 step 1 (audit code-review fix): refuse to fabricate a
+  // potency when L1 binding is null. The prior code substituted 50 nM as
+  // a "belt-and-braces" placeholder, which is precisely the silent-
+  // coercion class the no-fake-data policy bans — every downstream
+  // therapeutic-dose, Cmax, and NOAEL margin would have read as a real
+  // computation while resting on a fabricated 50 nM Ki.
+  if (!binding || !(binding.primaryIC50 > 0)) {
+    throw new Error(
+      "Animal cohort simulation requires an L1 binding estimate (primaryIC50). " +
+      "L1 returned binding=null because the target UniProt is not in the " +
+      "validated catalog — pick a curated target or wire ML binding before " +
+      "running animal cohort simulation.",
+    );
+  }
+  const bindingNm = binding.primaryIC50;
   const targetCmax = bindingNm * 10 * mw / 1e6 * 1e6; // ng/mL (10× IC50 in molar → ng/mL)
   const therapeuticDose = (targetCmax * vdAnimal * bw * 1000) / (bioavail * 1e6);  // mg/kg
 

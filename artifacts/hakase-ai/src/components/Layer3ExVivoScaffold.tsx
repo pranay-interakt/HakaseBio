@@ -48,6 +48,14 @@ type StageDef = {
   pendingReason?: string;
   /** True for stages whose schema also accepts a Manual Entry path (currently 2, 3, 4, 5). Stage 6 is pure orchestration. */
   acceptsManualEntry: boolean;
+  /**
+   * "data-unavailable" — endpoint exists but required data artifact (Parquet/snapshot) is not yet provisioned.
+   *                      Stage is rendered dimmed with a DATA UNAVAILABLE badge.
+   * "roadmap"          — stage logic exists but depends on manual entry only; no automated inference yet.
+   *                      Stage is rendered with a ROADMAP badge.
+   * undefined          — fully operational (S1, S2).
+   */
+  readinessFlag?: "data-unavailable" | "roadmap";
 };
 
 const L3_STAGES: StageDef[] = [
@@ -73,24 +81,26 @@ const L3_STAGES: StageDef[] = [
   },
   {
     n: 3, name: "Cell-type aggregation (Drug2cell + Tabula Sapiens)", wired: "ml-service",
-    detail: "Drug2cell-pattern scoring over Tabula Sapiens v2 (~480 cell types × 28 organs): score(cell_type, tissue) = Σᵢ wᵢ · mean_log1p_expression(geneᵢ, cell_type, tissue), where wᵢ is the min-max normalized pKi of target_i (or uniform 1.0 when pKi absent). Atlas Parquet preprocessed off-platform via colab_notebooks/prepare_tabula_sapiens.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for measured organoid IC50 (T2 wet-data path).",
+    detail: "Drug2cell-pattern scoring over Tabula Sapiens v2 (~480 cell types × 28 organs): score(cell_type, tissue) = Σᵢ wᵢ · mean_log1p_expression(geneᵢ, cell_type, tissue), where wᵢ is the min-max normalized pKi of target_i (or uniform 1.0 when pKi absent). Atlas Parquet preprocessed off-platform via colab_notebooks/prepare_tabula_sapiens.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for literature-curated IC50 with cited CVCL accession.",
     engines: [
       { name: "ai-service /predict/celltype-aggregation", note: "Drug2cell-pattern weighted aggregation; HTTP 503 + data-not-provisioned when atlas Parquet absent — NO synthetic fallback" },
       { name: "Tabula Sapiens v2 (CELLxGENE Census)",     note: "Aggregated off-platform in Colab → tabula_sapiens_aggregated.parquet (mean log1p expression per cell_type × tissue × gene); pinned by Census SHA" },
-      { name: "Manual entry (CRO organoid panels)",       note: "Cellosaurus CVCL accession + measured organoid IC50 + citation" },
+      { name: "Manual entry (literature-curated)",        note: "Cellosaurus CVCL accession + published IC50 + citation — Zero-Lab override path, no CRO dependency" },
     ],
     acceptsManualEntry: true,
+    readinessFlag: "data-unavailable",
   },
   {
     n: 4, name: "Patient-line projection (oncology only)", wired: "ml-service",
-    detail: "Per-cell-line projection of the L1 IC50 across the DepMap PRISM 24Q2 oncology panel, conditioned on per-cell-line target essentiality (Chronos CRISPR) + expression (CCLE log2 TPM). Deterministic in-house formula — predicted_IC50_uM(cell) = L1_IC50_uM × 2^(α · chronos), with `expression < 1.0 log2(TPM+1)` cell lines marked resistant_no_target. NOT a trained Chemprop GBM (the v2 spec pass downgraded that earlier overclaim). Snapshot Parquet preprocessed off-platform via colab_notebooks/prepare_depmap_prism.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for measured DepMap PRISM IC50 rows or to mark a non-oncology compound as not_applicable.",
+    detail: "Per-cell-line projection of the L1 IC50 across the DepMap PRISM 24Q2 oncology panel, conditioned on per-cell-line target essentiality (Chronos CRISPR) + expression (CCLE log2 TPM). Deterministic in-house formula — predicted_IC50_uM(cell) = L1_IC50_uM × 2^(α · chronos), with `expression < 1.0 log2(TPM+1)` cell lines marked resistant_no_target. NOT a trained Chemprop GBM (the v2 spec pass downgraded that earlier overclaim). Snapshot Parquet preprocessed off-platform via colab_notebooks/prepare_depmap_prism.ipynb and loaded by the ai-service on first request — endpoint returns explicit `data-not-provisioned` until the artifact ships. Manual entry remains available for literature-curated DepMap PRISM IC50 rows (with citation) or to mark a non-oncology compound as not_applicable.",
     engines: [
       { name: "ai-service /predict/patient-line", note: "in-house deterministic projection; HTTP 503 + data-not-provisioned when snapshot Parquet absent — NO synthetic fallback" },
       { name: "DepMap PRISM 24Q2 (Broad)",        note: "Preprocessed off-platform → depmap_prism_aggregated.parquet (per-cell-line target essentiality + expression for the prepared target set); pinned by release tag" },
       { name: "HCMI (NCI / ATCC)",                note: "~700 next-gen cancer models with paired matched-normal genomics — reference catalogue for downstream T2 wet-anchor selection" },
-      { name: "Manual entry (this build)",        note: "DepMap accession + measured IC50 rows, OR explicit non-oncology not_applicable" },
+      { name: "Manual entry (this build)",        note: "DepMap accession + literature-curated IC50 rows + citation, OR explicit non-oncology not_applicable" },
     ],
     acceptsManualEntry: true,
+    readinessFlag: "data-unavailable",
   },
   {
     n: 5, name: "DILI biomarker proxy + permeability", wired: "in-house",
@@ -101,6 +111,7 @@ const L3_STAGES: StageDef[] = [
     ],
     pendingReason: "Auto-runs deterministically once Stage 2 Manual Entry is filled (mechanism flags required). Optional brain Kp,uu override available.",
     acceptsManualEntry: true,
+    readinessFlag: "roadmap",
   },
   {
     n: 6, name: "Cascade integration + L2 Ex-Vivo → L3 envelope", wired: "in-house",
@@ -110,6 +121,7 @@ const L3_STAGES: StageDef[] = [
       { name: "lib/cascadeFlagState.ts → canSignLoadBearing", note: "Amber Curator predicate consumed downstream by L3 — requires cascadeKind:'pass'; t-user / t0 surrogate map to prediction_only" },
     ],
     acceptsManualEntry: false,
+    readinessFlag: "roadmap",
   },
 ];
 
@@ -229,40 +241,42 @@ interface Stage6Result {
 
 /* ─── Reference content (preserved verbatim from prior scaffold) ─────────── */
 
+// Zero-Lab pivot (May 13, 2026): L3 ex-vivo modalities are now the
+// computational data substrates that compose the virtual tissue model — NOT
+// physical wet-lab modalities. Chip-vendor adapters (Emulate / CN Bio /
+// Mimetas) and organoid biobanks (HCMI / HUB / ATCC) have been removed from
+// the customer-facing reference card; the customer pipeline does not depend
+// on any wet-lab data ingestion.
 const L3_MODALITIES = [
   {
-    name: "Precision-cut tissue slices (PCLS)",
-    summary: "Lung, liver, kidney, brain — preserves architecture + multi-cell-type context.",
+    name: "Tissue-expression baseline (GTEx Portal v2)",
+    summary: "54-organ median TPM expression matrix — per-tissue exposure margins computed from L1 IC50 ÷ predicted Cu, weighted by GTEx target expression.",
     sources: [
-      { name: "EU-ToxRisk / ONTOX", note: "Horizon Europe NAM datasets through 2027" },
-      { name: "Tox21 / NCATS",     note: "qHTS pre-screen — ~10K cmpds × ~70 assays" },
+      { name: "GTEx Portal v2 REST",     note: "v8 dataset (v10 not yet at medianGeneExpression endpoint) — pinned, license CC-BY" },
+      { name: "lib/gtexClient.ts",       note: "UBERON ↔ 2-compartment-PBPK mapping; returns null for tissues without a compartment" },
     ],
   },
   {
-    name: "Isolated perfused organs",
-    summary: "Langendorff heart, isolated perfused liver / kidney — full-organ pharmacology.",
+    name: "Cell-type atlas (Tabula Sapiens v2)",
+    summary: "~480 cell types × 28 organs — Drug2cell-pattern scoring against frozen mean-log1p expression per (cell_type, tissue, gene).",
     sources: [
-      { name: "Internal / academic protocols", note: "no public packaged dataset of meaningful size" },
+      { name: "Tabula Sapiens v2 (CELLxGENE Census)", note: "Aggregated off-platform → tabula_sapiens_aggregated.parquet; pinned by Census SHA" },
+      { name: "ai-service /predict/celltype-aggregation", note: "Drug2cell-pattern weighted aggregation; HTTP 503 + data-not-provisioned when atlas Parquet absent — NO synthetic fallback" },
     ],
   },
   {
-    name: "Patient-derived organoids",
-    summary: "Tumour + non-tumour 3D cultures with patient genomics + clinical metadata.",
+    name: "Patient-line projection (DepMap PRISM 24Q2)",
+    summary: "Per-cell-line oncology projection conditioned on Chronos CRISPR essentiality + CCLE log2 TPM expression — deterministic in-house projection of the L1 IC50 across the panel.",
     sources: [
-      { name: "HCMI (NCI / ATCC)",          note: "~700 next-gen cancer models with paired matched-normal genomics" },
-      { name: "Hubrecht HUB Organoid Biobank", note: "largest non-cancer + cancer biobank globally; HUB Foundation MTA" },
-      { name: "ATCC organoid lines",         note: "Commercial MTA (~$2–6k / line)" },
-      { name: "Cellosaurus (organoid records)", note: "~5K entries, CC-BY 4.0 — every L2 Ex-Vivo row should carry a CVCL accession" },
+      { name: "DepMap PRISM 24Q2 (Broad)", note: "Preprocessed off-platform → depmap_prism_aggregated.parquet; pinned by release tag" },
+      { name: "ai-service /predict/patient-line", note: "in-house deterministic projection; HTTP 503 + data-not-provisioned when snapshot Parquet absent — NO synthetic fallback" },
     ],
   },
   {
-    name: "Microphysiological systems / organ-on-chip",
-    summary: "Multi-tissue chips with media flow + mechanical cues. T3 vendor adapters are opt-in upgrades.",
+    name: "Literature-curated override (manual-entry path)",
+    summary: "Optional Zero-Lab override: paste a published IC50 with a Cellosaurus CVCL accession + citation. Promotes the row tier to 'literature-curated' (t-user) in the cascade gate.",
     sources: [
-      { name: "Emulate (Liver/Brain/Intestine/Lung-Chip S1)", note: "Liver-Chip qualification, Ewart 2022: 87% sensitivity vs Tox21" },
-      { name: "CN Bio (PhysioMimix OOC)",                     note: "strong on liver clearance + first-pass metabolism" },
-      { name: "Mimetas / TissUse / InSphero",                 note: "higher-throughput 3D / multi-organ chips" },
-      { name: "MPS-Database (FDA / U. Pittsburgh DILI)",      note: "T1 retrieval target; only public MPS dataset of meaningful size" },
+      { name: "Cellosaurus", note: "~5K entries, CC-BY 4.0 — every override row carries a CVCL accession + cite" },
     ],
   },
 ] as const;
@@ -311,6 +325,21 @@ function L1OutputRow({ label, value, source }: { label: string; value: string; s
   );
 }
 
+function ReadinessBadge({ flag }: { flag: StageDef["readinessFlag"] }) {
+  if (!flag) return null;
+  const isUnavailable = flag === "data-unavailable";
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase border ${
+      isUnavailable
+        ? "bg-rose-500/12 text-rose-400 border-rose-500/30"
+        : "bg-amber-500/12 text-amber-400 border-amber-500/30"
+    }`}>
+      <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+      {isUnavailable ? "Data unavailable" : "Roadmap"}
+    </span>
+  );
+}
+
 function StageCard({
   stage, status, busy, hasResult, onRun, runDisabled, runDisabledReason, errorReason, children,
 }: {
@@ -326,16 +355,34 @@ function StageCard({
 }) {
   const wb = wiredBadge(stage.wired);
   const canAutoRun = stage.wired === "in-house" || stage.wired === "ml-service";
+  const dimmed = stage.readinessFlag != null;
   return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+    <div className={`rounded-lg border p-3 ${dimmed ? "border-white/5 bg-white/[0.01] opacity-75" : "border-white/8 bg-white/[0.02]"}`}>
+      {stage.readinessFlag === "data-unavailable" && (
+        <div className="flex items-center gap-2 rounded-md border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 mb-2.5">
+          <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+          <p className="text-[10px] text-rose-300/80 leading-snug">
+            Required data artifact (Parquet) is not yet provisioned. This stage will show real results once the data pipeline is deployed. Manual entry is available in the interim.
+          </p>
+        </div>
+      )}
+      {stage.readinessFlag === "roadmap" && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 mb-2.5">
+          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+          <p className="text-[10px] text-amber-300/80 leading-snug">
+            Automated inference not yet implemented. Manual entry only — enter literature-curated values to populate this stage.
+          </p>
+        </div>
+      )}
       <div className="flex items-start gap-2.5 mb-2">
-        <div className="w-6 h-6 rounded-md bg-teal-500/10 border border-teal-500/25 text-teal-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
+        <div className={`w-6 h-6 rounded-md border text-[11px] font-semibold flex items-center justify-center shrink-0 ${dimmed ? "bg-slate-500/10 border-slate-500/25 text-slate-400" : "bg-teal-500/10 border-teal-500/25 text-teal-300"}`}>
           {stage.n}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-[12px] font-semibold text-white">Stage {stage.n} — {stage.name}</div>
             <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${wb.cls}`}>{wb.text}</span>
+            <ReadinessBadge flag={stage.readinessFlag} />
             {hasResult && (
               <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${statusBadgeClass(status)}`}>{status}</span>
             )}
@@ -423,12 +470,12 @@ function L3InputParamsCard({
   const route = params.l2.route ?? "oral";
   const dpd = params.l2.dosesPerDay ?? 1;
   const tcf = params.transporterConfidenceFloor;
-  const ic50_nM = simResults?.binding.primaryIC50;
+  const ic50_nM = simResults?.binding?.primaryIC50;
   return (
     <section className="rounded-xl border border-teal-500/25 bg-teal-500/[0.04] p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Sliders className="w-3.5 h-3.5 text-teal-400" />
-        <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L2 Ex-Vivo Input Parameters</span>
+        <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-widest">L2 Virtual-Tissue Input Parameters</span>
         <span className="ml-auto text-[9px] text-slate-500 italic">applied to Stage 1 (L2 chain auto-rerun)</span>
       </div>
 
@@ -658,14 +705,14 @@ function Stage2ManualForm({ onSave }: { onSave: (r: Stage2ManualResult) => void 
 function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void }) {
   const [cvcl, setCvcl] = useState("");
   const [ic50, setIc50] = useState<string>("");
-  const [assay, setAssay] = useState("CellTiter-Glo 72h, 384-well organoid");
+  const [assay, setAssay] = useState("Literature-curated IC50 (publication assay format)");
   const [citation, setCitation] = useState("");
   const ic50num = parseFloat(ic50);
   const valid = cvcl.match(/^CVCL_[A-Z0-9]{4}$/i) !== null && isFinite(ic50num) && ic50num > 0 && citation.trim().length >= 3;
   return (
     <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
       <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
-        <UserPen className="w-3 h-3" /> Manual entry · T2 wet-data path
+        <UserPen className="w-3 h-3" /> Manual entry · literature-curated path
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
@@ -677,7 +724,7 @@ function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void 
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Measured IC50 (µM)</span>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Published IC50 (µM)</span>
           <input
             type="number" min={0} step="any" value={ic50} onChange={e => setIc50(e.target.value)}
             placeholder="e.g. 0.42"
@@ -693,7 +740,7 @@ function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void 
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Citation (CRO report / DOI / PMID)</span>
+        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Citation (DOI / PMID)</span>
         <input
           type="text" value={citation} onChange={e => setCitation(e.target.value)}
           placeholder="e.g. Charles River report CR-2025-0421; or PMID:33175020"
@@ -711,9 +758,9 @@ function Stage3ManualForm({ onSave }: { onSave: (r: Stage3ManualResult) => void 
             ? "bg-cyan-600/30 hover:bg-cyan-500/40 text-cyan-200 border border-cyan-500/40 cursor-pointer"
             : "bg-slate-700/30 border border-slate-600/30 text-slate-500 cursor-not-allowed"
         }`}
-        title={valid ? "Save organoid measurement" : "Need valid CVCL_ accession, positive IC50, and citation"}
+        title={valid ? "Save literature-curated entry" : "Need valid CVCL_ accession, positive IC50, and citation"}
       >
-        <Check className="w-3 h-3" /> Save organoid measurement
+        <Check className="w-3 h-3" /> Save literature-curated entry
       </button>
     </div>
   );
@@ -808,13 +855,13 @@ function Stage5OverrideForm({ onSave, currentBrainKpUu }: { onSave: (brainKpUu: 
   return (
     <div className="pl-8 mt-2.5 space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
       <div className="text-[10px] text-cyan-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
-        <UserPen className="w-3 h-3" /> Optional override · brain Kp,uu (measured)
+        <UserPen className="w-3 h-3" /> Optional override · brain Kp,uu (literature-curated)
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-[10px] text-slate-400 uppercase tracking-wider">Brain Kp,uu (unitless, MDR1-MDCK ER or PET)</span>
         <input
           type="number" min={0} step="any" value={val} onChange={e => setVal(e.target.value)}
-          placeholder="leave blank to mark as unmeasured"
+          placeholder="leave blank to mark as not-cited"
           className="bg-white/5 border border-white/10 rounded-md px-2 py-1 text-[11px] text-cyan-200 font-mono placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
         />
       </label>
@@ -867,7 +914,7 @@ function CascadeBlock({ matrix }: { matrix: TissueSelectivityMatrix }) {
           <span className="text-slate-500">Fold-error band:</span>{" "}
           {s.foldError.cohortN > 0
             ? `median ${s.foldError.median.toFixed(2)}× / p90 ${s.foldError.p90.toFixed(2)}× (n=${s.foldError.cohortN})`
-            : "not yet measured (calibration cohort pending — ≥30 wet pairs)"}
+            : "not yet calibrated (literature pair set pending — ≥30 cited pairs)"}
         </div>
       </div>
     </div>
@@ -1056,7 +1103,7 @@ function buildStage6Envelope(results: PipelineResults): Stage6Result {
     tiers.push({ stage: 1, name: "Tissue selectivity + transporter flags", tier: "pending", cascadeKind: "not_applicable" });
   }
 
-  // Stage 2: ML → t0 (in-silico surrogate); Manual → t-user (user wet-data path).
+  // Stage 2: ML → t0 (in-silico surrogate); Manual → t-user (user literature-curated path).
   // If both saved (user ran ML then also filled manual), manual wins for tier
   // because severity + mechanism are the load-bearing assertions.
   const def2 = L3_STAGES.find(s => s.n === 2)!;
@@ -1068,8 +1115,8 @@ function buildStage6Envelope(results: PipelineResults): Stage6Result {
     tiers.push({ stage: 2, name: def2.name, tier: "pending", cascadeKind: "not_applicable" });
   }
 
-  // Stage 3: ML (Drug2cell + Tabula Sapiens) → t0; Manual organoid IC50 → t-user.
-  // If both saved, manual wins for tier (measured > predicted).
+  // Stage 3: ML (Drug2cell + Tabula Sapiens) → t0; Manual literature-curated IC50 → t-user.
+  // If both saved, manual wins for tier (literature-curated > predicted).
   const def3 = L3_STAGES.find(s => s.n === 3)!;
   const s3 = results.s3;
   if (s3?.status === "complete") {
@@ -1148,8 +1195,13 @@ export function Layer3ExVivoScaffold({
     setOne("s1", { status: "running" });
     try {
       const transporters = predictTransporterFlags(simResults.lipinski);
-      const simForRun = params.ic50_nM_override !== undefined && isFinite(params.ic50_nM_override) && params.ic50_nM_override > 0
-        ? { ...simResults, binding: { ...simResults.binding, primaryIC50: params.ic50_nM_override } }
+      // Override flow: only allowed when the base simResults already has a
+      // BindingEstimate (override mutates one field, not constructs ex
+      // nihilo). When binding is null, the override path is unreachable —
+      // the runStage1 button should be disabled upstream by the
+      // `simResults.binding == null` branch in the dose-validation effect.
+      const simForRun = params.ic50_nM_override !== undefined && isFinite(params.ic50_nM_override) && params.ic50_nM_override > 0 && simResults.binding
+        ? { ...simResults, binding: { ...simResults.binding, primaryIC50: params.ic50_nM_override } satisfies SimResults["binding"] }
         : simResults;
       const matrix = await computeTissueSelectivityMatrix({
         sim: simForRun, iv: inVitroResults, l2Params: params.l2,
@@ -1494,8 +1546,8 @@ export function Layer3ExVivoScaffold({
             <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
               <L1OutputRow label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
               <L1OutputRow label="UniProt target"      source="L1 / UniProt KB API"        value={simResults ? simResults.uniprotId : "—"} />
-              <L1OutputRow label="Target gene (display)" source="L1 binding"               value={simResults ? simResults.binding.targetName : "—"} />
-              <L1OutputRow label="L1 IC50 (nM)"        source="L1 binding · primary"        value={simResults ? simResults.binding.primaryIC50.toFixed(1) : "—"} />
+              <L1OutputRow label="Target gene (display)" source="L1 binding"               value={simResults?.binding ? simResults.binding.targetName : "—"} />
+              <L1OutputRow label="L1 IC50 (nM)"        source="L1 binding · primary"        value={simResults?.binding ? simResults.binding.primaryIC50.toFixed(1) : "—"} />
               <L1OutputRow label="Plasma fu (%)"       source="L1 PPB sim"                  value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
               <L1OutputRow label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"         value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
               <L1OutputRow label="MW · LogP · TPSA"    source="RDKit descriptors"           value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
@@ -1506,9 +1558,18 @@ export function Layer3ExVivoScaffold({
           <L3InputParamsCard params={params} setParams={setParams} simResults={simResults} />
 
           <section>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <Atom className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Ex-Vivo Pipeline (Spec v1.1 §3 + §10)</span>
+            </div>
+            {/* Pipeline readiness banner */}
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2 mb-3">
+              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-300/80 leading-snug">
+                <span className="font-semibold text-amber-300">S1–S2 are fully operational</span> (real data pipelines, no synthetic fallback).{" "}
+                <span className="font-semibold text-rose-300">S3–S4</span> require external data artifacts (Parquet) to be provisioned before automated inference is available — manual entry works now.{" "}
+                <span className="font-semibold text-amber-300">S5–S6</span> are roadmap stages; S5 auto-runs once S2 manual entry is complete, S6 is pure orchestration.
+              </p>
             </div>
             <div className="space-y-2">
               {L3_STAGES.map(s => {
@@ -1551,7 +1612,7 @@ export function Layer3ExVivoScaffold({
           >
             {pipelineRunning
               ? <><Loader2 className="w-4 h-4 animate-spin" />Running pipeline…</>
-              : <><Play className="w-4 h-4" />Run L2 Ex-Vivo Pipeline (S1 → S2/S3/S4 ai-service → S5 derived → S6 envelope)</>}
+              : <><Play className="w-4 h-4" />Run L2 Virtual-Tissue Pipeline (S1 → S2/S3/S4 ai-service → S5 derived → S6 envelope)</>}
           </button>
 
           {(results.s1?.status === "complete" || results.s2?.status === "complete" || results.s6?.status === "complete") && (
@@ -1560,14 +1621,14 @@ export function Layer3ExVivoScaffold({
               onClick={copyHandoff}
               className="w-full h-9 rounded-lg gap-2 text-[12px] flex items-center justify-center border border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/15 text-teal-300"
             >
-              {copied ? <><Check className="w-4 h-4" /> Copied L2 Ex-Vivo handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L2 Ex-Vivo handoff JSON (with provenance)</>}
+              {copied ? <><Check className="w-4 h-4" /> Copied L2 Virtual-Tissue handoff JSON</> : <><Copy className="w-4 h-4" /> Copy L2 Virtual-Tissue handoff JSON (with provenance)</>}
             </button>
           )}
 
           <section>
             <div className="flex items-center gap-2 mb-3">
               <Microscope className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L2 Ex-Vivo Modality Reference (T2 / T3 — opt-in)</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Virtual-Tissue Substrates (Zero-Lab — computational only)</span>
             </div>
             <div className="space-y-2">
               {L3_MODALITIES.map(m => (
@@ -1577,7 +1638,7 @@ export function Layer3ExVivoScaffold({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-[12px] font-semibold text-white">{m.name}</div>
-                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-teal-500/30 bg-teal-500/8 text-teal-300/80">T2/T3 opt-in</span>
+                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-teal-500/30 bg-teal-500/8 text-teal-300/80">computational</span>
                       </div>
                       <div className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{m.summary}</div>
                     </div>
@@ -1608,11 +1669,11 @@ export function Layer3ExVivoScaffold({
               <Microscope className="w-5 h-5 text-teal-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-[18px] font-semibold text-white">L2 Ex-Vivo · T0 In-Silico Surrogate</h2>
+              <h2 className="text-[18px] font-semibold text-white">L2 Virtual-Tissue · T0 In-Silico Projection</h2>
               <p className="text-[12px] text-slate-400 leading-relaxed mt-0.5">
-                Heuristic + ML predictions of organoid response from L1 + L2 + public atlases.
+                Heuristic + ML projections of tissue response from L1 + L2 + public atlases (GTEx + Tabula Sapiens v2).
                 Stages 1, 5, 6 in-house · Stages 2, 3, 4 ai-service (DILI-ML · Drug2cell + Tabula Sapiens · DepMap PRISM 24Q2). Stages 2–5 also accept Manual Entry tagged source: user-provided
-                (cascade flag: prediction_only, wet anchor required for IND-supporting claims).
+                (cascade flag: prediction_only, literature-curated anchor required for IND-supporting claims).
               </p>
             </div>
           </div>
@@ -1623,7 +1684,7 @@ export function Layer3ExVivoScaffold({
               <Microscope className="w-10 h-10 text-teal-400/50 mx-auto mb-3" />
               <p className="text-[13px] text-slate-300 mb-1">Ready to run L2 Ex-Vivo pipeline</p>
               <p className="text-[11px] text-slate-500">
-                Run Stages 1–5 individually (Stage 1 in-house, Stages 2/3/4 ai-service, Stage 5 auto-derived) or click <span className="text-teal-300 font-semibold">Run L2 Ex-Vivo Pipeline</span> to chain them and emit the Stage 6 envelope. Manual Entry on Stages 2–5 overrides any ML output. Non-oncology compounds: use Stage 4 Manual Entry's not_applicable mode.
+                Run Stages 1–5 individually (Stage 1 in-house, Stages 2/3/4 ai-service, Stage 5 auto-derived) or click <span className="text-teal-300 font-semibold">Run L2 Virtual-Tissue Pipeline</span> to chain them and emit the Stage 6 envelope. Manual Entry on Stages 2–5 overrides any ML output. Non-oncology compounds: use Stage 4 Manual Entry's not_applicable mode.
               </p>
             </div>
           )}
@@ -1697,12 +1758,12 @@ export function Layer3ExVivoScaffold({
                   <div className="text-slate-500">Source</div>
                   <div className="text-cyan-300 font-mono text-right">user-provided</div>
                 </div>
-                <div className="text-[10px] text-amber-300/80 italic">Cascade flag: prediction_only · wet anchor (T2/T3) required for IND-supporting claims.</div>
+                <div className="text-[10px] text-amber-300/80 italic">Cascade flag: prediction_only · literature-curated anchor (cited CVCL + IC50) required for IND-supporting claims.</div>
               </ResultShell>
             );
           })()}
 
-          {/* Stage 3 result — ML (Drug2cell + Tabula Sapiens v2) or Manual organoid IC50 */}
+          {/* Stage 3 result — ML (Drug2cell + Tabula Sapiens v2) or Manual literature-curated IC50 */}
           {results.s3?.status === "complete" && (() => {
             const v = results.s3.result;
             if (v.kind === "ml") {
@@ -1747,16 +1808,16 @@ export function Layer3ExVivoScaffold({
                       </div>
                     ))}
                   </div>
-                  <div className="text-[10px] text-teal-300/80 italic mt-2">Cascade flag: prediction_only · expression × affinity score, NOT a measured organoid IC50. Wet anchor (T2/T3) required for IND-supporting claims.</div>
+                  <div className="text-[10px] text-teal-300/80 italic mt-2">Cascade flag: prediction_only · expression × affinity score, NOT a literature-curated IC50. Cite a published IC50 (CVCL + DOI/PMID) to anchor IND-supporting claims.</div>
                 </ResultShell>
               );
             }
             return (
-              <ResultShell stage={3} name="Cell-type / organoid IC50 (user-provided)" icon={Atom} status="complete">
+              <ResultShell stage={3} name="Cell-type / literature-curated IC50 (user-provided)" icon={Atom} status="complete">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                  <div className="text-slate-500">Organoid (CVCL)</div>
+                  <div className="text-slate-500">Cell line (CVCL)</div>
                   <div className="text-cyan-300 font-mono text-right">{v.organoidCvcl}</div>
-                  <div className="text-slate-500">Measured IC50</div>
+                  <div className="text-slate-500">Published IC50</div>
                   <div className="text-cyan-300 font-mono text-right">{v.measuredIc50_uM.toFixed(3)} µM</div>
                   <div className="text-slate-500">Assay format</div>
                   <div className="text-slate-300 text-right">{v.assayFormat}</div>

@@ -54,16 +54,16 @@ export function Story() {
           <section>
             <div className="text-[10px] uppercase tracking-widest text-violet-500 font-semibold mb-3">The Problem</div>
             <h2 className="text-[32px] font-black tracking-tight text-white mb-6">
-              Three questions that can make or break a biotech company
+              Three questions that decide whether a molecule reaches the clinic
             </h2>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-6">
-              Small biotech companies face three fundamental questions before they can test a drug molecule in humans:
+              Before a small biotech can dose a single human, it has to answer three pre-clinical questions — and answer them defensibly enough that an IND filing holds up:
             </p>
             <div className="space-y-4">
               {[
-                ["1", "Is this molecule safe and viable?", "Will the human body absorb it, move it to the right place, and clear it without harm?", "violet"],
-                ["2", "What happens when real patients take it?", "How effective is it? What side effects will they experience? Who responds and who doesn't?", "blue"],
-                ["3", "Should we run a clinical trial?", "How many patients do we need? How long will it take? How much will it cost? Is it worth the investment?", "emerald"],
+                ["1", "Is this molecule worth confirming?", "Is it absorbable, drug-like, and free of obvious organ-tox liabilities — based on real chemistry, not estimates?", "violet"],
+                ["2", "Does the verdict survive deeper confirmation?", "Does in-silico docking + free-energy refinement agree with virtual-tissue (GTEx + Tabula Sapiens) projections of the in-vitro screen — entirely Zero-Lab?", "blue"],
+                ["3", "Are we IND-ready, and what is a defensible First-In-Human starting dose?", "Have we covered multi-species animal PK, NOAEL, GLP tox, CMC, and the Investigator's Brochure — and can we justify a MABEL-biased starting dose?", "emerald"],
               ].map(([num, q, detail, color]) => (
                 <div key={num} className={`rounded-xl border p-5 flex gap-5 items-start ${
                   color === "violet" ? "border-violet-500/20 bg-violet-500/5"
@@ -85,7 +85,7 @@ export function Story() {
             <div className="mt-8 rounded-xl border border-red-500/20 bg-red-500/5 p-5">
               <div className="text-[10px] uppercase tracking-widest text-red-400 font-semibold mb-2">The Hard Truth</div>
               <p className="text-[14px] text-slate-300 leading-relaxed">
-                Answering these three questions today costs <span className="text-white font-semibold">$2M–$5M</span> and takes <span className="text-white font-semibold">12–18 months</span> of lab experiments, animal studies, and biostatistics consulting. And 90% of drugs that enter clinical trials still fail — most for reasons that could have been predicted earlier: poor absorption, unexpected toxicity, or an underpowered trial design. By the time you discover the problem in a real lab, you've spent millions.
+                Answering these three questions today costs <span className="text-white font-semibold">$2M–$5M</span> and takes <span className="text-white font-semibold">12–18 months</span> of lab experiments, animal studies, and biostatistics consulting. And 90% of drugs that enter clinical trials still fail — most for reasons that could have been predicted earlier in pre-clinical: poor absorption, unexpected toxicity, weak target engagement, or a starting dose that was wrong from day one. By the time the problem surfaces in a real lab, you've already spent millions.
               </p>
             </div>
           </section>
@@ -100,36 +100,42 @@ export function Story() {
               Before a pilot flies a real plane, they spend hundreds of hours in a flight simulator. The simulator doesn't replace real flying — but it tells you whether this pilot, in this plane, on this route, is likely to succeed. And it does it without risking a single life or a dollar on jet fuel.
             </p>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              Our platform does the same for drug molecules. A scientist types in a molecule — think of it as the drug's unique code — and in under 10 seconds the platform answers all three questions above.
+              Our platform does the same for the pre-clinical journey. A scientist types in a molecule and a target, and four cascading layers walk it from in-vitro screen through to a sealed, IND-ready handoff — every output tagged with how it was produced (heuristic, structural, ML, literature, in-house, or class-median anchor), every override logged.
             </p>
 
             <div className="space-y-4">
               {[
                 {
-                  step: "Step 1", label: "Is it safe & viable?",
-                  desc: "Checks if the molecule can be absorbed, reach its target, and be cleared safely. Flags cardiac, liver, or brain risks.",
+                  step: "Step 1 · Layer 1", label: "Is it worth confirming?",
+                  desc: "Real RDKit cheminformatics, ML-augmented ADMET, validated-target binding, and an organ-tox cascade. Returns a HAIOps-traceable verdict in seconds.",
                   verdict: "GO / WATCH / NO-GO", color: "violet",
                 },
                 {
-                  step: "Step 2", label: "What happens to patients?",
-                  desc: "Simulates what happens when 100 or 1,000 patients take this drug at a given dose. Shows how the drug moves through the body, how many patients respond, and what side effects to expect.",
-                  verdict: "Responder Rate + AE Profile", color: "blue",
+                  step: "Step 2 · Layer 2", label: "Does it survive confirmation?",
+                  desc: "Two parallel sub-tracks, both 100% computational — a 10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD) and a virtual-tissue (ex-vivo) track that maps L1+L2 outputs against GTEx and Tabula Sapiens v2. Both seal into a single ConfirmationBlock v2.0.0.",
+                  verdict: "Sealed Confirmation Block", color: "blue",
                 },
                 {
-                  step: "Step 3", label: "Should we run a trial?",
-                  desc: "Designs a complete virtual clinical trial. Calculates how many patients are needed, how long it takes, how much it costs, and whether the trial is statistically likely to succeed.",
-                  verdict: "TRIAL GO / NO-GO", color: "emerald",
+                  step: "Step 3 · Layer 3", label: "How does it behave across species?",
+                  desc: "Multi-species PBPK across rat, dog, and monkey with BCS-aware formulation and allometric scaling per ICH M3(R2). Outputs species-by-species NOAEL and a human-equivalent dose.",
+                  verdict: "NOAEL + HED per species", color: "amber",
+                },
+                {
+                  step: "Step 4 · Layer 4", label: "Are we IND-ready?",
+                  desc: "Phase 1 Planner derives a defensible MABEL-biased starting dose, evaluates the IND-enabling gate, and seals everything upstream into a regulator-ingestible PreClinicalPackage v2.0.0.",
+                  verdict: "MABEL FIH dose + IND PASS", color: "emerald",
                 },
               ].map(({ step, label, desc, verdict, color }) => (
                 <div key={step} className={`rounded-xl border p-6 ${
                   color === "violet" ? "border-violet-500/20 bg-[#0d0f17]"
                   : color === "blue" ? "border-blue-500/20 bg-[#0d0f17]"
+                  : color === "amber" ? "border-amber-500/20 bg-[#0d0f17]"
                   : "border-emerald-500/20 bg-[#0d0f17]"
                 }`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className={`text-[10px] uppercase tracking-widest font-semibold mb-1 ${
-                        color === "violet" ? "text-violet-500" : color === "blue" ? "text-blue-500" : "text-emerald-500"
+                        color === "violet" ? "text-violet-500" : color === "blue" ? "text-blue-500" : color === "amber" ? "text-amber-500" : "text-emerald-500"
                       }`}>{step}</div>
                       <div className="text-[16px] font-bold text-white mb-2">{label}</div>
                       <div className="text-[13px] text-slate-400 leading-relaxed">{desc}</div>
@@ -137,6 +143,7 @@ export function Story() {
                     <div className={`shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg border ${
                       color === "violet" ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
                       : color === "blue" ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
+                      : color === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
                       : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                     }`}>{verdict}</div>
                   </div>
@@ -244,13 +251,13 @@ export function Story() {
               The circular dependency in pre-clinical decision-making
             </h2>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-6">
-              You're a medicinal chemist at a 12-person biotech. You've designed 40 candidate molecules against a validated target. To get to IND filing, you need to:
+              You're a medicinal chemist at a 12-person biotech. You've designed 40 candidate molecules against a validated target. To file an IND, you need to:
             </p>
             <div className="space-y-3 mb-8">
               {[
-                ["Screen all 40 for ADMET liabilities", "In vitro Caco-2, microsomal stability, and hERG patch-clamp assays cost $15K–$50K per compound. That's $600K–$2M for Layer 1 data alone on a typical $800K budget."],
-                ["Run PK studies for your top 3–5 candidates", "Another $50K–$150K each. But you won't know which 3–5 to pick until you have the ADMET data you can't afford."],
-                ["Engage a biostatistics CRO for Phase 1 protocol design", "$150K–$400K and 2–4 months. The power calculation depends on effect size estimates that don't exist yet because the PK study hasn't run."],
+                ["Screen all 40 for ADMET liabilities", "In-vitro Caco-2, microsomal stability, and hERG patch-clamp assays cost $15K–$50K per compound. That's $600K–$2M for Layer 1 data alone on a typical $800K budget."],
+                ["Confirm the top 3–5 with docking, FEP, and ex-vivo evidence", "Computational chemistry CRO time, GPU-hours for FEP, organoid panels, primary hepatocyte CLint — another $200K–$500K. But you won't know which 3–5 to pick until you have the L1 data you can't afford."],
+                ["Run multi-species animal PK and IND-enabling tox", "Rat / dog / monkey PK plus GLP tox: $400K–$1.2M and 6–12 months. The allometric FIH calculation depends on per-species NOAEL estimates that don't exist yet."],
               ].map(([title, desc], i) => (
                 <div key={i} className="flex gap-4 rounded-xl border border-white/8 bg-white/2 p-5">
                   <div className="shrink-0 w-7 h-7 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400 mt-0.5">{i + 1}</div>
@@ -276,7 +283,7 @@ export function Story() {
               What the BioDigital Twin actually computes
             </h2>
             <p className="text-[15px] text-slate-400 leading-relaxed mb-10">
-              A three-layer cascading simulation running entirely in the browser via WebAssembly (RDKit.js) and standard biostatistical formulas. Zero server calls during simulation. Zero data egress.
+              Four cascading pre-clinical layers. RDKit.js (WASM) for cheminformatics in the browser; an isolated AI Service for ML inference (fingerprints only, never SMILES); RunPod GPU for opt-in FEP. Every output tagged with a source-quality tier — computed-side (heuristic / structural / ML) or substrate-side (literature / in-house / class-median). HAIOps governs the cascade gate; the clinician-in-the-loop owns every override.
             </p>
 
             {/* Layer 1 */}
@@ -285,19 +292,19 @@ export function Story() {
                 <div className="w-10 h-10 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[11px] font-black text-violet-400">L1</div>
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-violet-500 font-semibold">Layer 1</div>
-                  <div className="text-[18px] font-bold text-white">In Vitro Digital Twin</div>
+                  <div className="text-[18px] font-bold text-white">In Vitro Twin</div>
                 </div>
               </div>
               <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                Input: SMILES string + UniProt target ID. Five computation steps in ~3 seconds.
+                Input: SMILES + UniProt target ID. Output: a sealed L1 EvidencePointer with verdict and source-quality tiers.
               </p>
               <div className="space-y-3">
                 {[
-                  ["Step 1 — RDKit.js Descriptor Computation", "MW, LogP, TPSA, HBD, HBA, rotatable bonds, QED, ring counts. Real cheminformatics — the same RDKit C++ library used at Pfizer and Novartis, compiled to WASM."],
-                  ["Step 2 — ADMET Scoring", "Five scores (Absorption, Distribution, Metabolism, Excretion, Toxicity) via QSAR rules grounded in Lipinski (1997), Veber (2002), and hERG SAR literature. Each score 0–1 with transparent thresholds."],
-                  ["Step 3 — Binding Affinity Estimation", "Target-map lookup places the molecule within the expected IC50 range for its target class (e.g. 1–100 nM for EGFR RTK inhibitors), adjusted by Lipinski compliance and QED. QSAR-based, not docking."],
-                  ["Step 4 — Go/No-Go Decision Tree", "High-severity toxicity flag OR ≥3 Lipinski violations = NO-GO. ADMET < 0.65 = WATCH. Otherwise = GO."],
-                  ["Step 5 — Results Caching", "The complete SimResults object (descriptors, ADMET, binding, toxicity, verdict) is cached in-memory and passed to Layer 2. Zero network calls."],
+                  ["Step 1 — RDKit.js Descriptor Computation", "MW, LogP, TPSA, HBD, HBA, rotatable bonds, QED, ring counts. Real cheminformatics — the same RDKit C++ library used at Pfizer and Novartis, compiled to WASM. Computed locally."],
+                  ["Step 2 — ML-Augmented ADMET", "Per-axis A·D·M·E·T with confidence intervals. ML predictions cross-checked against published QSAR rules (Lipinski 1997, Veber 2002, hERG SAR). Disagreement surfaces as a HAIOps flag."],
+                  ["Step 3 — Validated-Target Binding", "Affinity estimate (Kd, Ki, IC50) only when the target has curated ChEMBL / BindingDB / PDBbind evidence. Unknown targets are flagged 'no validated evidence' — never silently coerced."],
+                  ["Step 4 — Cascade Gate", "Deterministic: high-severity organ-tox flag OR ≥3 Lipinski violations = NO-GO. ADMET < 0.65 = WATCH. Otherwise GO. Source-quality tier of each input is part of the gate input."],
+                  ["Step 5 — L1 EvidencePointer", "Verdict, descriptors, ADMET, binding, organ-tox, source-quality tiers, and HAIOps provenance trail are sealed into an L1 EvidencePointer that L2 freezes at Stage 0."],
                 ].map(([title, desc]) => (
                   <div key={title as string} className="rounded-lg border border-violet-500/10 bg-violet-500/4 p-4">
                     <div className="text-[12px] font-semibold text-violet-300 mb-1">{title}</div>
@@ -306,10 +313,9 @@ export function Story() {
                 ))}
               </div>
               <div className="mt-4 rounded-lg border border-white/8 bg-white/2 p-4">
-                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Real vs Estimated</div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2">Source-Quality Tiers</div>
                 <div className="text-[12px] text-slate-400 leading-relaxed">
-                  Molecular descriptors: <span className="text-emerald-400 font-medium">100% real cheminformatics</span>, identical to wet-lab computed properties. ADMET scores: published QSAR rules — scientifically grounded, not ML-trained. Binding affinity: range placement, not a docking calculation.
-                  <span className="text-slate-500"> Upgrade path: ChemBERTa for ADMET · ESM-2 + AQAffinity for binding.</span>
+                  Descriptors: <span className="text-emerald-400 font-medium">structural</span> (RDKit). ADMET: <span className="text-blue-400 font-medium">ML</span> with QSAR cross-check. Binding: <span className="text-blue-400 font-medium">ML</span> when validated, <span className="text-amber-400 font-medium">heuristic</span> with explicit flag when not. Substrate overrides — <span className="text-emerald-400 font-medium">literature</span> (DOI/PMID + CVCL) or <span className="text-emerald-400 font-medium">in-house</span> (bench/CRO with assay method) — promote the row tier and trump downstream ML.
                 </div>
               </div>
             </div>
@@ -320,18 +326,21 @@ export function Story() {
                 <div className="w-10 h-10 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400">L2</div>
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold">Layer 2</div>
-                  <div className="text-[18px] font-bold text-white">Patient Cohort Simulation</div>
+                  <div className="text-[18px] font-bold text-white">Confirmation Layer (In-Silico + Ex-Vivo)</div>
                 </div>
               </div>
               <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                Takes L1 SimResults + cohort parameters (dose, route, size, age range, disease severity). Produces population-level PK/PD outcomes in ~1–2 seconds.
+                Takes the L1 EvidencePointer (frozen at Stage 0) and runs two parallel sub-tracks. The output is a single sealed ConfirmationBlock v2.0.0 that L3 must consume.
               </p>
               <div className="space-y-3">
                 {[
-                  ["PK Time-Course", "Two-compartment PBPK solver with RK4 integration at 1-minute steps. Central and peripheral volumes, inter-compartmental clearance, and allometric scaling (BW^0.75) derived from PK-Sim physiology. 95% CI from NHANES population variability."],
-                  ["Responder Rate", "Sigmoidal Emax model driven by binding affinity (stronger binding → higher response) and disease severity. Biomarker-positive subgroup gets 1.5–2× the overall rate."],
-                  ["AE Profiling", "Each organ-risk flag from L1 maps to CTCAE-graded adverse events: hERG → QT prolongation (Grade 1–2: 10–20%, Grade 3+: 5–15%), hepatotox → ALT elevation, BBB → CNS effects."],
-                  ["DLT Rate", "Dose-limiting toxicity probability: High severity = 15–25% per flag, Medium = 5–15%, Low = 1–5%. Aggregated for total DLT rate."],
+                  ["In-Silico · Stage 1 — ESM2 Druggability", "ESM2 protein language model embeddings + a druggability head produce a target-druggability score with confidence. AI Service inference; only fingerprints + UniProt go server-side."],
+                  ["In-Silico · Stage 2 — AutoDock Vina Docking", "AutoDock Vina 1.2.7 with OpenBabel 3.1.1 + RDKit pose preparation. Top-N poses with binding energy and contact map. Source-quality tier: structural."],
+                  ["In-Silico · Stage 3-4 — ML Cross-Check + Selectivity", "ML affinity + ADMET cross-check against L1; selectivity panel against off-targets; cardiotox cross-check (hERG, NaV1.5). Disagreements surface as HAIOps flags, never silent overrides."],
+                  ["In-Silico · Stage 5 — FEP Free-Energy Refinement (opt-in)", "Alchemical FEP on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the gate calls for it. Tier: physics."],
+                  ["In-Silico · Stage 6-8 — Pharmacology Projection", "PBPK projection (compartmental ODE) → QSP/PD coupling → therapeutic-index ranking. The PBPK output seeds L3, the TI ranking seeds the L4 dose conversation."],
+                  ["In-Silico · Stage 9 — Sealed Block", "ConfirmationLayerPanel seals a v2.0.0 ConfirmationEvidenceBlock with the L1 EvidencePointer baked in. Re-runs require explicit unseal — no silent recomputation."],
+                  ["Virtual-Tissue (Ex-Vivo) Sub-Track", "Computational multi-cellular tissue simulation: GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas (480 cell types × 28 organs) + DepMap PRISM 24Q2. No physical tissue, no organ-on-chip vendor dependency. Substrate overrides — literature (CVCL + DOI/PMID) or in-house (bench/CRO with assay method) — promote the row tier and trump downstream ML in the cascade gate."],
                 ].map(([title, desc]) => (
                   <div key={title as string} className="rounded-lg border border-blue-500/10 bg-blue-500/4 p-4">
                     <div className="text-[12px] font-semibold text-blue-300 mb-1">{title}</div>
@@ -342,24 +351,50 @@ export function Story() {
             </div>
 
             {/* Layer 3 */}
-            <div>
+            <div className="mb-10">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400">L3</div>
+                <div className="w-10 h-10 rounded-full border border-amber-500/40 bg-amber-500/10 flex items-center justify-center text-[11px] font-black text-amber-400">L3</div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">Layer 3</div>
-                  <div className="text-[18px] font-bold text-white">Clinical Trial Digital Twin</div>
+                  <div className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">Layer 3</div>
+                  <div className="text-[18px] font-bold text-white">Animal Cohort</div>
                 </div>
               </div>
               <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                Takes L1+L2 outputs + trial design parameters (phase, arms, blinding, α, power, dropout). Produces a complete virtual trial simulation in ~1–2 seconds.
+                Takes L2's PBPK projection + species selection + formulation choice. Output: per-species PK, NOAEL with safety factor, and the human-equivalent dose used to seed L4 MABEL.
               </p>
               <div className="space-y-3">
                 {[
-                  ["Power Calculation", "Exact normal CDF formula (not approximation): n = ((Z_α/2 + Z_β)² × 2σ²) / δ², adjusted for dropout and multi-arm designs. Same math as nQuery/PASS."],
-                  ["Kaplan-Meier Curves", "Parametric survival using Weibull distribution. Treatment vs control arms with hazard ratio and log-rank p-value. Greenwood's formula for confidence intervals."],
-                  ["Adaptive Design", "O'Brien-Fleming spending function: Z_boundary(k) = Z_α_final / √t_k. Computes early stopping boundaries for efficacy and futility at each interim look."],
-                  ["Site Allocation", "Enrollment rate model by region (NA: 1–2/site/month at $50K–$100K/patient · APAC: 3–5/site/month at $10K–$25K/patient). Cost and timeline projections."],
-                  ["Trial Verdict", "GO (power ≥80%, molecule GO, DLT <33%) / CONDITIONAL / NO-GO. Actionable recommendation with modification suggestions."],
+                  ["Multi-Species PBPK", "Two-compartment RK4 ODE solver across rat / dog / monkey. Species-specific Vd, CL, protein binding from PK-Sim physiology atlas. Bound checks per stage; binding-precondition guards reject malformed inputs explicitly."],
+                  ["Formulation Engine", "Six FDA-IIG-compliant classes (plain tablet · micronized · spray-dried · NLC · SNEDDS · nanosuspension). BCS classification picks the highest-defensible bioavailability boost — no fictional excipients."],
+                  ["Allometric Scaling — ICH M3(R2)", "BW^0.75 for clearance, BW^1.0 for Vd. 1/10 NOAEL safety factor applied per ICH M3(R2). Bootstrap CIs on the human-equivalent dose."],
+                  ["External Cross-Validation", "ToxCast · ToxRefDB · ECOTOX organ-tox; UniProt + AlphaFold target context; ChEMBL animal-PK ranges. Mismatches surface as HAIOps flags."],
+                ].map(([title, desc]) => (
+                  <div key={title as string} className="rounded-lg border border-amber-500/10 bg-amber-500/4 p-4">
+                    <div className="text-[12px] font-semibold text-amber-300 mb-1">{title}</div>
+                    <div className="text-[12px] text-slate-400 leading-relaxed font-mono">{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Layer 4 */}
+            <div>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400">L4</div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">Layer 4</div>
+                  <div className="text-[18px] font-bold text-white">First-In-Human Readiness</div>
+                </div>
+              </div>
+              <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
+                Takes L1 verdict + L2 ConfirmationBlock + L3 NOAEL/HED. Output: a sealed PreClinicalPackage v2.0.0 — the artefact a CRO, regulator, or licensing partner can ingest. This layer is the boundary into the clinic, not a clinical-trial simulator.
+              </p>
+              <div className="space-y-3">
+                {[
+                  ["MABEL-Biased FIH Dose", "Per FDA 2005 / EMA 2017 — minimal anticipated biological effect level. The Phase 1 Planner prefers MABEL over NOAEL/HED whenever target engagement is the binding constraint. Calculation derived from upstream evidence; never authored."],
+                  ["IND-Enabling Gate (evaluateINDGate)", "Checks GLP toxicology coverage, CMC readiness, Investigator's Brochure outline, and Pre-IND meeting prerequisites. Every gap reports as a HAIOps flag with a remediation path — never silently waived."],
+                  ["Phase 1 Planner Defaults (derivePhase1Defaults)", "Cohort sizing, escalation rules, and stopping criteria are derived from L1–L3 evidence. The clinician-in-the-loop owns every override; HAIOps logs every change."],
+                  ["Sealed PreClinicalPackage v2.0.0", "Bundles L1 verdict + L2 ConfirmationBlock + L3 NOAEL/HED + L4 IND-gate result with full HAIOps provenance. Tamper-evident. Regulator-ingestible."],
                 ].map(([title, desc]) => (
                   <div key={title as string} className="rounded-lg border border-emerald-500/10 bg-emerald-500/4 p-4">
                     <div className="text-[12px] font-semibold text-emerald-300 mb-1">{title}</div>
@@ -373,18 +408,18 @@ export function Story() {
           {/* Privacy */}
           <section>
             <div className="text-[10px] uppercase tracking-widest text-blue-500 font-semibold mb-3">Privacy Architecture</div>
-            <h2 className="text-[32px] font-black tracking-tight text-white mb-6">Client-side by design</h2>
+            <h2 className="text-[32px] font-black tracking-tight text-white mb-6">Fingerprint-only inference</h2>
             <div className="space-y-4">
               <div className="rounded-xl border border-white/8 bg-white/2 p-5">
-                <div className="text-[13px] font-semibold text-white mb-2">Current (v1)</div>
+                <div className="text-[13px] font-semibold text-white mb-2">Browser side</div>
                 <p className="text-[13px] text-slate-400 leading-relaxed">
-                  The entire simulation runs client-side in the browser. The SMILES string — your proprietary molecular IP — never leaves the browser. RDKit.js is a C++ engine compiled to WebAssembly that executes locally. All QSAR rules, PK models, and power calculations run in JavaScript. Zero network calls during simulation.
+                  RDKit.js (WASM) computes descriptors, ADMET QSAR cross-checks, and organ-tox heuristics entirely in your browser. SMILES strings, structures, and molecular IP never leave the browser sandbox — the AI Service for L2/L3/L4 only ever sees Morgan fingerprint hashes.
                 </p>
               </div>
               <div className="rounded-xl border border-white/8 bg-white/2 p-5">
-                <div className="text-[13px] font-semibold text-white mb-2">v2 AI Upgrade Path</div>
+                <div className="text-[13px] font-semibold text-white mb-2">AI Service (server side)</div>
                 <p className="text-[13px] text-slate-400 leading-relaxed">
-                  When we add ML models, the architecture sends only <span className="text-white font-medium">Morgan fingerprints</span> (2048-bit one-way hashes) to the inference server. Morgan fingerprints are mathematically irreversible — the server cannot reconstruct the original molecule. Even Hakase cannot see your structures.
+                  ML ADMET, ESM2 druggability, AutoDock Vina docking, ML affinity, and FEP refinement run on an isolated AI Service. The browser sends only <span className="text-white font-medium">Morgan fingerprints</span> (2048-bit one-way hashes) and target identifiers — mathematically irreversible. The server cannot reconstruct your structure.
                 </p>
               </div>
               <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
@@ -411,9 +446,9 @@ export function Story() {
               {[
                 ["Real PK parameters (t½, CL, Vd, F)", "ADMET-score proxies", "Literature-validated values from 100,000+ references"],
                 ["Adverse effects", "Structural flag estimates", "140K+ known adverse effects with real-world incidence rates (MedDRA/ICD-10 coded)"],
-                ["Drug-drug interactions", "Not included", "1.37M+ interaction warnings"],
-                ["Drug-protein interactions", "Target-class lookup", "28,000+ curated drug-protein interaction records"],
-                ["Clinical trial data", "Not included", "Real-world trial outcomes for approved drugs"],
+                ["Drug-drug interactions", "Not included", "1.37M+ DDI warnings (DrugBank, FAERS, openFDA)"],
+                ["Drug-protein interactions", "Target-class lookup", "28,000+ curated records (ChEMBL, BindingDB, PDBbind)"],
+                ["Animal-PK cross-validation", "Allometric scaling only", "ToxCast · ToxRefDB · ECOTOX · ChEMBL animal-PK"],
               ].map(([label, std, prem]) => (
                 <div key={label} className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5">
                   <div className="p-4 text-[12px] text-slate-300 font-medium">{label}</div>
@@ -423,7 +458,7 @@ export function Story() {
               ))}
             </div>
             <p className="text-[13px] text-slate-500 mt-5 leading-relaxed">
-              For trial decisions at the $5M+ level, Premium replaces educated estimates with predictions grounded in the same curated data used by pharmaceutical companies and regulatory agencies.
+              For pre-clinical decisions at the $5M+ level — IND-enabling study design, FIH starting dose, partner/CRO handoff — Premium replaces educated estimates with predictions grounded in the same curated data used by pharmaceutical companies and regulatory agencies.
             </p>
           </section>
 

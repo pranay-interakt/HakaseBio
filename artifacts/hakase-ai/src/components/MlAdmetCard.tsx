@@ -259,7 +259,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           <div className="text-[10px] text-red-300 leading-relaxed">
             <span className="font-semibold">ML service unavailable.</span> {error}
             <div className="text-slate-500 mt-0.5">
-              Heuristic ADMET (left of comparison view) is still valid for this molecule.
+              Rule-based ADMET (left of comparison view) is still valid for this molecule.
             </div>
           </div>
         </div>
@@ -272,17 +272,28 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           <div className="text-[10px] text-amber-300 leading-relaxed">
             <span className="font-semibold">ML inference unavailable for this molecule.</span>{" "}
             <span className="text-slate-400">
-              {result.error ?? "The model returned no predictions."} Heuristic ADMET below remains the source of truth.
+              {result.error ?? "The model returned no predictions."} Rule-based ADMET below remains the source of truth.
             </span>
           </div>
         </div>
       )}
 
-      {/* 5-axis side-by-side comparison */}
+      {/* 5-axis Computational ADMET — Consensus View
+          Methodology: instead of hiding the disagreement between an
+          independent ML predictor (Chemprop GNN ensemble) and the rule-based
+          QSAR engine inside a single averaged number, we surface BOTH the
+          consensus value AND the agreement strength as a badge — mirroring
+          the hERG paired-prediction pattern used elsewhere in this card.
+          - |Δ| < 8 pts → Consensus  (methods agree → high trust)
+          - |Δ| < 20 pts → Aligned   (minor disagreement → use average)
+          - else        → Divergent (flag for human review; do not auto-trust)
+          The headline value is the arithmetic mean of the two methods, but
+          the original ML and Rule-based numbers are always shown beneath so
+          nothing is silently merged away. */}
       {result && result.source === "ml" && (
         <div>
           <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            ML vs Heuristic — 5-axis ADMET
+            Computational ADMET — Consensus View (ML × Rule-based)
           </div>
           <div className="grid grid-cols-5 gap-2">
             {axes.map(axis => {
@@ -290,55 +301,70 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
               const heur = heuristicAxes ? heuristicAxes[axis] : null;
               const mlPct = ml !== null ? Math.round(ml * 100) : null;
               const heurPct = heur !== null && heur !== undefined ? Math.round(heur * 100) : null;
-              const delta =
-                mlPct !== null && heurPct !== null ? mlPct - heurPct : null;
+              const hasBoth = mlPct !== null && heurPct !== null;
+              const consensusPct = hasBoth
+                ? Math.round((mlPct! + heurPct!) / 2)
+                : (mlPct ?? heurPct);
+              const absDelta = hasBoth ? Math.abs(mlPct! - heurPct!) : null;
+              const agreement = absDelta === null
+                ? null
+                : absDelta < 8
+                  ? { label: "Consensus", text: "text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/30", bar: "bg-emerald-500" }
+                  : absDelta < 20
+                    ? { label: "Aligned", text: "text-yellow-300", bg: "bg-yellow-500/10", border: "border-yellow-500/30", bar: "bg-yellow-500" }
+                    : { label: "Divergent", text: "text-orange-300", bg: "bg-orange-500/10", border: "border-orange-500/30", bar: "bg-orange-500" };
               return (
-                <div key={axis} className="bg-white/5 rounded-lg p-2.5 space-y-1.5">
-                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">{BUCKET_LABELS[axis]}</div>
-                  {/* ML bar */}
+                <div
+                  key={axis}
+                  className={`rounded-lg p-2.5 space-y-1.5 border ${agreement?.bg ?? "bg-white/5"} ${agreement?.border ?? "border-white/10"}`}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider">{BUCKET_LABELS[axis]}</div>
+                    {agreement && (
+                      <Badge className={`text-[8px] ${agreement.bg} ${agreement.text} ${agreement.border}`}>
+                        {agreement.label}
+                      </Badge>
+                    )}
+                  </div>
+                  {/* Consensus headline */}
                   <div>
-                    <div className="flex items-center justify-between text-[9px]">
-                      <span className="text-violet-300 font-semibold">ML</span>
-                      <span className="text-violet-300">{mlPct !== null ? `${mlPct}%` : "—"}</span>
+                    <div className={`text-[18px] font-bold leading-none ${agreement?.text ?? "text-slate-200"}`}>
+                      {consensusPct !== null && consensusPct !== undefined ? `${consensusPct}%` : "—"}
                     </div>
-                    <div className="w-full bg-white/5 rounded h-1.5 mt-0.5">
+                    <div className="w-full bg-white/5 rounded h-1.5 mt-1">
                       <div
-                        className="h-1.5 rounded bg-violet-500"
-                        style={{ width: `${mlPct ?? 0}%` }}
+                        className={`h-1.5 rounded ${agreement?.bar ?? "bg-slate-500"}`}
+                        style={{ width: `${consensusPct ?? 0}%` }}
                       />
                     </div>
                   </div>
-                  {/* Heuristic bar */}
-                  <div>
-                    <div className="flex items-center justify-between text-[9px]">
-                      <span className="text-slate-400">Heur</span>
-                      <span className="text-slate-400">{heurPct !== null ? `${heurPct}%` : "—"}</span>
+                  {/* Per-method breakdown (always shown — never silently merged) */}
+                  <div className="text-[9px] space-y-0.5 pt-0.5 border-t border-white/5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-violet-300/80">ML</span>
+                      <span className="text-violet-300 font-mono">{mlPct !== null ? `${mlPct}%` : "—"}</span>
                     </div>
-                    <div className="w-full bg-white/5 rounded h-1.5 mt-0.5">
-                      <div
-                        className="h-1.5 rounded bg-slate-500"
-                        style={{ width: `${heurPct ?? 0}%` }}
-                      />
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Rule</span>
+                      <span className="text-slate-400 font-mono">{heurPct !== null ? `${heurPct}%` : "—"}</span>
                     </div>
+                    {absDelta !== null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Δ</span>
+                        <span className={`font-mono ${agreement?.text ?? "text-slate-500"}`}>{absDelta} pts</span>
+                      </div>
+                    )}
                   </div>
-                  {/* Delta */}
-                  {delta !== null && (
-                    <div
-                      className={`text-[9px] text-center ${
-                        Math.abs(delta) < 10
-                          ? "text-slate-500"
-                          : delta > 0
-                          ? "text-emerald-400"
-                          : "text-amber-400"
-                      }`}
-                    >
-                      Δ {delta > 0 ? "+" : ""}
-                      {delta} pts
-                    </div>
-                  )}
                 </div>
               );
             })}
+          </div>
+          <div className="text-[9px] text-slate-500 mt-2 leading-relaxed">
+            Headline value is the mean of the ML (Chemprop GNN) and rule-based
+            (QSAR / Lipinski) estimates. The badge reflects how much the two
+            independent methods agree — <span className="text-emerald-400">Consensus</span> = high trust,
+            <span className="text-yellow-400"> Aligned</span> = minor disagreement,
+            <span className="text-orange-400"> Divergent</span> = methods disagree, route to human review.
           </div>
         </div>
       )}

@@ -6,6 +6,46 @@ HakaseAI is a BioDigital Twin Platform designed to simulate **pre-clinical** dru
 ## User Preferences
 I prefer detailed explanations and for you to ask before making major changes. Do not make changes to the `artifacts/hakase-ai/src/pages/HAIOps.tsx` file. Do not make changes to the folder `artifacts/hakase-ai/src/lib/safetyFlags.ts`.
 
+### Zero-Lab Pivot (May 13, 2026 — supersedes prior IVIVE chip-vendor strategy)
+HakaseAI is marketed as a **100% Zero-Lab In-Silico Cascade**. The customer-facing pipeline is software-only end-to-end (SMILES → L4 FIH readiness) with no physical assays, no tissue chips, no organoids in the run path. Implications:
+- **Ex-Vivo (L2 sub-track) is computational tissue simulation** — virtual multi-cellular tissue environment derived from GTEx tissue-expression baselines + Tabula Sapiens v2 cell-type atlas + DepMap PRISM, NOT physical organoids/PCLS/organ-on-chip data ingestion.
+- **IVIVE recalibration substrate is literature + public PK datasets + virtual-tissue outputs ONLY**. The May 6 plan to use Emulate / CN Bio / Mimetas chip-vendor data as recalibration substrate is **deprecated**. Do not reintroduce wet-lab assay terminology ("organoid panels", "primary hepatocyte CLint", "hERG patch-clamp", "microsomal stability", "perfusion", "assay telemetry", "CRO organoid panels") into customer-facing marketing or scaffold UI labels.
+- Manual-entry paths in scaffolds remain as **literature-curated overrides** (user pastes published values + citation), not as wet-lab data ingestion endpoints.
+- Chip-vendor data-access deals as a 2-quarter critical-dependency workstream is **dead**. Do not staff against it.
+
+### Tier ladder canonical names (May 13, 2026)
+The collapsed `MEASURED` tier has been split into three regulatorily-distinct tiers. Use these names verbatim across marketing, user guide, and (after the schema rewrite lands) in-app badges. They are the standard biotech / DMPK terminology — do not invent SaaS-flavoured synonyms like "CUSTOMER" or engineery names like "AUTO".
+
+**Computed-side** (platform-generated): `HEURISTIC` / `STRUCTURAL` / `ML`.
+**Substrate-side** (external evidence): `LITERATURE` / `IN-HOUSE` / `CLASS-MEDIAN`.
+- `LITERATURE` — published value with DOI / PMID for this compound or a Tanimoto ≥ 0.4 congener.
+- `IN-HOUSE` — bench / CRO measurement supplied by the operating team with assay method + lab + date.
+- `CLASS-MEDIAN` — Lombardo 2018 / Smith 2010 drug-class anchor. Runnable fallback only.
+
+**Cross-species defensibility rule:** for fu_p AND B/P, human + ≥1 preclinical species each must be `LITERATURE` or `IN-HOUSE`. `CLASS-MEDIAN` does NOT satisfy.
+
+**Substrate mode** (sealed in IVIVE sign-off + propagated to PreClinicalPackage): `literature` / `in-house` / `class-median` / `mixed`.
+
+**In-app badge transition:** the dashboard IVIVE panel still shows the legacy `MEASURED` badge for both LITERATURE and IN-HOUSE inputs; the per-cell schema split is a planned follow-up (consultant proposal #2 / #6). Marketing surfaces and the user guide already use the new ladder.
+
+### Zero-Lab named substrates (the public corpora that replace chip-vendor data)
+Surfaced first-class in `/ivive` and the user guide §15. Pre-trained models + named public databases are the Zero-Lab story — name them, don't hide them.
+- **LITERATURE substrate + recalibration corpus:** FDA Drug Approval Packages (~1,000+ compounds, regulator-grade ground truth).
+- **IVIVE recalibration corpora:** Obach 1999 (29 cmpds), Hosea 2009, Wang 2010.
+- **LITERATURE substrate (broader coverage):** DrugBank PK panel, PK-DB (UKonstanz).
+- **Cross-species recalibration:** Open TG-GATEs (human + rat hepatocyte), eTRANSAFE (EMA-led translational safety).
+- **CLASS-MEDIAN anchors:** Lombardo 2018 (fu_p drug-class medians), Smith 2010 (PPB review).
+- **Pre-trained models in the cascade:** ESM2 (Meta · druggability), AutoDock Vina + ML scoring (docking), Drug2cell + Tabula Sapiens v2 (CELLxGENE Census · cell-type aggregation), DepMap PRISM 24Q2 (Broad · patient-line projection), DILI-ML (hepatotoxicity), Cardiotox-ML (hERG / NaV1.5).
+
+The IVIVE engine version stamp records the calibration set + fold-error band, e.g. `v2.4.1 / Obach29 + Hosea50 / fold-error 1.8× geomean`.
+
+### Deferred follow-ups (consultant proposal, May 13, 2026)
+Tracked here so they're not lost; do NOT implement without an explicit go-ahead from the user (each touches the v2.0.0 seal contract).
+- **#2 IvieSubstrateCell provenance object** — discriminated union (`literature` | `in-house` | `class-median`) replacing `assayMethod` + `notes`. Adds `compound: 'exact' | 'congener'` + `congenerSimilarity` to LITERATURE cells. Touches `lib/ivieInputs.ts`, `IvieInputsPanel.tsx`, hashChain canonicalization.
+- **#3 Calibration-corpus wiring** — actually ingest Obach29 / Hosea / FDA DAPs and compute per-engine-version fold-error. Names are surfaced now; ingestion is not.
+- **#5 New falsifiers** — `FX-DOCKING-TISSUE-DIVERGENCE`, `FX-IVIVE-NO-CONGENER`, `FX-IVIVE-LITERATURE-OUTLIER`, `FX-SUBSTRATE-CITATION-MISSING`. Touches the falsifier registry + seal-time validation.
+- **#6 substrateMode enum expansion in PreClinicalPackage v2.0.0** — `'literature-exact' | 'literature-congener' | 'in-house' | 'class-median' | 'mixed'` with per-cell rollup. Requires a v2.0.0 → v2.1.0 seal-contract bump and architect rounds against `hashChain.ts`.
+
 ## System Architecture
 
 ### UI/UX Decisions

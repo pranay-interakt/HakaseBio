@@ -437,3 +437,89 @@
 .hk-light ::-webkit-scrollbar-thumb:hover {
   background: #a0abc4;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Global typography bump: +2px on every text size used.
+   Applied via @layer utilities so it wins against Tailwind defaults
+   without needing !important in most cases. Arbitrary text-[Npx]
+   classes are listed explicitly because Tailwind v4 generates them
+   on demand and we need to override the same selectors.
+   ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Standard Tailwind sizes */
+  .text-xs   { font-size: 14px; line-height: 1.35; }
+  .text-sm   { font-size: 16px; line-height: 1.4;  }
+  .text-base { font-size: 18px; line-height: 1.5;  }
+  .text-lg   { font-size: 20px; line-height: 1.5;  }
+  .text-xl   { font-size: 22px; line-height: 1.4;  }
+  .text-2xl  { font-size: 26px; line-height: 1.35; }
+  .text-3xl  { font-size: 32px; line-height: 1.3;  }
+  .text-4xl  { font-size: 38px; line-height: 1.2;  }
+  .text-5xl  { font-size: 50px; line-height: 1.15; }
+  .text-6xl  { font-size: 62px; line-height: 1.1;  }
+  .text-7xl  { font-size: 74px; line-height: 1.05; }
+
+  /* Arbitrary px sizes used across the app — bumped by +2px */
+  .text-\[7px\]  { font-size:  9px; }
+  .text-\[8px\]  { font-size: 10px; }
+  .text-\[9px\]  { font-size: 11px; }
+  .text-\[10px\] { font-size: 12px; }
+  .text-\[11px\] { font-size: 13px; }
+  .text-\[12px\] { font-size: 14px; }
+  .text-\[13px\] { font-size: 15px; }
+  .text-\[14px\] { font-size: 16px; }
+  .text-\[15px\] { font-size: 17px; }
+  .text-\[16px\] { font-size: 18px; }
+  .text-\[17px\] { font-size: 19px; }
+  .text-\[18px\] { font-size: 20px; }
+  .text-\[20px\] { font-size: 22px; }
+  .text-\[22px\] { font-size: 24px; }
+  .text-\[24px\] { font-size: 26px; }
+  .text-\[26px\] { font-size: 28px; }
+  .text-\[28px\] { font-size: 30px; }
+  .text-\[30px\] { font-size: 32px; }
+  .text-\[32px\] { font-size: 34px; }
+  .text-\[36px\] { font-size: 38px; }
+  .text-\[38px\] { font-size: 40px; }
+  .text-\[40px\] { font-size: 42px; }
+  .text-\[42px\] { font-size: 44px; }
+  .text-\[44px\] { font-size: 46px; }
+  .text-\[48px\] { font-size: 50px; }
+  .text-\[52px\] { font-size: 54px; }
+  .text-\[56px\] { font-size: 58px; }
+  .text-\[58px\] { font-size: 60px; }
+  .text-\[60px\] { font-size: 62px; }
+  .text-\[64px\] { font-size: 66px; }
+}
+
+/* ── Wet-Lab Comprehensive Report — typography + print ───────────────── */
+.wet-lab-report { font-family: ui-serif, Georgia, "Times New Roman", serif; line-height: 1.65; color: #0f172a; }
+.wet-lab-report h1 { font-size: 28px; font-weight: 800; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 3px double #0f172a; letter-spacing: -0.01em; }
+.wet-lab-report h2 { font-size: 20px; font-weight: 700; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; color: #1e293b; }
+.wet-lab-report h3 { font-size: 15px; font-weight: 700; margin: 22px 0 10px; color: #334155; }
+.wet-lab-report p, .wet-lab-report li { font-size: 13px; }
+.wet-lab-report strong { color: #0f172a; }
+.wet-lab-report code { font-family: "SF Mono", ui-monospace, Consolas, monospace; font-size: 12px; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; color: #0f172a; }
+.wet-lab-report pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 11px; line-height: 1.45; }
+.wet-lab-report pre code { background: transparent; color: inherit; padding: 0; font-size: 11px; }
+.wet-lab-report table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 12px; }
+.wet-lab-report th, .wet-lab-report td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; vertical-align: top; }
+.wet-lab-report th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+.wet-lab-report tr:nth-child(even) td { background: #f8fafc; }
+.wet-lab-report hr { border: none; border-top: 1px solid #cbd5e1; margin: 24px 0; }
+.wet-lab-report blockquote { border-left: 3px solid #94a3b8; padding: 6px 14px; margin: 12px 0; color: #475569; font-style: italic; background: #f8fafc; font-size: 12px; }
+.wet-lab-report ul, .wet-lab-report ol { padding-left: 22px; margin: 8px 0 14px; }
+.wet-lab-report li { margin: 3px 0; }
+.wet-lab-report .katex { font-size: 1.05em; }
+.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
+
+/* Note: print/PDF for the wet-lab report is handled by an off-screen
+   iframe in WetLabReportView (handlePrint). That route gives a clean,
+   paginating document and avoids fighting the modal's fixed/flex/overflow
+   ancestors. The iframe injects its own @page + break-inside rules. */
+
+/* ── Wet-Lab Report — embedded SVG chart ─────────────────────────────── */
+.wet-lab-report .wet-lab-chart { margin: 18px 0 22px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; page-break-inside: avoid; }
+.wet-lab-report .wet-lab-chart svg { width: 100%; height: auto; display: block; }
+.wet-lab-report .wet-lab-chart figcaption { margin-top: 8px; font-size: 11px; color: #475569; font-style: italic; text-align: center; }
+.wet-lab-report .chart-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px; border-radius: 4px; font-size: 12px; }

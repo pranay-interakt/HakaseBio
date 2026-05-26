@@ -35,6 +35,7 @@ const basePath = rawBasePath ?? "/";
 
 export default defineConfig({
   base: basePath,
+  cacheDir: process.env.VITE_CACHE_DIR ?? "node_modules/.vite",
   plugins: [
     react(),
     tailwindcss(),
@@ -72,6 +73,12 @@ export default defineConfig({
     fs: {
       strict: true,
       deny: ["**/.*"],
+    },
+    proxy: {
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
     },
   },
   preview: {

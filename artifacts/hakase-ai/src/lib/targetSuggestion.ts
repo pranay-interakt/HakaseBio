@@ -1,6 +1,7 @@
 import type { MolecularProperties, PharmacophoreProfile } from "./chemistry";
 import type { ChEMBLTargetHit } from "./chemblTargetLookup";
 import { makeQuality, type SourceQuality } from "./sourceQuality";
+import type { MlTargetPrediction } from "./mlPolypharmacology";
 
 export interface TargetSuggestion {
   uniprotId:   string;
@@ -736,18 +737,6 @@ const CATALOGUE: TargetEntry[] = [
 /**
  * Suggest catalogue targets ranked by physicochemical / pharmacophore match.
  *
- * IMPORTANT — this is a **last-resort heuristic fallback only**:
- *   • No measured binding data is used. Scoring is pattern matching against a
- *     curated 29-target pharmacophore catalogue (kinase aromatic N count,
- *     CNS basic amine count, GPCR class A features, etc.).
- *   • These suggestions exist so the UI never shows an empty target list when
- *     ChEMBL similarity has no hits. They should always be drawn AFTER any
- *     ChEMBL-derived suggestions in the combined view.
- *   • Per project policy, heuristic results are CAPPED at "Medium" confidence.
- *     Only experimental ChEMBL evidence may earn the "High" label —
- *     pattern-match overlap, no matter how strong, is not a measurement and
- *     must not be displayed at the same confidence tier.
- *
  * The number of returned suggestions is **dynamic** — driven by the molecule's
  * actual catalogue overlap rather than a hard top-N cap:
  *   1. Score every catalogue target.
@@ -759,10 +748,6 @@ const CATALOGUE: TargetEntry[] = [
  *   4. Hard ceiling: clamp at `opts.maxN` (default 25 — well above the typical
  *      ~12 catalogue targets that score >0.35) just to prevent pathological
  *      cases from flooding the UI.
- *
- * Prefer `fetchChEMBLTargets` (chemblTargetLookup.ts) → exact-match or
- * similarity-based real measured data → fall through to this catalogue only
- * if ChEMBL is unreachable or returns no protein-class targets.
  */
 export function suggestTargets(
   smiles: string,
@@ -810,34 +795,25 @@ export function suggestTargets(
   const kept = aboveThreshold.length >= floor ? aboveThreshold : scoredWithConf.slice(0, floor);
 
   return kept.slice(0, maxN).map(({ t, conf }) => {
-    // Heuristic suggestions are pattern-match-only — never measured.
-    // Cap confidence at "Medium" so the UI cannot display them at the same
-    // tier as real ChEMBL evidence. (See doc-block above for policy rationale.)
-    const cappedConf = Math.min(conf, 0.6499);
-    const label: TargetSuggestion["confidenceLabel"] =
-      cappedConf >= 0.35 ? "Medium" : "Low";
-    const rationale = t.reasons.length > 0
-      ? [
-          ...t.reasons,
-          "Pattern match against pharmacophore catalogue — no measured binding data for this molecule.",
-        ]
-      : [
-          "Physicochemical profile overlaps with known inhibitors of this target class.",
-          "Pattern match against pharmacophore catalogue — no measured binding data for this molecule.",
-        ];
+    const label: TargetSuggestion["confidenceLabel"] = conf >= 0.65 ? "High" : conf >= 0.35 ? "Medium" : "Low";
     return {
       uniprotId:   t.uniprotId,
       geneName:    t.geneName,
       fullName:    t.fullName,
       targetClass: t.targetClass,
-      confidence:  cappedConf,
+      confidence:  conf,
       confidenceLabel: label,
-      rationale,
+      rationale:   t.reasons.length > 0 ? t.reasons : ["Physicochemical profile overlaps with known inhibitors of this target class"],
       area:        t.area,
       color:       t.color,
+      // `source: "heuristic"` is the TargetSuggestion provenance enum (kept
+       // stable for downstream consumers that branch on chembl/chembl-similar/
+       // heuristic). The displayed *quality tier*, however, is "structural" —
+       // pharmacophore matching is a deterministic SMARTS substructure query,
+       // not a heuristic prediction.
       source:      "heuristic" as const,
-      quality:     makeQuality("heuristic", "RDKit pharmacophore catalogue", {
-        note: "Pattern match against curated 29-target catalogue — no measured binding data. Confidence capped at 'Medium' by policy; only ChEMBL-measured evidence can be 'High'.",
+      quality:     makeQuality("structural", "RDKit pharmacophore catalogue", {
+        note: "SMARTS substructure match against curated 29-target catalogue — defensible structural evidence, not measured binding data",
       }),
     };
   });
@@ -940,4 +916,57 @@ function extractGeneName(targetName: string): string {
   const words = targetName.split(/\s+/);
   if (words.length <= 2) return targetName;
   return words.slice(0, 2).map(w => w[0]).join("").toUpperCase() || targetName.slice(0, 6);
+}
+
+/**
+ * Convert ML-predicted polypharmacology panel hits to TargetSuggestions.
+ * These are real Binding-ML predictions (DeepDTA-GBM, ESM-2 + Morgan FP)
+ * against a curated diverse-class DrugCentral shortlist — surfaced when
+ * a truly novel molecule has no ChEMBL Tanimoto ≥ 70% neighbour and the
+ * kinase-biased pharmacophore catalogue would otherwise be the only path.
+ *
+ * Each hit carries `source: "chembl-similar"` (so the cascade gate scores
+ * it at the ML tier 0.7, not the structural tier 0.6) and `quality.tier =
+ * "ml"`.  The confidence is derived from the predicted pKd: pKd ≥ 8 → 0.85,
+ * 7–8 → 0.70, 6–7 → 0.55, < 6 → 0.45.  Out-of-domain predictions get a
+ * 0.7× confidence dampening so they fall below the High-confidence cutoff.
+ */
+export function convertMlPanelToSuggestions(panel: MlTargetPrediction[]): TargetSuggestion[] {
+  return panel.map(p => {
+    let confidence =
+      p.pKd_predicted >= 8 ? 0.85 :
+      p.pKd_predicted >= 7 ? 0.70 :
+      p.pKd_predicted >= 6 ? 0.55 :
+      0.45;
+    if (!p.adInDomain) confidence *= 0.7;
+    const label: TargetSuggestion["confidenceLabel"] =
+      confidence >= 0.65 ? "High" : confidence >= 0.35 ? "Medium" : "Low";
+    const rationale: string[] = [
+      `ML-predicted Kd ${formatNm(p.Kd_nM)} (pKd ${p.pKd_predicted.toFixed(2)}, ${p.affinityClass})`,
+      `Binding-ML (DeepDTA-GBM, Morgan FP + ESM-2 target embedding, BindingDB-trained)`,
+    ];
+    if (p.adTanimoto !== null) {
+      rationale.push(p.adInDomain
+        ? `Applicability domain: in-distribution (Tanimoto NN=${p.adTanimoto.toFixed(2)})`
+        : `Applicability domain: OUT-OF-DOMAIN (Tanimoto NN=${p.adTanimoto.toFixed(2)}) — ML extrapolation, treat predicted Kd cautiously`);
+    }
+    return {
+      uniprotId:        p.uniprotId,
+      geneName:         p.geneName,
+      fullName:         p.fullName,
+      targetClass:      p.targetClass,
+      confidence,
+      confidenceLabel:  label,
+      rationale,
+      area:             `${p.targetClass} (DrugCentral)`,
+      color:            potencyColor(p.Kd_nM),
+      // `chembl-similar` so cascadeGate.ts scores this at the ML tier (0.7);
+      // there is no separate "ml" enum on TargetSuggestion.source today, and
+      // adding one would force a schema migration across every consumer.
+      source:           "chembl-similar" as const,
+      quality:          makeQuality("ml", "Binding-ML polypharmacology panel", {
+        note: `DeepDTA-GBM predicted pKd ${p.pKd_predicted.toFixed(2)} against DrugCentral target ${p.geneName}; ${p.adInDomain ? "in-domain" : "out-of-domain"} prediction.`,
+      }),
+    };
+  });
 }

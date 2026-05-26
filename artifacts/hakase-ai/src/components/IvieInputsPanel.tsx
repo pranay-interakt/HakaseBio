@@ -1,5 +1,5 @@
 /**
- * IVIVE Wet-Lab Inputs Panel
+ * IVIVE Substrate Inputs Panel
  *
  * P0 input substrate for the IVIVE Calibration engine. Captures three
  * cross-species measurements (fu_p, fu_mic, B/P) the biotech brings from
@@ -102,7 +102,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
   }
 
   function handleReset() {
-    if (typeof window !== "undefined" && !window.confirm("Clear all IVIVE wet-lab inputs? This cannot be undone.")) return;
+    if (typeof window !== "undefined" && !window.confirm("Clear all IVIVE substrate inputs? This cannot be undone.")) return;
     onChange(emptyIvieWetLabInputs());
   }
 
@@ -113,7 +113,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
     return (
       <div className="rounded-md border border-cyan-500/20 bg-cyan-500/[0.04] px-3 py-2 flex items-center gap-3">
         <Beaker className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
-        <span className="text-[11px] font-semibold text-slate-300">IVIVE wet-lab inputs</span>
+        <span className="text-[11px] font-semibold text-slate-300">IVIVE substrate inputs</span>
         <span className="text-[10px] text-slate-500">
           {Math.round(assessment.completionFraction * 100)}% complete · {assessment.crossSpeciesRuleSatisfied ? "cross-species rule satisfied" : "cross-species rule not satisfied"}
         </span>
@@ -135,7 +135,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
         </div>
         <div className="min-w-0 text-left">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">IVIVE Wet-Lab Inputs</span>
+            <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">IVIVE Substrate Inputs</span>
             {assessment.crossSpeciesRuleSatisfied ? (
               <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
                 <CheckCircle2 className="w-2.5 h-2.5" /> cross-species rule
@@ -246,7 +246,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
                           />
                           {isEstimated && (
                             <span
-                              title="Auto-populated literature midpoint — replace with measured value when CRO data is in."
+                              title="Lombardo / Smith CLASS-MEDIAN anchor — replace with a LITERATURE (DOI/PMID for this compound or Tanimoto ≥ 0.4 congener) or IN-HOUSE (assay method + lab + date) value to satisfy the cross-species rule."
                               className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded border border-orange-500/40 bg-orange-500/10 text-orange-300 font-bold"
                             >
                               AUTO
@@ -282,17 +282,17 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
             </table>
           </div>
 
-          {/* Auto-fill notice — only when at least one cell is currently AUTO. */}
+          {/* Class-median fallback notice — only when at least one cell is currently a class-median anchor. */}
           {hasEstimatedCells(value) && (
             <div className="rounded-md border border-orange-500/30 bg-orange-500/[0.06] px-3 py-2 flex items-start gap-2">
               <Wand2 className="w-3.5 h-3.5 text-orange-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0 text-[11px] text-orange-200/95 leading-snug">
-                <span className="font-semibold">Auto-substrate active.</span>{" "}
-                One or more cells use literature midpoints (orange "AUTO" pill). The
+                <span className="font-semibold">Class-median substrate active.</span>{" "}
+                One or more cells use Lombardo / Smith drug-class anchors (orange "AUTO" pill — legacy badge; per-cell badge split is a planned schema follow-up). The
                 cross-species rule still reads as <span className="font-semibold">UNMET</span> —
-                estimates do not count as evidence. Type any cell to upgrade it to
-                a measured value, or proceed via the L2 → L3 handoff which will
-                require an explicit auto-substrate sign-off.
+                only LITERATURE or IN-HOUSE cells satisfy the rule. Type any cell to upgrade it to
+                a literature or in-house value, or proceed via the L2 → L3 handoff which will
+                require an explicit class-median sign-off.
               </div>
             </div>
           )}
@@ -310,7 +310,7 @@ export function IvieInputsPanel({ value, onChange, compact = false, defaultExpan
             <button
               onClick={handleAutoFill}
               data-testid="ivie-auto-fill"
-              title="Fill empty cells with literature midpoints (tagged AUTO; never overwrites measured values)"
+              title="Fill empty cells with Lombardo / Smith CLASS-MEDIAN anchors (tagged AUTO; never overwrites LITERATURE or IN-HOUSE values)"
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-100 text-[11px] font-semibold transition-colors"
             >
               <Wand2 className="w-3 h-3" /> Auto-fill empty cells

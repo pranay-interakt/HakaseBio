@@ -1,6 +1,6 @@
 # HakaseAI BioDigital Twin — Layers Reference
 
-> **Scope.** End-to-end reference for every layer of the BioDigital Twin pipeline as implemented in `artifacts/hakase-ai/` on **May 10, 2026**. Covers user inputs, pipeline stages in execution order, component map, databases / models touched, result panels rendered, and the handoff payload between layers.
+> **Scope.** End-to-end reference for every layer of the BioDigital Twin pipeline as implemented in `artifacts/hakase-ai/` on **May 13, 2026**. Covers user inputs, pipeline stages in execution order, component map, databases / models touched, result panels rendered, the handoff payload between layers, plus the cross-cutting HAIOps governance, IVIVE gate, and Regulatory Outlook surfaces.
 >
 > **Policy reminder.** No fake data, no synthetic fallbacks, no silent coercion, no defaults for missing required output fields. Where a value is unknown or unrunnable, the UI must render `—` (or skip envelopes for opt-in stages) — never a placeholder.
 >
@@ -46,6 +46,29 @@ When blocked, the dashboard renders the **"Stage-Gate Review Required"** banner 
 ### Safety Flags (`src/lib/safetyFlags.ts`, do not modify)
 
 Flags raised at any layer cascade forward. `getFlagsForLayer(safetyFlags, layer)` filters them per tab. `SafetyFlagCascadeBanner` displays upstream flags above each layer's results.
+
+### HAIOps Governance (`src/pages/HAIOps.tsx`, do not modify)
+
+Cross-cutting governance surface that documents *how* the platform is allowed to ship a verdict. It is referenced by every layer's "Regulatory Outlook" gap report and by the IVIVE sign-off page.
+
+**Five Pillars** (the `PILLARS` constant at the top of `HAIOps.tsx`, rendered as the page overview):
+1. **Clinical Validation** — model card, training corpus, evaluation set, and validation status for every ML call (`MlAdmetCard`, Cardiotox, DILI-ML, DeepDTA, Drug2cell).
+2. **Regulatory Audit Trail** — every override (Stage-Gate, IVIVE, Confirmation) is persisted with actor + role + justification + authority citation through the provenance trail.
+3. **Patient Safety Surveillance** — Safety Flag Cascade: flags raised upstream are *never* cleared downstream; filtered per tab via `getFlagsForLayer`.
+4. **Compliance Monitoring** — codified rules engine for ICH / FDA mappings (see Regulatory section for which standards are surfaced where).
+5. **Confidence Scoring** — every output carries a source-quality tier (`HEURISTIC` / `STRUCTURAL` / `ML` / `MEASURED`); badges propagate into the Stage-Gate Review and the L2 confirmation joint outputs.
+
+The page also renders **Safety Flag Cascade**, **AI Model Governance**, **Model Lifecycle**, **Clinician-in-the-Loop Design**, **Data Governance & Provenance**, and a **Regulatory Compliance** section (ICH S7A/B, M3(R2) referenced in-page).
+
+> ⚠ `HAIOps.tsx` and `safetyFlags.ts` are **policy-locked** — do not modify in feature work.
+
+### Stale-Results Guard (`HakaseAI.tsx` ~line 970)
+
+A `useEffect` clears `simResults` and `inVitroResults` whenever the live SMILES diverges from `simResults.smiles`. Without this guard, the radar / organ panels could keep rendering the *previous* compound's numbers while the live Lipinski strip already reflects the new SMILES. Empty state renders `—`, never zero.
+
+### Stage-Gate Review Conditional Render
+
+The Stage-Gate Review banner (cross-referenced from §1.3) only mounts when `simResults` exists. Pre-molecule the layer renders a quiescent placeholder; this prevents the banner from flashing "BLOCKED BY: —" before the user has run anything.
 
 ---
 
@@ -97,7 +120,7 @@ Run trigger: `handleAnalyzeMolecule()` in `HakaseAI.tsx`.
 | Panel | Shows | Source |
 |---|---|---|
 | **L1 INPUTS** (cyan) | Compound · UniProt target · MW·LogP·TPSA · Predicted Ki (nM) · hERG IC50 (µM) · Plasma fu (%) · Caco-2 Papp · Microsomal CLint · Off-target hits (n/total) · L1 Go / No-Go | `Layer2InSilicoScaffold.tsx:600` (visual ref) |
-| **ADMET grid** | 5-axis radar (A/D/M/E/T) + per-property grid (50+ endpoints) | `MlAdmetCard.tsx` |
+| **Computational ADMET — Consensus View** | 5-axis radar (A/D/M/E/T) where each axis renders **mean(ML + Rule)** as the headline, with a per-axis **Consensus / Aligned / Divergent** badge (`<8` pts emerald, `<20` pts yellow, else orange) and the ML / Rule / Δ breakdown beneath. Per-property grid (50+ endpoints) sits below the radar. | `MlAdmetCard.tsx` ~282–380 |
 | **hERG / Cardiotox card** | IC50 µM + risk class (Low/Moderate/High) + provenance (`ML / Cardiotox`) | rendered in `HakaseAI.tsx` |
 | **DILI / Hepatotoxicity card** | DILIrank-compatible risk class + severity hint + ML model citation | `HakaseAI.tsx` |
 | **Binding panel** | ChEMBL-derived pIC50 (similar molecules) **vs.** ML-predicted pKd (DeepDTA) — deltas surface disagreement | `HakaseAI.tsx` |
@@ -162,6 +185,31 @@ Each cell carries its own `assayMethod` and `notes` provenance fields. The matri
 **Wiring into the engine.** `Layer2InSilicoScaffold` merges human values into the L2 params right before invoking `runStage8` / `runFullPipeline` via `mergeIvie(params)`. Precedence: explicit form override > IVIVE measured value > L1 fallback. `l2DoseProjection.scaleHepaticCL` accepts `{ fuMic, bpRatio }` opts and applies the corrections (Obach 1999 fu_mic correction; plasma → blood CL conversion). When values are absent the legacy heuristic path is preserved unchanged — **no synthetic defaults**.
 
 **Anti-fabrication.** Empty cells render `—`, not zero. Out-of-range values are rejected (the cell is set to `null` and the error is shown inline). Validation is range-strict per measurement.
+
+### 2.0b IVIVE Output & Sign-off Handoff (`src/pages/IVIVE.tsx`, route `/ivive`)
+
+> **Goal.** Treat IVIVE as a **standalone gate** between L2 confirmation and L3 animal-cohort design. Wet-lab substrate in (§2.0), tiered confidence assessment + cross-species defensibility check + sealed sign-off out. This is the marketing/spec surface for the gate; the in-app implementation is `mergeIvie` + `l2DoseProjection.scaleHepaticCL` (§2.0).
+
+#### Output panels
+
+| Panel | Shows |
+|---|---|
+| **Three measurements** | `fu_p` (plasma) · `fu_mic` (microsomal, Obach 1999) · `B/P` (blood-to-plasma) — per species: Human · Mouse · Rat · Dog (Beagle) · Monkey (Cyno). 15-cell matrix. |
+| **Tier ladder** | `Insufficient` (no human fu_p — **BLOCK**) · `Minimum` (human fu_p only — explicit sign-off required) · `Standard` (fu_p human+mouse+rat AND B/P human+≥1 preclinical — auto-substrate allowed) · `Premium` (Standard + fu_mic human+≥1 preclinical). Tier is **deterministic** from the matrix; no judgement calls. |
+| **Cross-species defensibility flag** | Independent of tier: counts **measured-only** cells. Standard / Premium can be *reached* with auto-estimated cells, but the green defensibility flag only flips when the rule is satisfied with measured values. |
+| **Math anchors** | Well-stirred liver model · Obach 1999 (`CL_int_corrected = CL_int_measured / fu_mic`) · Lombardo 2018 + Smith 2010 fu_p auto-substrate anchors · ICH M3(R2) species selection. |
+| **10-stage pipeline strip** | (1) receive sealed in-silico ConfirmationBlock v2.0.0 → (2) capture wet-lab matrix → (3) tier assessment → (4) Obach fu_mic correction → (5) well-stirred CL_h per species → (6) plasma → blood CL via B/P → (7) cross-species rule check (measured-only) → (8) hard-block / soft-warn assembly → (9) sign-off → (10) release to L3. |
+
+#### Hard blocks vs soft warns vs sign-off
+
+| Class | Items | Behaviour |
+|---|---|---|
+| **Hard blocks** | In-vitro twin not run · L1 verdict NO-GO · Insufficient tier (no human fu_p) | Cannot be acknowledged away — block release to L3. |
+| **Soft warns** | In-silico ConfirmationBlock not yet sealed · cross-species rule met only with estimates · substrate mode auto-estimated or mixed · HAIOps safety flag with `reviewRequired` | Per-alert acknowledgment required at sign-off. |
+| **Info** | `ivie-no-fumic` — `fu_mic` missing (Obach correction skipped). Surfaced as informational, not warn; does not require acknowledgment. | Tracked through to provenance but does not gate sign-off. |
+| **Sign-off payload** | Name + role + ISO timestamp · justification text · acknowledged alert IDs · substrate mode (`measured` / `auto-estimated` / `mixed`) | Tamper-evident; consumed by L3 animal-cohort design and L4 FIH MABEL projection. |
+
+**Substrate mode propagation.** A run sealed on auto-substrate is *not* silently identical to a run sealed on measured substrate — the substrate mode tag rides through the L3 NOAEL/HED panel and is read again by the L4 MABEL projector before the IND-enabling package is assembled.
 
 ### 2.1 Sub-Track A: In-Silico (`Layer2InSilicoScaffold.tsx`)
 
@@ -425,6 +473,34 @@ L4 emits an **IND-gate readiness package** as a typed boundary payload (`lib/pre
 
 ---
 
+## Regulatory Intelligence — Cross-Layer Outlook (`src/pages/Regulatory.tsx`, route `/regulatory`)
+
+> **Goal.** Marketing / spec surface that documents the per-layer **Regulatory Outlook** the platform aims to surface at every pre-clinical layer. As of May 2026 this page is **a static spec page** (hardcoded coverage arrays + screenshot stills of the in-app outlook); the runtime-computed Regulatory Outlook lives inside the dashboard layers themselves and is sourced from `safetyFlags.ts`, `admet.ts`, `animalSim.ts`, and the L4 IND-gate. Treat the items below as the contract the live outlook is held to.
+
+### Coverage matrix (one column per layer)
+
+| Layer | Outlook contents | Source of truth |
+|---|---|---|
+| **L1 — In Vitro Twin** | hERG / Cardiac QT flags · Mutagenicity / Genotox alerts · Required IND-enabling studies (six study types, urgency-weighted Urgent → Required → Waivable) · Physicochemical vs FDA guidance (RO5, BCS Class I/II) · Source-quality tier badge per output · Precedent drug context (approved drugs in same structural class) | `safetyFlags.ts`, `admet.ts`, `chemistry.ts`, ChEMBL similarity |
+| **L2 — Confirmation** | Structural confirmation (ESM-2 + Vina docking) · Selectivity & cardiotox cross-check (Morgan-RF) · Opt-in FEP refinement (RunPod TIES) · Ex-vivo evidence (organoid / hERG patch / hepatocyte CL) · **Sealed `ConfirmationBlock` v2.0.0** | `l2Pipeline.ts`, `confirmationEngine.ts` |
+| **L3 — Animal Cohort** | Multi-species PBPK (rat · dog · monkey) · FDA-IIG-compliant formulation engine · Allometric scaling per **ICH M3(R2)** · NOAEL → HED with bootstrap CIs · Cross-validated vs ToxCast / ToxRefDB · FAERS AE label signals (pre-populates WARNINGS AND PRECAUTIONS) · Phase I clinical-pharmacology package (SAD, MAD, Food Effect, Renal/Hepatic Impairment, **TQT (ICH E14)**, DDI, PopPK) tagged Required vs Recommended | `animalSim.ts`, `pbpk.ts`, FAERS reference |
+| **L4 — FIH Readiness** | **MABEL-biased starting dose** (FDA 2005 / EMA 2017 — preferred over NOAEL/HED whenever target engagement is the binding constraint) · IND-enabling gate (GLP tox · CMC · Investigator's Brochure · Pre-IND meeting prerequisites) · Designation eligibility (Breakthrough · Fast Track · Accelerated Approval · Orphan) · **Sealed `PreClinicalPackage` v2.0.0** handoff | `FirstInHumanPanel` (`HakaseAI.tsx:10395`), `Phase1Planner.tsx`, `lib/preclinical-handoff/src/v2_0_0.ts` |
+
+### Methodology pillars (rendered on `/regulatory`)
+
+| Pillar | Behaviour |
+|---|---|
+| **Deterministic rules engine** | hERG → Cardiac QT study, mutagenicity → Ames + MN battery, CYP → full DDI panel. No AI hallucination risk for compliance-critical items. |
+| **ICH guideline mapping** | Studies are mapped to **ICH S7A/S7B** (safety pharmacology), **ICH E14** (QT/QTc), **ICH M3(R2)** (non-clinical), and FDA clinical pharmacology guidance for NDA / BLA. |
+| **PBPK-driven dosing** | Phase I MRSD, interval, and DLT-risk are computed directly from PBPK outputs (not static estimates); the 1/10 × Cmax rule follows FDA Phase I dose-escalation guidance. |
+| **FAERS signal integration** | AE rates are calibrated against FDA's Adverse Event Reporting System for label-informing incidence estimates. |
+| **MABEL-biased starting dose** | Per FDA 2005 / EMA 2017 — *preferred* over NOAEL/HED whenever target engagement is binding. Calculation derived from L1–L3 evidence; never authored, never silently overridden. |
+| **Sealed handoff** | `PreClinicalPackage v2.0.0` bundles L1 verdict + L2 ConfirmationBlock + L3 NOAEL/HED + L4 IND-gate result with full HAIOps provenance — tamper-evident, regulator-ingestible. |
+
+> **Anti-fabrication.** The Regulatory Outlook never invents a flag. Empty / unrunnable items render `—` and surface in the gap report; hard blocks cannot be silently waived (only acknowledged via the IVIVE / Stage-Gate sign-off flow).
+
+---
+
 ## Component Map
 
 ```
@@ -487,8 +563,14 @@ artifacts/hakase-ai/src/
 | **DepMap PRISM** | Cell-line panel | L2 Ex-Vivo Stage 4 |
 | **PBPK 2-comp RK4** | ODE model | L2 Stage 6 + L3 PK profiles |
 | **ICH M3(R2)** | Regulatory standard | L3 study type definitions |
+| **ICH S7A / S7B** | Regulatory standard | Safety pharmacology — surfaced on `/regulatory` |
+| **ICH E14** | Regulatory standard | QT/QTc (TQT) — surfaced on `/regulatory` |
+| **FDA 2005 / EMA 2017** | Regulatory guidance | MABEL-biased FIH starting dose (L4) |
 | **BSA / Km method** | Scaling rule | L3 HED |
 | **BCS class table** | Reference | L3 formulation → F% |
+| **FAERS** | Post-market AE DB | L3 / `/regulatory` AE label-signal calibration |
+| **ToxCast / ToxRefDB** | Tox DB | L3 cross-validation reference |
+| **Lombardo 2018 · Smith 2010 · Obach 1999** | Pharmacokinetics literature | IVIVE auto-substrate anchors + microsomal binding correction (§2.0b) |
 
 ---
 

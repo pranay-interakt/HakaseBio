@@ -30,7 +30,34 @@ const LAYERS = [
   },
   {
     id: "L2",
-    name: "Animal Cohort Twin",
+    name: "Confirmation Layer",
+    color: "blue" as const,
+    upgrades: [
+      {
+        label: "ESM2 Druggability + Pocket Detection",
+        status: "v2",
+        desc: "ESM2 protein language model embeddings with a druggability head, paired with FPocket-derived binding-site descriptors. Replaces target-class heuristics with structure-aware scoring per UniProt entry.",
+      },
+      {
+        label: "AutoDock Vina Docking Service",
+        status: "v2",
+        desc: "Server-side AutoDock Vina 1.2.7 with OpenBabel + RDKit pose preparation. Top-N poses with binding energy, contact maps, and a structural source-quality tier.",
+      },
+      {
+        label: "FEP Free-Energy Refinement (RunPod)",
+        status: "v2",
+        desc: "Opt-in alchemical FEP on RunPod GPU (~24 GPU-h, cost-confirmed before launch). Replaces ML affinity with physics-grounded ΔG when the cascade gate calls for it.",
+      },
+      {
+        label: "Ex-Vivo Evidence Ingestion",
+        status: "planned",
+        desc: "Structured override path for substrate-side evidence: literature (DOI/PMID for this compound or a Tanimoto ≥ 0.4 congener) and in-house (bench / CRO measurement with assay method + lab + date). Promotes the row tier to LITERATURE or IN-HOUSE — both satisfy the IVIVE cross-species rule and trump downstream ML in the cascade gate.",
+      },
+    ],
+  },
+  {
+    id: "L3",
+    name: "Animal Cohort",
     color: "amber" as const,
     upgrades: [
       {
@@ -41,71 +68,44 @@ const LAYERS = [
       {
         label: "Formulation Science Engine v2",
         status: "v2",
-        desc: "ML-predicted dissolution profiles for 12 formulation types. BCS-aware solubility enhancement prediction trained on commercial formulation datasets.",
+        desc: "ML-predicted dissolution profiles for 12 FDA-IIG-compliant formulation classes. BCS-aware solubility enhancement prediction trained on commercial formulation datasets.",
       },
       {
-        label: "Allometric Scaling Uncertainty",
+        label: "Allometric Scaling with Uncertainty",
         status: "v2",
-        desc: "Bootstrap-resampled allometric scaling with species-specific correction factors. FIH dose recommendations include 90% credible intervals per ICH M3(R2).",
+        desc: "Bootstrap-resampled allometric scaling with species-specific correction factors. Human-equivalent dose recommendations include 90% credible intervals per ICH M3(R2).",
       },
       {
-        label: "In Vitro–In Vivo Correlation",
+        label: "In Vitro–In Vivo Correlation (IVIVC)",
         status: "planned",
-        desc: "IVIVC Level A/B/C prediction from dissolution data to in vivo absorption profiles. Bridges formulation bench data to PBPK simulations automatically.",
-      },
-    ],
-  },
-  {
-    id: "L3",
-    name: "Patient Cohort Twin",
-    color: "blue" as const,
-    upgrades: [
-      {
-        label: "Population PK/PD Engine",
-        status: "v2",
-        desc: "NONMEM-equivalent population PK/PD engine trained on real patient datasets. Captures individual-level variability with mixed-effects models across diverse virtual cohorts.",
-      },
-      {
-        label: "Adverse Event NLP Model",
-        status: "v2",
-        desc: "Clinical NLP model fine-tuned on FAERS narratives — predicts adverse event type, frequency, and severity grade directly from molecular structure and dosing regimen.",
-      },
-      {
-        label: "Drug–Drug Interaction GNN",
-        status: "v2",
-        desc: "Graph neural network trained on 1M+ known drug–drug interaction signals spanning approved and investigational compounds — flags DDI risk before patient exposure.",
-      },
-      {
-        label: "Pharmacogenomics Layer",
-        status: "planned",
-        desc: "CYP polymorphism and HLA risk scoring integrated at the cohort level. Predicts metabolizer phenotype distribution and HLA-mediated hypersensitivity risk across virtual patients.",
+        desc: "IVIVC Level A/B/C prediction from dissolution data to in-vivo absorption profiles. Bridges formulation bench data to PBPK simulations automatically.",
       },
     ],
   },
   {
     id: "L4",
-    name: "Trial Digital Twin",
+    name: "First-In-Human Readiness",
     color: "emerald" as const,
     upgrades: [
       {
-        label: "Trial Outcome Prediction",
+        label: "MABEL Calculator with Target-Engagement Priors",
         status: "v2",
-        desc: "Graph-based model trained on thousands of real clinical trials from ClinicalTrials.gov predicts go/no-go probability using molecule, cohort, and trial design as joint inputs.",
+        desc: "MABEL-biased starting-dose calculator per FDA 2005 / EMA 2017. Integrates QSP/PD target-engagement priors from L2 to bias the dose floor when target engagement is the binding constraint.",
       },
       {
-        label: "Deep Survival Analysis",
+        label: "IND Gate Auto-Evaluator",
         status: "v2",
-        desc: "Neural survival model learns non-proportional hazards from historical trial Kaplan-Meier data — replacing current Weibull parametric assumptions with data-driven hazard functions.",
+        desc: "Automated check of GLP toxicology coverage, CMC readiness, Investigator's Brochure outline, and Pre-IND prerequisites. Each gap surfaces as a HAIOps flag with a remediation path — never a silent waiver.",
       },
       {
-        label: "Adaptive Design Optimizer",
+        label: "Phase 1 Planner — Adaptive Cohorts",
         status: "v2",
-        desc: "Bayesian adaptive enrichment and sample size re-estimation at interim analyses. Optimizes stopping boundaries under multiple testing corrections (Bonferroni, BH, O'Brien-Fleming).",
+        desc: "derivePhase1Defaults extends to BOIN / mTPI-2 escalation rules with per-cohort stopping criteria. Clinician-in-the-loop owns every override; HAIOps logs every change.",
       },
       {
-        label: "Site Performance Modelling",
+        label: "PreClinicalPackage Regulator Export",
         status: "planned",
-        desc: "ML-ranked site selection with enrollment velocity prediction per geography. Integrates historical site performance data with patient prevalence maps.",
+        desc: "Export the sealed PreClinicalPackage v2.0.0 as an FDA eCTD-compatible submission bundle. Tamper-evident manifests with full HAIOps provenance for CRO and regulator ingestion.",
       },
     ],
   },
@@ -119,9 +119,9 @@ const PHASES = [
     color: "violet",
     items: [
       "Deep ADMET transformer model (L1)",
-      "ESM-2 binding affinity predictor (L1)",
-      "Population PK/PD engine v2 (L3)",
-      "Trial outcome prediction model (L4)",
+      "ESM2 druggability + pocket detection (L2)",
+      "AutoDock Vina docking service (L2)",
+      "MABEL calculator with QSP/PD priors (L4)",
     ],
   },
   {
@@ -130,10 +130,10 @@ const PHASES = [
     status: "Planned",
     color: "blue",
     items: [
-      "Full 18-compartment PBPK (L2)",
-      "Adverse event NLP model (L3)",
-      "Drug–drug interaction GNN (L3)",
-      "Deep survival analysis (L4)",
+      "FEP free-energy refinement on RunPod (L2)",
+      "Full 18-compartment PBPK (L3)",
+      "Allometric scaling with bootstrap CIs (L3)",
+      "IND gate auto-evaluator (L4)",
     ],
   },
   {
@@ -142,10 +142,10 @@ const PHASES = [
     status: "Roadmap",
     color: "emerald",
     items: [
-      "IVIVC Level A/B/C prediction (L2)",
-      "Pharmacogenomics layer (L3)",
-      "Adaptive design optimizer (L4)",
-      "Site performance modelling (L4)",
+      "Ex-vivo evidence ingestion (L2)",
+      "IVIVC Level A/B/C prediction (L3)",
+      "Phase 1 Planner adaptive cohorts (L4)",
+      "PreClinicalPackage regulator export (L4)",
     ],
   },
 ];
@@ -218,9 +218,9 @@ export function AdvancedV2() {
             </span>
           </h1>
           <p className="text-[16px] text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            Every simulation component is being upgraded with a dedicated deep learning model — from molecular ADMET scoring to trial outcome prediction.
+            Every layer is being upgraded with a dedicated deep-learning or physics-grounded model — from ML-augmented ADMET to ESM2 druggability, AutoDock Vina docking, opt-in FEP refinement, full PBPK, and the MABEL-biased Phase 1 Planner.
             50+ models evaluated. 16 upgrade modules. 3-phase rollout.
-            Full privacy guaranteed — your molecular structures never leave the browser.
+            SMILES stays in the browser; the AI Service only ever sees fingerprints.
           </p>
           <div className="mt-8 flex items-center justify-center gap-6 flex-wrap text-[13px] text-slate-500">
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block" /> 12 v2 upgrades</span>
