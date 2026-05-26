@@ -1,0 +1,392 @@
+Yes — this is actually the best direction if you want to build a serious computational ADMET stack without depending on commercial black boxes.
+
+Here are the strongest **open/pretrained models and ML architectures** by category.
+
+---
+
+# Foundation Chemistry Models (MOST IMPORTANT)
+
+These are the backbone models you should fine-tune across ADMET tasks.
+
+## Transformer Models + Molecular Language Models
+
+### ChemBERTa
+
+* SMILES transformer
+* pretrained on PubChem
+* HuggingFace compatible
+* excellent for transfer learning
+
+[ChemBERTa Paper](https://arxiv.org/abs/2010.09885?utm_source=chatgpt.com) ([arXiv][1])
+[DeepChem ChemBERTa Tutorial](https://deepchem.io/tutorials/transfer-learning-with-chemberta-transformers/?utm_source=chatgpt.com) ([deepchem.io][2])
+
+Best use:
+
+* hepatotoxicity
+* BBB
+* CYP classification
+* hERG
+* bioavailability
+
+---
+
+### MolFormer
+
+Large-scale molecular transformer.
+
+Advantages:
+
+* much better long-range chemical representation
+* scaffold generalization
+* strong transfer learning
+
+Good for:
+
+* multitask ADMET
+* target affinity
+* metabolism
+
+---
+
+### GROVER
+
+Graph transformer pretrained on millions of molecules.
+
+Excellent for:
+
+* toxicity
+* PK
+* multi-endpoint prediction
+
+---
+
+# hERG Prediction Models
+
+## CLOP-hERG
+
+Contrastive learning pretrained hERG model.
+
+Very strong modern architecture:
+
+* pretrained molecular representations
+* specifically optimized for hERG blockade
+
+[CLOP-hERG Repository Index](https://drugbud-suite.github.io/CADD_Vault/ADMET/Pretrained%20Models/?utm_source=chatgpt.com) ([drugbud-suite.github.io][3])
+
+---
+
+## CardioTox
+
+Deep ensemble cardiotoxicity predictor.
+
+Uses:
+
+* GNN ensembles
+* toxicity-focused embeddings
+
+Better than simple QSAR heuristics.
+
+---
+
+## Architecture Recommendation
+
+Best open-source stack:
+
+| Layer             | Model                   |
+| ----------------- | ----------------------- |
+| Molecular encoder | ChemBERTa / MolFormer   |
+| Graph encoder     | MPNN / GAT / GIN        |
+| Final predictor   | XGBoost or MLP ensemble |
+
+This hybrid usually outperforms standalone models.
+
+---
+
+# Hepatotoxicity / DILI
+
+## DILIrank + GNN
+
+Current best practical open stack:
+
+* Chemprop
+* GROVER
+* MolFormer
+* Graphormer
+
+trained on:
+
+* DILIrank
+* Tox21
+* TG-GATEs
+
+---
+
+## M3Hep
+
+Modern multimodal hepatotoxicity model.
+
+Combines:
+
+* molecular graphs
+* SMILES
+* mitochondrial toxicity
+
+Achieved strong AUC performance. ([ResearchGate][4])
+
+---
+
+## Tox21 + DeepChem
+
+Still extremely useful.
+
+Datasets:
+
+* mitochondrial toxicity
+* stress response
+* nuclear receptor activity
+* hepatotoxicity proxies
+
+---
+
+# CYP / Metabolism Models
+
+This is where your current stack is weakest.
+
+---
+
+## [BioTransformer 3.0](https://biotransformer.ca/?utm_source=chatgpt.com)
+
+Best open metabolism framework right now. ([biotransformer.ca][5])
+
+Capabilities:
+
+* CYP450 metabolite prediction
+* Phase I/II metabolism
+* gut microbiome metabolism
+* environmental metabolism
+
+Uses:
+
+* rule systems
+* ML
+* knowledge graph logic
+
+This is MUCH stronger than SMARTS alerts.
+
+---
+
+## XenoSite
+
+Very good for:
+
+* CYP sites of metabolism
+* reactive metabolite prediction
+
+Predicts:
+
+* likely oxidation sites
+* bioactivation hotspots
+
+---
+
+## SyGMa
+
+Rule + metabolism engine.
+
+Still widely used.
+
+---
+
+## MetaPredictor
+
+Transformer-style metabolite prediction.
+
+Mentioned in CADD Vault index. ([drugbud-suite.github.io][3])
+
+---
+
+# General ADMET Multi-task Systems
+
+## HelixADMET
+
+One of the strongest open research systems.
+
+Uses:
+
+* self-supervised pretraining
+* multitask transfer learning
+* endpoint extensibility
+
+Very aligned with modern pharma AI. ([arXiv][6])
+
+[HelixADMET Paper](https://arxiv.org/abs/2205.08055?utm_source=chatgpt.com)
+
+---
+
+## ADMET-AI
+
+Strong open multitask ADMET framework.
+
+Predicts:
+
+* absorption
+* clearance
+* toxicity
+* distribution
+* CYP
+
+Referenced in ADMET model repositories. ([drugbud-suite.github.io][3])
+
+---
+
+## DeepChem
+
+Probably the most important ecosystem.
+
+[DeepChem Official Site](https://deepchem.io?utm_source=chatgpt.com)
+
+Includes:
+
+* GNNs
+* transformers
+* molecular featurizers
+* docking interfaces
+* ADMET datasets
+* multitask pipelines
+
+This should probably be your core framework.
+
+---
+
+# Best Model Architectures
+
+## Best classical ML
+
+Still surprisingly strong:
+
+### XGBoost + Morgan fingerprints
+
+Can outperform deep learning on small datasets.
+
+[ADMET XGBoost Paper](https://arxiv.org/abs/2204.07532?utm_source=chatgpt.com) ([arXiv][7])
+
+Very useful when:
+
+* dataset < 50k compounds
+* noisy labels
+* sparse endpoints
+
+---
+
+## Best GNNs
+
+| Architecture | Best Use             |
+| ------------ | -------------------- |
+| MPNN         | general ADMET        |
+| GAT          | toxicity             |
+| GIN          | scaffold learning    |
+| AttentiveFP  | medicinal chemistry  |
+| Graphormer   | large-scale transfer |
+
+---
+
+## Best Transformer Models
+
+| Model      | Strength                   |
+| ---------- | -------------------------- |
+| ChemBERTa  | easiest integration        |
+| MolFormer  | strongest transfer         |
+| GROVER     | graph + transformer hybrid |
+| Graphormer | SOTA graph transformer     |
+
+---
+
+# If You Want IND-Grade Improvement
+
+The real breakthrough comes from combining:
+
+| Component                  | Purpose                 |
+| -------------------------- | ----------------------- |
+| Foundation chemistry model | molecular understanding |
+| Multitask learning         | shared ADMET knowledge  |
+| Mechanistic metabolism     | CYP realism             |
+| PBPK layer                 | whole-body simulation   |
+| Omics toxicity             | biological mechanism    |
+| Uncertainty estimation     | regulatory robustness   |
+
+---
+
+# Strong Open Datasets You NEED
+
+## Toxicity
+
+* Tox21
+* ClinTox
+* DILIrank
+* TG-GATEs
+
+## PK/ADME
+
+* Therapeutics Data Commons (TDC)
+* MoleculeNet
+* ChEMBL
+* BindingDB
+
+## Metabolism
+
+* DrugBank
+* MetaQSAR
+* Human Metabolome DB
+
+---
+
+# What I’d Build Today
+
+For a next-gen open stack:
+
+| Task             | Recommended Stack           |
+| ---------------- | --------------------------- |
+| hERG             | MolFormer + GAT ensemble    |
+| Hepatotoxicity   | GROVER + TG-GATEs           |
+| CYP metabolism   | BioTransformer + XenoSite   |
+| Binding affinity | Graphormer + ESM embeddings |
+| ADMET multitask  | HelixADMET                  |
+| Fast baseline    | XGBoost + Morgan            |
+
+---
+
+# Highest ROI Upgrade for You
+
+Based on the pipeline you showed, the biggest improvement would come from replacing:
+
+### Current:
+
+* heuristics
+* logP rules
+* SMARTS alerts
+
+with:
+
+### Better:
+
+* pretrained molecular transformers
+* metabolism prediction models
+* multitask GNNs
+* uncertainty-aware ensembles
+
+That alone can dramatically improve:
+
+* scaffold generalization
+* false positive rate
+* mechanistic realism
+* lead prioritization quality
+
+without needing commercial software.
+
+[1]: https://arxiv.org/abs/2010.09885?utm_source=chatgpt.com "ChemBERTa: Large-Scale Self-Supervised Pretraining for Molecular Property Prediction"
+[2]: https://deepchem.io/tutorials/transfer-learning-with-chemberta-transformers/?utm_source=chatgpt.com "Tutorial: ChemBERTa"
+[3]: https://drugbud-suite.github.io/CADD_Vault/ADMET/Pretrained%20Models/?utm_source=chatgpt.com "Pretrained Models - CADD Vault"
+[4]: https://www.researchgate.net/publication/373746583_VenomPred_20_A_Novel_In_Silico_Platform_for_an_Extended_and_Human_Interpretable_Toxicological_Profiling_of_Small_Molecules?utm_source=chatgpt.com "VenomPred 2.0: A Novel In Silico Platform for an Extended ..."
+[5]: https://biotransformer.ca/?utm_source=chatgpt.com "BioTransformer 3.0"
+[6]: https://arxiv.org/abs/2205.08055?utm_source=chatgpt.com "HelixADMET: a robust and endpoint extensible ADMET system incorporating self-supervised knowledge transfer"
+[7]: https://arxiv.org/abs/2204.07532?utm_source=chatgpt.com "Accurate ADMET Prediction with XGBoost"

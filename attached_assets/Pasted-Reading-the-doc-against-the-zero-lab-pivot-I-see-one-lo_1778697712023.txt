@@ -1,0 +1,62 @@
+Reading the doc against the zero-lab pivot, I see one load-bearing semantic problem and a cluster of terminology/provenance issues that follow from it. Going in order of impact.
+
+**1. The MEASURED tier is now under-defined and that flows everywhere.** §2's source-quality ladder defines MEASURED as "Wet-lab measured values entered into the platform" and asserts it's "the only tier that satisfies the IVIVE cross-species defensibility rule." In a zero-lab world that single tier collapses three very different things together:
+
+- **Literature-sourced measurements** — published human/preclinical PK from FDA Drug Approval Packages, DrugBank PK panels, Lombardo 2018, Obach 1999, Hosea 2009 / Wang 2010 IVIVE benchmark sets, Open TG-GATEs hepatocyte data, etc. Hakase doesn't generate these; it cites them.
+- **Customer-supplied measurements** — a biotech using the platform has bench data from their own CRO and types it into the matrix. Hakase still doesn't generate it.
+- **Auto-estimated** — Lombardo/Smith class-median fallback. Already correctly distinguished.
+
+These have very different regulatory weight (a literature `fu_p` for *this exact compound* with a DOI is gold; a literature `fu_p` for a congener is weaker; a customer-supplied uncited value is between them; class-median anchor is the weakest runnable input). My suggestion is to split MEASURED into `LITERATURE` and `CUSTOMER`, keep `AUTO`, and let the cross-species defensibility rule require any combination of LITERATURE + CUSTOMER cells across the human-plus-preclinical-species rule rather than the single "wet-lab" gate.
+
+**2. The IVIVE cell-level schema needs a provenance object, not just a tier badge.** Right now each cell carries `assayMethod` and `notes`. In zero-lab those become load-bearing for the regulatory package. Proposed shape:
+
+```ts
+type IvieSubstrateCell = {
+  value: number | null;
+  tier: 'LITERATURE' | 'CUSTOMER' | 'AUTO';
+  provenance:
+    | { kind: 'literature'; citation: { doi?: string; pmid?: string; dataset?: string }; compound: 'exact' | 'congener'; congenerSimilarity?: number }
+    | { kind: 'customer'; assayMethod: string; lab?: string; date?: string; notes?: string }
+    | { kind: 'auto'; anchor: 'lombardo2018' | 'smith2010' | 'obach1999'; class: string };
+};
+```
+
+The `compound: 'exact' | 'congener'` distinction matters — literature `fu_p` for an exact match is the strongest possible substrate; for a congener it should widen the IVIVE uncertainty band. This is invisible in the current schema.
+
+**3. Recalibration substrate — concrete public datasets to wire in this quarter.** Since chip vendors are out, here is what the IVIVE engine should be regression-tested against:
+
+| Source | What you get | Why it matters |
+|---|---|---|
+| FDA Drug Approval Packages (DAPs) | Clin-pharm reviews with measured human PK | Held-out human PK ground truth for ~1,000+ compounds |
+| Obach 1999 dataset | Classic IVIVE benchmark — 29 compounds with CL_int, fu, observed CL | The dataset everyone publishes IVIVE evaluations against; mandatory for credibility |
+| Hosea 2009 / Wang 2010 | Extended IVIVE benchmark sets | Validates beyond Obach's original 29 |
+| DrugBank PK panel | Human PK parameters across marketed drugs | Broader coverage; lower per-record quality |
+| PK-DB (UKonstanz) | Curated human PK with study metadata | Academic but cleanly structured |
+| Open TG-GATEs | Human + rat hepatocyte toxicogenomics | Cross-species recalibration substrate (hepatocyte CL_int proxies) |
+| eTRANSAFE | EMA-led translational safety DB | Regulator-recognised provenance |
+| Lombardo 2018 | fu_p drug-class medians | Already an AUTO anchor — also a calibration target |
+
+Practical suggestion: the recalibration workspace (the platform-team-user surface in §6.2 of the IVIVE memory) should treat each of those as a named calibration corpus with its own fold-error metric. The engine version stamp then reads not just "v2.4.1" but "v2.4.1 / Obach29+Hosea50 / fold-error 1.8× geomean."
+
+**4. Terminology pass through the doc.** Specific renames I'd push:
+
+- §6.1 panel title "IVIVE Wet-Lab Inputs" → "IVIVE Substrate Inputs" (or "Cross-Species Substrate Matrix"). The word "wet-lab" reads as a category error in v2.0.
+- §6.4 Confirmation Orchestrator step 2 "Enter Ex-Vivo Measurements — defaults: primary hepatocyte clearance, CYP3A4 inhibition IC50, BSEP inhibition, hERG patch-clamp, primary cellular dose-response" → these names *are* wet-lab assays. In zero-lab these endpoints come from the L2 tissue-scale sub-stream (GTEx + Tabula Sapiens-driven predictions) or from literature. The step should be "Confirm Tissue-Scale Predictions" with the same five readouts now framed as model outputs with provenance.
+- §6.3 "Sub-Track B — Ex-Vivo" → "Sub-Track B — Tissue-Scale" (matches the §10.2 / new BioDigital Twin memory rename to "Structural & Tissue-Scale Cross-Validation Gate"). The word "Ex-Vivo" should be used only in legacy/glossary context with a footnote that it's now the *virtual* ex-vivo (tissue digital twin).
+- §7.4 "Hard blocks: In-vitro twin not run" — keep. "Insufficient tier (no human fu_p)" — keep but redefine the satisfaction rule as literature/customer cells, not wet-lab.
+- §15.6 Glossary entry for IVIVE — already says "the standalone gate between L2 and L3" but should add "recalibrated against literature PK and L2 virtual-tissue outputs; does not consume physical chip data."
+
+**5. Falsifiers the zero-lab regime specifically needs.** The platform's defensibility now rides on $\Delta_{div}$ between physics-docking and tissue-expression streams; the falsifier registry should make that legible:
+
+- `FX-DOCKING-TISSUE-DIVERGENCE` — AutoDock-predicted organ selectivity disagrees with GTEx/Tabula Sapiens-predicted tissue selectivity beyond threshold. (This is the keystone falsifier; everything else stacks on top.)
+- `FX-IVIVE-NO-CONGENER` — IVIVE recalibration corpus contains no compound above similarity threshold (e.g., Tanimoto > 0.4) to the current compound. Engine forced to widen uncertainty bands explicitly rather than silently extrapolate.
+- `FX-IVIVE-LITERATURE-OUTLIER` — IVIVE-scaled human CL for this compound falls outside the fold-error band of its nearest literature congeners. Reads like an early-warning that the engine version is mis-calibrated for this chemotype.
+- `FX-SUBSTRATE-CITATION-MISSING` — `LITERATURE` tier cell lacks a DOI/PMID. Hard block at seal time — protects the regulatory submission from undefendable citations.
+
+**6. Regulatory framing for the IND-enabling package.** The substrate-mode tag riding through to the PreClinicalPackage is the right primitive; in zero-lab it just needs richer values. Right now §7.5 carries `substrateMode: 'measured' | 'auto-estimated' | 'mixed'`. Proposed expansion: `substrateMode: 'literature-exact' | 'literature-congener' | 'customer-supplied' | 'auto-estimated' | 'mixed'`, with a per-cell rollup so a reviewer can answer "for what fraction of the matrix did we have an exact-compound literature citation?" without opening the bundle. This dovetails with the regulatory alignment thesis (V&V40 / ISTAND / QNM) — a reviewer reading the IND-supporting M2.6 draft can trace any IVIVE-derived number back to its substrate provenance in one click.
+
+**7. Two things to leave alone.** The `iviveHash` chaining (§13.1) is fine — it doesn't care whether values are literature or bench, only that they don't change post-seal. And the §15.1 external-resources table already lists Lombardo/Smith/Obach as "Pharmacokinetics literature" — exactly the framing the zero-lab pivot wants; no rewrite there.
+
+---
+
+If you want, I can convert any of this into a concrete spec patch (diff against the doc you pasted) or memorialize the substrate-provenance schema and falsifier additions to memory so I'm not re-deriving them next session. Which is more useful right now — the patch, the memory write, or both?

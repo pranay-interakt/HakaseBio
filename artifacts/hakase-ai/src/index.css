@@ -1,0 +1,525 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: var(--destructive-border);
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-primary-border: var(--sidebar-primary-border);
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent-border: var(--sidebar-accent-border);
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* HakaseAI Dark Theme — default (always dark) */
+:root {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  /* Base — deep near-black */
+  --background: 228 25% 4%;
+  --foreground: 210 40% 92%;
+
+  /* Border */
+  --border: 228 20% 14%;
+  --input: 228 18% 16%;
+  --ring: 262 83% 65%;
+
+  /* Card — slightly lighter than background */
+  --card: 228 25% 6%;
+  --card-foreground: 210 40% 92%;
+  --card-border: 228 20% 12%;
+
+  /* Popover */
+  --popover: 228 28% 8%;
+  --popover-foreground: 210 40% 92%;
+  --popover-border: 228 20% 14%;
+
+  /* Primary — violet */
+  --primary: 262 83% 62%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary */
+  --secondary: 228 25% 12%;
+  --secondary-foreground: 210 30% 75%;
+
+  /* Muted */
+  --muted: 228 25% 10%;
+  --muted-foreground: 215 20% 45%;
+
+  /* Accent */
+  --accent: 228 25% 14%;
+  --accent-foreground: 210 40% 88%;
+
+  /* Destructive */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Charts */
+  --chart-1: 262 83% 62%;
+  --chart-2: 217 91% 60%;
+  --chart-3: 158 64% 52%;
+  --chart-4: 45 93% 58%;
+  --chart-5: 0 72% 51%;
+
+  /* Sidebar */
+  --sidebar: 228 28% 5%;
+  --sidebar-foreground: 210 40% 88%;
+  --sidebar-border: 228 20% 10%;
+  --sidebar-primary: 262 83% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 228 25% 10%;
+  --sidebar-accent-foreground: 210 30% 75%;
+  --sidebar-ring: 262 83% 65%;
+
+  --app-font-sans: 'Inter', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'JetBrains Mono', Menlo, monospace;
+  --radius: 0.5rem;
+
+  --shadow-2xs: 0px 1px 0px 0px rgba(0,0,0,0.4);
+  --shadow-xs: 0px 1px 2px 0px rgba(0,0,0,0.4);
+  --shadow-sm: 0px 2px 4px 0px rgba(0,0,0,0.5);
+  --shadow: 0px 2px 8px 0px rgba(0,0,0,0.5);
+  --shadow-md: 0px 4px 12px 0px rgba(0,0,0,0.5);
+  --shadow-lg: 0px 8px 24px 0px rgba(0,0,0,0.6);
+  --shadow-xl: 0px 16px 40px 0px rgba(0,0,0,0.7);
+  --shadow-2xl: 0px 24px 60px 0px rgba(0,0,0,0.8);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.12);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255,255,255,0.22);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-color: #07080c;
+    color: #f1f5f9;
+    margin: 0;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+}
+
+@layer utilities {
+  input[type="search"]::-webkit-search-cancel-button {
+    @apply hidden;
+  }
+
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+  }
+
+  .no-default-hover-elevate {}
+  .no-default-active-elevate {}
+
+  .toggle-elevate::before,
+  .toggle-elevate-2::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  .toggle-elevate.toggle-elevated::before {
+    background-color: var(--elevate-2);
+  }
+
+  .border.toggle-elevate::before {
+    inset: -1px;
+  }
+
+  .hover-elevate:not(.no-default-hover-elevate),
+  .active-elevate:not(.no-default-active-elevate),
+  .hover-elevate-2:not(.no-default-hover-elevate),
+  .active-elevate-2:not(.no-default-active-elevate) {
+    position: relative;
+    z-index: 0;
+  }
+
+  .hover-elevate:not(.no-default-hover-elevate)::after,
+  .active-elevate:not(.no-default-active-elevate)::after,
+  .hover-elevate-2:not(.no-default-hover-elevate)::after,
+  .active-elevate-2:not(.no-default-active-elevate)::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: 999;
+  }
+
+  .hover-elevate:hover:not(.no-default-hover-elevate)::after,
+  .active-elevate:active:not(.no-default-active-elevate)::after {
+    background-color: var(--elevate-1);
+  }
+
+  .hover-elevate-2:hover:not(.no-default-hover-elevate)::after,
+  .active-elevate-2:active:not(.no-default-active-elevate)::after {
+    background-color: var(--elevate-2);
+  }
+
+  .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
+  .border.active-elevate:not(.no-active-interaction-elevate)::after,
+  .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
+  .border.active-elevate-2:not(.no-active-interaction-elevate)::after {
+    inset: -1px;
+  }
+}
+
+/* ── HakaseAI Light Mode ─────────────────────────────────────────────────── */
+
+.hk-light {
+  --hk-bg:         #f5f7fa;
+  --hk-surface:    #ffffff;
+  --hk-surface2:   #f0f2f8;
+  --hk-surface3:   #e8ebf4;
+  --hk-border:     #d1d8e8;
+  --hk-border2:    #c5cde0;
+  --hk-text:       #111827;
+  --hk-text2:      #374151;
+  --hk-text3:      #6b7280;
+  --hk-text4:      #9ca3af;
+  background-color: var(--hk-bg) !important;
+  color: var(--hk-text) !important;
+}
+
+/* Header & sidebar chrome */
+.hk-light header {
+  background-color: var(--hk-surface) !important;
+  border-color: var(--hk-border) !important;
+}
+.hk-light aside {
+  background-color: var(--hk-surface2) !important;
+  border-color: var(--hk-border) !important;
+}
+
+/* Every panel/card that uses the dark hex backgrounds */
+.hk-light [class*="bg-[#07080c]"],
+.hk-light [class*="bg-[#0d0f17]"],
+.hk-light [class*="bg-[#0d0f1a]"],
+.hk-light [class*="bg-[#080a12]"],
+.hk-light [class*="bg-[#0b0d14]"] {
+  background-color: var(--hk-surface) !important;
+}
+
+/* Semi-transparent white surfaces → light equivalents */
+.hk-light [class*="bg-white/3"],
+.hk-light [class*="bg-white/5"] {
+  background-color: var(--hk-surface2) !important;
+}
+.hk-light [class*="bg-white/8"],
+.hk-light [class*="bg-white/10"] {
+  background-color: var(--hk-surface3) !important;
+}
+.hk-light [class*="bg-white/15"],
+.hk-light [class*="bg-white/20"] {
+  background-color: #dde2ef !important;
+}
+
+/* Slate/dark tinted surfaces */
+.hk-light [class*="bg-slate-900"],
+.hk-light [class*="bg-slate-800"],
+.hk-light [class*="bg-slate-950"] {
+  background-color: var(--hk-surface) !important;
+}
+.hk-light [class*="bg-slate-800/"] {
+  background-color: var(--hk-surface2) !important;
+}
+
+/* Main scroll areas */
+.hk-light main,
+.hk-light [class*="overflow-y-auto"]:not(aside) {
+  background-color: var(--hk-bg);
+}
+
+/* Borders */
+.hk-light [class*="border-white/8"],
+.hk-light [class*="border-white/10"],
+.hk-light [class*="border-white/5"],
+.hk-light [class*="border-white/15"],
+.hk-light [class*="border-white/20"] {
+  border-color: var(--hk-border) !important;
+}
+.hk-light [class*="border-white/25"],
+.hk-light [class*="border-white/30"],
+.hk-light [class*="border-white/40"],
+.hk-light [class*="border-white/50"] {
+  border-color: var(--hk-border2) !important;
+}
+.hk-light [class*="border-slate-700"],
+.hk-light [class*="border-slate-800"],
+.hk-light [class*="border-slate-600"] {
+  border-color: var(--hk-border) !important;
+}
+
+/* Text colours */
+.hk-light [class*="text-white"] {
+  color: var(--hk-text) !important;
+}
+.hk-light [class*="text-slate-100"],
+.hk-light [class*="text-slate-200"],
+.hk-light [class*="text-slate-300"] {
+  color: var(--hk-text2) !important;
+}
+.hk-light [class*="text-slate-400"] {
+  color: var(--hk-text3) !important;
+}
+.hk-light [class*="text-slate-500"],
+.hk-light [class*="text-slate-600"] {
+  color: var(--hk-text4) !important;
+}
+.hk-light [class*="text-slate-700"] {
+  color: #6b7280 !important;
+}
+
+/* Inputs */
+.hk-light input,
+.hk-light textarea,
+.hk-light select {
+  background-color: var(--hk-surface) !important;
+  color: var(--hk-text) !important;
+  border-color: var(--hk-border) !important;
+}
+.hk-light input::placeholder,
+.hk-light textarea::placeholder {
+  color: var(--hk-text4) !important;
+}
+
+/* Active/hover surfaces in nav */
+.hk-light [class*="hover:bg-white/5"]:hover,
+.hk-light [class*="hover:bg-white/8"]:hover,
+.hk-light [class*="hover:bg-white/10"]:hover {
+  background-color: var(--hk-surface3) !important;
+}
+
+/* Separator / dividers */
+.hk-light [class*="divide-white"],
+.hk-light hr {
+  border-color: var(--hk-border) !important;
+}
+
+/* Shadows */
+.hk-light [class*="shadow-black"] {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10) !important;
+}
+
+/* Tab row that uses bg-white/5 as container */
+.hk-light [class*="bg-white/5"].rounded-lg,
+.hk-light [class*="bg-white/8"].rounded-lg,
+.hk-light [class*="bg-white/10"].rounded-lg {
+  background-color: var(--hk-surface3) !important;
+}
+
+/* Backdrop blur headers should be solid in light mode */
+.hk-light [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  background-color: var(--hk-surface) !important;
+}
+
+/* Keep accent colours intact for all layer/status indicators */
+.hk-light [class*="text-violet"],
+.hk-light [class*="text-amber"],
+.hk-light [class*="text-blue"],
+.hk-light [class*="text-emerald"],
+.hk-light [class*="text-red"],
+.hk-light [class*="text-green"],
+.hk-light [class*="text-yellow"] {
+  /* inherit accent — do not override */
+}
+
+/* Scrollbar */
+.hk-light ::-webkit-scrollbar-track {
+  background: var(--hk-surface2);
+}
+.hk-light ::-webkit-scrollbar-thumb {
+  background: var(--hk-border2);
+}
+.hk-light ::-webkit-scrollbar-thumb:hover {
+  background: #a0abc4;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Global typography bump: +2px on every text size used.
+   Applied via @layer utilities so it wins against Tailwind defaults
+   without needing !important in most cases. Arbitrary text-[Npx]
+   classes are listed explicitly because Tailwind v4 generates them
+   on demand and we need to override the same selectors.
+   ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Standard Tailwind sizes */
+  .text-xs   { font-size: 14px; line-height: 1.35; }
+  .text-sm   { font-size: 16px; line-height: 1.4;  }
+  .text-base { font-size: 18px; line-height: 1.5;  }
+  .text-lg   { font-size: 20px; line-height: 1.5;  }
+  .text-xl   { font-size: 22px; line-height: 1.4;  }
+  .text-2xl  { font-size: 26px; line-height: 1.35; }
+  .text-3xl  { font-size: 32px; line-height: 1.3;  }
+  .text-4xl  { font-size: 38px; line-height: 1.2;  }
+  .text-5xl  { font-size: 50px; line-height: 1.15; }
+  .text-6xl  { font-size: 62px; line-height: 1.1;  }
+  .text-7xl  { font-size: 74px; line-height: 1.05; }
+
+  /* Arbitrary px sizes used across the app — bumped by +2px */
+  .text-\[7px\]  { font-size:  9px; }
+  .text-\[8px\]  { font-size: 10px; }
+  .text-\[9px\]  { font-size: 11px; }
+  .text-\[10px\] { font-size: 12px; }
+  .text-\[11px\] { font-size: 13px; }
+  .text-\[12px\] { font-size: 14px; }
+  .text-\[13px\] { font-size: 15px; }
+  .text-\[14px\] { font-size: 16px; }
+  .text-\[15px\] { font-size: 17px; }
+  .text-\[16px\] { font-size: 18px; }
+  .text-\[17px\] { font-size: 19px; }
+  .text-\[18px\] { font-size: 20px; }
+  .text-\[20px\] { font-size: 22px; }
+  .text-\[22px\] { font-size: 24px; }
+  .text-\[24px\] { font-size: 26px; }
+  .text-\[26px\] { font-size: 28px; }
+  .text-\[28px\] { font-size: 30px; }
+  .text-\[30px\] { font-size: 32px; }
+  .text-\[32px\] { font-size: 34px; }
+  .text-\[36px\] { font-size: 38px; }
+  .text-\[38px\] { font-size: 40px; }
+  .text-\[40px\] { font-size: 42px; }
+  .text-\[42px\] { font-size: 44px; }
+  .text-\[44px\] { font-size: 46px; }
+  .text-\[48px\] { font-size: 50px; }
+  .text-\[52px\] { font-size: 54px; }
+  .text-\[56px\] { font-size: 58px; }
+  .text-\[58px\] { font-size: 60px; }
+  .text-\[60px\] { font-size: 62px; }
+  .text-\[64px\] { font-size: 66px; }
+}
+
+/* ── Wet-Lab Comprehensive Report — typography + print ───────────────── */
+.wet-lab-report { font-family: ui-serif, Georgia, "Times New Roman", serif; line-height: 1.65; color: #0f172a; }
+.wet-lab-report h1 { font-size: 28px; font-weight: 800; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 3px double #0f172a; letter-spacing: -0.01em; }
+.wet-lab-report h2 { font-size: 20px; font-weight: 700; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; color: #1e293b; }
+.wet-lab-report h3 { font-size: 15px; font-weight: 700; margin: 22px 0 10px; color: #334155; }
+.wet-lab-report p, .wet-lab-report li { font-size: 13px; }
+.wet-lab-report strong { color: #0f172a; }
+.wet-lab-report code { font-family: "SF Mono", ui-monospace, Consolas, monospace; font-size: 12px; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; color: #0f172a; }
+.wet-lab-report pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 11px; line-height: 1.45; }
+.wet-lab-report pre code { background: transparent; color: inherit; padding: 0; font-size: 11px; }
+.wet-lab-report table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 12px; }
+.wet-lab-report th, .wet-lab-report td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; vertical-align: top; }
+.wet-lab-report th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+.wet-lab-report tr:nth-child(even) td { background: #f8fafc; }
+.wet-lab-report hr { border: none; border-top: 1px solid #cbd5e1; margin: 24px 0; }
+.wet-lab-report blockquote { border-left: 3px solid #94a3b8; padding: 6px 14px; margin: 12px 0; color: #475569; font-style: italic; background: #f8fafc; font-size: 12px; }
+.wet-lab-report ul, .wet-lab-report ol { padding-left: 22px; margin: 8px 0 14px; }
+.wet-lab-report li { margin: 3px 0; }
+.wet-lab-report .katex { font-size: 1.05em; }
+.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
+
+/* Note: print/PDF for the wet-lab report is handled by an off-screen
+   iframe in WetLabReportView (handlePrint). That route gives a clean,
+   paginating document and avoids fighting the modal's fixed/flex/overflow
+   ancestors. The iframe injects its own @page + break-inside rules. */
+
+/* ── Wet-Lab Report — embedded SVG chart ─────────────────────────────── */
+.wet-lab-report .wet-lab-chart { margin: 18px 0 22px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; page-break-inside: avoid; }
+.wet-lab-report .wet-lab-chart svg { width: 100%; height: auto; display: block; }
+.wet-lab-report .wet-lab-chart figcaption { margin-top: 8px; font-size: 11px; color: #475569; font-style: italic; text-align: center; }
+.wet-lab-report .chart-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px; border-radius: 4px; font-size: 12px; }

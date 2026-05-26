@@ -146,7 +146,6 @@ import {
 } from "@/components/IvieInputsPanel";
 import { IvieOutputHandoffPage, type IvieHandoffSignOff } from "@/components/IvieOutputHandoffPage";
 import {
-import { API_ROOT } from "@/lib/apiBase";
   assessIvieTier, deriveSubstrateMode, hasEstimatedCells, hasAnyIvieData,
 } from "@/lib/ivieInputs";
 
@@ -366,12 +365,20 @@ export function HakaseAI() {
   const [peptideFastaHeader, setPeptideFastaHeader] = useState<string | undefined>(undefined);
   const [peptideMods, setPeptideMods] = useState<PeptideModification>(defaultPeptideModification());
   const [showModPanel, setShowModPanel] = useState(false);
+  // ── Peptide environment parameters ─────────────────────────────────────────
+  const [peptidePh, setPeptidePh] = useState(7.4);
+  const [peptideIonicStrength, setPeptideIonicStrength] = useState(150.0);
+  const [peptideDisulfideBridges, setPeptideDisulfideBridges] = useState("");
   const [antibodyHeavy, setAntibodyHeavy] = useState("");
   const [antibodyLight, setAntibodyLight] = useState("");
   const [antibodyFormatHint, setAntibodyFormatHint] = useState("");
   const [antibodyLoading, setAntibodyLoading] = useState(false);
   const [antibodyError, setAntibodyError] = useState<string | null>(null);
   const [antibodyResult, setAntibodyResult] = useState<AntibodyResult | null>(null);
+  // ── Antibody bioprocess parameters ──────────────────────────────────────────
+  const [antibodyExpressionHost, setAntibodyExpressionHost] = useState("CHO");
+  const [antibodySubclass, setAntibodySubclass] = useState("IgG1");
+  const [antibodyTargetAntigen, setAntibodyTargetAntigen] = useState("");
   const [smiles, setSmiles] = useState("");
   const [activatedSmiles, setActivatedSmiles] = useState("");
   const [molName, setMolName] = useState("");
@@ -1605,7 +1612,7 @@ export function HakaseAI() {
           .map(p => ({ time: p.time, conc: +p.conc.toFixed(2) }));
       }
 
-      const res = await fetch(`${API_ROOT}/api/bio-analysis`, {
+      const res = await fetch("/api/bio-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1665,7 +1672,7 @@ export function HakaseAI() {
     opts.setStream("");
     opts.setReport(null);
     try {
-      const res = await fetch(`${API_ROOT}/api/bio-analysis`, {
+      const res = await fetch("/api/bio-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...opts.body, focus: opts.focus }),
@@ -1750,7 +1757,7 @@ export function HakaseAI() {
     const placeholderIdx = history.length;
     setChatMessages(prev => [...prev, { role: "assistant" as const, content: "" }]);
     try {
-      const res = await fetch(`${API_ROOT}/api/bio-chat`, {
+      const res = await fetch("/api/bio-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2248,7 +2255,13 @@ export function HakaseAI() {
     }, 150);
 
     try {
-      const res = await predictPeptide(peptideSequence, peptideCyclic);
+      const res = await predictPeptide(
+        peptideSequence,
+        peptideCyclic,
+        peptidePh,
+        peptideIonicStrength,
+        peptideDisulfideBridges.trim() || undefined,
+      );
       await new Promise(resolve => setTimeout(resolve, 1000));
       clearInterval(interval);
       setSimProgress(100);
@@ -2267,7 +2280,7 @@ export function HakaseAI() {
     } finally {
       setPeptideLoading(false);
     }
-  }, [peptideSequence, peptideCyclic, uniprotId, peptideMods]);
+  }, [peptideSequence, peptideCyclic, peptidePh, peptideIonicStrength, peptideDisulfideBridges, uniprotId, peptideMods]);
 
   const runAntibodyAnalysis = useCallback(async () => {
     const cleanSeq = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
@@ -2291,7 +2304,14 @@ export function HakaseAI() {
     }, 150);
 
     try {
-      const res = await predictAntibody(h, l || undefined, antibodyFormatHint || undefined);
+      const res = await predictAntibody(
+        h,
+        l || undefined,
+        antibodyFormatHint || undefined,
+        antibodyExpressionHost || undefined,
+        antibodySubclass || undefined,
+        antibodyTargetAntigen.trim() || undefined,
+      );
       await new Promise(resolve => setTimeout(resolve, 1000));
       clearInterval(interval);
       setSimProgress(100);
@@ -2305,7 +2325,7 @@ export function HakaseAI() {
     } finally {
       setAntibodyLoading(false);
     }
-  }, [antibodyHeavy, antibodyLight, antibodyFormatHint]);
+  }, [antibodyHeavy, antibodyLight, antibodyFormatHint, antibodyExpressionHost, antibodySubclass, antibodyTargetAntigen]);
 
   const handleDiagenFetch = useCallback(() => {
     if (!diagenJobId.trim()) return;
@@ -3268,6 +3288,42 @@ export function HakaseAI() {
                             })()}
                           </div>
                         )}
+
+                        {/* ── Peptide Environment Parameters ─────────────────── */}
+                        <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/[0.03] p-3 space-y-3">
+                          <div className="text-[10px] text-cyan-300 font-semibold uppercase tracking-wider">Formulation Environment</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">Aqueous pH</div>
+                              <input
+                                type="number"
+                                min="1" max="14" step="0.1"
+                                value={peptidePh}
+                                onChange={e => setPeptidePh(parseFloat(e.target.value) || 7.4)}
+                                className="w-full bg-black/30 border border-white/10 text-white text-[10px] font-mono rounded px-2 py-1 focus:outline-none focus:border-cyan-500/50"
+                              />
+                            </div>
+                            <div>
+                              <div className="text-[9px] text-slate-500 font-semibold mb-1">Ionic Str. (mM)</div>
+                              <input
+                                type="number"
+                                min="0" max="1000" step="10"
+                                value={peptideIonicStrength}
+                                onChange={e => setPeptideIonicStrength(parseFloat(e.target.value) || 150)}
+                                className="w-full bg-black/30 border border-white/10 text-white text-[10px] font-mono rounded px-2 py-1 focus:outline-none focus:border-cyan-500/50"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] text-slate-500 font-semibold mb-1">Disulfide Map <span className="font-normal">(e.g. 1-8, 3-24)</span></div>
+                            <input
+                              value={peptideDisulfideBridges}
+                              onChange={e => setPeptideDisulfideBridges(e.target.value)}
+                              placeholder="Cys pairs, blank for auto"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[10px] font-mono rounded px-2 py-1 focus:outline-none focus:border-cyan-500/50 placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
                       </>)}
 
                       {/* ── Antibody mode: sequence inputs in sidebar ──────── */}
@@ -3312,6 +3368,54 @@ export function HakaseAI() {
                             >
                               Load Example
                             </button>
+                          </div>
+                        </div>
+
+                        {/* ── Antibody Bioprocess Specifications ─────────────── */}
+                        <div className="rounded-lg border border-blue-500/20 bg-blue-500/[0.03] p-3 space-y-3">
+                          <div className="text-[10px] text-blue-300 font-semibold uppercase tracking-wider">Bioprocess Specs</div>
+                          <div>
+                            <div className="text-[9px] text-slate-500 font-semibold mb-1">Expression Host</div>
+                            <select
+                              value={antibodyExpressionHost}
+                              onChange={e => setAntibodyExpressionHost(e.target.value)}
+                              className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-blue-500/50"
+                            >
+                              <option value="CHO">CHO (Chinese Hamster Ovary)</option>
+                              <option value="HEK293">HEK293 (Human Embryonic Kidney)</option>
+                              <option value="NS0">NS0 (Murine Myeloma)</option>
+                              <option value="E. coli">E. coli (Prokaryotic)</option>
+                              <option value="S. cerevisiae">S. cerevisiae (Yeast)</option>
+                              <option value="Pichia pastoris">Pichia pastoris</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-[9px] text-slate-500 font-semibold mb-1">Antibody Subclass</div>
+                            <select
+                              value={antibodySubclass}
+                              onChange={e => setAntibodySubclass(e.target.value)}
+                              className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-blue-500/50"
+                            >
+                              <option value="IgG1">IgG1 (CDC/ADCC active, t½ ~21d)</option>
+                              <option value="IgG2">IgG2 (minimal effector, t½ ~21d)</option>
+                              <option value="IgG3">IgG3 (strong CDC, t½ ~7d)</option>
+                              <option value="IgG4">IgG4 (minimal effector, t½ ~21d)</option>
+                              <option value="IgA">IgA (mucosal, t½ ~6d)</option>
+                              <option value="IgM">IgM (pentameric, t½ ~5d)</option>
+                              <option value="IgE">IgE (allergy, t½ ~2d)</option>
+                              <option value="scFv">scFv (t½ ~hours)</option>
+                              <option value="Fab">Fab fragment</option>
+                              <option value="nanobody">Nanobody / VHH</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-[9px] text-slate-500 font-semibold mb-1">Target Antigen</div>
+                            <input
+                              value={antibodyTargetAntigen}
+                              onChange={e => setAntibodyTargetAntigen(e.target.value)}
+                              placeholder="e.g. HER2, TNF-α, PD-L1…"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[10px] rounded px-2 py-1 focus:outline-none focus:border-blue-500/50 placeholder:text-slate-600"
+                            />
                           </div>
                         </div>
                       </>)}
@@ -5020,6 +5124,16 @@ export function HakaseAI() {
                     loading={peptideLoading}
                     error={peptideError}
                     result={peptideResult}
+                    fastaHeader={peptideFastaHeader}
+                    indication={indication}
+                    l1AiReport={null}
+                    l1AiLoading={false}
+                    l1AiError={null}
+                    l1AiStream={""}
+                    runL1AiAnalysis={() => {}}
+                    customPh={peptidePh}
+                    ionicStrength={peptideIonicStrength}
+                    disulfideBridges={peptideDisulfideBridges}
                     onClear={() => {
                       setPeptideSequence("");
                       setPeptideResult(null);
@@ -5065,6 +5179,15 @@ export function HakaseAI() {
                     loading={antibodyLoading}
                     error={antibodyError}
                     result={antibodyResult}
+                    indication={indication}
+                    l1AiReport={null}
+                    l1AiLoading={false}
+                    l1AiError={null}
+                    l1AiStream={""}
+                    runL1AiAnalysis={() => {}}
+                    expressionHost={antibodyExpressionHost}
+                    subclass={antibodySubclass}
+                    targetAntigen={antibodyTargetAntigen}
                     onClear={() => { setAntibodyHeavy(""); setAntibodyLight(""); setAntibodyResult(null); setAntibodyError(null); setSimStatus(prev => ({ ...prev, 1: "idle" })); }}
                   />
                 )}
@@ -5147,6 +5270,8 @@ export function HakaseAI() {
                       runningSelectivityScreen={runningSelectivityScreen}
                       handleRunOffTargetScreen={handleRunOffTargetScreen}
                       extChEMBL={extChEMBL}
+                      mlAdmet={admetMl}
+                      cardiotoxMl={cardiotoxMl}
                       onSelectTarget={(uid) => {
                         uniprotManual.current = true;
                         setUniprotAutoMode(false);
@@ -9725,6 +9850,8 @@ function Layer1Results({
   runningSelectivityScreen = false,
   handleRunOffTargetScreen,
   extChEMBL,
+  mlAdmet,
+  cardiotoxMl,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
@@ -9754,6 +9881,8 @@ function Layer1Results({
   runningSelectivityScreen?: boolean;
   handleRunOffTargetScreen?: () => void;
   extChEMBL?: import("@/lib/chemblActivity").ChEMBLMultiTargetResult | null;
+  mlAdmet?: MlAdmetResult | null;
+  cardiotoxMl?: CardiotoxResult | null;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
@@ -9773,6 +9902,8 @@ function Layer1Results({
         molProps: molProps as unknown as Record<string, unknown> | null,
         simResults: simResults as unknown as Record<string, unknown> | null,
         inVitroResults: inVitroResults as unknown as Record<string, unknown> | null,
+        mlAdmet: mlAdmet as unknown as Record<string, unknown> | null,
+        cardiotox: cardiotoxMl as unknown as Record<string, unknown> | null,
       });
     } catch (err) {
       console.error("[Layer1 PDF] generation failed", err);

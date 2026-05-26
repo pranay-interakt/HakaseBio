@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.0.0",
+  "compound": {
+    "smiles": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+    "inchiKey": "HEFNNWSXXWATRW-UHFFFAOYSA-N",
+    "molecularWeight": 206.28,
+    "chemblId": "CHEMBL521",
+    "preferredName": "Ibuprofen"
+  },
+  "inVitro": {
+    "hergIc50UM": 64.5,
+    "caco2Permeability": 32.4,
+    "plasmaProteinBindingFraction": 0.99,
+    "primaryTargetUniprot": "P23219",
+    "primaryTargetGeneSymbol": "PTGS1",
+    "primaryTargetIc50nM": 8200
+  },
+  "inSilico": {
+    "humanProjectedCmaxNgPerMl": 21000,
+    "humanProjectedAucNgHPerMl": 89000,
+    "humanProjectedHalfLifeHours": 2.1,
+    "humanProjectedClearanceLPerHPerKg": 0.075,
+    "freeEnergyDdgKcalPerMol": null,
+    "freeEnergyUncertaintyKcalPerMol": null
+  },
+  "animalCohort": {
+    "speciesId": "rat",
+    "speciesDisplayName": "Sprague-Dawley Rat",
+    "studyTypeId": "28-day-tox",
+    "studyTypeLabel": "28-day repeat-dose oral toxicology",
+    "routeOfAdministration": "oral",
+    "noaelMgPerKg": 50,
+    "mtdMgPerKg": 180,
+    "fihDoseMg": 35,
+    "fihDoseMgPerKg": 0.5,
+    "hedBsaMgPerKg": 8.06,
+    "hedPbpkMgPerKg": 7.20,
+    "safetyMarginNoael": 11.0,
+    "overallRisk": "low",
+    "toxicityFlags": [
+      {
+        "organ": "GI",
+        "risk": "moderate",
+        "finding": "mild gastric erosion at 3× NOAEL",
+        "ichReference": "ICH S7A"
+      }
+    ],
+    "formulation": {
+      "formulationType": "tablet (immediate-release)",
+      "bcsClass": "II"
+    },
+    "indEnablingComplete": true
+  },
+  "cypTransporterPanel": {
+    "cyp": {
+      "cyp1a2InhibitionProb": 0.04,
+      "cyp2c9InhibitionProb": 0.71,
+      "cyp2c19InhibitionProb": 0.18,
+      "cyp2d6InhibitionProb": 0.06,
+      "cyp3a4InhibitionProb": 0.12,
+      "inductionMrnaFoldChange": 1.1,
+      "source": "in-vitro-experimental"
+    },
+    "transporters": {
+      "pgpInhibitionProb": 0.08,
+      "bcrpInhibitionProb": 0.10,
+      "oatp1b1InhibitionProb": 0.22,
+      "oatp1b3InhibitionProb": 0.19,
+      "oct2InhibitionProb": 0.05,
+      "mate1InhibitionProb": 0.07,
+      "source": "in-vitro-experimental"
+    }
+  },
+  "clearanceFractions": {
+    "renalFraction": 0.10,
+    "hepaticFraction": 0.85,
+    "biliaryFraction": 0.03,
+    "otherFraction": 0.02,
+    "basis": "Mass-balance from human radiolabel ADME (PK-DB IBP-001); CYP2C9 dominant CL with minor CYP2C8 contribution.",
+    "source": "in-vitro-experimental"
+  },
+  "provenance": {
+    "emittedAt": "2026-05-04T12:00:00Z",
+    "emitterEngine": "HakaseBioDigitalTwin",
+    "emitterVersion": "1.0.0",
+    "l1EngineVersion": "ADMET-AI 0.4.1",
+    "l2EngineVersion": "PK-Sim 11.2",
+    "l4EngineVersion": "HakaseAnimalTox 1.0.0",
+    "databaseQueries": [
+      { "database": "ChEMBL", "status": "success", "timestamp": "2026-05-04T11:58:12Z", "resultCount": 1 },
+      { "database": "PK-DB", "status": "success", "timestamp": "2026-05-04T11:58:30Z", "resultCount": 14 },
+      { "database": "DailyMed", "status": "success", "timestamp": "2026-05-04T11:58:45Z", "resultCount": 6 }
+    ],
+    "warnings": []
+  }
+}

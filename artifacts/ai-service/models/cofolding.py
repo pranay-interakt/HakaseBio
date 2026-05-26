@@ -65,6 +65,8 @@ import sqlite3
 import threading
 import time
 import uuid
+import subprocess
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
@@ -72,6 +74,133 @@ from typing import Any, Optional
 import requests
 
 from models import gpu_dispatch
+
+
+# ── Local Boltz-2 execution (GPU_PROVIDER=local) ─────────────────────────────
+
+def _run_boltz_locally(payload: dict) -> dict:
+    """Run boltz predict directly on this machine's GPU and return the output dict
+    matching the _store_result contract."""
+    import importlib, time as _time
+
+    boltz_yaml        = payload["boltz_yaml"]
+    job_name          = payload.get("job_name", "hakase_cofold")
+    out_fmt           = payload.get("output_format", "pdb")
+    affinity_req      = bool(payload.get("affinity_requested", False))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        work      = pathlib.Path(tmp)
+        yaml_path = work / f"{job_name}.yaml"
+        out_dir   = work / "output"
+        out_dir.mkdir()
+        yaml_path.write_text(boltz_yaml)
+
+        cmd = [
+            "boltz", "predict", str(yaml_path),
+            "--out_dir",            str(out_dir),
+            "--cache",              "/root/.boltz",
+            "--recycling_steps",    str(payload.get("recycling_steps",    3)),
+            "--sampling_steps",     str(payload.get("sampling_steps",     200)),
+            "--diffusion_samples",  str(payload.get("diffusion_samples",  1)),
+            "--step_scale",         str(payload.get("step_scale",         1.638)),
+            "--max_parallel_samples", str(payload.get("max_parallel_samples", 1)),
+            "--output_format",      out_fmt,
+        ]
+        if payload.get("use_msa_server"):
+            cmd += ["--use_msa_server",
+                    "--max_msa_seqs", str(payload.get("max_msa_seqs", 4096))]
+            if payload.get("subsample_msa"):
+                cmd += ["--subsample_msa",
+                        "--num_subsampled_msa", str(payload.get("num_subsampled_msa", 512))]
+        if payload.get("use_potentials"):  cmd.append("--use_potentials")
+        if payload.get("no_kernels"):      cmd.append("--no_kernels")
+        if payload.get("write_full_pae"):  cmd.append("--write_full_pae")
+        if payload.get("write_full_pde"):  cmd.append("--write_full_pde")
+        if affinity_req:
+            cmd += [
+                "--predict_affinity",
+                "--sampling_steps_affinity",    str(payload.get("sampling_steps_affinity",   200)),
+                "--diffusion_samples_affinity",  str(payload.get("diffusion_samples_affinity", 5)),
+            ]
+            if payload.get("affinity_mw_correction"):
+                cmd.append("--affinity_mw_correction")
+
+        t0 = _time.time()
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+        elapsed_s = _time.time() - t0
+
+        if res.returncode != 0:
+            raise RuntimeError(f"boltz predict failed:\n{res.stderr[-3000:]}")
+
+        # ── Parse output directory ────────────────────────────────────────────
+        job_out = out_dir / job_name
+        if not job_out.exists():
+            candidates = list(out_dir.glob("*"))
+            job_out = candidates[0] if candidates else out_dir
+
+        ext = "pdb" if out_fmt == "pdb" else "cif"
+        struct_files = sorted(job_out.glob(f"**/*model_0*.{ext}")) or \
+                       sorted(job_out.glob(f"**/*.{ext}"))
+        if not struct_files:
+            raise RuntimeError(f"boltz produced no .{ext} file in {job_out}")
+
+        structure_text = struct_files[0].read_text()
+
+        # Confidence
+        conf_files = sorted(job_out.glob("**/confidence_model_0*.json")) or \
+                     sorted(job_out.glob("**/*confidence*.json"))
+        conf = json.loads(conf_files[0].read_text()) if conf_files else {}
+
+        pae = conf.get("pae")
+        pae_flat = [v for row in pae for v in row] if isinstance(pae, list) else []
+
+        # Affinity
+        affinity_block = None
+        if affinity_req:
+            aff_files = sorted(job_out.glob("**/*affinity*.json"))
+            if aff_files:
+                aff_raw = json.loads(aff_files[0].read_text())
+                affinity_block = {
+                    "affinity_pred_value":           aff_raw.get("affinity_pred_value"),
+                    "affinity_probability_binary":   aff_raw.get("affinity_probability_binary"),
+                }
+
+        # GPU name (best effort)
+        try:
+            gpu_res = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=5,
+            )
+            gpu_name = gpu_res.stdout.strip().split("\n")[0] if gpu_res.returncode == 0 else "unknown"
+        except Exception:
+            gpu_name = "unknown"
+
+        # Boltz version
+        try:
+            import boltz as _boltz
+            boltz_version = getattr(_boltz, "__version__", "unknown")
+        except Exception:
+            boltz_version = "unknown"
+
+        return {
+            "structure":            structure_text,
+            "structure_format":     out_fmt,
+            "confidence":           conf,
+            "per_residue_plddt":    conf.get("plddt"),
+            "pae_matrix":           pae,
+            "pde_matrix":           conf.get("pde"),
+            "affinity":             affinity_block,
+            "models":               [{"rank": 0, "structure": structure_text, "confidence": conf}],
+            "n_models":             1,
+            "n_chains":             0,
+            "n_residues_modeled":   0,
+            "engine":               "Boltz-2 (local GPU)",
+            "boltz_version":        boltz_version,
+            "gpu_name":             gpu_name,
+            "msa_source":           "msa_server" if payload.get("use_msa_server") else "none",
+            "wallclock_seconds":    elapsed_s,
+            "warnings":             [],
+        }
 
 try:
     from rdkit import Chem
@@ -1181,6 +1310,15 @@ def _run_job(job_id: str, design: CoFoldDesign, yaml_text: str, needs_msa: bool)
             "sampling_steps_affinity":      opts["sampling_steps_affinity"],
             "diffusion_samples_affinity":   opts["diffusion_samples_affinity"],
         }
+
+        # ── LOCAL: run boltz predict directly on this machine's GPU ──────────
+        if provider == "local":
+            _set(job_id, runpod_job_id="local",
+                 progress="running Boltz-2 on local GPU")
+            output = _run_boltz_locally(payload)
+            _store_result(job_id, output, "local", yaml_text,
+                          bool(design.affinity_binder))
+            return
 
         # 1. Submit — returns an opaque provider_job_id
         provider_job_id = gpu_dispatch.submit(payload, "boltz")

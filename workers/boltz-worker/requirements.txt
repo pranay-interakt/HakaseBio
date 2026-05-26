@@ -1,0 +1,8 @@
+runpod>=1.6.0
+
+# Boltz-2 (MIT license)
+boltz>=0.4.0
+
+# Utilities
+numpy>=1.26.0
+requests>=2.31.0

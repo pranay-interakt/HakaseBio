@@ -1315,6 +1315,8 @@ export interface PeptidePhysicochemical {
   extinction_280_oxidised: number;
   extinction_280_reduced: number;
   n_disulfide_pairs: number;
+  /** Total cysteine residue count in the sequence. */
+  cysteine_count?: number;
 }
 
 export interface PeptideSecondaryStructure {
@@ -1433,6 +1435,8 @@ export interface PeptideAggregation {
   hotspot_area: number;
   method: string;
   provenance: string;
+  /** Ionic/pH aggregation drivers from Debye-Hückel environment model. */
+  drivers?: string[];
 }
 
 export interface PeptideImmunogenicity {
@@ -1515,6 +1519,18 @@ export interface PeptideBioconjugation {
   note: string;
 }
 
+export interface PeptideCustomEnv {
+  ph: number;
+  ionic_strength: number;
+  debye_huckel_factor: number;
+  net_charge_custom: number;
+  disulfide_bridges_input: string | null;
+  valid_bridges: Array<[number, number]>;
+  free_cys_count: number;
+  bridge_drivers: string[];
+  bridge_warnings: string[];
+}
+
 export interface PeptideResult {
   sequence: string;
   cyclic: boolean;
@@ -1539,6 +1555,8 @@ export interface PeptideResult {
   mic_estimate?: PeptideMicEstimate;
   receptor_engagement?: PeptideReceptorEngagement;
   bioconjugation_sites?: PeptideBioconjugation;
+  /** Debye-Hückel + disulfide environment model results. */
+  custom_env?: PeptideCustomEnv;
   engine: string;
 }
 
@@ -1548,10 +1566,16 @@ export interface PeptideResult {
 export async function predictPeptide(
   sequence: string,
   cyclic: boolean = false,
+  ph: number = 7.4,
+  ionicStrength: number = 150.0,
+  disulfideBridges?: string,
 ): Promise<PeptideResult> {
   return post<PeptideResult>("/peptide", {
     sequence: sequence.trim().toUpperCase(),
     cyclic,
+    ph,
+    ionic_strength: ionicStrength,
+    disulfide_bridges: disulfideBridges && disulfideBridges.trim() ? disulfideBridges.trim() : null,
   });
 }
 
@@ -1766,6 +1790,16 @@ export interface AntibodyCDRComposition {
   confidence: string;
 }
 
+export interface AntibodyBioprocessSpecs {
+  expression_host: string;
+  subclass: string;
+  target_antigen: string | null;
+  construct_mw_da: number;
+  glycosylation_note: string;
+  t_half_days: number;
+  t_half_note: string;
+}
+
 export interface AntibodyResult {
   engine: string;
   modality: string;
@@ -1781,6 +1815,8 @@ export interface AntibodyResult {
   viscosity_risk?: AntibodyViscosityRisk;
   fcrn_binding?: AntibodyFcRnBinding;
   cdr_composition?: AntibodyCDRComposition[];
+  /** Bioprocess spec results (expression host, subclass, construct MW, t½). */
+  bioprocess_specs?: AntibodyBioprocessSpecs;
   limitations: string;
 }
 
@@ -1791,12 +1827,18 @@ export async function predictAntibody(
   heavyChain: string,
   lightChain?: string,
   formatHint?: string,
+  expressionHost?: string,
+  subclass?: string,
+  targetAntigen?: string,
 ): Promise<AntibodyResult> {
   const clean = (s: string) => s.trim().toUpperCase().replace(/[^A-Z]/g, "");
   return post<AntibodyResult>("/antibody", {
     heavy_chain: clean(heavyChain),
     light_chain: lightChain && lightChain.trim() ? clean(lightChain) : null,
     format_hint: formatHint && formatHint.trim() ? formatHint.trim() : null,
+    expression_host: expressionHost && expressionHost.trim() ? expressionHost.trim() : null,
+    subclass: subclass && subclass.trim() ? subclass.trim() : null,
+    target_antigen: targetAntigen && targetAntigen.trim() ? targetAntigen.trim() : null,
   });
 }
 

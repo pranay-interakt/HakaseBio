@@ -102,7 +102,7 @@ function RLDCard({ product }: { product: RLDProduct }) {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold text-white">{product.brand_name || product.drug_name}</span>
+            <span className="text-[13px] font-semibold text-white">{product.brand_name || (product.active_ingredients?.[0]?.name ?? "")}</span>
             {product.reference_drug && (
               <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">RLD</span>
             )}

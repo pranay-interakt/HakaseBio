@@ -1,0 +1,65 @@
+Right — to make IVIVE outputs well-represented and defensible, the L1+L2 input panel breaks into six categories. The operating rule: *if it's not in the input, it can't be in the output evidence trail, and the prediction confidence drops accordingly.*
+
+**1. Physicochemical & computed properties** — free, computational
+
+LogP, LogD at pH 7.4 and pH 5; pKa(s) acidic and basic; molecular weight, TPSA, HBD/HBA, rotatable bonds; predicted aqueous solubility; ionization state at physiological pH; predicted tissue partition coefficients (Poulin-Theil / Rodgers-Rowland).
+
+*Why IVIVE needs it:* sets the priors. Lipophilicity drives partitioning; pKa drives ionization-dependent permeability and distribution.
+
+**2. Plasma protein binding & blood partitioning** — L1 wet lab
+
+Fraction unbound in plasma (fu_p), *human plus at least one preclinical species*; microsomal binding (fu_mic); blood-to-plasma ratio (B/P).
+
+*Why IVIVE needs it:* the IVIVE math (well-stirred or parallel-tube liver model) explicitly requires fu_p and B/P. Missing fu_mic is the single most common reason published IVIVE predictions diverge from observed clearance — the engine systematically over- or under-predicts. Cross-species fu_p is required for L3 species selection.
+
+**3. Metabolism** — L1 wet lab → L2 engine input
+
+Hepatic Cl_int from human liver microsomes (HLM); hepatic Cl_int from human hepatocytes (more predictive than HLM for low-clearance compounds); Cl_int in preclinical species microsomes/hepatocytes (mouse, rat minimum; dog or monkey ideal); recombinant CYP isoform contributions (fmCYP); Phase II contribution flags (UGT, SULT); reactive metabolite trapping (GSH, cyanide, methoxylamine adducts).
+
+*Why IVIVE needs it:* hepatic clearance is usually the dominant elimination pathway and the largest source of L3 prediction error. fmCYP is what lets the engine predict DDI risk. Cross-species Cl_int is the backbone of allometric scaling validation.
+
+**4. Permeability & transporters** — L1 wet lab
+
+Caco-2 Papp A→B and B→A (efflux ratio); MDCK or MDCK-MDR1 if Caco-2 efflux is ambiguous; P-gp / BCRP substrate flags; uptake transporter substrate flags (OATP1B1, OATP1B3) if hepatic uptake-limited; solubility in FaSSIF / FeSSIF for oral bioavailability prediction.
+
+*Why IVIVE needs it:* drives oral bioavailability (F) prediction and brain/tissue penetration. Without efflux ratio, the engine has to assume passive diffusion — which is wrong for roughly 30% of small molecules.
+
+**5. CYP inhibition / DDI panel** — L1 wet lab
+
+Reversible CYP IC50 for at least 3A4, 2D6, 2C9, 2C19, 1A2, 2B6; time-dependent inhibition (kinact / KI) for any CYP with reversible inhibition under 10 µM; CYP induction flags (PXR/CAR reporter or primary hepatocyte).
+
+*Why IVIVE needs it:* not for the program's own PK, but for the **DDI risk panel** in the Phase 1 dose justification — regulators ask for it explicitly. Skipping this leaves a visible blank in the evidence package.
+
+**6. Ex-vivo / chip data** — L2, optional but tier-defining
+
+Liver-Chip clearance + viability + biomarker panel; Heart-Chip MEA / electrophysiology; Gut-Chip absorption (only when oral bioavailability is the critical question); 3D liver microtissue tox readouts.
+
+*Why IVIVE needs it:* when present, chip data overrides in-silico tissue-specific predictions and tightens the L3 design recommendation. This is where Hakase's translation differentiation lives — most platforms can't ingest chip data into the calibration framework. Without it, predictions still work but uncertainty bounds widen.
+
+**The cross-species rule** — often missed, sales-critical
+
+For L3 study design recommendations to be *defensible*, every species-dependent measurement (fu_p, B/P, Cl_int microsomes, Cl_int hepatocytes) needs a human value AND at least one preclinical species. If only human data is provided, IVIVE can predict human PK but cannot calibrate the species translation — the L3 study design becomes "best guess" rather than evidence-based. Make this explicit in scoping conversations.
+
+**Pharmacology inputs** — compound mechanism, often available from the biotech's own discovery work
+
+Target binding (Ki, Kd); functional potency (IC50/EC50 in cell-based assay); target tissue expression; selectivity profile across off-targets. These don't feed the IVIVE PK math directly but feed the *PD coupling* for Phase 1 dose justification (NOAEL-based, MABEL-based, or PK/PD-driven dose selection).
+
+**Anti-fabrication output requirements** — engine-side, per v2.0.0 invariants
+
+Each IVIVE output carries: per-input provenance (which measured value drove which prediction), per-prediction uncertainty bound, falsifier conditions (the experiment that would invalidate it), calibration version pin (engine version + reference corpus snapshot), and nearest-neighbor reference compounds in chemistry space. These don't change the L1/L2 input panel — they constrain how outputs are reported.
+
+**Three-tier scoping for the Founding Partner offer**
+
+*Minimum panel* — physicochemical (free) + fu_p (human) + HLM Cl_int + Caco-2 + CYP IC50 panel. Produces baseline IVIVE outputs with wider uncertainty. Most early-stage biotechs already have this in hand.
+
+*Standard panel* — minimum + cross-species (mouse + rat) fu_p, Cl_int, B/P + fmCYP + bioactivation trapping. Produces high-confidence L3 study design and Phase 1 dose range. **This should be the default scope.**
+
+*Premium panel* — standard + chip data (liver minimum, heart for cardiac liability) + transporter substrate panel + CYP induction. Produces tightest L3 design and DDI-risk evidence. Pitch this for biotechs with existing chip access.
+
+**The right scoping conversation**
+
+Frame the discovery call as: *"Tell us what you've already measured; we'll tell you which IVIVE outputs that supports, where the uncertainty bounds will sit, and what one or two additional experiments would tighten them most."* That conversation by itself is value — most biotechs do not have a clean map of which L1 assay drives which downstream L3/Phase 1 prediction confidence. Walking them through it positions you as a translation partner, not a vendor.
+
+---
+
+Want me to package this as a one-page **IVIVE Input Scoping Sheet** in your workspace folder? Format: data inventory checklist (six categories with checkboxes), three-tier panel summary, a "what each tier predicts with what uncertainty" mapping, and a discovery-call conversation flow on the back. It would be a sharp sales artifact you can hand to prospects during the founding-partner pitch.
