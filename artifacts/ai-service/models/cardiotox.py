@@ -35,7 +35,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "cardiotox_rf.pkl")
-MODEL_VERSION = "1.0.0"
+MODEL_VERSION = "1.1.0"  # bumped: added training_fps for AD scoring
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
 
@@ -155,6 +155,12 @@ def _train() -> dict[str, Any]:
     pos = int(y_kept.sum())
     n = int(len(y_kept))
 
+    # Store training Morgan FP matrix for Applicability Domain (AD) scoring
+    # at inference time (Tanimoto similarity to nearest training neighbor).
+    # We keep only the FP columns (first MORGAN_NBITS columns), not the
+    # continuous descriptor columns, to keep Tanimoto semantics correct.
+    training_fps = X[:, :MORGAN_NBITS].astype(np.float32)
+
     bundle = {
         "version": MODEL_VERSION,
         "model": clf,
@@ -167,6 +173,7 @@ def _train() -> dict[str, Any]:
         "morgan_radius": MORGAN_RADIUS,
         "feature_dim": int(X.shape[1]),
         "trained_at": time.time(),
+        "training_fps": training_fps,  # (n_train, 1024) float32 for AD scoring
     }
 
     os.makedirs(CACHE_DIR, exist_ok=True)
@@ -234,6 +241,39 @@ def warmup() -> dict[str, Any]:
         return {"status": "ready", **is_ready()}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "error": str(exc), **is_ready()}
+
+
+def _compute_ad(bundle: dict[str, Any], query_fp: np.ndarray) -> dict[str, Any]:
+    """Compute Applicability Domain score via Tanimoto nearest-neighbor.
+
+    Tanimoto(A, B) = |A∩B| / |A∪B| = dot(A,B) / (sum(A) + sum(B) - dot(A,B))
+
+    AD threshold 0.4: molecules with nearest-neighbor Tanimoto < 0.4 are
+    considered out-of-domain (extrapolation) and the model's reliability is
+    substantially reduced. Molecules ≥ 0.4 are considered in-domain.
+
+    Returns:
+        ad_tanimoto_nearest: float — similarity to closest training molecule
+        ad_in_domain: bool — True if nearest >= 0.4
+    """
+    training_fps = bundle.get("training_fps")
+    if training_fps is None or len(training_fps) == 0:
+        return {"ad_tanimoto_nearest": None, "ad_in_domain": None}
+
+    q = query_fp[:MORGAN_NBITS].astype(np.float32)
+    T = training_fps  # (n_train, 1024)
+
+    dot = T @ q                      # (n_train,)
+    sum_q = float(q.sum())
+    sum_T = T.sum(axis=1)            # (n_train,)
+    union = sum_q + sum_T - dot
+    tanimoto = np.where(union > 0, dot / union, 0.0)
+    nearest = float(tanimoto.max())
+
+    return {
+        "ad_tanimoto_nearest": round(nearest, 4),
+        "ad_in_domain": bool(nearest >= 0.4),
+    }
 
 
 def _risk_class(prob: float) -> str:
@@ -324,6 +364,9 @@ def predict_cardiotox(smiles: str) -> dict[str, Any]:
         logger.exception("CardioTox inference failed for SMILES=%r", smiles)
         return _fallback_envelope(smiles, f"inference_failed: {exc}")
 
+    # Applicability Domain scoring
+    ad = _compute_ad(bundle, feats)
+
     return {
         "smiles": smiles,
         "source": "ml",
@@ -332,6 +375,16 @@ def predict_cardiotox(smiles: str) -> dict[str, Any]:
             "blocker_probability": prob,
             "risk_class": _risk_class(prob),
             "ic50_band": _ic50_band(prob),
+        },
+        "applicability_domain": {
+            "ad_tanimoto_nearest": ad["ad_tanimoto_nearest"],
+            "ad_in_domain": ad["ad_in_domain"],
+            "ad_threshold": 0.4,
+            "ad_note": (
+                "In-domain: model interpolates within training set chemistry."
+                if ad["ad_in_domain"]
+                else "Out-of-domain: query is structurally distant from training set — predictions less reliable."
+            ) if ad["ad_in_domain"] is not None else "AD scoring unavailable (no training FP matrix in bundle)",
         },
         "model_info": {
             "engine": "CardioTox v1 (Random Forest on Morgan FP + RDKit descriptors)",

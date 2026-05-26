@@ -68,7 +68,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "binding_ml_gbm.pkl")
 EMBED_CACHE_PATH = os.path.join(CACHE_DIR, "binding_ml_embeddings.npz")
-MODEL_VERSION = "1.1.0"  # bumped: removed placeholder/-like rows + added grouped CV
+MODEL_VERSION = "1.2.0"  # bumped: added training_drug_fps for AD scoring + qualitative disclaimer
 EMBED_CACHE_VERSION = "esm2_t12_35M_v1"  # tag stored in NPZ to invalidate stale shapes
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
@@ -389,6 +389,11 @@ def _train() -> dict[str, Any]:
     logger.info("BindingML: fitting final model on full training set...")
     reg.fit(X, y)
 
+    # Store training drug Morgan FP matrix for Applicability Domain (AD) scoring.
+    # We use only the drug FP columns (first MORGAN_NBITS) for Tanimoto — the
+    # protein embedding dimensions are not bit-vectors and Tanimoto doesn't apply.
+    training_drug_fps = X[:, :MORGAN_NBITS].astype(np.float32)
+
     bundle: dict[str, Any] = {
         "version": MODEL_VERSION,
         "model": reg,
@@ -417,6 +422,7 @@ def _train() -> dict[str, Any]:
         "protein_feature_dim": PROTEIN_FEATURE_DIM,
         "feature_dim": int(X.shape[1]),
         "trained_at": time.time(),
+        "training_drug_fps": training_drug_fps,  # (n_train, 1024) float32 for drug-side AD scoring
     }
 
     # Atomic write — never leave a partial pickle on disk if we crash.
@@ -499,6 +505,26 @@ def warmup() -> dict[str, Any]:
         return {"status": "ready", **is_ready()}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "error": str(exc), **is_ready()}
+
+
+def _compute_ad(bundle: dict[str, Any], drug_fp: np.ndarray) -> dict[str, Any]:
+    """Drug-side Applicability Domain via Tanimoto nearest-neighbor.
+
+    Only the drug fingerprint is used for Tanimoto (protein embedding is not
+    a bit-vector so Tanimoto is not meaningful on that side).
+    """
+    training_fps = bundle.get("training_drug_fps")
+    if training_fps is None or len(training_fps) == 0:
+        return {"ad_tanimoto_nearest": None, "ad_in_domain": None}
+    q = drug_fp[:MORGAN_NBITS].astype(np.float32)
+    T = training_fps
+    dot = T @ q
+    sum_q = float(q.sum())
+    sum_T = T.sum(axis=1)
+    union = sum_q + sum_T - dot
+    tanimoto = np.where(union > 0, dot / union, 0.0)
+    nearest = float(tanimoto.max())
+    return {"ad_tanimoto_nearest": round(nearest, 4), "ad_in_domain": bool(nearest >= 0.4)}
 
 
 def _affinity_class(pkd: float) -> str:
@@ -597,6 +623,8 @@ def predict_binding_ml(smiles: str, uniprot_id: str) -> dict[str, Any]:
         logger.exception("BindingML inference failed for SMILES=%r UID=%s", smiles, uniprot_id)
         return _fallback_envelope(smiles, uniprot_id, f"inference_failed: {exc}")
 
+    ad = _compute_ad(bundle, drug_feat)
+
     return {
         "smiles": smiles,
         "uniprot_id": uniprot_id,
@@ -607,6 +635,22 @@ def predict_binding_ml(smiles: str, uniprot_id: str) -> dict[str, Any]:
             "Kd_nM": _kd_nm(pkd),
             "affinity_class": _affinity_class(pkd),
         },
+        "applicability_domain": {
+            "ad_tanimoto_nearest": ad["ad_tanimoto_nearest"],
+            "ad_in_domain": ad["ad_in_domain"],
+            "ad_threshold": 0.4,
+            "ad_note": (
+                "Drug in-domain: model interpolates within training set drug chemistry."
+                if ad["ad_in_domain"]
+                else "Drug out-of-domain: query drug is structurally distant from training set — pKd prediction less reliable."
+            ) if ad["ad_in_domain"] is not None else "AD scoring unavailable",
+        },
+        "qualitative_disclaimer": (
+            f"QUALITATIVE SECOND OPINION ONLY. Training set: n_train={bundle.get('n_train')} pairs, "
+            f"{bundle.get('n_unique_targets')} unique targets. "
+            f"GroupKFold (leave-target-out) R²={bundle.get('cv_grp_r2_mean')}. "
+            "Absolute pKd values must be validated by wet-lab binding assay before any medicinal chemistry conclusion."
+        ),
         "model_info": {
             "engine": "BindingML v1 (Morgan FP + RDKit descriptors ⊕ ESM-2 t12 35M → Gradient Boosting Regressor)",
             "method": (

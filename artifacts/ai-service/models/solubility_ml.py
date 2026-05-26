@@ -48,7 +48,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "solubility_rf.pkl")
-MODEL_VERSION = "1.0.0"
+MODEL_VERSION = "1.1.0"  # bumped: added training_fps for AD scoring
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
 
@@ -186,6 +186,9 @@ def _train() -> dict[str, Any]:
     logger.info("SolubilityML: fitting final model on full training set...")
     reg.fit(X, y_kept)
 
+    # Store training Morgan FP matrix for Applicability Domain (AD) scoring
+    training_fps = X[:, :MORGAN_NBITS].astype(np.float32)
+
     bundle = {
         "version": MODEL_VERSION,
         "model": reg,
@@ -201,6 +204,7 @@ def _train() -> dict[str, Any]:
         "morgan_radius": MORGAN_RADIUS,
         "feature_dim": int(X.shape[1]),
         "trained_at": time.time(),
+        "training_fps": training_fps,  # (n_train, 1024) float32 for AD scoring
     }
 
     os.makedirs(CACHE_DIR, exist_ok=True)
@@ -272,6 +276,22 @@ def warmup() -> dict[str, Any]:
         return {"status": "ready", **is_ready()}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "error": str(exc), **is_ready()}
+
+
+def _compute_ad(bundle: dict[str, Any], query_fp: np.ndarray) -> dict[str, Any]:
+    """Applicability Domain via Tanimoto nearest-neighbor."""
+    training_fps = bundle.get("training_fps")
+    if training_fps is None or len(training_fps) == 0:
+        return {"ad_tanimoto_nearest": None, "ad_in_domain": None}
+    q = query_fp[:MORGAN_NBITS].astype(np.float32)
+    T = training_fps
+    dot = T @ q
+    sum_q = float(q.sum())
+    sum_T = T.sum(axis=1)
+    union = sum_q + sum_T - dot
+    tanimoto = np.where(union > 0, dot / union, 0.0)
+    nearest = float(tanimoto.max())
+    return {"ad_tanimoto_nearest": round(nearest, 4), "ad_in_domain": bool(nearest >= 0.4)}
 
 
 def _solubility_class(logs: float) -> str:
@@ -357,6 +377,8 @@ def predict_solubility_ml(smiles: str) -> dict[str, Any]:
     except (IndexError, ValueError):
         mw = None
 
+    ad = _compute_ad(bundle, feats)
+
     return {
         "smiles": smiles,
         "source": "ml",
@@ -365,6 +387,16 @@ def predict_solubility_ml(smiles: str) -> dict[str, Any]:
             "logS_predicted": logs,
             "solubility_class": _solubility_class(logs),
             "solubility_mg_mL": _solubility_mg_per_ml(logs, mw),
+        },
+        "applicability_domain": {
+            "ad_tanimoto_nearest": ad["ad_tanimoto_nearest"],
+            "ad_in_domain": ad["ad_in_domain"],
+            "ad_threshold": 0.4,
+            "ad_note": (
+                "In-domain: model interpolates within solubility training set chemistry."
+                if ad["ad_in_domain"]
+                else "Out-of-domain: query is structurally distant from training set — solubility prediction less reliable."
+            ) if ad["ad_in_domain"] is not None else "AD scoring unavailable",
         },
         "model_info": {
             "engine": "SolubilityML v1 (Random Forest Regressor on Morgan FP + RDKit descriptors)",

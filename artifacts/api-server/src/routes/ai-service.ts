@@ -167,6 +167,21 @@ router.post("/ai/binding-ml", async (req, res) => {
   }
 });
 
+// L1 — Peptide-native property engine (physicochemical, stability, permeability, AMP, developability)
+router.post("/ai/peptide", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/peptide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 // L2 Stage 2 — AutoDock Vina docking (async job submission + polling)
 router.post("/ai/dock", async (req, res) => {
   try {
@@ -274,6 +289,57 @@ router.post("/ai/models/warmup", async (_req, res) => {
     const resp = await fetch(`${AI_SERVICE_URL}/models/warmup`, {
       method: "POST",
     });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+// L2 Stage 2b — Biologics Co-Folding (Boltz-2, AlphaFold3-class structure + affinity)
+router.get("/ai/cofold/config", async (_req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold/config`);
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.post("/ai/cofold/validate", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.post("/ai/cofold", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.get("/ai/cofold/status/:jobId", async (req, res) => {
+  try {
+    const resp = await fetch(
+      `${AI_SERVICE_URL}/predict/cofold/status/${encodeURIComponent(req.params.jobId)}`,
+    );
     const data = await resp.json();
     res.status(resp.status).json(data);
   } catch (err) {

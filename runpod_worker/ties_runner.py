@@ -179,7 +179,7 @@ def _run_ties_cli(
         "n_lambda":       n_lambda,
         "n_replicas":     n_replicas,
         "production_ns":  ns_per_win,
-        "equilibration_ns": 0.5,
+        "equilibration_ns": 2.0,  # 0.5 ns was too short for solvated complex relaxation; 2 ns is minimum for well-equilibrated box
         "temperature_K":  298.15,
         "ionic_strength_M": 0.15,
         "platform":       "CUDA",
@@ -243,6 +243,22 @@ def _normalize_ties_output(raw: dict[str, Any]) -> dict[str, Any]:
             "dG_kcal_mol":      float(w["dG_kcal_mol"]),
             "stderr_kcal_mol":  float(w["stderr_kcal_mol"]),
         })
+    # Forward/reverse hysteresis check.
+    # If ties_md emits separate forward and reverse ΔΔG estimates (rare but
+    # possible with MBAR estimator), check that they agree within 1 kcal/mol.
+    # |ΔΔG_fwd + ΔΔG_rev| should be ~0 at convergence (time-reversibility).
+    fwd = raw.get("ddg_forward_kcalmol")
+    rev = raw.get("ddg_reverse_kcalmol")
+    if fwd is not None and rev is not None:
+        hysteresis = abs(float(fwd) + float(rev))
+        hysteresis_warn = hysteresis > 1.0
+    else:
+        hysteresis = None
+        hysteresis_warn = None
+
+    # MBAR cycle-closure flag (available when ties_md runs MBAR post-processing).
+    mbar_cycle_closure = raw.get("mbar_cycle_closure_kcalmol")
+
     return {
         "ddg_kcal_mol":            ddg,
         "ddg_uncertainty_kcalmol": ddg_u,
@@ -251,6 +267,10 @@ def _normalize_ties_output(raw: dict[str, Any]) -> dict[str, Any]:
         "gpu_minutes":             float(raw["gpu_minutes"]),
         "engine_version":          ENGINE_VERSION,
         "force_field":             FORCE_FIELD,
+        # Convergence quality indicators
+        "hysteresis_kcalmol":      round(hysteresis, 3) if hysteresis is not None else None,
+        "hysteresis_warn":         hysteresis_warn,
+        "mbar_cycle_closure_kcalmol": float(mbar_cycle_closure) if mbar_cycle_closure is not None else None,
     }
 
 
@@ -310,11 +330,22 @@ def run_relative_binding_fep(ti: TiesInput) -> dict[str, Any]:
 
         result = _normalize_ties_output(raw)
 
-    # Convergence-quality warning (non-blocking — upstream surfaces it).
+    # Convergence-quality warnings (non-blocking — upstream surfaces them).
     if result["ddg_uncertainty_kcalmol"] > 1.0:
         warnings.append(
             f"ΔΔG uncertainty {result['ddg_uncertainty_kcalmol']:.2f} kcal/mol "
             "exceeds 1.0 — recommend rerun with longer ns_per_window or more replicas."
+        )
+    if result.get("hysteresis_warn"):
+        warnings.append(
+            f"Forward/reverse hysteresis {result['hysteresis_kcalmol']:.2f} kcal/mol "
+            "exceeds 1.0 — FEP simulation may not be converged. "
+            "Increase equilibration_ns and/or ns_per_window before trusting this ΔΔG."
+        )
+    if result.get("mbar_cycle_closure_kcalmol") is not None and result["mbar_cycle_closure_kcalmol"] > 1.0:
+        warnings.append(
+            f"MBAR cycle-closure residual {result['mbar_cycle_closure_kcalmol']:.2f} kcal/mol "
+            "exceeds 1.0 — consider adding more λ windows or longer sampling per window."
         )
 
     result["warnings"] = warnings
