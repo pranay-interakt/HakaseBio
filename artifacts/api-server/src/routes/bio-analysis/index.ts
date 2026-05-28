@@ -277,11 +277,6 @@ Provide your expert analysis as structured JSON.`;
     }
 
     res.write(`data: ${JSON.stringify({ done: true, full: fullResponse })}\n\n`);
-    res.end();n`);
-      }
-    }
-
-    res.write(`data: ${JSON.stringify({ done: true, full: fullResponse })}\n\n`);
     res.end();
   } catch (err) {
     console.error("[bio-analysis] error:", err);

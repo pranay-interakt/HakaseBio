@@ -67,6 +67,7 @@ from models import docking_vina
 from models import fep_runpod
 from models import cofolding
 from models.peptide_properties import predict_peptide_properties
+from models.peptide_ml import predict_peptide_properties_ml
 from models.antibody_properties import predict_antibody_properties
 
 
@@ -408,7 +409,7 @@ def api_predict_peptide(req: PeptideRequest):
     No external API calls — runs in-process, sub-millisecond.
     """
     try:
-        return sanitize(predict_peptide_properties(
+        return sanitize(predict_peptide_properties_ml(
             req.sequence, req.cyclic, req.ph, req.ionic_strength, req.disulfide_bridges
         ))
     except ValueError as e:
