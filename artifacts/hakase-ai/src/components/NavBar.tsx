@@ -21,6 +21,25 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
   const platformRef = useRef<HTMLDivElement>(null);
   const techRef = useRef<HTMLDivElement>(null);
 
+  const [lightMode, setLightMode] = useState(() => {
+    return typeof document !== "undefined" && (
+      document.documentElement.classList.contains("hk-light") ||
+      localStorage.getItem("theme") === "light"
+    );
+  });
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (lightMode) {
+        document.documentElement.classList.add("hk-light");
+        localStorage.setItem("theme", "light");
+      } else {
+        document.documentElement.classList.remove("hk-light");
+        localStorage.setItem("theme", "dark");
+      }
+    }
+  }, [lightMode]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (platformRef.current && !platformRef.current.contains(e.target as Node)) setPlatformOpen(false);
@@ -155,8 +174,8 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
 
         {/* Logo */}
         <button onClick={() => { navigate("/"); setMobileOpen(false); }} className="flex items-center gap-2.5 shrink-0">
-          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.0</span>
+          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-9 w-auto object-contain" />
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.1</span>
         </button>
 
         {/* Desktop links */}
@@ -225,8 +244,23 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
           <button onClick={() => navigate("/story")} className="hover:text-white transition-colors">The Story</button>
         </div>
 
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center shrink-0">
+        {/* Desktop CTA & Theme Toggle */}
+        <div className="hidden md:flex items-center gap-4 shrink-0">
+          <button
+            onClick={() => setLightMode(l => !l)}
+            className="p-2 rounded-lg border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            title={lightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+          >
+            {lightMode ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
           <button
             onClick={() => navigate("/login")}
             className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors text-white"
@@ -303,10 +337,31 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
               The Story
             </button>
 
-            <div className="pt-4">
+            <div className="pt-4 flex items-center gap-3">
+              <button
+                onClick={() => setLightMode(l => !l)}
+                className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white flex items-center justify-center gap-2 text-[14px]"
+                title={lightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+              >
+                {lightMode ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                    </svg>
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => { navigate("/login"); setMobileOpen(false); }}
-                className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 transition-colors text-white font-semibold text-[14px]"
+                className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 transition-colors text-white font-semibold text-[14px]"
               >
                 Get Started →
               </button>

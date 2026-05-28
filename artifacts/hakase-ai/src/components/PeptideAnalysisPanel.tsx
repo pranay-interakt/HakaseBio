@@ -37,7 +37,7 @@
 import { useState, useCallback, useRef } from "react";
 import {
   Dna, Play, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Info,
-  FlaskConical, Activity, Shield, Zap, Clock, ChevronDown, ChevronRight,
+  FlaskConical, Activity, Shield, ShieldCheck, Zap, Clock, ChevronDown, ChevronRight,
   Microscope, TestTube2, Target, Wrench, ArrowRight, BookOpen, Thermometer,
   Droplets, HeartPulse, BarChart3, Map, FileText,
 } from "lucide-react";
@@ -283,9 +283,15 @@ export function PeptideAnalysisPanel({
     : null;
   // Numeric Caco-2 Papp cm/s estimate from permeability score (empirical mapping)
   const pappCmS = perm
-    ? (perm.membrane_permeability_score >= 60 ? 15 : perm.membrane_permeability_score >= 35 ? 5 : 1) * 1e-6
+    ? (perm.Caco2_logPeff_predicted != null
+        ? Math.pow(10, perm.Caco2_logPeff_predicted)
+        : (perm.membrane_permeability_score >= 60 ? 15 : perm.membrane_permeability_score >= 35 ? 5 : 1) * 1e-6)
     : null;
-  const pappFormatted = pappCmS != null ? `${(pappCmS * 1e6).toFixed(1)} ×10⁻⁶ cm/s` : "—";
+  const pappFormatted = pappCmS != null
+    ? (pappCmS * 1e6 < 0.1
+        ? `${(pappCmS * 1e6).toFixed(3)} ×10⁻⁶ cm/s`
+        : `${(pappCmS * 1e6).toFixed(2)} ×10⁻⁶ cm/s`)
+    : "—";
   // Volume of distribution estimate (L/kg) — positively charged peptides tend to distribute widely
   const vdEstimate = pc
     ? (pc.net_charge_pH7 > 1 ? "High (>1.0 L/kg)" : pc.net_charge_pH7 < -1 ? "Low (<0.2 L/kg)" : "Moderate (0.2–1.0 L/kg)")
@@ -529,6 +535,70 @@ export function PeptideAnalysisPanel({
               {copied ? "Copied!" : "Copy JSON"}
             </button>
           </div>
+
+          {/* ── ML & Connected-API Provenance ── */}
+          {result?.ml_api_provenance && (
+            <div className="rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/60 to-purple-900/30 p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-5 h-5 text-violet-400" />
+                <h3 className="text-[13px] font-semibold text-white tracking-tight">
+                  ML & Connected-API Provenance
+                </h3>
+                <span className="ml-auto text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-300 font-bold">
+                  Hybrid Engine v2.0
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mb-3 leading-relaxed">
+                {result.ml_api_provenance.description}
+              </p>
+              <div className="grid grid-cols-2 gap-4 text-[11px] border-t border-white/5 pt-3">
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Homology Match</span>
+                  <span className="font-mono text-violet-300 font-bold">
+                    {result.ml_api_provenance.matched_template} ({result.ml_api_provenance.sequence_homology}%)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Target Engagement</span>
+                  <span className="text-slate-200 font-semibold">{result.ml_api_provenance.target}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Live REST APIs</span>
+                  <span className={result.ml_api_provenance.is_live_api_retrieved ? "text-emerald-400 font-bold" : "text-amber-400"}>
+                    {result.ml_api_provenance.is_live_api_retrieved ? "✓ Connected & Verified" : "⚠ Offline / Local Fallback"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Citations & References</span>
+                  <span className="text-slate-300 flex items-center gap-1 font-mono text-[9px]">
+                    {result.ml_api_provenance.uniprot !== "None" && (
+                      <a href={`https://www.uniprot.org/uniprotkb/${result.ml_api_provenance.uniprot}`} target="_blank" rel="noreferrer" className="text-cyan-400 underline">
+                        UniProt
+                      </a>
+                    )}
+                    {result.ml_api_provenance.chembl_id !== "None" && (
+                      <a href={`https://www.ebi.ac.uk/chembl/beta/explore/molecules/${result.ml_api_provenance.chembl_id}`} target="_blank" rel="noreferrer" className="text-cyan-400 underline ml-2">
+                        ChEMBL
+                      </a>
+                    )}
+                    {result.ml_api_provenance.pubmed_id !== "None" && (
+                      <a href={`https://pubmed.ncbi.nlm.nih.gov/${result.ml_api_provenance.pubmed_id}`} target="_blank" rel="noreferrer" className="text-cyan-400 underline ml-2">
+                        PMID:{result.ml_api_provenance.pubmed_id}
+                      </a>
+                    )}
+                  </span>
+                </div>
+              </div>
+              {result.ml_api_provenance.uniprot_live_api && (
+                <div className="mt-3 bg-white/[0.02] border border-white/5 rounded-md p-2 text-[9.5px] text-slate-400 space-y-1">
+                  <div className="text-[10px] font-semibold text-slate-200">UniProt KB Live Data:</div>
+                  <div>• Gene Name: <span className="font-mono text-slate-300 font-semibold">{result.ml_api_provenance.uniprot_live_api.gene_name}</span></div>
+                  <div>• Subcellular Location: <span className="text-slate-300">{result.ml_api_provenance.uniprot_live_api.subcellular_location}</span></div>
+                  <div>• Tissue Specificity: <span className="text-slate-300 italic">{result.ml_api_provenance.uniprot_live_api.tissue_expression}</span></div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Physicochemical ─────────────────────────────────────────────── */}
           <Section icon={Activity} title="Physicochemical Properties" provenance="exact">
@@ -785,12 +855,12 @@ export function PeptideAnalysisPanel({
           </Section>
 
           {/* ── Half-life ───────────────────────────────────────────────────── */}
-          <Section icon={Clock} title="Half-Life Estimates" defaultOpen={true} provenance="heuristic">
+          <Section icon={Clock} title="Half-Life Estimates" defaultOpen={true} provenance={result?.ml_api_provenance ? "ML/API" : "heuristic"}>
             {hl && (
               <div>
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   {[
-                    { label: "Plasma", value: hl.plasma_h, icon: "🩸" },
+                    { label: "Plasma", value: result?.ml_api_provenance && result?.proteolytic_stability?.plasma_half_life_hours != null ? `${result.proteolytic_stability.plasma_half_life_hours.toFixed(1)} h` : hl.plasma_h, icon: "🩸" },
                     { label: "GI tract", value: hl.gi_h, icon: "🧫" },
                     { label: "Renal", value: hl.renal_h, icon: "💧" },
                   ].map(({ label, value, icon }) => (

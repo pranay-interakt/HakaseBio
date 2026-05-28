@@ -27,6 +27,7 @@ import { IvieInputsPanel } from "@/components/IvieInputsPanel";
 import type { ConfirmationEvidenceBlock } from "@workspace/preclinical-handoff";
 import type { InVitroResults } from "@/lib/inVitroSim";
 import type { L2DoseProjection } from "@/lib/l2DoseProjection";
+import type { Modality } from "@/lib/modalityRouter";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,9 @@ interface SafetyFlagLike {
 }
 
 interface Props {
+  modality?: Modality;
+  peptideResult?: any;
+  antibodyResult?: any;
   ivieInputs: IvieWetLabInputs;
   /** Editable on this page — substrate matrix is now captured at the
    *  L2 → L3 handoff (was previously inside the L2 Confirmation page). */
@@ -98,8 +102,11 @@ interface GateAlert {
 // ─── Alert assembly ──────────────────────────────────────────────────────────
 
 function buildAlerts(
+  modality: Modality | undefined,
   ivieInputs: IvieWetLabInputs,
   simResults: SimResultsLike | null,
+  peptideResult: any,
+  antibodyResult: any,
   confirmationBlock: ConfirmationEvidenceBlock | null,
   safetyFlags: SafetyFlagLike[],
 ): GateAlert[] {
@@ -107,20 +114,54 @@ function buildAlerts(
   const tierA = assessIvieTier(ivieInputs);
 
   // Hard blocks
-  if (!simResults) {
-    alerts.push({
-      id: "no-l1",
-      level: "block",
-      title: "L1 In-Vitro has not been run",
-      detail: "Run the Layer 1 simulation before initiating Animal Cohort study design.",
-    });
-  } else if (simResults.goNogo === "NO-GO") {
-    alerts.push({
-      id: "l1-nogo",
-      level: "block",
-      title: "L1 verdict is NO-GO",
-      detail: "The L1 stage-gate failed. Resolve the blocking signals or record an explicit override before progressing.",
-    });
+  if (modality === "small_molecule") {
+    if (!simResults) {
+      alerts.push({
+        id: "no-l1",
+        level: "block",
+        title: "L1 In-Vitro has not been run",
+        detail: "Run the Layer 1 simulation before initiating Animal Cohort study design.",
+      });
+    } else if (simResults.goNogo === "NO-GO") {
+      alerts.push({
+        id: "l1-nogo",
+        level: "block",
+        title: "L1 verdict is NO-GO",
+        detail: "The L1 stage-gate failed. Resolve the blocking signals or record an explicit override before progressing.",
+      });
+    }
+  } else if (modality === "peptide") {
+    if (!peptideResult) {
+      alerts.push({
+        id: "no-l1",
+        level: "block",
+        title: "L1 Peptide has not been run",
+        detail: "Run the Layer 1 peptide simulation before initiating Animal Cohort study design.",
+      });
+    } else if (peptideResult.chemical_liabilities?.risk === "High") {
+      alerts.push({
+        id: "l1-nogo",
+        level: "block",
+        title: "L1 verdict is stability risk concern",
+        detail: "The L1 stage-gate failed due to high chemical-degradation risk. Resolve the blocking signals or record an explicit override before progressing.",
+      });
+    }
+  } else if (modality === "antibody") {
+    if (!antibodyResult) {
+      alerts.push({
+        id: "no-l1",
+        level: "block",
+        title: "L1 Antibody has not been run",
+        detail: "Run the Layer 1 antibody simulation before initiating Animal Cohort study design.",
+      });
+    } else if (antibodyResult.summary?.verdict?.toUpperCase()?.startsWith("FAIL")) {
+      alerts.push({
+        id: "l1-nogo",
+        level: "block",
+        title: "L1 verdict is FAIL",
+        detail: "The L1 antibody developability stage-gate failed. Resolve the blocking signals or record an explicit override before progressing.",
+      });
+    }
   }
   if (tierA.tier === "Insufficient") {
     alerts.push({
@@ -241,13 +282,14 @@ function fmtCell(v: number | null | undefined): string {
 }
 
 export function IvieOutputHandoffPage({
+  modality = "small_molecule", peptideResult = null, antibodyResult = null,
   ivieInputs, onIvieInputsChange, simResults, inVitroResults = null, confirmationBlock, l2Projection = null, safetyFlags, onBack, onProceed,
 }: Props) {
   const tierA = useMemo(() => assessIvieTier(ivieInputs), [ivieInputs]);
   const substrateMode = useMemo(() => deriveSubstrateMode(ivieInputs), [ivieInputs]);
   const alerts = useMemo(
-    () => buildAlerts(ivieInputs, simResults, confirmationBlock, safetyFlags),
-    [ivieInputs, simResults, confirmationBlock, safetyFlags],
+    () => buildAlerts(modality, ivieInputs, simResults, peptideResult, antibodyResult, confirmationBlock, safetyFlags),
+    [modality, ivieInputs, simResults, peptideResult, antibodyResult, confirmationBlock, safetyFlags],
   );
   const blocks = alerts.filter(a => a.level === "block");
   const warns  = alerts.filter(a => a.level === "warn");
@@ -317,72 +359,192 @@ export function IvieOutputHandoffPage({
         {/* ── L1 + L2 Evidence summary ───────────────────────────────── */}
         <section className="col-span-12 lg:col-span-7 space-y-4">
 
-          {/* L1 In-Vitro */}
+          {/* L1 In-Vitro / Biologic Properties */}
           <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Beaker className="w-4 h-4 text-violet-300" />
-                <h3 className="text-[13px] font-semibold text-white">L1 — In-Vitro</h3>
-              </div>
-              {simResults?.goNogo && (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                  simResults.goNogo === "GO"
-                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
-                    : "bg-rose-500/15 text-rose-300 border-rose-500/40"
-                }`}>
-                  {simResults.goNogo}
-                </span>
-              )}
-            </div>
-            <div className="text-[12px] text-slate-300">
-              {simResults
-                ? <>Compound <span className="font-mono text-violet-200">{simResults.molName ?? "—"}</span> completed L1.</>
-                : <span className="text-slate-500">L1 has not been run.</span>}
-            </div>
-
-            {/* ── L1 IVIVE Output — substrate numerics consumed by IVIVE ───── */}
-            {inVitroResults ? (
-              <div className="mt-3 pt-3 border-t border-violet-500/15">
-                <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
-                  L1 IVIVE Output (consumed by L2 dose projection)
+            {modality === "peptide" && peptideResult ? (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Beaker className="w-4 h-4 text-violet-300" />
+                    <h3 className="text-[13px] font-semibold text-white">L1 — Peptide Properties</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    peptideResult.chemical_liabilities?.risk === "High"
+                      ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
+                      : "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                  }`}>
+                    {peptideResult.chemical_liabilities?.risk === "High" ? "LIABILITY RISK" : "GO"}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
-                  <div>
-                    <span className="text-slate-500">Target IC₅₀: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.doseResponse.ic50_nM, 1, "nM")}</span>
+                <div className="text-[12px] text-slate-300">
+                  Peptide <span className="font-mono text-violet-200">{peptideResult.sequence.slice(0, 10)}...</span> completed L1 sequence profiling.
+                </div>
+                <div className="mt-3 pt-3 border-t border-violet-500/15">
+                  <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
+                    L1 Physicochemical &amp; Stability Metrics
                   </div>
-                  <div>
-                    <span className="text-slate-500">Plasma fu: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.plasmaProteinBinding.fuPercent, 2, "%")}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Caco-2 Pₐₚₚ: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.permeability.caco2Papp, 1, "×10⁻⁶ cm/s")}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Microsomal CL_int: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.metabolicStability.microsomalCLint, 1, "µL/min/mg")}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">hERG IC₅₀: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.herg.ic50_uM, 2, "µM")}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">In-vitro score: </span>
-                    <span className="font-mono text-violet-100">{fmt(inVitroResults.inVitroScore, 0)}</span>
-                    <span className="text-slate-500"> · risk </span>
-                    <span className={
-                      inVitroResults.overallRisk === "Low"      ? "text-emerald-300" :
-                      inVitroResults.overallRisk === "Moderate" ? "text-amber-300"   :
-                                                                  "text-rose-300"
-                    }>{inVitroResults.overallRisk}</span>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
+                    <div>
+                      <span className="text-slate-500">Molecular Weight: </span>
+                      <span className="font-mono text-violet-100">{fmt(peptideResult.physicochemical.molecular_weight_da, 1, "Da")}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Net charge (pH 7.4): </span>
+                      <span className="font-mono text-violet-100">{fmt(peptideResult.physicochemical.net_charge_pH7, 1)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Isoelectric point: </span>
+                      <span className="font-mono text-violet-100">{fmt(peptideResult.physicochemical.isoelectric_point, 1)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Instability index: </span>
+                      <span className="font-mono text-violet-100">
+                        {fmt(peptideResult.physicochemical.instability_index, 1)} ({peptideResult.physicochemical.instability_class})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Protease sites: </span>
+                      <span className="font-mono text-violet-100">{peptideResult.proteolytic_stability.sites.length} sites</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Permeability score: </span>
+                      <span className="font-mono text-violet-100">{fmt(peptideResult.membrane_permeability.membrane_permeability_score, 0)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Aggregation risk: </span>
+                      <span className="font-mono text-violet-100">{peptideResult.aggregation?.risk ?? "Low"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Synthesis difficulty: </span>
+                      <span className="font-mono text-violet-100">
+                        {peptideResult.synthesis?.difficulty_class ?? "Routine"} (score: {fmt(peptideResult.synthesis?.difficulty_score, 1)})
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </>
+            ) : modality === "antibody" && antibodyResult ? (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Beaker className="w-4 h-4 text-violet-300" />
+                    <h3 className="text-[13px] font-semibold text-white">L1 — Antibody Developability</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    antibodyResult.summary?.verdict?.toUpperCase()?.startsWith("FAIL")
+                      ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
+                      : "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                  }`}>
+                    {antibodyResult.summary?.verdict}
+                  </span>
+                </div>
+                <div className="text-[12px] text-slate-300">
+                  Antibody <span className="font-mono text-violet-200">{antibodyResult.inferred_format}</span> completed Fv CDR developability profiling.
+                </div>
+                <div className="mt-3 pt-3 border-t border-violet-500/15">
+                  <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
+                    L1 TAP-Style developability metrics
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
+                    <div>
+                      <span className="text-slate-500">Inferred format: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.inferred_format}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Developability tier: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.summary.developability_tier}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Aggregation risk: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.summary.aggregation_risk}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">High liabilities: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.summary.n_liabilities_high} motifs</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Total liabilities: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.summary.n_liabilities_total} motifs</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Viscosity risk: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.viscosity_risk?.risk ?? "Low"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">FcRn binding: </span>
+                      <span className="font-mono text-violet-100">{antibodyResult.fcrn_binding?.overall_fcrn_score ?? "Moderate"}</span>
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="mt-3 pt-3 border-t border-violet-500/15 text-[11px] text-slate-500 italic">
-                No L1 IVIVE numerics available — run L1 In-Vitro to populate.
-              </div>
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Beaker className="w-4 h-4 text-violet-300" />
+                    <h3 className="text-[13px] font-semibold text-white">L1 — In-Vitro</h3>
+                  </div>
+                  {simResults?.goNogo && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      simResults.goNogo === "GO"
+                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                        : "bg-rose-500/15 text-rose-300 border-rose-500/40"
+                    }`}>
+                      {simResults.goNogo}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[12px] text-slate-300">
+                  {simResults
+                    ? <>Compound <span className="font-mono text-violet-200">{simResults.molName ?? "—"}</span> completed L1.</>
+                    : <span className="text-slate-500">L1 has not been run.</span>}
+                </div>
+
+                {/* ── L1 IVIVE Output — substrate numerics consumed by IVIVE ───── */}
+                {inVitroResults ? (
+                  <div className="mt-3 pt-3 border-t border-violet-500/15">
+                    <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold mb-1.5">
+                      L1 IVIVE Output (consumed by L2 dose projection)
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11.5px]">
+                      <div>
+                        <span className="text-slate-500">Target IC₅₀: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.doseResponse.ic50_nM, 1, "nM")}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Plasma fu: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.plasmaProteinBinding.fuPercent, 2, "%")}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Caco-2 Pₐₚₚ: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.permeability.caco2Papp, 1, "×10⁻⁶ cm/s")}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Microsomal CL_int: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.metabolicStability.microsomalCLint, 1, "µL/min/mg")}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">hERG IC₅₀: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.herg.ic50_uM, 2, "µM")}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">In-vitro score: </span>
+                        <span className="font-mono text-violet-100">{fmt(inVitroResults.inVitroScore, 0)}</span>
+                        <span className="text-slate-500"> · risk </span>
+                        <span className={
+                          inVitroResults.overallRisk === "Low"      ? "text-emerald-300" :
+                          inVitroResults.overallRisk === "Moderate" ? "text-amber-300"   :
+                                                                      "text-rose-300"
+                        }>{inVitroResults.overallRisk}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 pt-3 border-t border-violet-500/15 text-[11px] text-slate-500 italic">
+                    No L1 IVIVE numerics available — run L1 In-Vitro to populate.
+                  </div>
+                )}
+              </>
             )}
           </div>
 

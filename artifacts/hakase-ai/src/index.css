@@ -267,43 +267,153 @@
 }
 
 /* ── HakaseAI Light Mode ─────────────────────────────────────────────────── */
+/*
+   Reworked May 2026 — warmer, higher-contrast premium palette.
+   Goals:
+     • Soft warm off-white page background (not cool blue-grey)
+     • Pure white cards with layered, elegant shadows
+     • Strong typographic hierarchy (slate-900 → slate-600 → slate-500)
+     • Subtle hairline borders, never harsh black lines
+     • Hardcoded dark hex backgrounds (#07080c, #0d0f17, etc.) translate cleanly
+*/
 
-.hk-light {
-  --hk-bg:         #f5f7fa;
-  --hk-surface:    #ffffff;
-  --hk-surface2:   #f0f2f8;
-  --hk-surface3:   #e8ebf4;
-  --hk-border:     #d1d8e8;
-  --hk-border2:    #c5cde0;
-  --hk-text:       #111827;
-  --hk-text2:      #374151;
-  --hk-text3:      #6b7280;
-  --hk-text4:      #9ca3af;
+.hk-light,
+html.hk-light {
+  /* Premium Light Theme Palette */
+  --background: 30 25% 98%;            /* Warm off-white #fafaf7 — easier on the eyes than cool grey */
+  --foreground: 222 47% 11%;           /* Slate-900 */
+
+  --border: 220 14% 88%;
+  --input: 220 14% 88%;
+  --ring: 262 83% 58%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 220 14% 90%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 220 14% 90%;
+
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 30 20% 96%;             /* Slightly warm tint to match background */
+  --secondary-foreground: 222 30% 20%;
+
+  --muted: 30 20% 96%;
+  --muted-foreground: 215 16% 47%;     /* Slate-500/600 readable on white */
+
+  --accent: 220 14% 93%;
+  --accent-foreground: 262 83% 50%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --sidebar: 0 0% 100%;                /* Pure white sidebar */
+  --sidebar-foreground: 222 30% 25%;
+  --sidebar-border: 220 14% 90%;
+  --sidebar-primary: 262 83% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 14% 95%;
+  --sidebar-accent-foreground: 222 30% 20%;
+  --sidebar-ring: 262 83% 58%;
+
+  --button-outline: rgba(15, 23, 42, 0.10);
+  --badge-outline: rgba(15, 23, 42, 0.06);
+  --elevate-1: rgba(15, 23, 42, 0.035);
+  --elevate-2: rgba(15, 23, 42, 0.07);
+
+  /* Local design tokens */
+  --hk-bg:         #fafaf7;            /* Warm off-white page */
+  --hk-bg-deep:    #f3f1ec;            /* Deeper page section (alt strip) */
+  --hk-surface:    #ffffff;            /* Pure white card */
+  --hk-surface2:   #f5f5f1;            /* Soft warm surface */
+  --hk-surface3:   #ecebe5;            /* Slightly stronger surface */
+  --hk-border:     #e6e4dd;            /* Soft warm hairline border */
+  --hk-border2:    #d6d3cb;
+  --hk-text:       #0f172a;            /* Slate-900 — primary text */
+  --hk-text2:      #1e293b;            /* Slate-800 — strong sub-headers */
+  --hk-text3:      #334155;            /* Slate-700 — body */
+  --hk-text4:      #64748b;            /* Slate-500 — muted */
+  --hk-text5:      #94a3b8;            /* Slate-400 — captions */
+
+  --hk-shadow-sm:  0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --hk-shadow-md:  0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --hk-shadow-lg:  0 8px 24px -8px rgba(15, 23, 42, 0.10), 0 2px 6px -2px rgba(15, 23, 42, 0.05);
+
   background-color: var(--hk-bg) !important;
   color: var(--hk-text) !important;
 }
 
-/* Header & sidebar chrome */
-.hk-light header {
-  background-color: var(--hk-surface) !important;
-  border-color: var(--hk-border) !important;
-}
-.hk-light aside {
-  background-color: var(--hk-surface2) !important;
-  border-color: var(--hk-border) !important;
+html.hk-light body,
+.hk-light body,
+.hk-light .min-h-screen,
+.hk-light .h-screen,
+.hk-light [class*="min-h-screen"] {
+  background-color: var(--hk-bg) !important;
+  color: var(--hk-text) !important;
 }
 
-/* Every panel/card that uses the dark hex backgrounds */
+/* ── Page-level dark backgrounds → warm off-white ─────────────────── */
 .hk-light [class*="bg-[#07080c]"],
+.hk-light [class*="bg-[#080a12]"],
+.hk-light [class*="bg-[#06070a]"],
+.hk-light [class*="bg-[#08090e]"] {
+  background-color: var(--hk-bg) !important;
+}
+
+/* CTA button "bg-white text-[#07080c]" → flip in light mode */
+.hk-light [class*="bg-white"][class*="text-[#07080c]"],
+.hk-light [class*="bg-white"][class*="text-\\[\\#07080c\\]"] {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.35) !important;
+}
+.hk-light [class*="bg-white"][class*="text-[#07080c]"]:hover,
+.hk-light [class*="bg-white"][class*="text-\\[\\#07080c\\]"]:hover {
+  background-color: #1e293b !important;
+}
+
+/* ── Card surfaces — pure white with soft shadow + hairline ──────── */
 .hk-light [class*="bg-[#0d0f17]"],
 .hk-light [class*="bg-[#0d0f1a]"],
-.hk-light [class*="bg-[#080a12]"],
-.hk-light [class*="bg-[#0b0d14]"] {
+.hk-light [class*="bg-[#0c0e16]"],
+.hk-light [class*="bg-[#0b0d14]"],
+.hk-light [class*="bg-[#0f111a]"],
+.hk-light [class*="bg-[#10121c]"],
+.hk-light [class*="bg-[#0a0b10]"],
+.hk-light [class*="bg-[#0e1018]"],
+.hk-light [class*="bg-slate-900"],
+.hk-light [class*="bg-slate-950"],
+.hk-light [class*="bg-zinc-900"],
+.hk-light [class*="bg-zinc-950"],
+.hk-light [class*="bg-neutral-900"],
+.hk-light [class*="bg-neutral-950"],
+.hk-light [class*="bg-gray-900"],
+.hk-light [class*="bg-gray-950"] {
   background-color: var(--hk-surface) !important;
+  border-color: var(--hk-border) !important;
+  box-shadow: var(--hk-shadow-md) !important;
 }
 
-/* Semi-transparent white surfaces → light equivalents */
+.hk-light [class*="bg-slate-800"],
+.hk-light [class*="bg-zinc-800"],
+.hk-light [class*="bg-neutral-800"],
+.hk-light [class*="bg-gray-800"] {
+  background-color: var(--hk-surface2) !important;
+}
+.hk-light [class*="bg-slate-700"],
+.hk-light [class*="bg-zinc-700"],
+.hk-light [class*="bg-neutral-700"],
+.hk-light [class*="bg-gray-700"] {
+  background-color: var(--hk-surface3) !important;
+}
+
+/* Semi-transparent white overlays → warm light surface tones */
+.hk-light [class*="bg-white/2"],
 .hk-light [class*="bg-white/3"],
+.hk-light [class*="bg-white/4"],
 .hk-light [class*="bg-white/5"] {
   background-color: var(--hk-surface2) !important;
 }
@@ -312,67 +422,437 @@
   background-color: var(--hk-surface3) !important;
 }
 .hk-light [class*="bg-white/15"],
-.hk-light [class*="bg-white/20"] {
-  background-color: #dde2ef !important;
+.hk-light [class*="bg-white/20"],
+.hk-light [class*="bg-white/25"],
+.hk-light [class*="bg-white/30"] {
+  background-color: #dcdad2 !important;
+}
+.hk-light [class*="bg-black/40"],
+.hk-light [class*="bg-black/30"],
+.hk-light [class*="bg-black/20"],
+.hk-light [class*="bg-black/10"],
+.hk-light [class*="bg-black/5"],
+.hk-light [class*="bg-black/"] {
+  background-color: rgba(15, 23, 42, 0.035) !important;
 }
 
-/* Slate/dark tinted surfaces */
-.hk-light [class*="bg-slate-900"],
-.hk-light [class*="bg-slate-800"],
-.hk-light [class*="bg-slate-950"] {
-  background-color: var(--hk-surface) !important;
+/* ── Deep tinted gradient cards (GO / WATCH / NO-GO summary, etc.) ─ */
+/* The dashboard uses from-{color}-950/60 to-{color}-900/30 for the "GO" hero
+   panel. In dark mode this reads as a deep moody glow; in light mode it would
+   be muddy. Translate them to airy, lightly-tinted gradients. */
+.hk-light [class*="from-emerald-950"][class*="to-emerald-900"],
+.hk-light [class*="from-emerald-900"][class*="to-emerald-800"] {
+  background-image: linear-gradient(to right, rgba(16, 185, 129, 0.10), rgba(16, 185, 129, 0.04)) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
 }
-.hk-light [class*="bg-slate-800/"] {
-  background-color: var(--hk-surface2) !important;
+.hk-light [class*="from-yellow-950"][class*="to-yellow-900"],
+.hk-light [class*="from-amber-950"][class*="to-amber-900"] {
+  background-image: linear-gradient(to right, rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.04)) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+.hk-light [class*="from-red-950"][class*="to-red-900"],
+.hk-light [class*="from-rose-950"][class*="to-rose-900"] {
+  background-image: linear-gradient(to right, rgba(239, 68, 68, 0.10), rgba(239, 68, 68, 0.04)) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+.hk-light [class*="from-violet-950"][class*="to-violet-900"],
+.hk-light [class*="from-purple-950"][class*="to-purple-900"] {
+  background-image: linear-gradient(to right, rgba(139, 92, 246, 0.10), rgba(139, 92, 246, 0.04)) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+}
+.hk-light [class*="from-blue-950"][class*="to-blue-900"],
+.hk-light [class*="from-indigo-950"][class*="to-indigo-900"] {
+  background-image: linear-gradient(to right, rgba(59, 130, 246, 0.10), rgba(59, 130, 246, 0.04)) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
 }
 
-/* Main scroll areas */
-.hk-light main,
-.hk-light [class*="overflow-y-auto"]:not(aside) {
-  background-color: var(--hk-bg);
+/* Inside these tinted hero cards, the headline text was `text-{color}-400` and
+   the body was `text-white` — keep colored headline but make the body slate */
+.hk-light [class*="from-emerald-950"] [class*="text-white"],
+.hk-light [class*="from-yellow-950"] [class*="text-white"],
+.hk-light [class*="from-red-950"] [class*="text-white"],
+.hk-light [class*="from-violet-950"] [class*="text-white"],
+.hk-light [class*="from-blue-950"] [class*="text-white"] {
+  color: var(--hk-text) !important;
+}
+.hk-light [class*="from-emerald-950"] [class*="text-slate-400"],
+.hk-light [class*="from-yellow-950"] [class*="text-slate-400"],
+.hk-light [class*="from-red-950"] [class*="text-slate-400"],
+.hk-light [class*="from-violet-950"] [class*="text-slate-400"],
+.hk-light [class*="from-blue-950"] [class*="text-slate-400"] {
+  color: var(--hk-text4) !important;
+}
+/* And ensure the colored "GO/WATCH/NO-GO" headline stays vivid */
+.hk-light [class*="from-emerald-950"] [class*="text-emerald-400"] { color: #047857 !important; }
+.hk-light [class*="from-yellow-950"] [class*="text-yellow-400"]   { color: #b45309 !important; }
+.hk-light [class*="from-red-950"]    [class*="text-red-400"]      { color: #b91c1c !important; }
+.hk-light [class*="from-violet-950"] [class*="text-violet-400"]   { color: #6d28d9 !important; }
+.hk-light [class*="from-blue-950"]   [class*="text-blue-400"]     { color: #1d4ed8 !important; }
+
+/* ── Violet / cyan / color glow overlays — transparent and glassmorphic ── */
+.hk-light [class*="bg-violet-600/8"],
+.hk-light [class*="bg-violet-600/10"],
+.hk-light [class*="bg-violet-600/15"],
+.hk-light [class*="bg-violet-600/20"],
+.hk-light [class*="bg-violet-500/8"],
+.hk-light [class*="bg-violet-500/10"],
+.hk-light [class*="bg-violet-500/15"],
+.hk-light [class*="bg-violet-400/8"],
+.hk-light [class*="bg-violet-400/10"] {
+  background-color: rgba(139, 92, 246, 0.05) !important;
+}
+.hk-light [class*="bg-cyan-600/8"],
+.hk-light [class*="bg-cyan-600/10"],
+.hk-light [class*="bg-cyan-500/8"],
+.hk-light [class*="bg-cyan-500/10"],
+.hk-light [class*="bg-cyan-400/8"],
+.hk-light [class*="bg-cyan-400/10"] {
+  background-color: rgba(6, 182, 212, 0.05) !important;
+}
+.hk-light [class*="bg-amber-600/8"],
+.hk-light [class*="bg-amber-600/10"],
+.hk-light [class*="bg-amber-500/8"],
+.hk-light [class*="bg-amber-500/10"],
+.hk-light [class*="bg-amber-400/8"],
+.hk-light [class*="bg-amber-400/10"] {
+  background-color: rgba(245, 158, 11, 0.05) !important;
+}
+.hk-light [class*="bg-emerald-600/8"],
+.hk-light [class*="bg-emerald-600/10"],
+.hk-light [class*="bg-emerald-500/8"],
+.hk-light [class*="bg-emerald-500/10"],
+.hk-light [class*="bg-emerald-400/8"],
+.hk-light [class*="bg-emerald-400/10"] {
+  background-color: rgba(16, 185, 129, 0.05) !important;
+}
+.hk-light [class*="bg-blue-600/8"],
+.hk-light [class*="bg-blue-600/10"],
+.hk-light [class*="bg-blue-500/8"],
+.hk-light [class*="bg-blue-500/10"] {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+}
+.hk-light [class*="bg-rose-600/8"],
+.hk-light [class*="bg-rose-600/10"],
+.hk-light [class*="bg-rose-500/8"],
+.hk-light [class*="bg-rose-500/10"],
+.hk-light [class*="bg-red-600/8"],
+.hk-light [class*="bg-red-600/10"] {
+  background-color: rgba(239, 68, 68, 0.05) !important;
 }
 
-/* Borders */
-.hk-light [class*="border-white/8"],
-.hk-light [class*="border-white/10"],
-.hk-light [class*="border-white/5"],
-.hk-light [class*="border-white/15"],
-.hk-light [class*="border-white/20"] {
+/* ── Header / nav / backdrop-blur elements ──────────────────────────── */
+.hk-light [class*="backdrop-blur"] {
+  backdrop-filter: saturate(180%) blur(18px) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(18px) !important;
+  background-color: rgba(250, 250, 247, 0.78) !important; /* Warm glass */
+  border-bottom-color: var(--hk-border) !important;
+}
+
+/* ── Borders ─────────────────────────────────────────────────────────── */
+.hk-light [class*="border-white/"],
+.hk-light [class*="divide-white"] {
   border-color: var(--hk-border) !important;
-}
-.hk-light [class*="border-white/25"],
-.hk-light [class*="border-white/30"],
-.hk-light [class*="border-white/40"],
-.hk-light [class*="border-white/50"] {
-  border-color: var(--hk-border2) !important;
 }
 .hk-light [class*="border-slate-700"],
 .hk-light [class*="border-slate-800"],
-.hk-light [class*="border-slate-600"] {
+.hk-light [class*="border-slate-600"],
+.hk-light [class*="border-zinc-700"],
+.hk-light [class*="border-zinc-800"],
+.hk-light [class*="border-neutral-700"],
+.hk-light [class*="border-neutral-800"] {
+  border-color: var(--hk-border) !important;
+}
+.hk-light hr {
   border-color: var(--hk-border) !important;
 }
 
-/* Text colours */
+/* Divider lines (divide-y / divide-x with white/black) */
+.hk-light [class*="divide-white/"] > * + *,
+.hk-light [class*="divide-slate-7"] > * + *,
+.hk-light [class*="divide-slate-8"] > * + * {
+  border-color: var(--hk-border) !important;
+}
+
+/* ── Landing-page hardcoded animated grid (white strokes on white bg) ── */
+.hk-light .hk-grid-stroke,
+.hk-light svg path[stroke="white"],
+.hk-light svg rect[fill*="url(#grid)"] {
+  stroke: #0f172a !important;
+  opacity: 0.7;
+}
+
+/* ── Code-block style panels on landing — keep dark for syntax legibility ── */
+.hk-light .hk-code-panel {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  box-shadow: var(--hk-shadow-lg) !important;
+}
+.hk-light .hk-code-panel [class*="text-slate-"],
+.hk-light .hk-code-panel [class*="text-white"] {
+  color: #e2e8f0 !important;
+}
+.hk-light .hk-code-panel [class*="text-slate-500"],
+.hk-light .hk-code-panel [class*="text-slate-600"] {
+  color: #94a3b8 !important;
+}
+
+/* ── High-Contrast Typographic Color Overrides ─────────────────────────── */
+/* Primary dark state text colors -> beautifully calibrated high-contrast light slate colors */
+.hk-light .text-white,
 .hk-light [class*="text-white"] {
   color: var(--hk-text) !important;
 }
+
+.hk-light [class*="text-slate-50"] {
+  color: var(--hk-text) !important;
+}
 .hk-light [class*="text-slate-100"],
-.hk-light [class*="text-slate-200"],
-.hk-light [class*="text-slate-300"] {
+.hk-light [class*="text-slate-200"] {
   color: var(--hk-text2) !important;
 }
-.hk-light [class*="text-slate-400"] {
-  color: var(--hk-text3) !important;
+.hk-light [class*="text-slate-300"] {
+  color: var(--hk-text3) !important; /* highly legible body Slate-700 */
 }
-.hk-light [class*="text-slate-500"],
+.hk-light [class*="text-slate-400"] {
+  color: #475569 !important;        /* Slate-600 secondary */
+}
+.hk-light [class*="text-slate-500"] {
+  color: var(--hk-text4) !important; /* Slate-500 captions/muted */
+}
 .hk-light [class*="text-slate-600"] {
-  color: var(--hk-text4) !important;
+  color: #475569 !important;
 }
 .hk-light [class*="text-slate-700"] {
-  color: #6b7280 !important;
+  color: var(--hk-text3) !important;
+}
+.hk-light [class*="text-slate-800"] {
+  color: var(--hk-text2) !important;
 }
 
-/* Inputs */
+/* ── Solid Colored Button & Hover Exceptions ───────────────────────── */
+/* Restores pristine white text inside solid colored backgrounds/buttons and text hover:white effects */
+.hk-light .bg-primary .text-white,
+.hk-light .bg-primary.text-white,
+.hk-light [class*="bg-violet-"] .text-white,
+.hk-light [class*="bg-violet-"].text-white,
+.hk-light [class*="bg-blue-"] .text-white,
+.hk-light [class*="bg-blue-"].text-white,
+.hk-light [class*="bg-indigo-"] .text-white,
+.hk-light [class*="bg-indigo-"].text-white,
+.hk-light [class*="bg-emerald-"] .text-white,
+.hk-light [class*="bg-emerald-"].text-white,
+.hk-light [class*="bg-red-"] .text-white,
+.hk-light [class*="bg-red-"].text-white,
+.hk-light [class*="bg-rose-"] .text-white,
+.hk-light [class*="bg-rose-"].text-white,
+.hk-light [class*="bg-cyan-"] .text-white,
+.hk-light [class*="bg-cyan-"].text-white,
+.hk-light [class*="bg-teal-"] .text-white,
+.hk-light [class*="bg-teal-"].text-white,
+.hk-light [class*="bg-purple-"] .text-white,
+.hk-light [class*="bg-purple-"].text-white,
+.hk-light [class*="bg-gradient-to-"] .text-white,
+.hk-light [class*="bg-gradient-to-"].text-white,
+.hk-light [class*="bg-slate-9"] .text-white,
+.hk-light [class*="bg-slate-9"].text-white,
+.hk-light [class*="bg-slate-8"] .text-white,
+.hk-light [class*="bg-slate-8"].text-white,
+.hk-light [class*="bg-zinc-9"] .text-white,
+.hk-light [class*="bg-zinc-9"].text-white,
+.hk-light [class*="bg-gray-9"] .text-white,
+.hk-light [class*="bg-gray-9"].text-white,
+.hk-light [class*="bg-neutral-9"] .text-white,
+.hk-light [class*="bg-neutral-9"].text-white,
+.hk-light [class*="bg-black"] .text-white,
+.hk-light [class*="bg-black"].text-white {
+  color: #ffffff !important;
+}
+
+/* Ensure hover:text-white overrides always display white correctly */
+.hk-light [class*="hover:text-white"]:hover {
+  color: #ffffff !important;
+}
+
+/* ── Re-flip text-white to dark inside LOW-OPACITY tinted containers ──
+   Tailwind's slash-opacity syntax produces classes like `bg-violet-500/5`
+   that match the previous broad `[class*="bg-violet-"]` exception and
+   keep text white — invisible on light tinted backgrounds. Force dark
+   text back inside any low-opacity coloured tint. */
+.hk-light [class*="-400/4"] .text-white,
+.hk-light [class*="-400/5"] .text-white,
+.hk-light [class*="-400/6"] .text-white,
+.hk-light [class*="-400/8"] .text-white,
+.hk-light [class*="-400/10"] .text-white,
+.hk-light [class*="-400/12"] .text-white,
+.hk-light [class*="-400/15"] .text-white,
+.hk-light [class*="-400/20"] .text-white,
+.hk-light [class*="-500/4"] .text-white,
+.hk-light [class*="-500/5"] .text-white,
+.hk-light [class*="-500/6"] .text-white,
+.hk-light [class*="-500/8"] .text-white,
+.hk-light [class*="-500/10"] .text-white,
+.hk-light [class*="-500/12"] .text-white,
+.hk-light [class*="-500/15"] .text-white,
+.hk-light [class*="-500/20"] .text-white,
+.hk-light [class*="-500/25"] .text-white,
+.hk-light [class*="-500/30"] .text-white,
+.hk-light [class*="-600/4"] .text-white,
+.hk-light [class*="-600/5"] .text-white,
+.hk-light [class*="-600/6"] .text-white,
+.hk-light [class*="-600/8"] .text-white,
+.hk-light [class*="-600/10"] .text-white,
+.hk-light [class*="-600/15"] .text-white,
+.hk-light [class*="-600/20"] .text-white {
+  color: var(--hk-text) !important;
+}
+
+/* ── Solid colored buttons WITHOUT explicit text class — force white text ─
+   Some buttons in the app (e.g. "Continue to Confirmation") use
+   `bg-violet-600 hover:bg-violet-500 ...` with NO `text-white`. In dark
+   mode they inherit the page's near-white body color and look fine; in
+   light mode they would inherit slate-900 and become unreadable purple-
+   on-purple. This forces white text on any solid colored button. */
+.hk-light button[class*="bg-violet-5"],
+.hk-light button[class*="bg-violet-6"],
+.hk-light button[class*="bg-violet-7"],
+.hk-light button[class*="bg-blue-5"],
+.hk-light button[class*="bg-blue-6"],
+.hk-light button[class*="bg-blue-7"],
+.hk-light button[class*="bg-indigo-5"],
+.hk-light button[class*="bg-indigo-6"],
+.hk-light button[class*="bg-indigo-7"],
+.hk-light button[class*="bg-emerald-5"],
+.hk-light button[class*="bg-emerald-6"],
+.hk-light button[class*="bg-emerald-7"],
+.hk-light button[class*="bg-red-5"],
+.hk-light button[class*="bg-red-6"],
+.hk-light button[class*="bg-red-7"],
+.hk-light button[class*="bg-rose-5"],
+.hk-light button[class*="bg-rose-6"],
+.hk-light button[class*="bg-rose-7"],
+.hk-light button[class*="bg-amber-5"],
+.hk-light button[class*="bg-amber-6"],
+.hk-light button[class*="bg-amber-7"],
+.hk-light button[class*="bg-cyan-5"],
+.hk-light button[class*="bg-cyan-6"],
+.hk-light button[class*="bg-cyan-7"],
+.hk-light button[class*="bg-teal-5"],
+.hk-light button[class*="bg-teal-6"],
+.hk-light button[class*="bg-teal-7"],
+.hk-light button[class*="bg-purple-5"],
+.hk-light button[class*="bg-purple-6"],
+.hk-light button[class*="bg-purple-7"],
+.hk-light button[class*="bg-fuchsia-5"],
+.hk-light button[class*="bg-fuchsia-6"],
+.hk-light button[class*="bg-fuchsia-7"],
+.hk-light button[class*="bg-pink-5"],
+.hk-light button[class*="bg-pink-6"],
+.hk-light button[class*="bg-pink-7"],
+.hk-light button.bg-primary {
+  color: #ffffff !important;
+}
+/* Same for the icon/text children inside these buttons */
+.hk-light button[class*="bg-violet-5"] *,
+.hk-light button[class*="bg-violet-6"] *,
+.hk-light button[class*="bg-violet-7"] *,
+.hk-light button[class*="bg-blue-5"] *,
+.hk-light button[class*="bg-blue-6"] *,
+.hk-light button[class*="bg-blue-7"] *,
+.hk-light button[class*="bg-indigo-5"] *,
+.hk-light button[class*="bg-indigo-6"] *,
+.hk-light button[class*="bg-indigo-7"] *,
+.hk-light button[class*="bg-emerald-5"] *,
+.hk-light button[class*="bg-emerald-6"] *,
+.hk-light button[class*="bg-emerald-7"] *,
+.hk-light button[class*="bg-red-5"] *,
+.hk-light button[class*="bg-red-6"] *,
+.hk-light button[class*="bg-red-7"] *,
+.hk-light button[class*="bg-rose-5"] *,
+.hk-light button[class*="bg-rose-6"] *,
+.hk-light button[class*="bg-rose-7"] *,
+.hk-light button[class*="bg-amber-5"] *,
+.hk-light button[class*="bg-amber-6"] *,
+.hk-light button[class*="bg-amber-7"] *,
+.hk-light button[class*="bg-cyan-5"] *,
+.hk-light button[class*="bg-cyan-6"] *,
+.hk-light button[class*="bg-cyan-7"] *,
+.hk-light button[class*="bg-teal-5"] *,
+.hk-light button[class*="bg-teal-6"] *,
+.hk-light button[class*="bg-teal-7"] *,
+.hk-light button[class*="bg-purple-5"] *,
+.hk-light button[class*="bg-purple-6"] *,
+.hk-light button[class*="bg-purple-7"] *,
+.hk-light button.bg-primary * {
+  color: #ffffff !important;
+}
+
+/* ── Rich Text Gradient Color Enhancements ───────────────────────────── */
+/* Replace washed-out pastel gradients with deep, saturated stops that hold up
+   against a warm off-white background. */
+.hk-light [class*="from-violet-400"][class*="via-blue-400"][class*="to-emerald-400"] {
+  background-image: linear-gradient(to right, #5b21b6, #1d4ed8, #047857) !important;
+}
+.hk-light [class*="from-blue-400"][class*="via-violet-400"][class*="to-emerald-400"] {
+  background-image: linear-gradient(to right, #1d4ed8, #5b21b6, #047857) !important;
+}
+.hk-light [class*="from-violet-400"][class*="to-blue-400"] {
+  background-image: linear-gradient(to right, #5b21b6, #1d4ed8) !important;
+}
+.hk-light [class*="from-cyan-300"][class*="via-cyan-200"][class*="to-amber-300"] {
+  background-image: linear-gradient(to right, #0e7490, #155e75, #92400e) !important;
+}
+/* Any other generic violet→blue or blue→emerald gradient text — darker stops */
+.hk-light [class*="from-violet-500"][class*="to-blue-500"] {
+  background-image: linear-gradient(to right, #5b21b6, #1d4ed8) !important;
+}
+.hk-light [class*="from-violet-500"][class*="to-emerald-500"] {
+  background-image: linear-gradient(to right, #5b21b6, #047857) !important;
+}
+
+/* ── Strengthen muted body text on warm off-white ─────────────────── */
+/* slate-500 (#64748b) reads as faded grey on #fafaf7 — bump to slate-600/700 */
+.hk-light [class*="text-slate-500"] {
+  color: #475569 !important; /* slate-600 */
+}
+.hk-light [class*="text-slate-600"] {
+  color: #334155 !important; /* slate-700 */
+}
+.hk-light [class*="text-slate-400"] {
+  color: #475569 !important; /* slate-600 — readable secondary */
+}
+/* Captions / very-muted labels (deliberately faded) */
+.hk-light .text-slate-600.font-mono,
+.hk-light .text-slate-600.uppercase {
+  color: #64748b !important;
+}
+
+/* ── Dark Scrollbars in Light Mode ───────────────────────────────────── */
+.hk-light * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent !important;
+}
+.hk-light *::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+}
+.hk-light *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Accent text — darken for legibility on white backgrounds */
+.hk-light [class*="text-violet-300"] { color: #6d28d9 !important; }
+.hk-light [class*="text-violet-400"] { color: #5b21b6 !important; }
+.hk-light [class*="text-cyan-300"]   { color: #0e7490 !important; }
+.hk-light [class*="text-cyan-400"]   { color: #0c6780 !important; }
+.hk-light [class*="text-blue-300"]   { color: #1d4ed8 !important; }
+.hk-light [class*="text-blue-400"]   { color: #1e40af !important; }
+.hk-light [class*="text-emerald-300"]{ color: #047857 !important; }
+.hk-light [class*="text-emerald-400"]{ color: #065f46 !important; }
+.hk-light [class*="text-amber-300"]  { color: #b45309 !important; }
+.hk-light [class*="text-amber-400"]  { color: #92400e !important; }
+.hk-light [class*="text-rose-300"]   { color: #be123c !important; }
+.hk-light [class*="text-rose-400"]   { color: #9f1239 !important; }
+
+/* ── Inputs / selects / textareas ─────────────────────────────────────── */
 .hk-light input,
 .hk-light textarea,
 .hk-light select {
@@ -384,59 +864,87 @@
 .hk-light textarea::placeholder {
   color: var(--hk-text4) !important;
 }
-
-/* Active/hover surfaces in nav */
-.hk-light [class*="hover:bg-white/5"]:hover,
-.hk-light [class*="hover:bg-white/8"]:hover,
-.hk-light [class*="hover:bg-white/10"]:hover {
-  background-color: var(--hk-surface3) !important;
+.hk-light input:focus,
+.hk-light textarea:focus,
+.hk-light select:focus {
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
 }
 
-/* Separator / dividers */
-.hk-light [class*="divide-white"],
-.hk-light hr {
+/* ── Focus ring color for buttons ─────────────────────────────────── */
+.hk-light *:focus-visible {
+  outline-color: hsl(var(--ring)) !important;
+}
+
+/* ── Soft section separator strips (alt-row look) ─────────────────── */
+.hk-light .hk-section-alt {
+  background-color: var(--hk-bg-deep) !important;
+}
+
+/* ── Hide / soften the white animated grid on landing in light mode ─── */
+.hk-light .hk-animated-grid {
+  opacity: 0.5;
+}
+.hk-light .hk-animated-grid svg path {
+  stroke: #d6d3cb !important;
+}
+.hk-light .hk-animated-grid .hk-glow-violet {
+  background-color: rgba(139, 92, 246, 0.10) !important;
+}
+.hk-light .hk-animated-grid .hk-glow-blue {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+.hk-light .hk-animated-grid .hk-glow-emerald {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+
+/* ── Logo "v1.0" version chip in NavBar ───────────────────────────── */
+.hk-light nav button img + span {
+  background-color: rgba(139, 92, 246, 0.10) !important;
+  color: #6d28d9 !important;
+}
+
+/* ── Theme-aware logo: invert white→dark while preserving cyan ────────
+   The existing logo PNG has WHITE "hakase" text + CYAN cap + CYAN "AI",
+   designed for dark backgrounds. Add `hk-logo` to any <img> using it and
+   in light mode it will: invert(1) flips white→black, hue-rotate(180deg)
+   then brings cyan back from its inverted red. Net result: black
+   "hakase" + cyan "AI" + cyan cap — readable on the off-white page. */
+.hk-light img.hk-logo {
+  filter: invert(1) hue-rotate(180deg) saturate(1.1);
+}
+
+/* ── Dropdown menus from NavBar — light + crisp ───────────────────── */
+.hk-light nav [class*="bg-[#0d0f17]"] {
+  background-color: #ffffff !important;
   border-color: var(--hk-border) !important;
+  box-shadow: var(--hk-shadow-lg) !important;
 }
 
-/* Shadows */
-.hk-light [class*="shadow-black"] {
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10) !important;
+/* ── Theme toggle button — proper light-mode look ─────────────────── */
+.hk-light nav button[title*="Dark Mode"],
+.hk-light nav button[title*="Light Mode"] {
+  background-color: #ffffff !important;
+  border-color: var(--hk-border) !important;
+  color: #475569 !important;
+}
+.hk-light nav button[title*="Dark Mode"]:hover,
+.hk-light nav button[title*="Light Mode"]:hover {
+  background-color: var(--hk-surface2) !important;
+  color: var(--hk-text) !important;
+  border-color: var(--hk-border2) !important;
 }
 
-/* Tab row that uses bg-white/5 as container */
-.hk-light [class*="bg-white/5"].rounded-lg,
-.hk-light [class*="bg-white/8"].rounded-lg,
-.hk-light [class*="bg-white/10"].rounded-lg {
-  background-color: var(--hk-surface3) !important;
+/* ── Soft, layered card hover lift in light mode ──────────────────── */
+.hk-light .hk-lift {
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.hk-light .hk-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--hk-shadow-lg) !important;
 }
 
-/* Backdrop blur headers should be solid in light mode */
-.hk-light [class*="backdrop-blur"] {
-  backdrop-filter: none !important;
-  background-color: var(--hk-surface) !important;
-}
 
-/* Keep accent colours intact for all layer/status indicators */
-.hk-light [class*="text-violet"],
-.hk-light [class*="text-amber"],
-.hk-light [class*="text-blue"],
-.hk-light [class*="text-emerald"],
-.hk-light [class*="text-red"],
-.hk-light [class*="text-green"],
-.hk-light [class*="text-yellow"] {
-  /* inherit accent — do not override */
-}
-
-/* Scrollbar */
-.hk-light ::-webkit-scrollbar-track {
-  background: var(--hk-surface2);
-}
-.hk-light ::-webkit-scrollbar-thumb {
-  background: var(--hk-border2);
-}
-.hk-light ::-webkit-scrollbar-thumb:hover {
-  background: #a0abc4;
-}
 
 /* ─────────────────────────────────────────────────────────────
    Global typography bump: +2px on every text size used.

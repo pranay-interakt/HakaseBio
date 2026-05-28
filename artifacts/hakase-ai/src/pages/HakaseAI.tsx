@@ -206,7 +206,24 @@ export function HakaseAI() {
   const [simProgress, setSimProgress] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputPanelOpen, setInputPanelOpen] = useState(true);
-  const [lightMode, setLightMode] = useState(false);
+  const [lightMode, setLightMode] = useState(() => {
+    return typeof document !== "undefined" && (
+      document.documentElement.classList.contains("hk-light") ||
+      localStorage.getItem("theme") === "light"
+    );
+  });
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (lightMode) {
+        document.documentElement.classList.add("hk-light");
+        localStorage.setItem("theme", "light");
+      } else {
+        document.documentElement.classList.remove("hk-light");
+        localStorage.setItem("theme", "dark");
+      }
+    }
+  }, [lightMode]);
   const [viewer3DOpen, setViewer3DOpen] = useState(false);
   const [viewer3DMode, setViewer3DMode] = useState<"cinematic" | "scientific" | "explorer" | "docking">("cinematic");
   const [diagenOpen, setDiagenOpen] = useState(false);
@@ -2501,12 +2518,12 @@ export function HakaseAI() {
   const layerColors = ["violet", "cyan", "amber", "emerald"] as const;
 
   return (
-    <div className={`h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']${lightMode ? " hk-light" : ""}`} style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className={lightMode ? `h-screen bg-white text-slate-900 flex flex-col overflow-hidden font-['Inter'] hk-light` : `h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']`} style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Top Navigation Bar */}
-      <header className="h-14 border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md flex items-center px-4 gap-4 shrink-0 z-50">
+      <header className={`h-14 flex items-center px-4 gap-4 shrink-0 z-50 ${lightMode ? 'border-b border-slate-200 bg-white shadow-sm' : 'border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md'}`}>
         {/* Logo */}
         <div className="flex items-center gap-2 min-w-[160px]">
-          <img src={hakaseLogo} alt="HakaseAI" className="h-8 w-auto object-contain" />
+          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-8 w-auto object-contain" />
           <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-500/40 text-violet-400">
             v1.0
           </Badge>
@@ -2722,7 +2739,7 @@ export function HakaseAI() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar — Project Panel */}
-        <aside className={`${sidebarOpen ? "w-[240px]" : "w-14"} border-r border-white/8 bg-[#0d0f17]/60 flex flex-col shrink-0 transition-all duration-200 overflow-hidden`}>
+        <aside className={`${sidebarOpen ? "w-[240px]" : "w-14"} flex flex-col shrink-0 transition-all duration-200 overflow-hidden ${lightMode ? 'border-r border-slate-200 bg-slate-100' : 'border-r border-white/8 bg-[#0d0f17]/60'}`}>
           <div className="flex items-center justify-between p-3 border-b border-white/8">
             {sidebarOpen && (
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Projects</span>
@@ -3069,7 +3086,7 @@ export function HakaseAI() {
             <div className="flex-1 flex overflow-hidden">
               {/* Input Panel — collapsible */}
               {!inputPanelOpen && (
-                <div className="w-10 border-r border-white/8 bg-[#0d0f17]/60 flex flex-col items-center py-3 shrink-0">
+                <div className={`w-10 flex flex-col items-center py-3 shrink-0 ${lightMode ? 'border-r border-slate-200 bg-slate-100' : 'border-r border-white/8 bg-[#0d0f17]/60'}`}>
                   <button
                     onClick={() => setInputPanelOpen(true)}
                     className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-violet-300 transition-colors"
@@ -3089,7 +3106,7 @@ export function HakaseAI() {
                 </div>
               )}
               {inputPanelOpen && (
-              <div className="w-[420px] border-r border-white/8 overflow-y-auto flex flex-col shrink-0">
+              <div className={`w-[420px] overflow-y-auto flex flex-col shrink-0 ${lightMode ? 'border-r border-slate-200 bg-white' : 'border-r border-white/8'}`}>
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <TestTube2 className="w-4 h-4 text-violet-400" />
@@ -5320,6 +5337,9 @@ export function HakaseAI() {
               and forces a sign-off pass before L3 can be entered. */}
           {iviveHandoffOpen && (
             <IvieOutputHandoffPage
+              modality={l1Modality}
+              peptideResult={peptideResult}
+              antibodyResult={antibodyResult}
               ivieInputs={ivieInputs}
               onIvieInputsChange={setIvieInputs}
               simResults={simResults}
@@ -5399,6 +5419,9 @@ export function HakaseAI() {
                     antibodyHeavy={antibodyHeavy}
                     antibodyLight={antibodyLight}
                     onComplete={() => setSimStatus(prev => ({ ...prev, 2: "complete" }))}
+                    onContinue={() => setIviveHandoffOpen(true)}
+                    onConfirmationBlockReady={setConfirmationBlock}
+                    onProjectionReady={setL2Projection}
                   />
                 </div>
               ) : (

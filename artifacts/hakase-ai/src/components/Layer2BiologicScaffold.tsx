@@ -28,6 +28,8 @@ import {
   type BioStage0, type BioStage1, type BioStage2, type BioStage3,
   type BioStage4, type BioStage5, type BioStage6, type BioStage7,
 } from "@/lib/biologicL2";
+import type { ConfirmationEvidenceBlock } from "@workspace/preclinical-handoff";
+import type { L2DoseProjection } from "@/lib/l2DoseProjection";
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,9 @@ export interface Layer2BiologicScaffoldProps {
   antibodyHeavy:   string;
   antibodyLight:   string;
   onComplete?:     () => void;
+  onContinue?:     () => void;
+  onConfirmationBlockReady?: (block: ConfirmationEvidenceBlock) => void;
+  onProjectionReady?: (projection: L2DoseProjection) => void;
 }
 
 // ── Stage registry (left-panel cards) ───────────────────────────────────────
@@ -244,11 +249,280 @@ function KV({ label, value, source }: { label: string; value: string; source?: s
   );
 }
 
+// ── main helper functions for biologic confirmation blocks and dose projections ──
+function buildBiologicConfirmationBlock(
+  input: BiologicL2Input,
+  s7: any,
+  results: PipelineResults,
+  params: BiologicL2Params
+): ConfirmationEvidenceBlock {
+  const now = new Date().toISOString();
+  const l1Pointer = (input.modality === "peptide" ? "l1-peptide-pointer" : "l1-antibody-pointer") as any;
+  
+  const inSilicoEvidence: any[] = [];
+  
+  if (results.s2?.result) {
+    inSilicoEvidence.push({
+      recordId: `${l1Pointer}#inSilico-targetEngagement`,
+      predictionDomain: "dose_response",
+      predictedValue: results.s2.result.gated?.Ki_nM ?? (results.s2.result.iptm ? results.s2.result.iptm * 100 : null),
+      unit: results.s2.result.gated?.Ki_nM ? "nM" : "ipTM",
+      falsified: false,
+      falsifierId: null,
+    });
+  }
+  
+  if (results.s3?.result) {
+    inSilicoEvidence.push({
+      recordId: `${l1Pointer}#inSilico-pk`,
+      predictionDomain: "clearance_fractions",
+      predictedValue: results.s3.result.halfLifeHours ? (results.s3.result.halfLifeHours.low + results.s3.result.halfLifeHours.high) / 2 : null,
+      unit: "h",
+      falsified: false,
+      falsifierId: null,
+    });
+  }
+
+  const gatePolicy: any = {
+    policyId: "biologic-default-policy",
+    policyVersion: "2.0.0",
+    snapshottedAt: now,
+    inSilicoGateThresholds: {},
+    exVivoGateRules: [],
+    jointOutputTolerances: {},
+    overrideAuthorityRequired: {},
+  };
+
+  const jointOutputs: any = {
+    cypTransporter: {
+      domain: "cyp_transporter",
+      status: "mlGap",
+      mlEvidenceRef: l1Pointer,
+      kineticEvidenceRef: null,
+      synthesisedValue: null,
+      unit: "µM",
+      jointConfidence: 0,
+      falsifierTriggered: null,
+      confidenceCaveat: "Not applicable for biologics",
+      repairPath: null,
+      perEnzyme: {},
+      transporterPanel: [],
+    },
+    clearanceFractions: {
+      domain: "clearance_fractions",
+      status: "mlGap",
+      mlEvidenceRef: l1Pointer,
+      kineticEvidenceRef: null,
+      synthesisedValue: null,
+      unit: "mL/min/kg",
+      jointConfidence: 0,
+      falsifierTriggered: null,
+      confidenceCaveat: "Class-based PK applied",
+      repairPath: null,
+      hepatic: null,
+      renal: null,
+      biliary: null,
+      totalClearance: null,
+    },
+    offTarget: {
+      domain: "off_target",
+      status: "mlGap",
+      mlEvidenceRef: l1Pointer,
+      kineticEvidenceRef: null,
+      synthesisedValue: null,
+      unit: "µM",
+      jointConfidence: 0,
+      falsifierTriggered: null,
+      confidenceCaveat: "Not applicable for biologics",
+      repairPath: null,
+    },
+    doseResponse: {
+      domain: "dose_response",
+      status: "mlGap",
+      mlEvidenceRef: l1Pointer,
+      kineticEvidenceRef: null,
+      synthesisedValue: null,
+      unit: "fold",
+      jointConfidence: 0,
+      falsifierTriggered: null,
+      confidenceCaveat: "Not applicable for biologics",
+      repairPath: null,
+    },
+    hergPbpkProjection: {
+      domain: "herg_pbpk",
+      status: "mlGap",
+      mlEvidenceRef: l1Pointer,
+      kineticEvidenceRef: null,
+      synthesisedValue: null,
+      unit: "µM",
+      jointConfidence: 0,
+      falsifierTriggered: null,
+      confidenceCaveat: "Biologics do not inhibit hERG channels",
+      repairPath: null,
+    },
+  };
+
+  return {
+    layer: "confirmation",
+    inSilico: {
+      layer: "confirmation_inSilico",
+      evidence: inSilicoEvidence,
+      confidence: { byClass: {} },
+      gateStatus: s7.l2Verdict === "HOLD" ? "failed" : "passed",
+      falsifiers: [],
+      overrides: [],
+      emittedAt: now,
+      emitterEngine: "biologicL2" as any,
+      emitterEngineVersion: "2.0.0",
+      l1EvidencePointer: l1Pointer,
+    },
+    exVivo: {
+      layer: "confirmation_exVivo",
+      evidence: [],
+      confidence: { byClass: {} },
+      gateStatus: "passed",
+      falsifiers: [],
+      overrides: [],
+      emittedAt: now,
+      emitterEngine: "biologicL2" as any,
+      emitterEngineVersion: "2.0.0",
+      l1EvidencePointer: l1Pointer,
+    },
+    exVivoEntryMode: {
+      kind: "notApplicable",
+      exemption: {
+        exemptionId: "biologic-exemption" as any,
+        compoundClass: input.modality === "peptide" ? "peptide" : "monoclonal_antibody",
+        predictionDomain: "cyp_transporter",
+        reason: "Biologics are inherently exempt from small-molecule ex-vivo assays",
+        evidenceCited: [],
+        catalogueVersion: "2.0.0",
+      },
+    } as any,
+    directive: null,
+    jointOutputs,
+    overrides: [],
+    gateStatus: s7.l2Verdict === "HOLD" ? "failed" : "passed",
+    gatePolicy,
+    l1EvidencePointer: l1Pointer,
+    emittedAt: now,
+    emitterEngine: "biologicL2" as any,
+    emitterEngineVersion: "2.0.0",
+  };
+}
+
+function buildBiologicDoseProjection(
+  input: BiologicL2Input,
+  s7: any,
+  results: PipelineResults,
+  params: BiologicL2Params
+): L2DoseProjection {
+  const now = new Date().toISOString();
+  
+  const targetOccupancy = params.targetOccupancy;
+  const kiMultiplier = targetOccupancy / Math.max(1e-6, 1 - targetOccupancy);
+  
+  let ki_nM = 1.0;
+  let ki_source: "l1_catalog" | "cofolded" | "user_override" = "cofolded";
+  
+  if (input.modality === "peptide") {
+    if (results.s2?.result?.gated?.Ki_nM != null) {
+      ki_nM = results.s2.result.gated.Ki_nM;
+    } else {
+      ki_nM = 10.0;
+    }
+  } else {
+    const iptm = results.s2?.result?.iptm ?? null;
+    ki_nM = iptm ? (iptm >= 0.8 ? 0.5 : iptm >= 0.6 ? 5.0 : iptm >= 0.45 ? 50.0 : 500.0) : 1.0;
+  }
+  
+  const targetCmaxUnbound_nM = kiMultiplier * ki_nM;
+  
+  let fu_fraction = 1.0;
+  if (input.modality === "peptide" && input.peptide?.serum_stability?.albumin_binding_pct != null) {
+    const b = input.peptide.serum_stability.albumin_binding_pct;
+    fu_fraction = Math.max(0.01, Math.min(1.0, 1 - b / 100));
+  }
+  
+  const targetCmaxTotal_nM = targetCmaxUnbound_nM / fu_fraction;
+  
+  const Vd_L_per_kg = input.modality === "peptide" ? 0.1 : 0.05;
+  const Vd_assumption = input.modality === "peptide"
+    ? "Peptide typical distribution volume (confined to blood and interstitial fluids, ~0.1 L/kg)."
+    : "Monoclonal antibody central volume of distribution (~0.05 L/kg).";
+    
+  const F_oral = params.route === "iv" ? 1.0 
+    : params.route === "sc" ? 0.7 
+    : params.route === "im" ? 0.7 
+    : input.modality === "peptide" ? 0.01 : 0.0;
+  const F_assumption = `Biologic bioavailability for ${params.route.toUpperCase()} route: ${F_oral.toFixed(2)}.`;
+  
+  const mw = input.modality === "peptide"
+    ? input.peptide?.physicochemical.molecular_weight_da ?? 3500
+    : input.antibody?.bioprocess_specs?.construct_mw_da ?? 150000;
+    
+  const predictedDose_mg_per_kg = (targetCmaxTotal_nM * Vd_L_per_kg * mw) / (F_oral > 0 ? F_oral * 1e6 : 1e6);
+  const predictedDose_mg_per_day = predictedDose_mg_per_kg * params.bodyWeightKg;
+  
+  const doseAssumption = `First-pass biologic dose projection: target occupancy ${(targetOccupancy * 100).toFixed(0)}%, dose = ${predictedDose_mg_per_day.toFixed(2)} mg/day for a ${params.bodyWeightKg} kg subject.`;
+  
+  return {
+    generatedAt: now,
+    l1Stamp: now,
+    molName: input.modality === "peptide" ? "Peptide" : "Antibody",
+    smiles: input.modality === "peptide" ? input.peptideSequence ?? "" : `${input.antibodyHeavy}/${input.antibodyLight}`,
+    uniprotId: input.modality === "peptide" ? (input.peptide as any)?.uniprotId ?? "" : (input.antibody as any)?.uniprotId ?? "",
+    
+    targetOccupancy,
+    targetCmaxUnbound_nM,
+    targetCmaxTotal_nM,
+    fu_fraction,
+    ki_nM,
+    ki_source,
+    
+    Vd_L_per_kg,
+    Vd_assumption,
+    F_oral,
+    F_assumption,
+    hepaticCL_mL_min_kg: null,
+    CL_assumption: "Hepatic microsomal clearance is not applicable for biologics (catabolic clearance).",
+    predictedDose_mg_per_kg,
+    predictedDose_mg_per_day,
+    doseAssumption,
+    
+    margins: [
+      {
+        label: "Immunogenicity Risk Margin",
+        ratio: input.modality === "peptide" 
+          ? (input.peptide?.developability.aggregation_risk === "High" ? 5 : 50)
+          : (input.antibody?.summary.aggregation_risk === "High" ? 5 : 50),
+        tier: input.modality === "peptide"
+          ? (input.peptide?.developability.aggregation_risk === "High" ? "RISK" : "SAFE")
+          : (input.antibody?.summary.aggregation_risk === "High" ? "RISK" : "SAFE"),
+        numerator: "Aggregation profile (AGGRESCAN peak)",
+        denominator: "Dose exposure threshold",
+        assumption: "Aggregation hot spots act as potent immunogenicity drivers; low aggregation risk is critical for clinical development."
+      }
+    ],
+    
+    verdict: s7.l2Verdict === "HOLD" ? "NO-GO" : s7.l2Verdict === "ADVANCE" ? "GO" : "WATCH",
+    rationale: [
+      `Biologic modality: ${input.modality}`,
+      `L2 Verdict: ${s7.l2Verdict}`,
+      `Target engagement predicted via Boltz-2 co-folding.`
+    ],
+    warnings: results.s5?.result?.signals.filter((s: any) => s.level === "high").map((s: any) => `High risk liability: ${s.category} - ${s.detail}`) ?? [],
+    confidence: "low",
+    confidenceNote: "Class-based projection for biologic modalities, not a calibrated pharmacokinetics fit."
+  };
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function Layer2BiologicScaffold({
   modality, layer1Ready, peptideResult, antibodyResult,
   peptideSequence, peptideCyclic, antibodyHeavy, antibodyLight, onComplete,
+  onContinue, onConfirmationBlockReady, onProjectionReady,
 }: Layer2BiologicScaffoldProps) {
   const [params, setParams]   = useState<BiologicL2Params>(defaultBiologicL2Params());
   const [targetSeq, setTargetSeq] = useState("");
@@ -315,7 +589,13 @@ export function Layer2BiologicScaffold({
             s4: results.s4?.result, s5: results.s5?.result, s6: results.s6?.result,
           });
           setOne("s7", r);
-          if (r.status === "wired") onComplete?.();
+          if (r.status === "wired") {
+            onComplete?.();
+            const block = buildBiologicConfirmationBlock(input, r.result, results, params);
+            const projection = buildBiologicDoseProjection(input, r.result, results, params);
+            onConfirmationBlockReady?.(block);
+            onProjectionReady?.(projection);
+          }
           break;
         }
       }
@@ -339,8 +619,15 @@ export function Layer2BiologicScaffold({
       const s7 = runBioStage7Handoff(input, {
         s0: s0.result, s2: s2?.result, s3: s3.result, s4: s4.result, s5: s5.result, s6: s6.result,
       });
-      setResults(prev => ({ ...prev, s0, s2: s2 ?? prev.s2, s3, s4, s5, s6, s7 }));
-      if (s7.status === "wired") onComplete?.();
+      const updatedResults = { ...results, s0, s2: s2 ?? results.s2, s3, s4, s5, s6, s7 };
+      setResults(updatedResults);
+      if (s7.status === "wired") {
+        onComplete?.();
+        const block = buildBiologicConfirmationBlock(input, s7.result, updatedResults, params);
+        const projection = buildBiologicDoseProjection(input, s7.result, updatedResults, params);
+        onConfirmationBlockReady?.(block);
+        onProjectionReady?.(projection);
+      }
     } finally {
       setBusyStage(null);
     }
@@ -816,6 +1103,18 @@ export function Layer2BiologicScaffold({
                       ))}
                     </div>
                   </div>
+                  {onContinue && (
+                    <div className="pt-3 border-t border-white/5 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={onContinue}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[12px] font-semibold transition-colors shadow-lg shadow-cyan-950/40 cursor-pointer animate-pulse hover:animate-none"
+                      >
+                        Proceed to IVIVE Handoff
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   <div className="text-[9px] text-slate-600 text-right">schema: {r.schemaVersion}</div>
                 </div>
               );

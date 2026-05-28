@@ -1336,6 +1336,7 @@ export interface PeptideProteolytic {
   sites: PeptideProteaseSite[];
   most_labile_protease: string | null;
   most_labile_n_sites: number;
+  plasma_half_life_hours?: number;
 }
 
 export interface PeptidePermeability {
@@ -1344,6 +1345,7 @@ export interface PeptidePermeability {
   cyclic_bonus_applied: boolean;
   cpp_signal_detected: boolean;
   notes: string[];
+  Caco2_logPeff_predicted?: number;
 }
 
 export interface PeptideAmpScore {
@@ -1557,6 +1559,7 @@ export interface PeptideResult {
   bioconjugation_sites?: PeptideBioconjugation;
   /** Debye-Hückel + disulfide environment model results. */
   custom_env?: PeptideCustomEnv;
+  ml_api_provenance?: any;
   engine: string;
 }
 
