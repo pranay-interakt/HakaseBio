@@ -161,6 +161,23 @@ def health():
     return {"status": "ok", "service": "HakaseAI AI Service", "version": "1.0.0"}
 
 
+@app.get("/registry/open-source")
+def api_open_source_registry(modality: str | None = None):
+    """Return the open-source data / tools / corpora registry.
+
+    Pass ?modality=peptide_l1, antibody_l1, or biologic_l2 to filter.
+    Lists the public datasets, scales, algorithms, and ML models the
+    biologic L1/L2 engines lean on, alongside the explicit roadmap items
+    that are flagged but NOT yet wired (humanness alignment, NetMHCIIpan,
+    AGGRESCAN3D, PBPK, etc.).
+    """
+    from models.open_source_registry import get_open_source_registry
+    try:
+        return sanitize(get_open_source_registry(modality))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registry read failed: {str(e)}")
+
+
 @app.post("/predict/admet")
 def api_predict_admet(req: SmilesRequest):
     try:

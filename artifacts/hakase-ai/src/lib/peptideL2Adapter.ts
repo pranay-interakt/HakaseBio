@@ -71,23 +71,55 @@ export function peptideToSimResults(
   // (currently L1 peptide doesn't produce Ki/Kd; these come from L2 co-folding)
   const binding: BindingEstimate | null = null;
 
-  // Lipinski rule-of-5 is meaningless for peptides (almost all violate MW/HBD/HBA)
-  // but the interface requires all fields. Flag everything as violated.
+  // Lipinski rule-of-5 was designed for small molecules — for peptides it
+  // gives the wrong answer in two ways: (a) almost every linear peptide
+  // violates MW/HBD/HBA, so the violation count is uninformative, and
+  // (b) cyclic peptides such as cyclosporin A and the macrocycles in the
+  // Whitty 2016 paradigm are orally bioavailable despite "violating" the
+  // rules. Hard-coding `violations: 4` for every peptide was wrong.
+  //
+  // Read the L1 engine's published HBD/HBA computation if present (it lives
+  // under `pep.hbd_hba` after the recent backend changes), otherwise fall
+  // back to a transparent backbone-only estimate. Lipinski violations are
+  // counted from real per-rule comparisons, not a magic constant. For
+  // cyclic peptides we apply the cyclic-peptide bioavailability gate
+  // (Whitty 2016) instead of small-molecule Lipinski.
   const mw = pc.molecular_weight_da;
   const logP = gravyToLogP(pc.gravy);
+  const hbdHba: { hbd: number; hba: number } | undefined =
+    (pep as unknown as { hbd_hba?: { hbd: number; hba: number } }).hbd_hba;
+  const hbd = hbdHba?.hbd ?? Math.max(0, pc.sequence_length - 1); // backbone N-H, no side chains
+  const hba = hbdHba?.hba ?? pc.sequence_length;                  // backbone C=O, no side chains
+  const tpsa = hba * 23 + hbd * 12;  // rough Veber-style additive estimate (Å²)
+  const rotBonds = Math.max(0, (pc.sequence_length - 1) * 2);     // φ, ψ per peptide bond
+
+  // Per-rule pass flags.
+  const mwPass = mw <= 500;
+  const logPPass = logP <= 5;
+  const hbdPass = hbd <= 5;
+  const hbaPass = hba <= 10;
+  const linearViolations =
+    (mwPass ? 0 : 1) + (logPPass ? 0 : 1) + (hbdPass ? 0 : 1) + (hbaPass ? 0 : 1);
+
+  // Cyclic-peptide oral-bioavailability gate (Whitty 2016 / Doak 2014):
+  //   MW < 1200 AND HBD ≤ 5 AND |charge| < 1.0  →  cyclosporin-A paradigm
+  const isCyclic = !!pep.cyclic;
+  const cyclicOralOk = isCyclic && mw < 1200 && hbd <= 5 && Math.abs(pc.net_charge_pH7) < 1.0;
+  const violations = cyclicOralOk ? 0 : linearViolations;
+
   const lipinski: LipinskiAnalysis = {
-    mwPass:     mw <= 500,
+    mwPass,
     mw,
-    logPPass:   logP <= 5,
+    logPPass,
     logP,
-    hbdPass:    false,   // peptides have many H-bond donors (NH in backbone)
-    hbd:        pc.sequence_length, // ~1 per residue (rough)
-    hbaPass:    false,   // peptides have many H-bond acceptors (C=O in backbone)
-    hba:        pc.sequence_length, // ~1 per residue (rough)
-    violations: 4,       // peptides virtually always violate all 4 rules
-    leadLike:   false,
-    tpsa:       pc.sequence_length * 40, // ~40 Å² per residue (rough estimate)
-    rotBonds:   pc.sequence_length * 2,  // ~2 rotatable bonds per residue
+    hbdPass,
+    hbd,
+    hbaPass,
+    hba,
+    violations,
+    leadLike: cyclicOralOk,
+    tpsa,
+    rotBonds,
   };
 
   return {

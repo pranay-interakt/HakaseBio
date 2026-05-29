@@ -369,6 +369,48 @@ export function IVIVE() {
         </p>
       </section>
 
+      {/* ── Biologics scope note ───────────────────────────────────────────── */}
+      <section className="max-w-6xl mx-auto px-6 md:px-8 py-14 border-b border-white/5">
+        <div className="text-[10px] uppercase tracking-widest text-amber-400 font-semibold mb-2">Modality scope</div>
+        <h2 className="text-[28px] font-black tracking-tight text-white mb-3">Peptides and antibodies use a different bridge.</h2>
+        <p className="text-[14px] text-slate-400 leading-relaxed max-w-3xl mb-6">
+          The IVIVE gate described above — well-stirred liver model, microsomal CL_int, Obach fu_mic correction,
+          Caco-2 → F bins — is the <span className="text-cyan-300">small-molecule</span> bridge. Biologics do not
+          go through CYP-mediated hepatic metabolism, so the substrate matrix above is not the right one for them.
+          HakaseAI runs a modality-aware biologic L2 instead, which projects PK from the right physiology for each modality.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/4 p-5">
+            <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-2">Peptides</div>
+            <div className="text-[13px] text-slate-300 leading-relaxed mb-2">
+              Cleared by plasma + tissue proteases and (for MW &lt; ~5 kDa) glomerular filtration. CYP pathway is irrelevant; well-stirred liver model does not apply.
+            </div>
+            <div className="text-[11px] text-slate-500 leading-relaxed">
+              Bridge substrate: plasma stability (LC-MS/MS at 37 °C), microsomal proteolysis half-life, SC bioavailability and renal clearance for &lt;60 kDa species. Half-life-extension modifications (PEGylation, lipidation, Fc-fusion) shift the regime entirely — flagged explicitly in the L2 readout.
+            </div>
+          </div>
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/4 p-5">
+            <div className="text-[10px] uppercase tracking-widest text-cyan-400 font-semibold mb-2">Antibodies</div>
+            <div className="text-[13px] text-slate-300 leading-relaxed mb-2">
+              Cleared by reticuloendothelial catabolism + target-mediated drug disposition (TMDD); IgG half-life is set by FcRn-mediated recycling. Microsomal CL_int and Caco-2 are not on the substrate list.
+            </div>
+            <div className="text-[11px] text-slate-500 leading-relaxed">
+              Bridge substrate: SPR-measured FcRn KD at pH 6 / 7.4, antigen KD by SPR/BLI, in-vivo PK in hFcRn transgenic mice or cyno, target receptor density for TMDD. Fc-less formats (Fab, scFv, VHH) get the short renal-clearance branch, with PEGylation / albumin-binder strategies flagged.
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 flex items-start gap-3 max-w-3xl">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-[7px] shrink-0" />
+          <div className="text-[12px] text-slate-400 leading-relaxed">
+            <span className="text-amber-300 font-semibold">Honesty contract.</span>{" "}
+            If the input molecule is a peptide or antibody, the small-molecule IVIVE pipeline above is hard-gated OFF.
+            Peptide / antibody runs surface the modality-specific PK projection in their L2 panel and an explicit
+            <span className="font-mono text-white"> assay_required </span>
+            field rather than reusing a small-molecule clearance number.
+          </div>
+        </div>
+      </section>
+
       {/* ── First target area ──────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 md:px-8 py-16 border-b border-white/5">
         <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 via-transparent to-amber-500/5 p-8">

@@ -311,8 +311,10 @@ export function predictNEndPest(seq: string): {
       const len = i - start;
       if (len >= 8) {
         const region = s.slice(start, i);
+        // Fixed: was `"K R"` (with a stray space) — only worked by accident
+        // because safeSeq() strips whitespace upstream. Explicit Lys/Arg test.
         const localCharge =
-          [...region].filter(c => "K R".includes(c)).length === 0 ? len / 8 : len / 10;
+          [...region].filter(c => c === "K" || c === "R").length === 0 ? len / 8 : len / 10;
         pest.push({ start: start + 1, end: i, sequence: region, score: Number(localCharge.toFixed(2)) });
       }
     } else i++;

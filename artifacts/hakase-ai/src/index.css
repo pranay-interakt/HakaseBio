@@ -268,13 +268,15 @@
 
 /* ── HakaseAI Light Mode ─────────────────────────────────────────────────── */
 /*
-   Reworked May 2026 — warmer, higher-contrast premium palette.
+   Reworked May 2026 (round 2: contrast pass) — warm, premium, high-contrast.
    Goals:
      • Soft warm off-white page background (not cool blue-grey)
      • Pure white cards with layered, elegant shadows
-     • Strong typographic hierarchy (slate-900 → slate-600 → slate-500)
+     • Body text ≥ 4.5:1 contrast against any surface (WCAG AA)
+     • Every Tailwind text-{color}-{100..500} darkened so accents stay vivid
+       on white instead of washing out
      • Subtle hairline borders, never harsh black lines
-     • Hardcoded dark hex backgrounds (#07080c, #0d0f17, etc.) translate cleanly
+     • Hardcoded dark hex backgrounds (#07080c, #0d0f17, #1a1d2b, etc.) translate cleanly
 */
 
 .hk-light,
@@ -355,12 +357,54 @@ html.hk-light body,
   color: var(--hk-text) !important;
 }
 
+/* Default body / heading / paragraph text — slate-900 on the warm page.
+   This is the safety net for any element WITHOUT a Tailwind text utility. */
+.hk-light h1, .hk-light h2, .hk-light h3,
+.hk-light h4, .hk-light h5, .hk-light h6 {
+  color: var(--hk-text) !important;
+}
+.hk-light p, .hk-light li, .hk-light dd, .hk-light dt {
+  color: var(--hk-text3) !important;
+}
+.hk-light label {
+  color: var(--hk-text2) !important;
+}
+.hk-light code:not(.hk-code-panel code):not(pre code) {
+  color: var(--hk-text) !important;
+  background-color: var(--hk-surface2) !important;
+  border: 1px solid var(--hk-border) !important;
+  padding: 1px 5px !important;
+  border-radius: 3px !important;
+}
+
 /* ── Page-level dark backgrounds → warm off-white ─────────────────── */
 .hk-light [class*="bg-[#07080c]"],
 .hk-light [class*="bg-[#080a12]"],
 .hk-light [class*="bg-[#06070a]"],
-.hk-light [class*="bg-[#08090e]"] {
+.hk-light [class*="bg-[#08090e]"],
+.hk-light [class*="bg-[#04050a]"],
+.hk-light [class*="bg-[#05060a]"],
+.hk-light [class*="bg-[#060812]"],
+.hk-light [class*="bg-[#070810]"],
+.hk-light [class*="bg-[#07080e]"],
+.hk-light [class*="bg-[#070a12]"],
+.hk-light [class*="bg-[#080a10]"],
+.hk-light [class*="bg-[#0a0b10]"],
+.hk-light [class*="bg-[#0a0c12]"],
+.hk-light [class*="bg-[#0a0c14]"],
+.hk-light [class*="bg-[#0a0d14]"],
+.hk-light [class*="bg-[#0c0e15]"],
+.hk-light [class*="bg-[#0c0e18]"],
+.hk-light [class*="bg-[#0f1117]"] {
   background-color: var(--hk-bg) !important;
+}
+
+/* The mid-tone dashboard panel uses #1a1d2b — translate to a soft warm surface */
+.hk-light [class*="bg-[#1a1d2b]"] {
+  background-color: var(--hk-surface2) !important;
+  border-color: var(--hk-border) !important;
+  color: var(--hk-text) !important;
+  box-shadow: var(--hk-shadow-sm) !important;
 }
 
 /* CTA button "bg-white text-[#07080c]" → flip in light mode */
@@ -598,37 +642,65 @@ html.hk-light body,
 }
 
 /* ── High-Contrast Typographic Color Overrides ─────────────────────────── */
-/* Primary dark state text colors -> beautifully calibrated high-contrast light slate colors */
+/* Dark-mode slate scale (slate-50 brightest → slate-900 darkest) is INVERTED
+   in light mode (slate-50 mapped to darkest text → slate-500 muted). The
+   previous mapping collapsed slate-400 and slate-600 onto the same colour,
+   which is why the page felt "foggy" — secondary text and body text were
+   indistinguishable. This version preserves a real 4-tier hierarchy:
+     slate-50/100/200/white  → slate-900 (#0f172a)   body / headings
+     slate-300               → slate-800 (#1e293b)   strong secondary
+     slate-400               → slate-700 (#334155)   secondary body
+     slate-500               → slate-600 (#475569)   muted but readable
+     slate-600               → slate-500 (#64748b)   captions
+     slate-700/800           → slate-900 (used as accent in dark, dark-text in light)
+*/
 .hk-light .text-white,
 .hk-light [class*="text-white"] {
   color: var(--hk-text) !important;
 }
 
-.hk-light [class*="text-slate-50"] {
-  color: var(--hk-text) !important;
-}
+.hk-light [class*="text-slate-50"],
 .hk-light [class*="text-slate-100"],
 .hk-light [class*="text-slate-200"] {
-  color: var(--hk-text2) !important;
+  color: #0f172a !important;            /* slate-900 — top of hierarchy */
 }
 .hk-light [class*="text-slate-300"] {
-  color: var(--hk-text3) !important; /* highly legible body Slate-700 */
+  color: #1e293b !important;            /* slate-800 — strong sub-header / lead-paragraph */
 }
 .hk-light [class*="text-slate-400"] {
-  color: #475569 !important;        /* Slate-600 secondary */
+  color: #334155 !important;            /* slate-700 — primary body */
 }
 .hk-light [class*="text-slate-500"] {
-  color: var(--hk-text4) !important; /* Slate-500 captions/muted */
+  color: #475569 !important;            /* slate-600 — secondary body (still ≥ 4.5:1 on #fafaf7) */
 }
 .hk-light [class*="text-slate-600"] {
-  color: #475569 !important;
+  color: #64748b !important;            /* slate-500 — muted captions */
 }
 .hk-light [class*="text-slate-700"] {
-  color: var(--hk-text3) !important;
+  color: #334155 !important;            /* slate-700 — used as accent in dark, body in light */
 }
 .hk-light [class*="text-slate-800"] {
-  color: var(--hk-text2) !important;
+  color: #1e293b !important;
 }
+.hk-light [class*="text-slate-900"] {
+  color: #0f172a !important;
+}
+
+/* Zinc / neutral / gray / stone — same intent as slate, less commonly used */
+.hk-light [class*="text-zinc-100"],   .hk-light [class*="text-neutral-100"],
+.hk-light [class*="text-gray-100"],   .hk-light [class*="text-stone-100"],
+.hk-light [class*="text-zinc-200"],   .hk-light [class*="text-neutral-200"],
+.hk-light [class*="text-gray-200"],   .hk-light [class*="text-stone-200"] { color: #0f172a !important; }
+.hk-light [class*="text-zinc-300"],   .hk-light [class*="text-neutral-300"],
+.hk-light [class*="text-gray-300"],   .hk-light [class*="text-stone-300"] { color: #1e293b !important; }
+.hk-light [class*="text-zinc-400"],   .hk-light [class*="text-neutral-400"],
+.hk-light [class*="text-gray-400"],   .hk-light [class*="text-stone-400"] { color: #334155 !important; }
+.hk-light [class*="text-zinc-500"],   .hk-light [class*="text-neutral-500"],
+.hk-light [class*="text-gray-500"],   .hk-light [class*="text-stone-500"] { color: #475569 !important; }
+.hk-light [class*="text-zinc-600"],   .hk-light [class*="text-neutral-600"],
+.hk-light [class*="text-gray-600"],   .hk-light [class*="text-stone-600"] { color: #64748b !important; }
+.hk-light [class*="text-zinc-900"],   .hk-light [class*="text-neutral-900"],
+.hk-light [class*="text-gray-900"],   .hk-light [class*="text-stone-900"] { color: #0f172a !important; }
 
 /* ── Solid Colored Button & Hover Exceptions ───────────────────────── */
 /* Restores pristine white text inside solid colored backgrounds/buttons and text hover:white effects */
@@ -810,17 +882,6 @@ html.hk-light body,
   background-image: linear-gradient(to right, #5b21b6, #047857) !important;
 }
 
-/* ── Strengthen muted body text on warm off-white ─────────────────── */
-/* slate-500 (#64748b) reads as faded grey on #fafaf7 — bump to slate-600/700 */
-.hk-light [class*="text-slate-500"] {
-  color: #475569 !important; /* slate-600 */
-}
-.hk-light [class*="text-slate-600"] {
-  color: #334155 !important; /* slate-700 */
-}
-.hk-light [class*="text-slate-400"] {
-  color: #475569 !important; /* slate-600 — readable secondary */
-}
 /* Captions / very-muted labels (deliberately faded) */
 .hk-light .text-slate-600.font-mono,
 .hk-light .text-slate-600.uppercase {
@@ -838,19 +899,86 @@ html.hk-light body,
   background-color: rgba(0, 0, 0, 0.25) !important;
 }
 
-/* Accent text — darken for legibility on white backgrounds */
+/* ── Accent text — calibrated for ≥ 4.5:1 contrast on warm off-white ───
+   Tailwind text-{color}-100..300 maps to "headline tinted" — bright in
+   dark mode, washed-out in light. We anchor everything to the 700-800
+   stops of the same hue so headlines stay tinted and readable. */
+
+/* Violet */
+.hk-light [class*="text-violet-100"] { color: #5b21b6 !important; }
+.hk-light [class*="text-violet-200"] { color: #5b21b6 !important; }
 .hk-light [class*="text-violet-300"] { color: #6d28d9 !important; }
 .hk-light [class*="text-violet-400"] { color: #5b21b6 !important; }
+.hk-light [class*="text-violet-500"] { color: #4c1d95 !important; }
+
+/* Purple / fuchsia */
+.hk-light [class*="text-purple-100"], .hk-light [class*="text-purple-200"],
+.hk-light [class*="text-purple-300"] { color: #6d28d9 !important; }
+.hk-light [class*="text-purple-400"] { color: #5b21b6 !important; }
+.hk-light [class*="text-purple-500"] { color: #4c1d95 !important; }
+.hk-light [class*="text-fuchsia-300"], .hk-light [class*="text-fuchsia-400"] { color: #a21caf !important; }
+.hk-light [class*="text-fuchsia-500"] { color: #86198f !important; }
+
+/* Indigo */
+.hk-light [class*="text-indigo-100"], .hk-light [class*="text-indigo-200"],
+.hk-light [class*="text-indigo-300"] { color: #4338ca !important; }
+.hk-light [class*="text-indigo-400"] { color: #3730a3 !important; }
+.hk-light [class*="text-indigo-500"] { color: #312e81 !important; }
+
+/* Cyan */
+.hk-light [class*="text-cyan-100"], .hk-light [class*="text-cyan-200"] { color: #0e7490 !important; }
 .hk-light [class*="text-cyan-300"]   { color: #0e7490 !important; }
-.hk-light [class*="text-cyan-400"]   { color: #0c6780 !important; }
+.hk-light [class*="text-cyan-400"]   { color: #155e75 !important; }
+.hk-light [class*="text-cyan-500"]   { color: #155e75 !important; }
+
+/* Sky */
+.hk-light [class*="text-sky-300"], .hk-light [class*="text-sky-400"] { color: #0369a1 !important; }
+.hk-light [class*="text-sky-500"] { color: #075985 !important; }
+
+/* Teal */
+.hk-light [class*="text-teal-200"]   { color: #0f766e !important; }
+.hk-light [class*="text-teal-300"]   { color: #0f766e !important; }
+.hk-light [class*="text-teal-400"]   { color: #115e59 !important; }
+.hk-light [class*="text-teal-500"]   { color: #134e4a !important; }
+
+/* Blue */
+.hk-light [class*="text-blue-100"], .hk-light [class*="text-blue-200"] { color: #1d4ed8 !important; }
 .hk-light [class*="text-blue-300"]   { color: #1d4ed8 !important; }
 .hk-light [class*="text-blue-400"]   { color: #1e40af !important; }
+.hk-light [class*="text-blue-500"]   { color: #1e3a8a !important; }
+
+/* Emerald */
+.hk-light [class*="text-emerald-100"], .hk-light [class*="text-emerald-200"] { color: #047857 !important; }
 .hk-light [class*="text-emerald-300"]{ color: #047857 !important; }
 .hk-light [class*="text-emerald-400"]{ color: #065f46 !important; }
+.hk-light [class*="text-emerald-500"]{ color: #064e3b !important; }
+
+/* Green / lime */
+.hk-light [class*="text-green-300"], .hk-light [class*="text-green-400"] { color: #15803d !important; }
+.hk-light [class*="text-green-500"] { color: #166534 !important; }
+.hk-light [class*="text-lime-300"], .hk-light [class*="text-lime-400"] { color: #4d7c0f !important; }
+
+/* Amber / yellow / orange */
+.hk-light [class*="text-amber-100"], .hk-light [class*="text-amber-200"] { color: #b45309 !important; }
 .hk-light [class*="text-amber-300"]  { color: #b45309 !important; }
 .hk-light [class*="text-amber-400"]  { color: #92400e !important; }
+.hk-light [class*="text-amber-500"]  { color: #92400e !important; }
+.hk-light [class*="text-yellow-300"], .hk-light [class*="text-yellow-400"] { color: #a16207 !important; }
+.hk-light [class*="text-yellow-500"] { color: #854d0e !important; }
+.hk-light [class*="text-orange-200"], .hk-light [class*="text-orange-300"] { color: #c2410c !important; }
+.hk-light [class*="text-orange-400"] { color: #9a3412 !important; }
+.hk-light [class*="text-orange-500"] { color: #7c2d12 !important; }
+
+/* Rose / red / pink */
+.hk-light [class*="text-rose-200"]   { color: #be123c !important; }
 .hk-light [class*="text-rose-300"]   { color: #be123c !important; }
 .hk-light [class*="text-rose-400"]   { color: #9f1239 !important; }
+.hk-light [class*="text-rose-500"]   { color: #881337 !important; }
+.hk-light [class*="text-red-200"], .hk-light [class*="text-red-300"] { color: #b91c1c !important; }
+.hk-light [class*="text-red-400"]    { color: #991b1b !important; }
+.hk-light [class*="text-red-500"]    { color: #7f1d1d !important; }
+.hk-light [class*="text-pink-300"], .hk-light [class*="text-pink-400"] { color: #be185d !important; }
+.hk-light [class*="text-pink-500"] { color: #9d174d !important; }
 
 /* ── Inputs / selects / textareas ─────────────────────────────────────── */
 .hk-light input,

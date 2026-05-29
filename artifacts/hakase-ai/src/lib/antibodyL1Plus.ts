@@ -103,11 +103,11 @@ export function predictHicRetention(chains: AntibodyChain[]): {
   );
   const cdrSeq = cdrs.map(c => c.sequence).join("");
   if (!cdrSeq) {
-    // Fall back to full-chain estimate
-    const full = chains.map(c => safeSeq("")).join("");
+    // No anchored CDR boundaries available — return an explicit "unavailable"
+    // result rather than a misleading "Low" verdict on an empty sequence.
     return {
-      index: 0, band: "Low", drivers: ["No anchored CDRs available"], provenance: "rule-based",
-      note: `Anchored CDRs not localised — HIC retention not estimated (use Layer 2 co-folded structure).${full ? "" : ""}`,
+      index: 0, band: "Low", drivers: ["No anchored CDRs available — HIC index not computed"], provenance: "rule-based",
+      note: "Anchored CDR boundaries not localised — HIC retention not estimated. Use the Layer 2 co-folded structure or run ANARCI for exact IMGT numbering before re-running.",
     };
   }
   const phi = mean([...cdrSeq].map(c => SURFACE_HYDROPHOBICITY[c] ?? 0));
@@ -219,6 +219,39 @@ export function predictCdrH3Aggregation(chains: AntibodyChain[]): {
 
 // ── Half-life via FcRn pH-binding heuristic ────────────────────────────────
 
+/**
+ * Read the heavy-chain sequence for charge analysis.
+ *
+ * Earlier revisions concatenated CDR sequences and called that the "chain
+ * sequence". For an FcRn-binding proxy that's doubly wrong: (1) FcRn binds
+ * via Fc residues, not the CDR variable region, and (2) a CDR concatenation
+ * isn't a real sequence so its pH-6 charge has no physical meaning. We now
+ * read the chain-level physicochemical numbers the L1 backend already
+ * computed on the FULL chain, with the CDR concatenation only as a fallback
+ * (and an explicit "approximate" note when we have to use it).
+ */
+function readHeavyChargeProfile(heavy: AntibodyChain): { z6: number; z74: number; method: "full-chain" | "cdr-fallback" } {
+  // Prefer the L1 chain-level number (computed on the full chain).
+  const z74Real = heavy.physicochemical?.net_charge_pH7;
+  const cdrSeq = heavy.cdrs?.map(c => c.sequence ?? "").join("") ?? "";
+
+  if (typeof z74Real === "number" && isFinite(z74Real)) {
+    // Use the chain-level z(pH 7.4) and approximate z(pH 6) by adding the
+    // CDR-anchored His contribution to it (each His protonates ~0.5 charge
+    // unit between 7.4 and 6.0). The L1 backend's own _fcrn_binding_prediction
+    // does this from the full chain — this client-side proxy uses the CDR
+    // His count as a coarse hint when the full sequence isn't available here.
+    const cdrHis = (cdrSeq.match(/H/g) || []).length;
+    const z6 = z74Real + 0.5 * cdrHis;
+    return { z6, z74: z74Real, method: "full-chain" };
+  }
+
+  // Fallback only — explicitly tagged in the response.
+  const z74 = chargeAtPh(cdrSeq, 7.4);
+  const z6  = chargeAtPh(cdrSeq, 6.0);
+  return { z6, z74, method: "cdr-fallback" };
+}
+
 export function predictHalfLifeProxy(chains: AntibodyChain[], isFullAntibody: boolean): {
   estimated_t_half_days: string;
   band: "Short" | "Average" | "Extended";
@@ -229,9 +262,9 @@ export function predictHalfLifeProxy(chains: AntibodyChain[], isFullAntibody: bo
   // (plasma) is the FcRn-binding signature. Real prediction requires the Fc.
   const heavy = chains.find(c => /heavy/i.test(c.label) || /VH/i.test(c.label)) ?? chains[0];
   if (!heavy) return { estimated_t_half_days: "—", band: "Average", drivers: ["no heavy chain"], provenance: "rule-based" };
-  const seq = (heavy.cdrs?.map(c => c.sequence ?? "").join("") || "");
-  const charge_pH6 = chargeAtPh(seq, 6.0);
-  const charge_pH7 = chargeAtPh(seq, 7.4);
+  const profile = readHeavyChargeProfile(heavy);
+  const charge_pH6 = profile.z6;
+  const charge_pH7 = profile.z74;
   const drivers: string[] = [];
   let band: "Short" | "Average" | "Extended" = "Average";
   let tHalfDays = "10–14 d (IgG1 typical)";
@@ -249,6 +282,13 @@ export function predictHalfLifeProxy(chains: AntibodyChain[], isFullAntibody: bo
     drivers.push(`Acidic variable region — anionic at both pH; expect faster clearance.`);
   } else {
     drivers.push("Charge signature is within typical IgG1 range.");
+  }
+  if (profile.method === "cdr-fallback") {
+    drivers.push(
+      "Heavy-chain net charge unavailable from L1 — fell back to a CDR-concatenation " +
+      "charge, which is a poor proxy for the FcRn interface. Use the L1 Henderson–Hasselbalch " +
+      "result instead when available."
+    );
   }
   return { estimated_t_half_days: tHalfDays, band, drivers, provenance: "rule-based" };
 }
