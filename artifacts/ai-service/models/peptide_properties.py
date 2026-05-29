@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -184,13 +184,25 @@ def _clean_sequence(seq: str) -> str:
     return clean
 
 
-def _charge_at_ph(seq: str, ph: float) -> float:
-    """Net charge using Henderson–Hasselbalch, summing all ionisable groups."""
+def _charge_at_ph(seq: str, ph: float, cyclic: bool = False) -> float:
+    """Net charge via Henderson–Hasselbalch, summing all ionisable groups.
+
+    A head-to-tail cyclic peptide does not expose a free N- or C-terminus —
+    those backbone atoms are now an internal amide bond, so the standard
+    PKA_NTERM (+1) and PKA_CTERM (-1) contributions are skipped when
+    ``cyclic=True``. Without this correction, a cyclic peptide with no
+    ionisable side chains was being reported as ~-0.2 charged at pH 7.4
+    (and a wrong isoelectric point) — a real bug that biased every
+    downstream solubility, aggregation and IVIVE call for cyclics.
+    """
     def hh_frac(pka: float, is_acid: bool) -> float:
         ratio = 10 ** (ph - pka)
         return -ratio / (1 + ratio) if is_acid else 1 / (1 + 10 ** (ph - pka))
 
-    charge = hh_frac(PKA_NTERM, False) + hh_frac(PKA_CTERM, True)
+    charge = 0.0
+    if not cyclic:
+        # Linear (or branch-cyclised) peptide — termini are free amino / carboxyl.
+        charge += hh_frac(PKA_NTERM, False) + hh_frac(PKA_CTERM, True)
     for aa in seq:
         if aa in PKA_SIDE:
             pka = PKA_SIDE[aa]
@@ -199,12 +211,16 @@ def _charge_at_ph(seq: str, ph: float) -> float:
     return charge
 
 
-def _isoelectric_point(seq: str) -> float:
-    """Binary search for the pH where net charge ≈ 0."""
+def _isoelectric_point(seq: str, cyclic: bool = False) -> float:
+    """Binary search for the pH where net charge ≈ 0.
+
+    Respects ``cyclic`` so head-to-tail cyclics use the no-terminus charge
+    profile (otherwise the binary search ends up at the wrong pI).
+    """
     lo, hi = 0.0, 14.0
     for _ in range(50):
         mid = (lo + hi) / 2
-        if _charge_at_ph(seq, mid) > 0:
+        if _charge_at_ph(seq, mid, cyclic=cyclic) > 0:
             lo = mid
         else:
             hi = mid
@@ -212,8 +228,30 @@ def _isoelectric_point(seq: str) -> float:
 
 
 def _molecular_weight(seq: str) -> float:
-    """Monoisotopic mass (Da) including terminal H2O."""
+    """Monoisotopic mass (Da) including terminal H2O — for MS workflows."""
     return sum(RESIDUE_MASS.get(aa, 111.1) for aa in seq) + WATER_MASS
+
+
+# Average residue masses (Da, no water) — convention for biologics / PK work.
+# Source: IUPAC average amino-acid masses, no terminal modification.
+_AVG_RESIDUE_MASS: dict[str, float] = {
+    "A": 71.0788,  "R": 156.1875, "N": 114.1038, "D": 115.0886, "C": 103.1388,
+    "Q": 128.1307, "E": 129.1155, "G": 57.0519,  "H": 137.1411, "I": 113.1594,
+    "L": 113.1594, "K": 128.1741, "M": 131.1926, "F": 147.1766, "P": 97.1167,
+    "S": 87.0782,  "T": 101.1051, "W": 186.2132, "Y": 163.1760, "V": 99.1326,
+}
+_AVG_WATER_MASS = 18.01528
+
+
+def _average_molecular_weight(seq: str) -> float:
+    """Average mass (Da) including terminal H2O — convention for PK / dosing.
+
+    For a 30-mer the average and monoisotopic masses differ by ~1–2 Da;
+    for a 150 kDa IgG they differ by ~100 Da. Pharmacology uses the average
+    mass when converting between mg/kg and µM, so reporting only the
+    monoisotopic mass biases every dose conversion downstream.
+    """
+    return sum(_AVG_RESIDUE_MASS.get(aa, 110.0) for aa in seq) + _AVG_WATER_MASS
 
 
 def _gravy(seq: str) -> float:
@@ -359,9 +397,12 @@ def _permeability_estimate(
     - Cyclic peptides (cyclosporin A paradigm): MW gate < 1200 Da, ≤ 5 H-bond donors
     - Linear oral peptides: essentially impossible above 8 residues without tricks
     """
-    n_hbd = seq.count("S") + seq.count("T") + seq.count("N") + seq.count("Q") + \
-            seq.count("K") + seq.count("R") + seq.count("H") + seq.count("Y") + \
-            seq.count("W") + seq.count("C") + 2  # backbone amide H's (rough)
+    # H-bond donor count — use the same enumeration as the public _hbd_hba()
+    # helper instead of a broken inline count. Previously the function added a
+    # constant "+2" for backbone amide donors, which under-counts massively
+    # (a real peptide has n-1-nP backbone N-H donors plus side chains), and
+    # in practice made the ``mw <= 500 and n_hbd <= 5`` branch dead code.
+    n_hbd = _hbd_hba(seq)["hbd"]
     abs_charge = abs(charge_74)
 
     if cyclic:
@@ -464,7 +505,7 @@ def _half_life_estimate(seq: str, mw: float, cyclic: bool) -> dict[str, Any]:
     trypsin_sites = len([m for m in re.finditer(r"[KR](?!P)", seq)])
     high_protease = trypsin_sites >= 3
     small         = mw < 800
-    charged       = abs(_charge_at_ph(seq, 7.4)) > 2.0
+    charged       = abs(_charge_at_ph(seq, 7.4, cyclic=cyclic)) > 2.0
 
     if cyclic:
         plasma_t12 = "hours–days"
@@ -1054,19 +1095,22 @@ def _synthesis_assessment(seq: str, cyclic: bool, num_bridges: int = 0) -> dict[
 # Charge pH profile  (formulation-critical)
 # ===========================================================================
 
-def _charge_profile(seq: str) -> dict[str, float]:
+def _charge_profile(seq: str, cyclic: bool = False) -> dict[str, float]:
     """Net charge at 5 key pH values for formulation and stability work.
 
     Scientists need charge vs pH to select buffer pH, predict aggregation
-    at the pI, and design lyophilisation formulations.
+    at the pI, and design lyophilisation formulations. Respects ``cyclic``
+    so head-to-tail cyclics report the no-terminus charge profile rather
+    than the linear one (otherwise the pH-7.4 row in the table would
+    disagree with the headline net charge).
     """
     return {
-        "pH_4_0": round(_charge_at_ph(seq, 4.0), 2),
-        "pH_5_0": round(_charge_at_ph(seq, 5.0), 2),
-        "pH_6_0": round(_charge_at_ph(seq, 6.0), 2),
-        "pH_7_4": round(_charge_at_ph(seq, 7.4), 2),
-        "pH_8_0": round(_charge_at_ph(seq, 8.0), 2),
-        "pH_9_0": round(_charge_at_ph(seq, 9.0), 2),
+        "pH_4_0": round(_charge_at_ph(seq, 4.0, cyclic=cyclic), 2),
+        "pH_5_0": round(_charge_at_ph(seq, 5.0, cyclic=cyclic), 2),
+        "pH_6_0": round(_charge_at_ph(seq, 6.0, cyclic=cyclic), 2),
+        "pH_7_4": round(_charge_at_ph(seq, 7.4, cyclic=cyclic), 2),
+        "pH_8_0": round(_charge_at_ph(seq, 8.0, cyclic=cyclic), 2),
+        "pH_9_0": round(_charge_at_ph(seq, 9.0, cyclic=cyclic), 2),
     }
 
 
@@ -1453,9 +1497,15 @@ def predict_peptide_properties(
 
     # ── Core physicochemical ──────────────────────────────────────────────────
     mw          = _molecular_weight(seq)
-    charge_74   = round(_charge_at_ph(seq, 7.4), 2)
-    charge_custom = round(_charge_at_ph(seq, ph), 2)
-    pI          = _isoelectric_point(seq)
+    mw_avg      = _average_molecular_weight(seq)
+    # Charge calculation must know whether the molecule is head-to-tail cyclic
+    # (no free N/C-terminal contributions). This fixes a long-standing bug
+    # where cyclic peptides were reported as ~-0.2 charged at pH 7.4 even
+    # without any ionisable side chains, biasing pI, solubility, aggregation
+    # and IVIVE downstream.
+    charge_74   = round(_charge_at_ph(seq, 7.4, cyclic=cyclic), 2)
+    charge_custom = round(_charge_at_ph(seq, ph, cyclic=cyclic), 2)
+    pI          = _isoelectric_point(seq, cyclic=cyclic)
     gravy       = round(_gravy(seq), 3)
     instability = round(_instability_index(seq), 2)
     aliphatic   = round(_aliphatic_index(seq), 2)
@@ -1529,7 +1579,7 @@ def predict_peptide_properties(
 
     # ── Industry-standard expanded outputs (new preclinical readouts) ─────────
     total_protease_sites = sum(p["n_sites"] for p in protease)
-    charge_prof  = _charge_profile(seq)
+    charge_prof  = _charge_profile(seq, cyclic=cyclic)
     hbd_hba      = _hbd_hba(seq)
     serum_stab   = _serum_stability(seq, mw, gravy, charge_74, cyclic, total_protease_sites)
     mic_est      = _mic_estimate(amp["amp_score"], charge_74, mw)
@@ -1583,7 +1633,10 @@ def predict_peptide_properties(
 
         "physicochemical": {
             "sequence_length":             n,
+            # Monoisotopic — what mass spectrometers measure.
             "molecular_weight_da":         round(mw, 2),
+            # Average — what pharmacology uses to convert mg/kg ↔ µM.
+            "molecular_weight_avg_da":     round(mw_avg, 2),
             "net_charge_pH7":              charge_74,
             "isoelectric_point":           pI,
             "gravy":                       gravy,
