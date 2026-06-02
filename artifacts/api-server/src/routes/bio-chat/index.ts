@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { anthropic, anthropicBypassActive } from "@workspace/integrations-anthropic-ai";
 
 const router = Router();
+
+router.get("/bio-chat/status", (_req, res) => {
+  res.json({ bypass: anthropicBypassActive, ready: true });
+});
 
 router.post("/bio-chat", async (req, res) => {
   try {

@@ -147,6 +147,7 @@ import {
 import { IvieOutputHandoffPage, type IvieHandoffSignOff } from "@/components/IvieOutputHandoffPage";
 import {
   assessIvieTier, deriveSubstrateMode, hasEstimatedCells, hasAnyIvieData,
+  emptyIvieWetLabInputs,
 } from "@/lib/ivieInputs";
 
 type Layer = 1 | 2 | 3 | 4;
@@ -364,14 +365,84 @@ export function HakaseAI() {
   // property engine (peptide_properties.py) — completely separate from the
   // RDKit / ADMET-AI / ChEMBL pipeline used for small molecules.
   const [l1Modality, setL1Modality] = useState<Modality>("small_molecule");
+  // Track the previous modality so the reset effect below only fires on an
+  // ACTUAL change. The first render seeds the ref with the initial modality
+  // so no reset runs on mount (avoids wiping persisted IVIVE inputs at boot).
+  const prevModalityRef = useRef<Modality>(l1Modality);
   useEffect(() => {
-    setSimStatus({
-      1: "idle",
-      2: "idle",
-      3: "idle",
-      4: "idle",
-    });
+    // No-op on mount.
+    if (prevModalityRef.current === l1Modality) return;
+    const prev = prevModalityRef.current;
+    prevModalityRef.current = l1Modality;
+
+    // ── PRODUCTION-GRADE MODALITY RESET ───────────────────────────────────
+    // When the user switches modality after running Layer 1, the app MUST
+    // start over. Otherwise stale inputs from the prior modality leak into
+    // L2 confirmation, IVIVE, and the L3 handoff page. We clear:
+    //   • Layer status + active layer (back to L1 idle)
+    //   • All modality-specific inputs and results (smiles, peptide, antibody)
+    //   • Protein/PDB metadata (modality-specific in practice)
+    //   • L1 simulation outputs + in-vitro evidence
+    //   • L2 confirmation block + IVIVE projection (modality-locked artifacts)
+    //   • IVIVE substrate inputs and handoff sign-off (downstream of L2)
+    //   • Animal cohort / L3 state (downstream of IVIVE)
+    //   • Open dialogs and panels that reference the prior modality
+    console.info(`[modality] switching ${prev} → ${l1Modality}; resetting pipeline state`);
+    setSimStatus({ 1: "idle", 2: "idle", 3: "idle", 4: "idle" });
     setActiveLayer(1);
+
+    // Layer 1 inputs (clear ALL modalities to prevent cross-contamination
+    // when the user toggles between modalities multiple times).
+    setSmiles("");
+    setActivatedSmiles("");
+    setMolName("");
+    setUniprotId("");
+    setPdbId("");
+    setPeptideSequence("");
+    setPeptideResult(null);
+    setPeptideError(null);
+    setPeptideL2(null);
+    setPeptideFastaHeader(undefined);
+    setPeptideMods(defaultPeptideModification());
+    setAntibodyHeavy("");
+    setAntibodyLight("");
+    setAntibodyFormatHint("");
+    setAntibodyResult(null);
+    setAntibodyError(null);
+
+    // Layer 1 derived state
+    setProteinInfo(null);
+    setProteinError(null);
+    setPdbStructure(null);
+    setAlphafoldData(null);
+    setProteinRule(null);
+    setProteinMl(null);
+    setSolRule(null);
+    setSolMl(null);
+    setBindingChembl(null);
+    setBindingMl(null);
+    setDiliMl(null);
+    setAdmetMl(null);
+    setCardiotoxMl(null);
+    setSolubilityMl(null);
+
+    // L1 simulation outputs
+    setSimResults(null);
+    setInVitroResults(null);
+
+    // L2 / IVIVE / L3 — modality-locked artifacts
+    setConfirmationBlock(null);
+    setL2Projection(null);
+    setIvieInputs(emptyIvieWetLabInputs());
+    setIviveHandoffOpen(false);
+    setIviveHandoffSignOff(null);
+    setConfirmationSubTrack("insilico");
+    lastLoadedKeyRef.current = null;
+
+    // Close any open viewers / dialogs that referenced the prior modality
+    setViewer3DOpen(false);
+    setDiagenOpen(false);
+    setApiImportOpen(false);
   }, [l1Modality]);
   const [peptideSequence, setPeptideSequence] = useState("");
   const [peptideCyclic, setPeptideCyclic] = useState(false);
@@ -494,9 +565,11 @@ export function HakaseAI() {
   // also call them later. Stale-request guards via *SeqRef.
   const [diliMl, setDiliMl] = useState<DiliMlResult | null>(null);
   const diliMlSeqRef = useRef(0);
+  const [diliMlLoading, setDiliMlLoading] = useState(false);
   const [admetMl, setAdmetMl] = useState<MlAdmetResult | null>(null);
   const [admetMlError, setAdmetMlError] = useState<string | null>(null);
   const admetMlSeqRef = useRef(0);
+  const [admetMlLoading, setAdmetMlLoading] = useState(false);
   // CardioTox-ML (Wang/Karim 2016 hERG RF) — the dedicated hERG classifier
   // is preferred over the ADMET-AI hERG head when building the L1 ML overlay
   // (it's trained specifically on the patch-clamp-anchored Wang dataset).
@@ -504,8 +577,10 @@ export function HakaseAI() {
   // share one prediction per SMILES rather than fetching three times.
   const [cardiotoxMl, setCardiotoxMl] = useState<CardiotoxResult | null>(null);
   const cardiotoxMlSeqRef = useRef(0);
+  const [cardiotoxMlLoading, setCardiotoxMlLoading] = useState(false);
   const [solubilityMl, setSolubilityMl] = useState<SolubilityMlResult | null>(null);
   const solubilityMlSeqRef = useRef(0);
+  const [solubilityMlLoading, setSolubilityMlLoading] = useState(false);
   // Empty string ("") is the canonical "no therapeutic area selected" value.
   // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
   // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
@@ -1336,28 +1411,64 @@ export function HakaseAI() {
     const seqCardio = ++cardiotoxMlSeqRef.current;
     const seqSol = ++solubilityMlSeqRef.current;
     setAdmetMlError(null);
+    setDiliMlLoading(true);
+    setAdmetMlLoading(true);
+    setCardiotoxMlLoading(true);
+    setSolubilityMlLoading(true);
     predictDiliMl(sm)
-      .then(r => { if (diliMlSeqRef.current === seqDili) setDiliMl(r); })
-      .catch(() => { if (diliMlSeqRef.current === seqDili) setDiliMl(null); });
+      .then(r => { if (diliMlSeqRef.current === seqDili) { setDiliMl(r); setDiliMlLoading(false); } })
+      .catch(() => { if (diliMlSeqRef.current === seqDili) { setDiliMl(null); setDiliMlLoading(false); } });
     predictAdmetMl(sm)
-      .then(r => { if (admetMlSeqRef.current === seqAdmet) { setAdmetMl(r); setAdmetMlError(null); } })
+      .then(r => { if (admetMlSeqRef.current === seqAdmet) { setAdmetMl(r); setAdmetMlError(null); setAdmetMlLoading(false); } })
       .catch(e => {
         if (admetMlSeqRef.current === seqAdmet) {
           setAdmetMl(null);
           setAdmetMlError(e instanceof Error ? e.message : String(e));
+          setAdmetMlLoading(false);
         }
       });
     // CardioTox-ML — dedicated hERG RF; preferred over ADMET-AI hERG head
     // when building the overlay (Wang/Karim 2016 patch-clamp-anchored).
     predictCardiotox(sm)
-      .then(r => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(r); })
-      .catch(() => { if (cardiotoxMlSeqRef.current === seqCardio) setCardiotoxMl(null); });
+      .then(r => { if (cardiotoxMlSeqRef.current === seqCardio) { setCardiotoxMl(r); setCardiotoxMlLoading(false); } })
+      .catch(() => { if (cardiotoxMlSeqRef.current === seqCardio) { setCardiotoxMl(null); setCardiotoxMlLoading(false); } });
     // Solubility-ML — surfaces logS for the ADMET panel; also feeds L2 PBPK
     // dissolution. Silent fail leaves overlay's logS null (heuristic only).
     predictSolubilityMl(sm)
-      .then(r => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(r); })
-      .catch(() => { if (solubilityMlSeqRef.current === seqSol) setSolubilityMl(null); });
+      .then(r => { if (solubilityMlSeqRef.current === seqSol) { setSolubilityMl(r); setSolubilityMlLoading(false); } })
+      .catch(() => { if (solubilityMlSeqRef.current === seqSol) { setSolubilityMl(null); setSolubilityMlLoading(false); } });
   }, [smiles, rdkitReady, molProps?.isValid]);
+
+  // ── DETERMINISTIC VERDICT GATE (part 1: pending tracker) ────────────────
+  // Same molecule MUST produce the same Go/No-Go on every run. The L1 math
+  // (admet.ts, inVitroSim.ts) is fully seeded on hashSmiles(smiles), so the
+  // remaining sources of run-to-run drift are async inputs whose values
+  // depend on which fetch lands first:
+  //
+  //   A. ML overlay race — DILI / ADMET-AI / CardioTox / Solubility / Binding
+  //      ML calls. If they land between two clicks of Run, the engine uses
+  //      heuristic on one run and ML on the next. Different verdict.
+  //
+  //   B. Target / TA race — `targetSuggestions` is built from
+  //      `chemblSuggestions` (async ChEMBL multi-target fetch) ∪
+  //      `mlPanelSuggestions` (async DeepDTA polypharmacology panel) ∪
+  //      heuristic pharmacophore matches. The TOP suggestion auto-sets
+  //      `therapeuticArea` (effect ~917) and, when uniprot-auto is on,
+  //      `uniprotId` (effect ~977). Both flow into runAdmetSimulation /
+  //      runInVitroSimulation as positional inputs, so racing on these
+  //      flips the verdict (e.g. NO-GO on first run, WATCH on reload —
+  //      exactly the bug reported for compound C1CN(C(=O)c2cc3cc(NC(=O)...).
+  //
+  // The combined `l1InputsPending` blocks runSimulation until BOTH the ML
+  // overlay AND the target/TA propagation have settled. With this gate the
+  // verdict is a pure function of (SMILES + ML overlay + target/TA), and
+  // those inputs are deterministic the moment everything has landed.
+  const mlOverlayPending =
+    diliMlLoading || admetMlLoading || cardiotoxMlLoading || solubilityMlLoading || bindingMlLoading;
+  const targetSuggestionPending = chemblLookupLoading || mlPanelLoading;
+  const l1InputsPending = mlOverlayPending || targetSuggestionPending;
+  const mlOverlaySettled = !mlOverlayPending;
+  const l1InputsSettled = !l1InputsPending;
 
   // ── ML overlay — single source of truth for L1 ML signals ──────────────
   // Builds an `MlOverlay` once from all the cached ML responses; L1
@@ -1376,6 +1487,80 @@ export function HakaseAI() {
       solubility: solubilityMl,
     }),
     [admetMl, cardiotoxMl, diliMl, bindingMl, solubilityMl],
+  );
+  // DETERMINISTIC VERDICT GATE (part 2): heuristic-only mode = ML settled but
+  // every call came back empty/null. The verdict is still deterministic
+  // (mulberry32 keyed on SMILES) but the reviewer should know it's NOT
+  // enriched with ML — so we surface a "Heuristic verdict (ML unavailable)"
+  // banner so reviewers don't confuse it with the ML-enriched one.
+  const mlOverlayUnavailable = mlOverlaySettled && !overlayHasAnyMl(mlOverlay);
+
+  // Ref-mirror of l1InputsPending so an async runSimulation can poll the
+  // CURRENT pending state without re-rendering. Without this the closure
+  // captured at click time would only see the snapshot from that render.
+  const l1InputsPendingRef = useRef(l1InputsPending);
+  useEffect(() => { l1InputsPendingRef.current = l1InputsPending; }, [l1InputsPending]);
+
+  // ── Ref-mirrors for state read AFTER an await ─────────────────────────
+  // runSimulation is async. The useCallback closure captures uniprotId /
+  // therapeuticArea / targetSuggestions / molName at click time. If the
+  // user clicks Run before ChEMBL / target lookup land, those state
+  // values are empty in the closure. Then `await waitForMlSettle()` runs
+  // and (while we're awaiting) the auto-effects populate the real
+  // uniprotId and therapeuticArea — but the closure can never see them.
+  // The run then uses the stale empty values and the verdict diverges
+  // from a run where the user waited before clicking. The ref-mirrors
+  // below let the L1 branch re-read the CURRENT value after the await.
+  const uniprotIdRef = useRef(uniprotId);
+  const therapeuticAreaRef = useRef(therapeuticArea);
+  const targetSuggestionsRef = useRef(targetSuggestions);
+  const molNameRef = useRef(molName);
+  const bindingMlRef = useRef(bindingMl);
+  const mlOverlayRef = useRef(mlOverlay);
+  useEffect(() => { uniprotIdRef.current = uniprotId; }, [uniprotId]);
+  useEffect(() => { therapeuticAreaRef.current = therapeuticArea; }, [therapeuticArea]);
+  useEffect(() => { targetSuggestionsRef.current = targetSuggestions; }, [targetSuggestions]);
+  useEffect(() => { molNameRef.current = molName; }, [molName]);
+  useEffect(() => { bindingMlRef.current = bindingMl; }, [bindingMl]);
+  useEffect(() => { mlOverlayRef.current = mlOverlay; }, [mlOverlay]);
+
+  /**
+   * Block until every L1 deterministic input has either resolved or
+   * `timeoutMs` ms have passed. Inputs gated:
+   *   • DILI / ADMET-AI / CardioTox / Solubility / Binding ML overlay
+   *   • ChEMBL multi-target lookup + ML polypharmacology panel
+   *     (these decide `targetSuggestions[0]` which auto-fills
+   *     `therapeuticArea` and, when auto-mode is on, `uniprotId`).
+   *
+   * Resolves to:
+   *   "ml"        — at least one ML response settled with real ML data
+   *   "heuristic" — every ML call returned empty/failed (deterministic fallback)
+   *   "timeout"   — wall-clock hit; treat as heuristic so the user isn't stuck
+   *
+   * Same molecule → same final verdict. We refuse to publish a verdict
+   * while ANY of these inputs is still in flight, because doing so would
+   * let the user see GO on one run and WATCH/NO-GO on the next depending
+   * only on which fetch raced ahead.
+   */
+  const waitForMlSettle = useCallback(
+    (timeoutMs: number = 12000): Promise<"ml" | "heuristic" | "timeout"> => {
+      return new Promise((resolve) => {
+        const deadline = Date.now() + timeoutMs;
+        const poll = () => {
+          if (!l1InputsPendingRef.current) {
+            resolve(overlayHasAnyMl(mlOverlay) ? "ml" : "heuristic");
+            return;
+          }
+          if (Date.now() >= deadline) {
+            resolve("timeout");
+            return;
+          }
+          setTimeout(poll, 100);
+        };
+        poll();
+      });
+    },
+    [mlOverlay],
   );
 
   const cascadeGate = useMemo(
@@ -1875,6 +2060,22 @@ export function HakaseAI() {
     setSimStatus(prev => ({ ...prev, [activeLayer]: "running" }));
     setSimProgress(0);
 
+    // ── L1 input-stability gate (production determinism guarantee) ────────
+    // Same molecule MUST yield the same Go/No-Go. Block here until every
+    // async input that the L1 engines consume has settled:
+    //   • ML overlay  (DILI / ADMET-AI / CardioTox / Solubility / Binding)
+    //   • ChEMBL multi-target lookup  (decides targetSuggestions[0])
+    //   • ML polypharmacology panel   (fallback when ChEMBL is empty)
+    // targetSuggestions[0] auto-sets `therapeuticArea` and may also
+    // auto-set `uniprotId`. If either flips between runs, the verdict
+    // flips. We wait up to 12 s; on timeout we proceed with the
+    // deterministic heuristic engine and surface a banner so the reviewer
+    // knows the verdict is heuristic-only (still stable for the SMILES,
+    // but NOT ML-enriched).
+    if (activeLayer === 1 && l1InputsPendingRef.current) {
+      await waitForMlSettle(12000);
+    }
+
     // Tick budgets per layer — L2 Confirmation (In-Silico ↔ Ex-Vivo) is a scaffold in
     // this build (no Run handler), so 0 ticks. L3 Animal Cohort uses the same
     // 16-tick budget the relocated runner inherited from former internal slot 2.
@@ -2103,7 +2304,19 @@ export function HakaseAI() {
         clearInterval(interval);
 
         if (activeLayer === 1) {
-          const results = runAdmetSimulation(molProps, smiles, molName || "Unnamed Molecule", uniprotId, therapeuticArea, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
+          // Read all auto-fillable state via refs so we use the value at
+          // the END of the wait gate, not the value at click time. Without
+          // this, a click made before the auto-uniprot / auto-TA effects
+          // fired would compute the verdict with empty strings even after
+          // those effects landed during the await — flipping the verdict
+          // between runs of the same molecule.
+          const _uniprotId = uniprotIdRef.current;
+          const _therapeuticArea = therapeuticAreaRef.current;
+          const _targetSuggestions = targetSuggestionsRef.current;
+          const _molName = molNameRef.current;
+          const _bindingMl = bindingMlRef.current;
+          const _mlOverlay = mlOverlayRef.current;
+          const results = runAdmetSimulation(molProps, smiles, _molName || "Unnamed Molecule", _uniprotId, _therapeuticArea, _bindingMl?.prediction?.Kd_nM ?? null, _mlOverlay);
 
           if (fingerprintOn && tissueTypes.length > 0) {
             const tissueOrganMap: Record<string, string> = {
@@ -2128,9 +2341,10 @@ export function HakaseAI() {
           // a validated target for dose-response generation — not just the
           // hard-coded allow-list. Falls back to null when no suggestion
           // matches (e.g. user typed an arbitrary UniProt manually).
-          const matchedSuggestion = targetSuggestions.find(s => s.uniprotId === uniprotId);
+          // Uses ref-fresh values (see comment above) to stay deterministic.
+          const matchedSuggestion = _targetSuggestions.find(s => s.uniprotId === _uniprotId);
           const targetConfidence = matchedSuggestion?.confidence ?? null;
-          const ivResults = runInVitroSimulation(molProps, smiles, uniprotId, therapeuticArea, offTargetScreenRun, targetConfidence, bindingMl?.prediction?.Kd_nM ?? null, mlOverlay);
+          const ivResults = runInVitroSimulation(molProps, smiles, _uniprotId, _therapeuticArea, offTargetScreenRun, targetConfidence, _bindingMl?.prediction?.Kd_nM ?? null, _mlOverlay);
           setInVitroResults(ivResults);
           // Pass structural alert result from the L1 ADMET simulation so that
           // computeLayer1Flags can prepend PAINS / Brenk / Ames-ICH safety
@@ -2229,7 +2443,10 @@ export function HakaseAI() {
       trialPhase, primaryEndpointName, clinicalDiff, targetSampleSize, sigLevel,
       powerTarget, dropoutRate, numArms, adaptiveEnabled,
       bindingOn, toxOn, fingerprintOn, tissueTypes,
-      procovaEnabled, procovaVarManual, procovaVarReduction, procovaRatio, primaryEndpointType]);
+      procovaEnabled, procovaVarManual, procovaVarReduction, procovaRatio, primaryEndpointType,
+      // Determinism gate — runSimulation must wait for ML to settle so the
+      // same molecule always yields the same Go/No-Go verdict.
+      waitForMlSettle, mlOverlay, bindingMl]);
 
   // ── Auto-detect modality on paste ────────────────────────────────────────────
   // When user pastes text into the SMILES input that looks like a peptide
@@ -4979,6 +5196,56 @@ export function HakaseAI() {
                       </div>
                     );
                   })()}
+                  {/* ── L1 verdict stability indicator ────────────────────
+                      Production guardrail: same molecule must produce the
+                      same Go/No-Go on every run. The badge below tells the
+                      reviewer whether the verdict they're looking at is
+                      ML-enriched (final), still computing (do not act yet),
+                      or heuristic-only because ML was unavailable
+                      (deterministic but NOT enriched — reviewer should
+                      know this if comparing across sessions). */}
+                  {l1Modality === "small_molecule" && simResults && (
+                    <div className={
+                      l1InputsPending
+                        ? "rounded-xl border border-sky-500/25 bg-sky-500/6 p-3 flex items-center gap-2"
+                        : mlOverlayUnavailable
+                        ? "rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 flex items-center gap-2"
+                        : "rounded-xl border border-emerald-500/25 bg-emerald-500/6 p-3 flex items-center gap-2"
+                    }>
+                      {l1InputsPending ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 text-sky-400 animate-spin shrink-0" />
+                          <div className="flex-1">
+                            <div className="text-[10px] font-semibold text-sky-300">
+                              Stabilising L1 inputs…
+                              {mlOverlayPending && " ML overlay"}
+                              {mlOverlayPending && targetSuggestionPending && " · "}
+                              {targetSuggestionPending && " target/TA lookup"}
+                            </div>
+                            <div className="text-[9px] text-sky-400/80">Verdict not final until ADMET-AI, CardioTox, DILI, Solubility, Binding ML, and ChEMBL target lookup respond.</div>
+                          </div>
+                        </>
+                      ) : mlOverlayUnavailable ? (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <div className="flex-1">
+                            <div className="text-[10px] font-semibold text-amber-300">Heuristic verdict — ML predictions unavailable</div>
+                            <div className="text-[9px] text-amber-400/80">Deterministic for this molecule (seeded by SMILES) but NOT ML-enriched. ai-service may be down or RUNPOD bypass active.</div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <div className="flex-1">
+                            <div className="text-[10px] font-semibold text-emerald-300">
+                              ML-enriched verdict · stable
+                            </div>
+                            <div className="text-[9px] text-emerald-400/80">Same SMILES + same ML overlay → identical Go/No-Go on every run.</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {l1Modality === "small_molecule" && (<div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
@@ -5299,9 +5566,14 @@ export function HakaseAI() {
                         setProteinError(null);
                       }}
                     />
-                    {safetyFlags.filter(f => f.originLayer === 1).length > 0 && (
-                      <SafetyFlagCascadeBanner flags={safetyFlags.filter(f => f.originLayer === 1)} layerLabel="Layer 1" />
-                    )}
+                    {/* L1 safety flags are already rendered inside <LayerAiPanel>'s
+                        <AiSafetyGate>. We previously also rendered a second
+                        <SafetyFlagCascadeBanner> + <ReviewAcknowledgmentButton>
+                        here, which duplicated the same flag set verbatim. The
+                        cascade banner is intentionally kept for L2/L3/L4 where
+                        it surfaces UPSTREAM flags — at L1 there are no upstream
+                        layers, so we render only the persistent acknowledgment
+                        CTA so reviewers don't have to expand the gate to find it. */}
                     <ReviewAcknowledgmentButton
                       flags={safetyFlags.filter(f => f.originLayer === 1)}
                       acknowledged={haIOpsCtx.reviewAcknowledged}

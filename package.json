@@ -8,7 +8,10 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
 
-    "backend": "tsx scripts/start-backend.mts",
+    "backend": "node backend/scripts/orchestrator.mjs",
+    "backend:dev": "NODE_ENV=development WATCH_SOURCE=true node backend/scripts/orchestrator.mjs",
+    "backend:reload": "bash backend/ops/reload.sh",
+    "backend:legacy": "tsx scripts/start-backend.mts",
     "backend:stop": "pm2 stop hakase-ai-service hakase-api-server",
     "backend:logs": "pm2 logs",
     "backend:status": "pm2 status",
