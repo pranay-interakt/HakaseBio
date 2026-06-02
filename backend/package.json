@@ -1,0 +1,33 @@
+{
+  "name": "@hakase/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hakase BioTwin backend deploy unit — Express API server + FastAPI AI service.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "install:all": "node scripts/install.mjs",
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/orchestrator.mjs",
+    "start:all": "node scripts/orchestrator.mjs",
+    "start:dev": "NODE_ENV=development WATCH_SOURCE=true node scripts/orchestrator.mjs",
+    "start:prod": "NODE_ENV=production node scripts/orchestrator.mjs",
+    "start:legacy": "node scripts/start.mjs",
+    "pm2:start": "pm2 start config/ecosystem.config.cjs --env production",
+    "pm2:reload": "pm2 reload config/ecosystem.config.cjs --update-env",
+    "pm2:stop": "pm2 stop config/ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs --lines 200",
+    "pm2:status": "pm2 status",
+    "pm2:save": "pm2 save",
+    "deploy": "bash ops/deploy.sh",
+    "deploy:reload": "bash ops/reload.sh",
+    "healthcheck": "node scripts/healthcheck.mjs",
+    "preflight": "node scripts/preflight.mjs"
+  },
+  "dependencies": {
+    "pm2": "^5.4.3"
+  }
+}
