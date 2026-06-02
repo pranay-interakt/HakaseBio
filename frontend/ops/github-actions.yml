@@ -1,0 +1,48 @@
+# .github/workflows/frontend-deploy.yml
+name: frontend-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/hakase-ai/**"
+      - "lib/**"
+      - "frontend/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+concurrency:
+  group: frontend-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: latest }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile=false
+      - run: node frontend/scripts/preflight.mjs
+      - run: pnpm --filter @workspace/hakase-ai run typecheck
+      - run: node frontend/scripts/build.mjs
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_AI_SERVICE_URL: ${{ vars.VITE_AI_SERVICE_URL }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.FRONTEND_HOST }}
+          username: ${{ secrets.FRONTEND_USER }}
+          key: ${{ secrets.FRONTEND_SSH_KEY }}
+          script: |
+            cd /opt/hakase/Hakase-BioTwin-dev
+            bash frontend/ops/deploy.sh

@@ -1,0 +1,42 @@
+
+> workspace@0.0.0 frontend:dev /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev
+> tsx scripts/start-frontend.mts dev
+
+
+╔══════════════════════════════════════════════════╗
+║         Hakase BioTwin — Frontend               ║
+╚══════════════════════════════════════════════════╝
+  Frontend → http://localhost:3000
+
+→ Starting Vite dev server...
+
+> @workspace/hakase-ai@0.0.0 dev /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/hakase-ai
+> vite --config vite.config.ts --host 0.0.0.0
+
+Port 3000 is in use, trying another one...
+
+  VITE v7.3.1  ready in 235 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: http://192.168.1.5:3001/
+[BABEL] Note: The code generator has deoptimised the styling of /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/hakase-ai/src/pages/HakaseAI.tsx as it exceeds the max of 500KB.
+5:20:18 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:20:38 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:36:49 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:40:30 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:40:37 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:41:07 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:41:33 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:41:43 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:42:05 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:42:19 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:42:42 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:43:27 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:48:00 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:48:19 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:48:30 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:48:51 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:50:33 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:50:59 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+5:51:09 AM [vite] (client) hmr update /src/pages/HakaseAI.tsx, /src/index.css
+[BABEL] Note: The code generator has deoptimised the styling of /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/hakase-ai/src/pages/HakaseAI.tsx as it exceeds the max of 500KB.

@@ -1,0 +1,1119 @@
+
+> workspace@0.0.0 backend /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev
+> tsx scripts/start-backend.mts
+
+
+╔══════════════════════════════════════════════════╗
+║         Hakase BioTwin — Backend                 ║
+╚══════════════════════════════════════════════════╝
+  API Server  → http://localhost:3000
+  AI Service  → http://localhost:8090
+
+→ Checking Python dependencies...
+  Python dependencies ready.
+
+→ Starting Uvicorn backend and Express API server in foreground...
+
+> @workspace/api-server@0.0.0 dev /Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/api-server
+> NODE_ENV=development tsx ./src/index.ts
+
+Server listening on port 3000
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/ai-service/main.py:117: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [4883]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8090 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51430 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51707 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51709 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51708 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51709 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51707 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51707 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51737 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51709 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 8371.86it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 250.66it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|█████     | 1/2 [00:00<00:00,  7.93it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 10.19it/s]
+INFO:     127.0.0.1:51708 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 6754.11it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 71.19it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:51754 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.66it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.64it/s]
+INFO:     127.0.0.1:51753 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+[bio-analysis] error: AuthenticationError: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"},"request_id":"req_011CbbyHZUCoo3Et96DypDkk"}
+    at APIError.generate (/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/node_modules/.pnpm/@anthropic-ai+sdk@0.78.0_zod@4.3.6/node_modules/@anthropic-ai/sdk/src/core/error.ts:67:14)
+    at Anthropic.makeStatusError (/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/node_modules/.pnpm/@anthropic-ai+sdk@0.78.0_zod@4.3.6/node_modules/@anthropic-ai/sdk/src/client.ts:514:28)
+    at Anthropic.makeRequest (/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/node_modules/.pnpm/@anthropic-ai+sdk@0.78.0_zod@4.3.6/node_modules/@anthropic-ai/sdk/src/client.ts:749:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  status: 401,
+  headers: Headers {
+    date: 'Mon, 01 Jun 2026 05:15:53 GMT',
+    'content-type': 'application/json',
+    'transfer-encoding': 'chunked',
+    connection: 'keep-alive',
+    'x-should-retry': 'false',
+    'request-id': 'req_011CbbyHZUCoo3Et96DypDkk',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+    server: 'cloudflare',
+    'content-encoding': 'gzip',
+    vary: 'Accept-Encoding',
+    'set-cookie': '_cfuvid=SeEc8bv1ZuxG6wUNg3aiyiIt9R7iy_09nBqW9._Fdfw-1780290953.3823836-1.0.1.1-99eeMvLojeJytRq1FrU2DX2Kw1tGNdBo3iZApxgohHU; HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com',
+    'x-robots-tag': 'none',
+    'cf-cache-status': 'DYNAMIC',
+    'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+    'cf-ray': 'a04bbe3aa9183a35-BOM'
+  },
+  requestID: 'req_011CbbyHZUCoo3Et96DypDkk',
+  error: {
+    type: 'error',
+    error: { type: 'authentication_error', message: 'invalid x-api-key' },
+    request_id: 'req_011CbbyHZUCoo3Et96DypDkk'
+  }
+}
+INFO:     127.0.0.1:51948 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51948 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51948 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51978 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51979 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51980 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51981 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51948 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51948 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51978 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51980 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51981 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51979 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51948 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52180 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52182 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52183 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52181 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 4655.17it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:52183 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52180 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52182 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 24.98it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|█████     | 1/2 [00:00<00:00,  7.63it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 10.05it/s]
+INFO:     127.0.0.1:52181 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52181 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52183 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52182 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52180 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3490.89it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 50.89it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:52224 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.80it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.79it/s]
+INFO:     127.0.0.1:52223 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52625 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52626 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52624 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2648.76it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:52626 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52625 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 26.85it/s]
+INFO:     127.0.0.1:52623 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|█████     | 1/2 [00:00<00:00,  6.46it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00,  8.84it/s]
+INFO:     127.0.0.1:52624 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52625 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52626 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52624 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52624 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52626 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52625 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52674 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52623 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52624 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3199.32it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:52624 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 61.18it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.92it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.91it/s]
+INFO:     127.0.0.1:52623 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52725 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52727 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52729 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52728 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52730 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52725 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53595 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56077 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56079 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56080 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56078 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3423.92it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56080 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56079 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56077 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 26.96it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|█████     | 1/2 [00:00<00:00,  6.22it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00,  8.50it/s]
+INFO:     127.0.0.1:56078 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56077 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56079 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56080 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56078 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2049.00it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 49.11it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56124 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.08it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.07it/s]
+INFO:     127.0.0.1:56123 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2075.36it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56147 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 48.36it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.86it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.84it/s]
+INFO:     127.0.0.1:56146 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56199 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56200 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56201 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56202 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56203 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56199 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56200 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56201 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56199 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56200 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56202 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56203 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56201 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56235 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56199 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56200 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1968.23it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 50.03it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56249 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.67it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.66it/s]
+INFO:     127.0.0.1:56248 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1970.54it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 43.92it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56256 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.81it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.80it/s]
+INFO:     127.0.0.1:56248 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2002.53it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 47.25it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56256 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.34it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.33it/s]
+INFO:     127.0.0.1:56248 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1915.64it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 51.33it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+INFO:     127.0.0.1:56270 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.26it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.25it/s]
+INFO:     127.0.0.1:56269 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3269.14it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 49.18it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56278 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.22it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.21it/s]
+INFO:     127.0.0.1:56277 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56300 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2389.92it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56299 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 27.89it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56313 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56314 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.32it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.31it/s]
+INFO:     127.0.0.1:56300 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56300 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56300 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56313 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56314 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56339 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56300 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56313 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56313 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56314 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56300 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56339 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56371 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56299 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56313 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2005.88it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 50.39it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56300 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.73it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.72it/s]
+INFO:     127.0.0.1:56299 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 7781.64it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 25.50it/s]
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56404 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s][ASMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 8551.08it/s]
+
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s][AGPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+INFO:     127.0.0.1:56404 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 32.00it/s]
+
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s][APredicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+INFO:     127.0.0.1:56404 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+
+
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+ADMET-AI inference failed for SMILES='C1CN(C(=O)c2cc3cc(NC(=O)c4ccc(F)cn4)ccc3[nH]2)CCC1N'
+Traceback (most recent call last):
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/artifacts/ai-service/models/admet_ml.py", line 197, in predict_admet_ml
+    raw = model.predict(smiles=smiles_batch)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/admet_ai/admet_model.py", line 179, in predict
+    task_to_preds = self._make_ensemble_predictions(data_loader=data_loader)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/admet_ai/admet_model.py", line 263, in _make_ensemble_predictions
+    [torch.cat(trainer.predict(model=model, dataloaders=data_loader), dim=0) for model in models]
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/admet_ai/admet_model.py", line 263, in <listcomp>
+    [torch.cat(trainer.predict(model=model, dataloaders=data_loader), dim=0) for model in models]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/trainer.py", line 941, in predict
+    return call._call_and_handle_interrupt(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/call.py", line 49, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/trainer.py", line 990, in _predict_impl
+    results = self._run(model, ckpt_path=ckpt_path, weights_only=weights_only)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/trainer.py", line 1092, in _run
+    call._call_teardown_hook(self)
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/call.py", line 139, in _call_teardown_hook
+    _call_callback_hooks(trainer, "teardown", stage=fn)
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/call.py", line 228, in _call_callback_hooks
+    fn(trainer, trainer.lightning_module, *args, **kwargs)
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/callbacks/progress/rich_progress.py", line 701, in teardown
+    self._stop_progress()
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/callbacks/progress/rich_progress.py", line 668, in _stop_progress
+    self.progress.stop()
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/callbacks/progress/rich_progress.py", line 106, in stop
+    super().stop()
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/rich/progress.py", line 1176, in stop
+    self.live.stop()
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/rich/live.py", line 151, in stop
+    self.console.clear_live()
+  File "/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/rich/console.py", line 841, in clear_live
+    self._live_stack.pop()
+IndexError: pop from empty list
+INFO:     127.0.0.1:56403 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|█████     | 1/2 [00:00<00:00,  6.54it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00,  8.82it/s]
+INFO:     127.0.0.1:56408 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56406 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56407 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56408 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56530 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56403 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56404 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56618 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56620 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56619 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1993.96it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56621 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 24.58it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56618 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56620 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.34it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.33it/s]
+INFO:     127.0.0.1:56619 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56618 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56620 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56621 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56619 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1941.81it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 49.54it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56664 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.03it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.02it/s]
+INFO:     127.0.0.1:56663 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1596.31it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 27.07it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56690 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56689 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 14.18it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 14.17it/s]
+INFO:     127.0.0.1:56684 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56689 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56690 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56715 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56716 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56716 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56715 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56690 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56689 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56683 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1925.32it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 49.49it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56777 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.09it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.08it/s]
+INFO:     127.0.0.1:56776 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56841 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56842 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56843 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56844 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 5087.09it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56845 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56846 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56843 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56845 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56841 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56846 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56842 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 30.58it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.62it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.61it/s]
+INFO:     127.0.0.1:56844 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56841 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56842 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56846 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56846 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56844 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56845 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56846 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56843 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56841 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56842 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56845 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56844 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56946 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56948 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56947 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3938.31it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56949 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+Computing physchem properties:  50%|█████     | 1/2 [00:00<00:00,  8.97it/s]INFO:     127.0.0.1:56948 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56946 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 16.23it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 11.64it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 11.63it/s]
+INFO:     127.0.0.1:56947 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56946 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56948 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56949 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56947 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2474.52it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:56994 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 37.47it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.78it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.77it/s]
+INFO:     127.0.0.1:56993 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57852 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57855 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57853 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3081.78it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:57855 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+Computing physchem properties:  50%|█████     | 1/2 [00:00<00:00,  9.15it/s]INFO:     127.0.0.1:57854 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 16.86it/s]
+INFO:     127.0.0.1:57852 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 11.58it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 11.56it/s]
+INFO:     127.0.0.1:57853 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57852 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57854 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57855 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57853 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2836.86it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:57899 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 39.70it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.20it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 12.19it/s]
+INFO:     127.0.0.1:57898 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57908 - "GET /predict/fep/config HTTP/1.1" 200 OK
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/198 [00:00<?, ?it/s]Loading weights: 100%|██████████| 198/198 [00:00<00:00, 6417.47it/s]
+[transformers] [1mEsmModel LOAD REPORT[0m from: facebook/esm2_t12_35M_UR50D
+Key                       | Status     | 
+--------------------------+------------+-
+lm_head.dense.weight      | UNEXPECTED | 
+lm_head.layer_norm.bias   | UNEXPECTED | 
+lm_head.dense.bias        | UNEXPECTED | 
+lm_head.layer_norm.weight | UNEXPECTED | 
+lm_head.bias              | UNEXPECTED | 
+pooler.dense.bias         | MISSING    | 
+pooler.dense.weight       | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+INFO:     127.0.0.1:57912 - "POST /predict/protein-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57912 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 3802.63it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 149.94it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.09it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.07it/s]
+INFO:     127.0.0.1:57912 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57912 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 4566.47it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 57.40it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+INFO:     127.0.0.1:57945 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 14.27it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 14.25it/s]
+INFO:     127.0.0.1:57944 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 2049.00it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:57944 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 27.76it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:57960 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57959 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.75it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.74it/s]
+INFO:     127.0.0.1:57958 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57944 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57959 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57960 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57958 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57978 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57992 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57994 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57995 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57993 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+SMILES to Mol:   0%|          | 0/2 [00:00<?, ?it/s]SMILES to Mol: 100%|██████████| 2/2 [00:00<00:00, 1923.11it/s]
+Computing physchem properties:   0%|          | 0/2 [00:00<?, ?it/s]INFO:     127.0.0.1:57994 - "POST /predict/cardiotox HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57995 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57992 - "POST /predict/dili-ml HTTP/1.1" 200 OK
+Computing physchem properties: 100%|██████████| 2/2 [00:00<00:00, 26.23it/s]
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/setup.py:175: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+/Users/pranaydinavahi/Downloads/Hakase-BioTwin-dev/.venv/lib/python3.11/site-packages/lightning/pytorch/trainer/connectors/data_connector.py:434: The 'predict_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=9` in the `DataLoader` to improve performance.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: True (mps), used: False
+TPU available: False, using: 0 TPU cores
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.91it/s]model ensembles: 100%|██████████| 2/2 [00:00<00:00, 13.90it/s]
+INFO:     127.0.0.1:57993 - "POST /predict/admet-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57992 - "POST /predict/properties HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57994 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57995 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57993 - "POST /predict/solubility-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57992 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57993 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58036 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58047 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58054 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58055 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58054 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58067 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58068 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58067 - "POST /predict/peptide HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58067 - "POST /predict/binding HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58080 - "POST /predict/binding-ml HTTP/1.1" 200 OK
+ChEMBL API fetch failed: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=2.0). Falling back to local copy.
+INFO:     127.0.0.1:58067 - "POST /predict/peptide HTTP/1.1" 200 OK
