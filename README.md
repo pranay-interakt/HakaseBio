@@ -72,48 +72,63 @@ If your NumPy/RDKit versions complain, ensure they are pinned correctly (NumPy 2
 
 ### 3. **Starting the Services (Local Dev)**
 
-You need to run **three services** concurrently in separate terminal windows. Make sure your Python virtual environment is active in the backend terminal.
+You can start the full stack using the built-in workspace scripts in two separate terminal windows (recommended), or start the individual services manually.
 
-#### 🖲️ Terminal 1: Python AI/ML Service
-Navigate to the AI service folder and start the Flask server:
-```bash
-cd artifacts/ai-service
-python main.py
-```
-*   **URL:** `http://localhost:5000`
-*   *Note: If port 5000 is occupied (e.g. by macOS AirPlay Receiver), configure the server or disable the receiver in macOS System Settings.*
+#### Option A: Using the Workspace Scripts (Recommended)
 
-#### 🛡️ Terminal 2: Express API Middleware
-From the root of the repository, launch the Node Express API server:
-```bash
-PORT=3000 DATABASE_URL="file:local.db" pnpm --filter @workspace/api-server dev
-```
-*   **URL:** `http://localhost:3000`
-*   Acts as the central API gateway and serves SQLite database operations.
+1.  **Terminal 1 (Backend)**: Start both the Python AI/ML Service and the Express API server concurrently:
+    ```bash
+    pnpm run backend:legacy
+    ```
+    *   **API Server:** `http://localhost:3000`
+    *   **AI Service:** `http://localhost:8090`
 
-#### 🎨 Terminal 3: Vite React Frontend
-From the root of the repository, start the Vite client dev server:
-```bash
-PORT=5173 BASE_PATH="/" pnpm --filter @workspace/hakase-ai dev
-```
-*   **URL:** `http://localhost:5173`
-*   In development mode, Vite configuration proxies all `/api` requests automatically to the middleware on `http://localhost:3000` to prevent CORS issues.
+2.  **Terminal 2 (Frontend)**: Start the Vite React client dev server:
+    ```bash
+    pnpm run frontend
+    ```
+    *   **Frontend Client:** `http://localhost:3001` (or `http://localhost:4000` depending on port availability)
+
+---
+
+#### Option B: Starting Services Manually
+
+If you prefer to run the services individually:
+
+1.  **Python AI/ML Service**:
+    ```bash
+    cd artifacts/ai-service
+    python main.py
+    ```
+    *   **URL:** `http://localhost:8090` (Configure `AI_SERVICE_PORT` in `.env` if needed)
+
+2.  **Express API Middleware**:
+    ```bash
+    PORT=3000 DATABASE_URL="file:local.db" pnpm --filter @workspace/api-server dev
+    ```
+    *   **URL:** `http://localhost:3000`
+
+3.  **Vite React Frontend**:
+    ```bash
+    PORT=3001 BASE_PATH="/" pnpm --filter @workspace/hakase-ai dev
+    ```
+    *   **URL:** `http://localhost:3001`
 
 ---
 
 ## 🧪 Verification & Health Check
 
-Once all services are running, verify communication via these health check curls:
+Once the services are running, you can verify their connection and health:
 
 1.  **AI/ML Service Health check:**
     ```bash
-    curl -s http://localhost:5000/health
+    curl -s http://localhost:8090/health
     # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
     ```
 2.  **API Server Proxy Health check:**
     ```bash
-    curl -s http://localhost:5173/api/ai/health
+    curl -s http://localhost:3000/api/ai/health
     # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
     ```
 
-If both verify successfully, open your browser to `http://localhost:5173/dashboard` and you are ready to simulate preclinical twins!
+If both verify successfully, open your browser to `http://localhost:3001/dashboard` (or the frontend port listed in your terminal) and you are ready to simulate preclinical twins!
