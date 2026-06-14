@@ -98,6 +98,8 @@ export interface L2DoseProjection {
   targetCmaxTotal_nM:     number;
   fu_fraction:            number;       // fraction (0–1) — from L1 plasma protein binding
   ki_nM:                  number;
+  /** Where the Ki used for receptor-occupancy came from. */
+  ki_source:              "l1_catalog" | "cofolded" | "user_override";
 
   // ── PK projection (heuristic — first-pass) ────────────────────────────────
   Vd_L_per_kg:            number;
@@ -215,6 +217,14 @@ export function computeL2DoseProjection(
   sim: SimResults,
   iv:  InVitroResults,
   params: L2InputParams = {},
+  /**
+   * Optional co-fold-derived Ki (nM) from Stage 2b.
+   * Used as a fallback when L1 catalog binding is unavailable (off-catalog
+   * target), or as a cross-reference source when L1 binding exists.
+   * Callers must confidence-gate this value BEFORE passing it here —
+   * suppressed cofold affinities should be passed as null.
+   */
+  cofoldKi_nM?: number | null,
 ): L2DoseProjection {
 
   // ── Resolve input params (with defaults) ──────────────────────────────────
@@ -225,19 +235,28 @@ export function computeL2DoseProjection(
   const dosesPerDay = Math.max(1, Math.floor(params.dosesPerDay ?? DEFAULTS.dosesPerDay));
   const kiMultiplier = occupancy / Math.max(1e-6, 1 - occupancy);
 
-  // ── Read live L1 inputs ───────────────────────────────────────────────────
-  // RF#1 / §9 step 1: L1 binding is null when no validated UniProt is in
-  // TARGET_MAP. Dose projection without a Ki is not meaningful — refuse
-  // explicitly rather than substituting 0 or a default.
-  if (!sim.binding) {
+  // ── Resolve Ki: L1 catalog → co-folded fallback → refuse ─────────────────
+  // Priority: L1 experimental/catalog Ki > co-fold-derived Ki > error.
+  // Dose projection without ANY Ki is not meaningful — refuse explicitly.
+  let ki_nM: number;
+  let ki_source: "l1_catalog" | "cofolded" | "user_override";
+  if (sim.binding) {
+    ki_nM    = sim.binding.primaryKi;
+    ki_source = "l1_catalog";
+  } else if (
+    cofoldKi_nM !== null && cofoldKi_nM !== undefined &&
+    isFinite(cofoldKi_nM) && cofoldKi_nM > 0
+  ) {
+    ki_nM    = cofoldKi_nM;
+    ki_source = "cofolded";
+  } else {
     throw new Error(
-      "L2 dose projection requires an L1 binding estimate (primaryKi). " +
-      "L1 returned binding=null because the target UniProt is not in the " +
-      "validated catalog — pick a curated target or wire ML binding before " +
-      "attempting dose projection.",
+      "L2 dose projection requires a Ki estimate. " +
+      "L1 returned binding=null (target not in validated catalog) and " +
+      "no confidence-gated co-fold Ki was available — pick a curated target, " +
+      "wire ML binding, or run co-folding before attempting dose projection.",
     );
   }
-  const ki_nM    = sim.binding.primaryKi;
   const mw       = sim.lipinski.mw;
   const logP     = sim.lipinski.logP;
   const fuPct    = iv.plasmaProteinBinding.fuPercent;
@@ -485,6 +504,7 @@ export function computeL2DoseProjection(
     targetCmaxTotal_nM,
     fu_fraction:          fu,
     ki_nM,
+    ki_source,
 
     Vd_L_per_kg:           Vd,
     Vd_assumption:         VdNote,

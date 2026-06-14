@@ -70,7 +70,7 @@ const L2_STAGES: StageDef[] = [
       { name: "AutoDock Vina 1.2.7",   note: "Apache 2.0 — classical docking, runs locally via subprocess" },
       { name: "OpenBabel 3.1.1",       note: "GPL-2 — receptor & ligand PDBQT preparation" },
       { name: "RDKit 2026.3.1",        note: "BSD-3 — ligand 3D embedding + UFF energy minimisation" },
-      { name: "GNINA / Boltz-2",       note: "OOS — CNN-rescored docking + AF3-equiv co-folding (GPU)" },
+      { name: "Deep-learning co-folding", note: "OOS — structure-prediction + affinity co-folding (GPU)" },
     ],
   },
   {

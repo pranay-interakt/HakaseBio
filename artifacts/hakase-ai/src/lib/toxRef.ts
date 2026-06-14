@@ -1,3 +1,4 @@
+import { API_ROOT } from "./apiBase";
 // EPA CCTE Hazard (ToxRefDB / ToxValDB mirror)
 // Real measured NOAEL/LOAEL from animal studies — ground truth for Layer 2 safety margin.
 
@@ -38,7 +39,7 @@ async function resolveDtxsid(inchiKey: string | undefined, name: string | undefi
   else if (name) params.set("name", name);
   else return { dtxsid: null, preferredName: null };
   try {
-    const r = await fetch(`/api/ccte/resolve?${params.toString()}`);
+    const r = await fetch(`${API_ROOT}/api/ccte/resolve?${params.toString()}`);
     if (!r.ok) return { dtxsid: null, preferredName: null };
     const j = await r.json();
     return { dtxsid: j?.dtxsid ?? null, preferredName: j?.preferredName ?? null };
@@ -55,7 +56,7 @@ export async function fetchToxRef(opts: { inchiKey?: string; name?: string }): P
   if (!dtxsid) return base;
 
   try {
-    const r = await fetch(`/api/ccte/hazard/${encodeURIComponent(dtxsid)}`);
+    const r = await fetch(`${API_ROOT}/api/ccte/hazard/${encodeURIComponent(dtxsid)}`);
     if (!r.ok) return { ...base, dtxsid, preferredName, status: "error" };
     const data = await r.json();
     if (!Array.isArray(data) || data.length === 0) {

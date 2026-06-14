@@ -10,6 +10,41 @@
     <!-- Preload RDKit files so the browser fetches them before React mounts -->
     <link rel="preload" href="/rdkit/RDKit_minimal.js" as="script">
     <link rel="preload" href="/rdkit/RDKit_minimal.wasm" as="fetch" crossorigin>
+    <!--
+      Theme bootstrapper — runs synchronously BEFORE React hydrates so the
+      first paint already matches the user's preference. Without this, the
+      page would flash light on dark-preferring machines (or vice versa)
+      because React reads localStorage on mount, one frame too late.
+
+      Defaults to DARK if nothing is saved. Light mode is opt-in via the
+      navbar toggle, which writes localStorage.theme = "light".
+    -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("theme");
+          if (saved == null) {
+            // First-time visit — explicitly write "dark" so subsequent
+            // refreshes don't fall back to system preference.
+            localStorage.setItem("theme", "dark");
+          }
+          var root = document.documentElement;
+          if (saved === "light") {
+            root.classList.add("hk-light");
+          } else {
+            root.classList.remove("hk-light");
+          }
+          // Set a CSS variable so the body background is correct even before
+          // the main stylesheet has applied (prevents a white flash).
+          root.style.setProperty("color-scheme", saved === "light" ? "light" : "dark");
+          if (saved !== "light") {
+            document.documentElement.style.backgroundColor = "#07080c";
+          }
+        } catch (e) { /* localStorage may be unavailable — default dark */
+          document.documentElement.style.backgroundColor = "#07080c";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

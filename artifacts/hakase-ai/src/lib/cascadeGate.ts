@@ -34,7 +34,8 @@
 import type { SimResults } from "./admet";
 import type { InVitroResults } from "./inVitroSim";
 import type { TargetSuggestion } from "./targetSuggestion";
-import { TIER_SCORE, type QualityTier } from "./sourceQuality";
+import { TIER_SCORE, makeCofoldedQuality, type QualityTier } from "./sourceQuality";
+import type { CofoldGateResult } from "./confidenceGate";
 
 const SAFETY_MIN_SCORE     = 0.6;
 const NON_SAFETY_MIN_AVG   = 0.6;
@@ -163,6 +164,24 @@ export function evaluateCascadeGate(
    * the caller to also remember to pass the matching `mlOverrides`).
    */
   inVitroResults: InVitroResults | null = null,
+  /**
+   * Optional co-folding confidence gate result from Stage 2b.
+   * When provided and the gate verdict is not "suppressed", adds a
+   * `cofolded_binding` entry to the quality detail map. The quality score
+   * is ipTM-interpolated via `makeCofoldedQuality()`.
+   */
+  cofoldGate: CofoldGateResult | null = null,
+  /**
+   * Unified L1 scorecard verdict (`l1Scorecard.ts`). When supplied it is the
+   * CANONICAL Go/Watch/No-Go for the compound — it already folds in the
+   * flag-based hard ML vetoes (hERG > 0.80, DILI High, Ames > 0.75, ClinTox,
+   * carcinogenicity, structural hard-reject) that the legacy `simResults.goNogo`
+   * does not check. Passing it keeps the cascade direction consistent with the
+   * headline verdict the biotech team sees on the L1 panel: a scorecard NO-GO
+   * blocks auto-advance to L2/L3 regardless of the legacy field. Falls back to
+   * `simResults.goNogo` when null (older callers unchanged).
+   */
+  l1ScorecardVerdict: "GO" | "WATCH" | "NO-GO" | null = null,
 ): CascadeGateResult {
   const detail = defaultDetail();
 
@@ -259,6 +278,20 @@ export function evaluateCascadeGate(
     }
   }
 
+  // ── 3. Co-folding binding (ipTM-scaled quality tier) ──────────────────────
+  // When Stage 2b ran and the confidence gate did not suppress the affinity,
+  // add a non-safety `cofolded_binding` entry. Its score is ipTM-interpolated
+  // (0.45–0.70) so a high-ipTM result lifts the non-safety average; a marginal
+  // one barely helps — and a suppressed result is simply absent.
+  if (cofoldGate && cofoldGate.verdict !== "suppressed") {
+    const cq = makeCofoldedQuality("Stage 2b co-folding", cofoldGate.iptm);
+    detail["cofolded_binding"] = {
+      tier:  cq.tier,
+      score: cq.score,
+      note:  `Co-folding affinity (${cofoldGate.verdict}) — ipTM ${cofoldGate.iptm?.toFixed(3) ?? "N/A"}, quality score ${cq.score.toFixed(3)}`,
+    };
+  }
+
   // Compute safety-min and non-safety-avg.
   const safetyScores = SAFETY_KEYS.map((k) => detail[k as SafetyKey].score);
   const safetyMinScore = Math.min(...safetyScores);
@@ -271,7 +304,11 @@ export function evaluateCascadeGate(
 
   const blockedBy: string[] = [];
 
-  if (simResults?.goNogo === "NO-GO") {
+  // Canonical verdict: the unified L1 scorecard when available, else the legacy
+  // ADMET goNogo. Keeps the cascade aligned with the headline L1 verdict.
+  const effectiveVerdict: "GO" | "WATCH" | "NO-GO" | null =
+    l1ScorecardVerdict ?? simResults?.goNogo ?? null;
+  if (effectiveVerdict === "NO-GO") {
     blockedBy.push("NO-GO decision");
   }
   for (const k of SAFETY_KEYS) {
@@ -286,8 +323,10 @@ export function evaluateCascadeGate(
   let reason: string;
   if (canAutoCascade) {
     reason = "All quality thresholds met — auto-cascade permitted.";
-  } else if (simResults?.goNogo === "NO-GO") {
-    reason = "NO-GO compound — manual review required regardless of data quality.";
+  } else if (effectiveVerdict === "NO-GO") {
+    reason = l1ScorecardVerdict === "NO-GO"
+      ? "Unified L1 scorecard returned NO-GO (hard liability veto) — manual review required before advancing to L2/L3."
+      : "NO-GO compound — manual review required regardless of data quality.";
   } else {
     const safetyBlocked = blockedBy.filter((k) => SAFETY_KEYS.includes(k as SafetyKey));
     if (safetyBlocked.length > 0) {

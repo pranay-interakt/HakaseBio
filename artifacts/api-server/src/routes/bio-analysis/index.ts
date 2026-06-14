@@ -20,6 +20,38 @@ Always respond in structured JSON with exactly these keys:
 }`,
   },
 
+  "peptide-vitro": {
+    label: "Peptide In Vitro Analysis",
+    system: `You are an expert peptide drug discovery scientist. Your role is to provide a rigorous, evidence-based peptide assessment focused on the sequence, cyclization, physical properties, proteolytic stability, permeability, and synthesizability. Tell if the predicted numbers/properties are good or bad and what is expected to make them nicer.
+
+Always respond in structured JSON with exactly these keys:
+{
+  "peptideOverview": "<2-3 sentence overview of sequence, conformation, length, and primary verdict>",
+  "physicochemicalProfile": "<interpretation of MW, pI, net charge at pH 7.4, GRAVY, instability index — pre-clinical/formulation implications>",
+  "stabilityNarrative": "<proteolytic stability across 9 proteases, serum stability, clearance, and half-life>",
+  "permeabilityAndActivity": "<interpretation of membrane permeability, AMP class/score, and target/receptor engagement>",
+  "synthesisAndDevelopability": "<SPPS synthesizability difficulty, aggregation hotspots, immunogenicity risk class, and developability flags>",
+  "riskMitigations": ["<specific structural risk and concrete modification/engineering strategy>", "<second risk and modification>", "<third risk>"],
+  "nextSteps": ["<highest-priority in vitro assay with rationale>", "<second priority assay>", "<third priority sequence optimization goal>"]
+}`,
+  },
+
+  "antibody-vitro": {
+    label: "Antibody Developability Analysis",
+    system: `You are an expert antibody developability and bioprocess scientist. Your role is to provide a rigorous, evidence-based antibody assessment focused on heavy/light chain pairing, CDR compositions, TAP-style developability flags, aggregation hotspots, self-association/viscosity risks, conformational stability, and FcRn binding. Tell if the predicted numbers/properties are good or bad and what is expected to make them nicer.
+
+Always respond in structured JSON with exactly these keys:
+{
+  "antibodyOverview": "<2-3 sentence overview of heavy/light pairing, inferred format, and overall developability tier>",
+  "chainAndCdrProfile": "<interpretation of heavy/light chain properties, CDR length/composition, and humanness/immunogenicity screen>",
+  "developabilityAssessment": "<TAP-style liabilities, aggregation hotspots, and self-association/viscosity risks>",
+  "stabilityAndBinding": "<conformational stability outlook, expression/manufacturability triage, and FcRn binding half-life implication>",
+  "regulatoryPathway": "<recommended regulatory submission class (BLA) and critical pre-IND safety study priorities>",
+  "riskMitigations": ["<specific developability liability and concrete engineering/optimization strategy>", "<second liability and mitigation>", "<third liability>"],
+  "nextSteps": ["<highest-priority biophysical characterization with rationale>", "<second priority developability assay>", "<third priority antibody engineering goal>"]
+}`,
+  },
+
   clinical: {
     label: "Clinical PK/PD & Cohort",
     system: `You are an expert clinical pharmacologist and PBPK modelling specialist. Your role is to provide a rigorous interpretation of the patient cohort simulation, focusing on pharmacokinetics, pharmacodynamics, population variability, and adverse event signals.
@@ -38,37 +70,37 @@ Always respond in structured JSON with exactly these keys:
 
   trial: {
     label: "Trial Design & Regulatory",
-    system: `You are an expert clinical trial statistician and regulatory strategist with deep experience in FDA and EMA submissions. Your role is to provide a rigorous evaluation of the trial digital twin design and recommend an evidence-based regulatory pathway.
+    system: `You are an expert clinical trial statistician and regulatory strategist with FDA/EMA submissions. Your role is to provide statistical evaluation of the clinical trial twin and regulatory pathway recommendations.
 
 Always respond in structured JSON with exactly these keys:
 {
-  "trialDesignRationale": "<evaluation of the simulated trial design — sample size justification vs. comparable precedent — endpoint appropriateness — adaptive strategy assessment — key design assumptions and vulnerabilities>",
-  "powerAnalysis": "<statistical power interpretation — success probability context — Type I/II error trade-off — sensitivity to effect size assumptions — interim analysis strategy effectiveness>",
-  "regulatoryPathway": "<recommended FDA pathway (NDA 505b1/b2, BLA) — Priority Review vs Standard — Accelerated Approval eligibility — Breakthrough Therapy rationale based on HR and power — Orphan Drug designation applicability — key IND-enabling requirements before Phase I>",
-  "goNogoRationale": "<scientific and statistical GO/WATCH/NO-GO justification — the three most critical decision criteria — comparison to historical success rates for this indication class>",
-  "costBenefitAssessment": "<trial cost interpretation — cost per patient relative to industry average ($50k-$150k Phase III) — site optimization opportunities — timeline compression strategies>",
-  "riskMitigations": ["<primary trial design risk and contingency plan>", "<primary regulatory risk and mitigation strategy>", "<primary enrollment risk and site selection mitigation>"],
-  "nextSteps": ["<most critical pre-IND meeting or protocol amendment>", "<second priority regulatory submission action>", "<third priority — Phase II-III bridging strategy>"]
+  "trialDesignRationale": "<evaluation of the simulated trial design>",
+  "powerAnalysis": "<statistical power interpretation>",
+  "regulatoryPathway": "<recommended regulatory strategy>",
+  "goNogoRationale": "<scientific and statistical GO/WATCH/NO-GO justification>",
+  "costBenefitAssessment": "<cost interpretation>",
+  "riskMitigations": ["<risk and mitigation>"],
+  "nextSteps": ["<action 1>", "<action 2>"]
 }`,
   },
 
   full: {
     label: "Full Integrated Analysis",
-    system: `You are an expert pharmaceutical scientist and clinical pharmacologist with deep expertise in drug discovery, ADMET profiling, PBPK modelling, and clinical trial design. You provide rigorous, evidence-based analysis of computational drug development data.
+    system: `You are an expert pharmaceutical scientist and clinical pharmacologist. You provide rigorous, evidence-based analysis of computational drug development data.
 
 Always respond in structured JSON with exactly these keys:
 {
-  "molecularOverview": "<2-3 sentence summary of the molecule's drug-likeness and key physicochemical properties>",
-  "safetyNarrative": "<clinical safety interpretation of ADMET scores and toxicity alerts, with specific concern flags>",
-  "pkAnalysis": "<pharmacokinetic interpretation: absorption, distribution, half-life, clearance — clinical dosing implications. If a PBPK curve is provided, interpret the shape, onset, and peak characteristics.>",
-  "targetEngagement": "<binding affinity interpretation, selectivity profile, therapeutic window estimate. Reference gene/protein biology if target info provided.>",
-  "cohortInsights": "<Layer 2 patient population insights, responder segmentation, dose-response interpretation. Reference real AE signals if FAERS data is present. — or 'Layer 2 not yet run' if absent>",
-  "trialDesignRationale": "<Layer 3 trial design evaluation, adaptive strategy assessment including interim analysis decisions if available, power/cost trade-offs — or 'Layer 3 not yet run' if absent>",
-  "competitiveContext": "<how this compound compares to existing drugs in its class based on the similar drugs listed>",
-  "regulatoryPathway": "<recommended FDA/EMA regulatory strategy: application type (NDA/BLA), likely pathway (standard/priority/accelerated/breakthrough), IND-enabling study priorities, Phase I starting dose rationale based on binding IC50 and ADMET, breakthrough therapy or fast track eligibility reasoning, and key regulatory risk factors>",
-  "riskMitigations": ["<specific risk 1 with mitigation>", "<specific risk 2 with mitigation>", "<specific risk 3>"],
+  "molecularOverview": "<2-3 sentence summary of the molecule's drug-likeness>",
+  "safetyNarrative": "<clinical safety interpretation of ADMET scores>",
+  "pkAnalysis": "<pharmacokinetic interpretation>",
+  "targetEngagement": "<binding affinity interpretation>",
+  "cohortInsights": "<Layer 2 patient population insights>",
+  "trialDesignRationale": "<Layer 3 trial design evaluation>",
+  "competitiveContext": "<how this compound compares to existing drugs>",
+  "regulatoryPathway": "<recommended FDA/EMA regulatory strategy>",
+  "riskMitigations": ["<specific risk 1 with mitigation>"],
   "goNogoRationale": "<scientific justification for the GO/WATCH/NO-GO recommendation>",
-  "nextSteps": ["<immediate next experiment or study>", "<second priority action>", "<third priority action>"]
+  "nextSteps": ["<immediate next experiment>"]
 }`,
   },
 };
@@ -170,6 +202,12 @@ ${JSON.stringify({
   systemRecommendation: l1.recommendation,
 }, null, 2)}`;
 
+    const peptideBlock = `## Layer 1 — Peptide In Vitro & In Silico Results
+${JSON.stringify(layer1, null, 2)}`;
+
+    const antibodyBlock = `## Layer 1 — Antibody Developability Results
+${JSON.stringify(layer1, null, 2)}`;
+
     const l2Block = l2
       ? `## Layer 2 — Patient Cohort PBPK Simulation
 ${JSON.stringify({
@@ -200,7 +238,11 @@ ${JSON.stringify({
       : "## Layer 3 — Not yet simulated";
 
     const focusedDataBlocks =
-      focus === "molecular"
+      focus === "peptide-vitro"
+        ? `${peptideBlock}\n\n${proteinBlock}`
+        : focus === "antibody-vitro"
+        ? `${antibodyBlock}\n\n${proteinBlock}`
+        : focus === "molecular"
         ? `${l1Block}\n\n${proteinBlock}`
         : focus === "clinical"
         ? `${l1Block}\n\n${proteinBlock}\n\n${l2Block}\n\n${pkCurveBlock}\n\n${aeBlock}`

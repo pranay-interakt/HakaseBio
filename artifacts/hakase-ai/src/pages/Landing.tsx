@@ -27,7 +27,7 @@ const LAYERS = [
     ),
     runtime: "5–30 sec",
     question: "Is this molecule worth confirming?",
-    metrics: ["RDKit cheminformatics (WASM)", "ADMET + organ-tox cascade", "Validated-target binding (nM)", "Source-quality tier per output", "Cascade gate · Go / Watch / No-Go"],
+    metrics: ["In-browser cheminformatics & drug-likeness", "ADMET profile with confidence intervals", "Target-binding affinity estimate (nM)", "Source-quality tier on every output", "Cascade gate · Go / Watch / No-Go"],
   },
   {
     num: "02",
@@ -50,8 +50,8 @@ const LAYERS = [
       </svg>
     ),
     runtime: "1–10 min · GPU opt-in",
-    question: "Does the L1 verdict survive in-silico + ex-vivo confirmation?",
-    metrics: ["10-stage in-silico pipeline (docking → FEP → PBPK → QSP/PD)", "AutoDock Vina + ESM2 druggability + ML affinity", "FEP free-energy refinement (RunPod GPU, opt-in)", "Virtual tissue panel (GTEx + Tabula Sapiens v2)", "Sealed Confirmation Block (v2.0.0)"],
+    question: "Does the L1 verdict survive in-silico + virtual-tissue confirmation?",
+    metrics: ["Multi-stage in-silico confirmation pipeline", "Structure-based pose generation + affinity", "Optional GPU free-energy refinement", "Virtual-tissue safety & selectivity panel", "Sealed Confirmation Block (v2.0.0)"],
   },
   {
     num: "03",
@@ -75,7 +75,7 @@ const LAYERS = [
     ),
     runtime: "10–60 sec",
     question: "How does it behave across preclinical species?",
-    metrics: ["Multi-species PBPK (rat / dog / monkey)", "FDA-IIG formulation engine (BCS-aware)", "Allometric FIH dose scaling (BW^0.75)", "Species-by-species NOAEL + safety margin", "ToxCast / ToxRefDB / ECOTOX cross-validation"],
+    metrics: ["Multi-species PBPK modeling", "Regulatory-grade formulation engine", "Allometric FIH dose scaling (ICH M3(R2))", "Species-by-species NOAEL + safety margin", "Cross-validated against regulatory registries"],
   },
   {
     num: "04",
@@ -97,7 +97,7 @@ const LAYERS = [
     ),
     runtime: "instant · ICH M3(R2)",
     question: "Are we IND-ready and what is a defensible MABEL starting dose?",
-    metrics: ["MABEL-biased FIH starting dose (per FDA 2005 / EMA 2017)", "IND-enabling gap analysis (GLP tox, CMC, IB)", "Phase 1 Planner with Pre-IND defaults", "Sealed PreClinicalPackage v2.0.0 handoff", "Full HAIOps provenance (every flag, every override)"],
+    metrics: ["MABEL-biased FIH starting dose (FDA/EMA aligned)", "IND-enabling gap analysis (GLP tox · CMC · IB)", "Phase 1 Planner with Pre-IND defaults", "Sealed PreClinicalPackage v2.0.0 handoff", "Full audit trail · every flag, every override"],
   },
 ];
 
@@ -105,12 +105,12 @@ const STATS = [
   { val: "90%", label: "of drugs fail in clinic" },
   { val: "$2–5M", label: "spent per IND filing" },
   { val: "12–18 mo", label: "to pre-clinical sign-off" },
-  { val: "0 bytes", label: "of SMILES leave the browser" },
+  { val: "0 bytes", label: "of structural IP transmitted" },
 ];
 
 function AnimatedGrid() {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="hk-animated-grid absolute inset-0 overflow-hidden pointer-events-none">
       <svg width="100%" height="100%" className="opacity-[0.035]">
         <defs>
           <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
@@ -119,12 +119,46 @@ function AnimatedGrid() {
         </defs>
         <rect width="100%" height="100%" fill="url(#grid)" />
       </svg>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-violet-600/8 rounded-full blur-[120px]" />
-      <div className="absolute top-1/3 left-0 w-[400px] h-[400px] bg-blue-600/6 rounded-full blur-[100px]" />
-      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-emerald-600/6 rounded-full blur-[100px]" />
+      <div className="hk-glow-violet absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-violet-600/8 rounded-full blur-[120px]" />
+      <div className="hk-glow-blue absolute top-1/3 left-0 w-[400px] h-[400px] bg-blue-600/6 rounded-full blur-[100px]" />
+      <div className="hk-glow-emerald absolute top-1/3 right-0 w-[400px] h-[400px] bg-emerald-600/6 rounded-full blur-[100px]" />
     </div>
   );
 }
+
+/* ── Release metadata (used in footer / version chip only) ── */
+const RELEASE = {
+  version: "v1.1",
+  date: "May 2026",
+};
+
+/* ── Outcome-focused pillars — the value a customer actually buys ── */
+const VALUE_PILLARS = [
+  {
+    color: "violet",
+    label: "Cut decision time",
+    headline: "From candidate to IND-readiness in days, not quarters.",
+    desc: "Compress 12–18 months of pre-clinical work into a single, defensible package — without expanding the wet-lab footprint.",
+    metric: "30–50%",
+    metricLabel: "faster pre-clinical cycle",
+  },
+  {
+    color: "blue",
+    label: "Defensible at every gate",
+    headline: "Regulator-aligned outputs at every cascade step.",
+    desc: "MABEL-biased FIH dosing, ICH M3(R2) allometric scaling, and a complete provenance trail — built to survive sponsor and regulator scrutiny.",
+    metric: "ICH · FDA · EMA",
+    metricLabel: "frameworks aligned",
+  },
+  {
+    color: "emerald",
+    label: "Privacy by construction",
+    headline: "Structural IP never leaves your machine.",
+    desc: "Molecular structures stay client-side. The platform only ever sees one-way derived signals — there is no path back to your candidate from anything we receive.",
+    metric: "0 bytes",
+    metricLabel: "of structural IP transmitted",
+  },
+];
 
 export function Landing() {
   const [, navigate] = useLocation();
@@ -153,7 +187,7 @@ export function Landing() {
           </span>
         </h1>
         <p className="text-[20px] text-slate-500 font-medium tracking-tight mb-4 max-w-3xl mx-auto">
-          From SMILES to a sealed, IND-ready handoff — a 100% Zero-Lab In-Silico Cascade across four pre-clinical layers.
+          From candidate molecule to a sealed, IND-ready handoff — a Zero-Lab in-silico cascade across four pre-clinical layers.
         </p>
 
         <p className="text-[16px] text-slate-300 font-semibold tracking-tight mb-8 max-w-3xl mx-auto leading-snug">
@@ -167,7 +201,7 @@ export function Landing() {
         <div className="flex items-center justify-center gap-6 mb-10 text-[11px] text-slate-500">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            SMILES stays in the browser
+            Structural IP stays client-side
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
@@ -182,14 +216,14 @@ export function Landing() {
 
         {/* Pipeline visual */}
         <div className="mt-20 flex items-center justify-center gap-0 flex-wrap">
-          {/* INPUT node — generic, with Diagen as complementary badge */}
+          {/* INPUT node — any discovery source */}
           <div className="relative px-4 py-2.5 rounded-xl border border-slate-500/30 bg-slate-500/8 text-center">
             <div className="text-[11px] font-bold text-slate-300">INPUT</div>
             <div className="text-[10px] text-slate-600 mt-0.5">Manual · API · File</div>
-            {/* Diagen badge */}
+            {/* Any discovery source badge */}
             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-500/40 bg-violet-500/15 whitespace-nowrap">
               <span className="w-1 h-1 rounded-full bg-violet-400" />
-              <span className="text-[8px] font-semibold text-violet-400">Diagen</span>
+              <span className="text-[8px] font-semibold text-violet-400">Any source</span>
             </div>
           </div>
 
@@ -217,6 +251,39 @@ export function Landing() {
               </div>
             )
           )}
+        </div>
+      </section>
+
+      {/* ── Value Pillars — what a customer actually buys ── */}
+      <section id="value" className="relative z-10 py-20 px-6 border-t border-white/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">Why teams choose BioDigital Twin</div>
+            <h2 className="text-[34px] font-black tracking-tight text-white">A pre-clinical edge, end to end</h2>
+            <p className="text-[14px] text-slate-400 mt-3 max-w-2xl mx-auto leading-relaxed">
+              Faster decisions, defensible outputs, and structural IP that never leaves your machine — designed for the realities of getting to IND.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {VALUE_PILLARS.map(({ color, label, headline, desc, metric, metricLabel }) => {
+              const tone =
+                color === "violet"  ? { bd: "border-violet-500/25",  bg: "bg-violet-500/5",  tx: "text-violet-300",  num: "text-violet-300"  } :
+                color === "blue"    ? { bd: "border-blue-500/25",    bg: "bg-blue-500/5",    tx: "text-blue-300",    num: "text-blue-300"    } :
+                                       { bd: "border-emerald-500/25",bg: "bg-emerald-500/5", tx: "text-emerald-300", num: "text-emerald-300" };
+              return (
+                <div key={label} className={`hk-lift rounded-2xl border ${tone.bd} ${tone.bg} p-6 flex flex-col`}>
+                  <div className={`text-[10px] uppercase tracking-widest font-semibold mb-3 ${tone.tx}`}>{label}</div>
+                  <h3 className="text-[18px] font-bold text-white leading-snug mb-3">{headline}</h3>
+                  <p className="text-[13px] text-slate-400 leading-relaxed mb-5 flex-1">{desc}</p>
+                  <div className="pt-4 border-t border-white/5">
+                    <div className={`text-[24px] font-black tracking-tight ${tone.num}`}>{metric}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{metricLabel}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -276,52 +343,56 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Discovery Partner Integration ── */}
-      <section id="diagen" className="relative z-10 py-24 px-6 border-t border-white/5">
+      {/* ── Integrates with Any Discovery Engine ── */}
+      <section id="integrations" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-violet-500 mb-4">Discovery Partner Integration</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-violet-500 mb-4">Built to Integrate</div>
               <h2 className="text-[38px] font-black tracking-tight text-white leading-tight mb-4">
                 Plugs into any drug-<br />discovery engine
               </h2>
               <p className="text-[15px] text-slate-400 leading-relaxed mb-4">
-                BioDigital Twin is the pre-clinical confirmation layer for whatever generates your molecules — generative-AI platforms, virtual-screening pipelines, in-house medchem, or licensed assets. Hand us a SMILES (and optionally fingerprints, ADMET pre-scores, or a target UniProt) and we walk it through L1 → L4 to a sealed, IND-ready PreClinicalPackage.
+                BioDigital Twin is the pre-clinical confirmation layer for whatever generates your molecules — generative-AI platforms, virtual-screening pipelines, in-house medchem, or licensed assets. Bring the candidate; we take it from a structure to a sealed, IND-ready package.
               </p>
               <p className="text-[12px] text-slate-500 leading-relaxed mb-6">
-                <span className="text-violet-300 font-semibold">Diagen AI</span> is our reference partner — the integration shown here — but the same payload contract works with any source. We're actively partnering with discovery teams across the industry.
+                Discovery teams across the industry use BioDigital Twin as their pre-clinical confirmation engine. Open contract, vendor-neutral, no lock-in.
               </p>
               <div className="space-y-3">
                 {[
-                  { mode: "Synchronous", desc: "Single molecule import in under 30 seconds", color: "text-violet-400" },
-                  { mode: "Async Batch", desc: "Webhook-driven batch processing with job IDs", color: "text-blue-400" },
-                  { mode: "Cascade", desc: "Auto-runs L1 → L2 → L3 → L4 in one pipeline call", color: "text-emerald-400" },
+                  { mode: "Single Molecule",  desc: "Synchronous run · under 30 seconds end-to-end",        color: "text-violet-400" },
+                  { mode: "Batch",            desc: "Async pipeline with webhook callbacks and job IDs",     color: "text-blue-400"   },
+                  { mode: "Full Cascade",     desc: "Auto-runs every layer in one orchestrated call",         color: "text-emerald-400"},
                 ].map(({ mode, desc, color }) => (
                   <div key={mode} className="flex items-start gap-3">
-                    <span className={`text-[12px] font-semibold w-28 shrink-0 pt-0.5 ${color}`}>{mode}</span>
+                    <span className={`text-[12px] font-semibold w-32 shrink-0 pt-0.5 ${color}`}>{mode}</span>
                     <span className="text-[13px] text-slate-500">{desc}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-[#0d0f17] border border-white/8 rounded-2xl p-5 font-mono text-[12px] space-y-2">
-              <div className="text-slate-600 mb-3">{`// Discovery partner → BioDigital Twin handoff`}</div>
-              <div><span className="text-violet-400">const</span> <span className="text-white">payload</span> <span className="text-slate-500">=</span> <span className="text-slate-400">{"{"}</span></div>
-              <div className="pl-4 space-y-1">
-                <div><span className="text-blue-400">smiles</span><span className="text-slate-500">:</span> <span className="text-emerald-400">"CC(C)Cc1ccc(cc1)..."</span><span className="text-slate-500">,</span></div>
-                <div><span className="text-blue-400">fingerprints</span><span className="text-slate-500">:</span> <span className="text-emerald-400">[0.82, 0.14, ...]</span><span className="text-slate-500">,</span></div>
-                <div><span className="text-blue-400">admet_prescores</span><span className="text-slate-500">:</span> <span className="text-slate-400">{"{"}</span></div>
-                <div className="pl-4">
-                  <div><span className="text-blue-300">absorption</span><span className="text-slate-500">:</span> <span className="text-amber-400">0.84</span><span className="text-slate-500">,</span></div>
-                  <div><span className="text-blue-300">toxicity</span><span className="text-slate-500">:</span> <span className="text-amber-400">0.91</span></div>
-                </div>
-                <div><span className="text-slate-400">{"}"}</span><span className="text-slate-500">,</span></div>
-                <div><span className="text-blue-400">target_uniprot</span><span className="text-slate-500">:</span> <span className="text-emerald-400">"P00533"</span><span className="text-slate-500">,</span></div>
-                <div><span className="text-blue-400">mode</span><span className="text-slate-500">:</span> <span className="text-emerald-400">"cascade"</span></div>
+            {/* Capability diagram — no payload internals, just the flow */}
+            <div className="rounded-2xl border border-white/8 bg-white/2 p-7">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-5">Pre-clinical handoff flow</div>
+              <div className="space-y-3">
+                {[
+                  { step: "01", label: "Submit a candidate",         desc: "Through the UI, API, or partner integration." },
+                  { step: "02", label: "Run the cascade",            desc: "Layers 1 → 4 execute end-to-end with full provenance." },
+                  { step: "03", label: "Receive a sealed package",   desc: "Regulator-ingestible PreClinicalPackage v2.0.0." },
+                ].map(({ step, label, desc }) => (
+                  <div key={step} className="flex items-start gap-4 rounded-xl border border-white/5 bg-white/2 px-4 py-3">
+                    <div className="text-[11px] font-mono text-violet-400 pt-0.5 shrink-0">{step}</div>
+                    <div className="flex-1">
+                      <div className="text-[13px] font-semibold text-white">{label}</div>
+                      <div className="text-[12px] text-slate-500 leading-relaxed">{desc}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div><span className="text-slate-400">{"}"}</span></div>
-              <div className="pt-2 border-t border-white/5 text-slate-600">{`// → L1 → L2 confirm → L3 animal → L4 FIH-ready`}</div>
+              <div className="mt-5 pt-4 border-t border-white/5 text-[11px] text-slate-500 leading-relaxed">
+                Structural inputs stay on the client. The platform receives only one-way derived signals — never the molecule itself.
+              </div>
             </div>
           </div>
         </div>
@@ -334,7 +405,7 @@ export function Landing() {
           {/* Header */}
           <div className="text-center mb-20">
             <div className="text-[11px] uppercase tracking-[0.2em] text-slate-600 mb-3">The Complete Pre-Clinical Pipeline</div>
-            <h2 className="text-[40px] font-black tracking-tight text-white mb-4">From SMILES to IND-ready handoff</h2>
+            <h2 className="text-[40px] font-black tracking-tight text-white mb-4">From candidate to IND-ready handoff</h2>
             <p className="text-[15px] text-slate-500 max-w-2xl mx-auto leading-relaxed">
               IND-enabling pre-clinical work costs $2–5M and takes 12–18 months — and 90% of the molecules that reach Phase 1 still fail. HakaseAI connects four cascading pre-clinical layers into one HAIOps-governed pipeline. Source-quality tiered per output. No fake data. No silent fallbacks.
             </p>
@@ -346,7 +417,7 @@ export function Landing() {
               <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">The Creator · any discovery engine</div>
               <h3 className="text-[22px] font-black text-white mb-3">Generative chemistry, virtual screening, or in-house medchem</h3>
               <p className="text-[14px] text-slate-400 leading-relaxed">
-                Wherever your candidate molecules come from — generative AI (Diagen, Insilico, Iktos, Chemistry42…), virtual-screening pipelines, or your medchem team — BioDigital Twin is the pre-clinical confirmation layer that takes them forward. <span className="text-violet-300">Diagen is our reference integration; the contract is open.</span>
+                Wherever your candidate molecules come from — generative-AI platforms, virtual-screening pipelines, or your medchem team — BioDigital Twin is the pre-clinical confirmation layer that takes them forward. Open contract, vendor-neutral, no lock-in.
               </p>
             </div>
             <div className="rounded-2xl border border-blue-500/25 bg-blue-500/5 p-8">
@@ -377,17 +448,17 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Molecule Input · any source</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Bring your candidate molecule</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    A researcher hands BioDigital Twin a candidate molecule and a target — say, EGFR for non-small-cell lung cancer. The molecule can come from anywhere: a generative-AI partner (Diagen, Insilico, Iktos, Chemistry42…), a virtual-screening pipeline, an in-house medchem series, a licensed asset, or a manual SMILES paste. Hakase doesn't care where it came from — only that the input contract is met.
+                    A researcher hands BioDigital Twin a candidate and a target — say, a kinase inhibitor for non-small-cell lung cancer. The molecule can come from anywhere: a generative-AI partner, a virtual-screening pipeline, an in-house medchem series, or a licensed asset. We're source-agnostic; the input contract is what matters.
                   </p>
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-5">
-                    <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">Input contract — what BioDigital Twin needs</div>
+                    <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-3">What BioDigital Twin accepts</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-6">
                       {[
-                        "SMILES string (required — molecular structure notation)",
-                        "Target protein ID (required — UniProt, e.g. P00533 for EGFR)",
-                        "Molecular fingerprints (optional — accelerates L1)",
-                        "ADMET pre-scores (optional — fed in as priors)",
-                        "3D conformers (optional — used by L2 docking)",
+                        "A candidate molecule (required)",
+                        "A target protein (required)",
+                        "Optional priors — pre-computed signals or descriptors",
+                        "Optional 3D structure data",
+                        "Therapeutic area context",
                       ].map(item => (
                         <div key={item} className="flex items-start gap-2 text-[12px] text-slate-400">
                           <span className="text-violet-500 mt-0.5 shrink-0">→</span> {item}
@@ -395,10 +466,10 @@ export function Landing() {
                       ))}
                     </div>
                     <div className="mt-4 pt-3 border-t border-white/5 text-[11px] text-slate-600">
-                      Three ingestion modes:&nbsp;
-                      <span className="text-violet-400">Synchronous</span> (single molecule, &lt;30 s) ·&nbsp;
-                      <span className="text-blue-400">Async Batch</span> (webhook callbacks) ·&nbsp;
-                      <span className="text-emerald-400">Cascade</span> (auto-runs L1→L2→L3→L4 in one call). Diagen is our reference integration; the same contract is open to any discovery partner.
+                      Three modes:&nbsp;
+                      <span className="text-violet-400">Single</span> (one molecule, under 30 seconds) ·&nbsp;
+                      <span className="text-blue-400">Batch</span> (async with callbacks) ·&nbsp;
+                      <span className="text-emerald-400">Cascade</span> (full layer pipeline in one call). Open contract, vendor-neutral.
                     </div>
                   </div>
                 </div>
@@ -411,15 +482,15 @@ export function Landing() {
                   <div className="text-[9px] uppercase tracking-widest text-violet-500 font-semibold mb-1">Layer 1 · In Vitro Twin</div>
                   <h4 className="text-[18px] font-bold text-white mb-2">Is this molecule worth confirming?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    RDKit.js (WASM) computes descriptors in the browser; ML-augmented ADMET adds confidence intervals; a validated-target binding estimate and organ-tox cascade feed the HAIOps cascade gate. Output: GO / WATCH / NO-GO with a source-quality tier per output (heuristic / structural / ML on the computed side; literature / in-house / class-median on the substrate side), plus an EvidencePointer that L2 freezes at Stage 0.
+                    The first gate is a fast in-vitro twin: structural sanity, drug-likeness, ADMET profile with confidence intervals, target-binding estimate, and an organ-tox screen — each output tagged with a source-quality tier. The cascade gate issues a GO / WATCH / NO-GO verdict and seals an EvidencePointer for the next layer to consume.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
-                        ["ADMET Profiling", "ML-augmented A·D·M·E·T with confidence intervals and source-quality tier per axis"],
-                        ["Target Binding", "Validated-target affinity estimate (Kd / Ki / IC50) with structural & ML cross-checks"],
-                        ["Drug-likeness", "Lipinski + Veber + QED + SAS — all surfaced with rule provenance"],
-                        ["Cascade Gate", "GO / WATCH / NO-GO from HAIOps; sealed EvidencePointer for L2 ingestion"],
+                        ["ADMET Profile",       "Absorption · distribution · metabolism · excretion · toxicity with confidence intervals."],
+                        ["Drug-Likeness",       "Industry-standard medicinal-chemistry rules with rule-by-rule provenance."],
+                        ["Target Binding",      "Affinity estimate against the user-specified protein, with a quality tier per output."],
+                        ["Cascade Gate",        "GO / WATCH / NO-GO verdict feeding a sealed EvidencePointer into Layer 2."],
                       ].map(([label, desc]) => (
                         <div key={label} className="p-4">
                           <div className="text-[11px] font-semibold text-violet-300 mb-1">{label}</div>
@@ -436,17 +507,17 @@ export function Landing() {
                 <div className="shrink-0 w-12 h-12 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[11px] font-black text-blue-400 z-10">L2</div>
                 <div className="flex-1 pt-1 pb-10 border-b border-white/5">
                   <div className="text-[9px] uppercase tracking-widest text-blue-500 font-semibold mb-1">Layer 2 · Confirmation Layer</div>
-                  <h4 className="text-[18px] font-bold text-white mb-2">Does the L1 Verdict Survive Confirmation?</h4>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Does the L1 verdict survive confirmation?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Two parallel sub-tracks — both 100% computational. The <span className="text-blue-300">in-silico track</span> runs a 10-stage pipeline — ESM2 druggability → AutoDock Vina docking → ML affinity + ADMET cross-check → selectivity / cardiotox panel → optional FEP free-energy refinement (RunPod GPU) → PBPK projection → QSP/PD coupling → therapeutic-index ranking → handoff. The <span className="text-blue-300">virtual-tissue (ex-vivo) track</span> simulates a multi-cellular tissue environment by mapping L1 descriptors and L2 docking poses against GTEx tissue baselines and the Tabula Sapiens v2 cell-type atlas — no physical tissue, no chip vendors. Both seal into a v2.0.0 ConfirmationBlock.
+                    Two parallel sub-tracks, both entirely computational. An <span className="text-blue-300">in-silico track</span> generates poses, projects affinity, runs a safety panel, and — optionally — refines free energy on GPU. A <span className="text-blue-300">virtual-tissue track</span> evaluates selectivity and tissue-level signals against curated human reference data — no physical tissue, no chip vendors. Both seal into a v2.0.0 ConfirmationBlock.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
-                        ["In-Silico Pipeline", "10 stages · AutoDock Vina + OpenBabel + RDKit · ESM2 druggability"],
-                        ["Free-Energy Refinement", "FEP on RunPod GPU (opt-in, ~24 GPU-h, cost-confirmed)"],
-                        ["Virtual-Tissue Evidence", "GTEx tissue baselines · Tabula Sapiens v2 cell-type atlas · DepMap PRISM — computational, no chips"],
-                        ["Sealed Confirmation Block", "v2.0.0 evidence package · L1 EvidencePointer frozen at Stage 0"],
+                        ["In-Silico Confirmation",  "Multi-stage pose + affinity + safety pipeline."],
+                        ["Free-Energy Refinement",  "Optional GPU refinement when higher-confidence ΔG is required."],
+                        ["Virtual-Tissue Panel",    "Selectivity & tissue-level signal against curated human reference data."],
+                        ["Sealed Confirmation Block","v2.0.0 evidence package, EvidencePointer chain preserved."],
                       ].map(([label, desc]) => (
                         <div key={label} className="p-4">
                           <div className="text-[11px] font-semibold text-blue-300 mb-1">{label}</div>
@@ -463,17 +534,17 @@ export function Landing() {
                 <div className="shrink-0 w-12 h-12 rounded-full border border-amber-500/40 bg-amber-500/10 flex items-center justify-center text-[11px] font-black text-amber-400 z-10">L3</div>
                 <div className="flex-1 pt-1 pb-10 border-b border-white/5">
                   <div className="text-[9px] uppercase tracking-widest text-amber-500 font-semibold mb-1">Layer 3 · Animal Cohort</div>
-                  <h4 className="text-[18px] font-bold text-white mb-2">How Does It Behave Across Species?</h4>
+                  <h4 className="text-[18px] font-bold text-white mb-2">How does it behave across species?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    Multi-species PBPK across rat, dog, and monkey using allometric scaling (BW^0.75 for clearance, BW^1.0 for Vd) and a BCS-aware FDA-IIG formulation engine. Cross-validated against ToxCast, ToxRefDB, ECOTOX, and ChEMBL animal-PK records. Outputs species-by-species NOAEL with safety margins and the human-equivalent dose used to seed L4 MABEL calculations.
+                    Multi-species PBPK across the standard pre-clinical species, allometric scaling per ICH M3(R2), and a regulatory-grade formulation engine that respects route, dose form, and bioavailability constraints. Outputs species-by-species NOAEL with safety margins and the human-equivalent dose used to seed Layer 4.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
-                        ["Multi-species PBPK", "Rat · Dog · Monkey — Cmax, AUC, t½, Vd, CL per species"],
-                        ["Formulation Engine", "Six FDA-IIG excipient classes · BCS-aware bioavailability"],
-                        ["Allometric Scaling", "ICH M3(R2) — BW^0.75 for CL, BW^1.0 for Vd, 1/10 NOAEL safety factor"],
-                        ["External Validation", "ToxCast · ToxRefDB · ECOTOX · ChEMBL animal-PK"],
+                        ["Multi-species PBPK",  "Standard pre-clinical species — Cmax, AUC, t½, Vd, CL."],
+                        ["Formulation Engine",  "Route- and dose-form-aware bioavailability."],
+                        ["Allometric Scaling",  "ICH M3(R2)-aligned with the standard NOAEL safety factor."],
+                        ["Regulatory Validation","Cross-validated against curated pre-clinical reference data."],
                       ].map(([label, desc]) => (
                         <div key={label} className="p-4">
                           <div className="text-[11px] font-semibold text-amber-300 mb-1">{label}</div>
@@ -490,17 +561,17 @@ export function Landing() {
                 <div className="shrink-0 w-12 h-12 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center text-[11px] font-black text-emerald-400 z-10">L4</div>
                 <div className="flex-1 pt-1">
                   <div className="text-[9px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Layer 4 · First-In-Human Readiness</div>
-                  <h4 className="text-[18px] font-bold text-white mb-2">Are We IND-Ready?</h4>
+                  <h4 className="text-[18px] font-bold text-white mb-2">Are we IND-ready?</h4>
                   <p className="text-[14px] text-slate-400 leading-relaxed mb-5">
-                    The Phase 1 Planner derives a defensible MABEL-biased starting dose (per FDA 2005 / EMA 2017), evaluates the IND-enabling gate (GLP tox, CMC, Investigator's Brochure), and seals every piece of upstream evidence into a single PreClinicalPackage v2.0.0 — the artefact a CRO, regulator, or licensing partner can ingest as-is. This is the boundary into the clinic, not a clinical-trial simulator.
+                    The Phase 1 Planner derives a defensible MABEL-biased starting dose (FDA/EMA aligned), evaluates the IND-enabling gate (GLP tox, CMC, Investigator's Brochure), and seals every piece of upstream evidence into a single PreClinicalPackage v2.0.0 — the artefact a CRO, regulator, or licensing partner can ingest as-is. The boundary into the clinic, not a clinical-trial simulator.
                   </p>
                   <div className="rounded-xl border border-white/8 bg-white/2 overflow-hidden">
                     <div className="grid grid-cols-2 divide-x divide-white/5 divide-y divide-white/5">
                       {[
-                        ["MABEL Starting Dose", "FDA 2005 / EMA 2017 — minimal anticipated biological effect level"],
-                        ["IND Gate", "GLP tox · CMC · Investigator's Brochure · Pre-IND meeting checklist"],
-                        ["Phase 1 Planner", "Cohort sizing · escalation rules · stopping criteria — derived, not authored"],
-                        ["Sealed Handoff", "PreClinicalPackage v2.0.0 · full HAIOps provenance trail"],
+                        ["MABEL Starting Dose",  "FDA/EMA-aligned minimal anticipated biological effect level."],
+                        ["IND-Enabling Gate",    "GLP tox · CMC · Investigator's Brochure · Pre-IND checklist."],
+                        ["Phase 1 Planner",      "Cohort sizing · escalation rules · stopping criteria — derived, not authored."],
+                        ["Sealed Handoff",       "PreClinicalPackage v2.0.0 with a complete provenance trail."],
                       ].map(([label, desc]) => (
                         <div key={label} className="p-4">
                           <div className="text-[11px] font-semibold text-emerald-300 mb-1">{label}</div>
@@ -547,30 +618,29 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Advanced AI v2 ── */}
-      <section id="ai-v2" className="relative z-10 py-24 px-6 border-t border-white/5">
+      {/* ── On the Roadmap ── */}
+      <section id="roadmap" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
 
           {/* Header */}
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-500/25 bg-violet-500/8 mb-5">
               <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-violet-400 tracking-wide uppercase">Coming in v2</span>
+              <span className="text-[11px] font-semibold text-violet-400 tracking-wide uppercase">On the roadmap</span>
             </div>
             <h2 className="text-[38px] font-black tracking-tight text-white mb-4">
-              Advanced AI Models
+              Continuously sharpening the cascade
             </h2>
             <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              Every layer is backed by dedicated models — from ML-augmented ADMET to ESM2 druggability, AutoDock Vina docking, opt-in FEP refinement, and the MABEL-biased Phase 1 Planner.
-              50+ models evaluated. 8 components. 3-phase rollout.
-              SMILES stays in the browser; the AI Service only ever sees fingerprints.
+              Every layer is governed by a dedicated upgrade roadmap — added depth where it sharpens decisions, with no compromise on the privacy boundary.
+              Structural inputs stay client-side; the platform only ever processes one-way derived signals.
             </p>
           </div>
 
-          {/* Upgrade grid */}
+          {/* Roadmap grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
 
-            {/* Layer 1 upgrades */}
+            {/* Layer 1 roadmap */}
             <div className="rounded-2xl border border-violet-500/15 bg-violet-500/4 p-5">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-7 h-7 rounded-full border border-violet-500/40 bg-violet-500/10 flex items-center justify-center text-[10px] font-black text-violet-400">L1</div>
@@ -578,9 +648,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["ADMET Scoring",      "Transformer model trained on tens of millions of molecules, delivering depth beyond traditional physicochemical rules."],
-                  ["Binding Affinity",   "Protein language model embeddings paired with an attention-based affinity predictor. Coverage spans ~20 well-known targets to thousands."],
-                  ["Organ Toxicity",     "Specialized per-organ models (cardiac, hepatic, renal) with confidence intervals — cardiac, hepatic, and renal endpoints covered."],
+                  ["Deeper ADMET",         "Higher-fidelity ADMET predictions with calibrated confidence intervals across every axis."],
+                  ["Broader Target Coverage", "Affinity coverage expanded across well-characterised and emerging targets."],
+                  ["Organ-Specific Safety", "Dedicated cardiac, hepatic, and renal safety predictions with quality-tier provenance."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-violet-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -590,7 +660,7 @@ export function Landing() {
               </div>
             </div>
 
-            {/* Layer 2 upgrades */}
+            {/* Layer 2 roadmap */}
             <div className="rounded-2xl border border-blue-500/15 bg-blue-500/4 p-5">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-7 h-7 rounded-full border border-blue-500/40 bg-blue-500/10 flex items-center justify-center text-[10px] font-black text-blue-400">L2</div>
@@ -598,9 +668,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["GNINA / Boltz-2 Docking",  "CNN-rescored docking + AlphaFold-3-equivalent co-folding — replaces classical Vina poses for receptors with no crystal structure."],
-                  ["FEP+ Refinement",          "Alchemical free-energy perturbation on GPU (RunPod, ~24 GPU-h). Replaces ML affinity prediction with physics-grounded ΔG."],
-                  ["Whole-Body PBPK",          "18-compartment PBPK replacing the 2-compartment RK4 solver — species parameters from PK-Sim physiology atlas."],
+                  ["No-Crystal Pose Generation", "Structural prediction for targets without a solved crystal — closing a major gap in modern medchem."],
+                  ["Higher-Confidence ΔG",       "Optional refinement pass for cases where higher-confidence binding free-energy is decision-critical."],
+                  ["Whole-Body PBPK",            "Richer compartmental physiology when single-organ projections aren't enough."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-blue-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -610,7 +680,7 @@ export function Landing() {
               </div>
             </div>
 
-            {/* Layer 3 + 4 upgrades */}
+            {/* Layer 3 + 4 roadmap */}
             <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/4 p-5">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-7 h-7 rounded-full border border-amber-500/40 bg-amber-500/10 flex items-center justify-center text-[10px] font-black text-amber-400">L3</div>
@@ -619,9 +689,9 @@ export function Landing() {
               </div>
               <div className="space-y-3">
                 {[
-                  ["Allometric Uncertainty",  "Bootstrap-resampled FIH dose with 90% credible intervals per ICH M3(R2) — replacing point-estimate scaling."],
-                  ["IVIVC Bridging",          "In-vitro–in-vivo correlation Level A/B/C from dissolution data into PBPK absorption profiles, bench-to-cohort automatically."],
-                  ["MABEL ML Calibrator",     "Learned MABEL-vs-NOAEL crossover calibrated on historical FIH dose decisions — flags when MABEL should drive starting dose."],
+                  ["Allometric Uncertainty",  "Credible intervals on FIH dose, ICH M3(R2)-aligned — replacing point-estimate scaling."],
+                  ["IVIVC Bridging",          "In-vitro–in-vivo correlation translated automatically into absorption profiles."],
+                  ["Smarter MABEL Selection", "Calibrated guidance on when MABEL — rather than NOAEL — should drive the starting dose."],
                 ].map(([label, desc]) => (
                   <div key={label as string} className="border-t border-emerald-500/10 pt-3 first:border-0 first:pt-0">
                     <div className="text-[12px] font-semibold text-white mb-1">{label}</div>
@@ -642,7 +712,7 @@ export function Landing() {
             <div className="flex-1">
               <div className="text-[13px] font-semibold text-white mb-1">Privacy guarantee</div>
               <p className="text-[12px] text-slate-400 leading-relaxed">
-                The AI inference server never sees your SMILES. The browser computes a Morgan fingerprint — a 2048-bit one-way hash — and sends only that to the model endpoint. Morgan fingerprints are mathematically irreversible: no server, including ours, can reconstruct the original molecular structure.
+                Inference servers never receive your molecule's structure. The client derives a one-way signal locally and only that signal travels onward — cryptographically irreversible, so no server (including ours) can reconstruct your candidate.
               </p>
             </div>
             <div className="shrink-0 text-[10px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/8 text-emerald-400">
@@ -653,174 +723,101 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Real-Data Backbone Across L2 / L3 / L4 ── */}
-      <section id="vpse" className="relative z-10 py-24 px-6 border-t border-white/5">
+      {/* ── Regulatory-Grade Evidence ── */}
+      <section id="evidence" className="relative z-10 py-24 px-6 border-t border-white/5">
         <div className="max-w-5xl mx-auto">
 
           {/* Header */}
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/25 bg-blue-500/8 mb-5">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-blue-400 tracking-wide uppercase">Now Live · Real-Data Backbone</span>
+              <span className="text-[11px] font-semibold text-blue-400 tracking-wide uppercase">Now Live</span>
             </div>
             <h2 className="text-[38px] font-black tracking-tight text-white mb-4">
-              Real evidence at every layer
+              Regulatory-grade evidence at every layer
             </h2>
             <p className="text-[15px] text-slate-400 max-w-2xl mx-auto leading-relaxed">
-              Four real-world data sources back the cascade — PK-Sim OSP physiology for multi-species PBPK, ChEMBL bioactivity for PD seeding, FAERS for label-grade adverse-event signal, and curated species-physiology reference data for allometric scaling. No synthetic fallbacks, no fake data.
+              Every output is backed by curated, regulator-recognised reference data — pharmacokinetics, pharmacodynamics, real-world safety, and pre-clinical physiology. No synthetic fallbacks, no opaque fabrications.
             </p>
           </div>
 
-          {/* 4 upgrade cards */}
+          {/* 4 evidence cards — capability-level, no specific datasets */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
 
-            {/* 1 — Two-Compartment PBPK */}
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/4 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#3b82f6" strokeWidth="1.5">
-                      <path d="M3 12 Q6 6 9 12 Q12 18 15 12 Q18 6 21 12" />
-                      <circle cx="9" cy="12" r="1.5" fill="#3b82f6" />
-                      <circle cx="15" cy="12" r="1.5" fill="#3b82f6" />
-                    </svg>
+            {[
+              {
+                tag: "L3 · Pharmacokinetics",
+                title: "Multi-Species PBPK",
+                desc: "Pharmacokinetic projections across the standard pre-clinical species — clearance, volume, half-life, and exposure — anchored to curated physiology reference data and ICH M3(R2)-aligned scaling.",
+                chips: ["Multi-species", "ICH M3(R2)", "Physiology-anchored"],
+                color: "blue",
+              },
+              {
+                tag: "L3 · Allometric Scaling",
+                title: "NOAEL → HED with Uncertainty",
+                desc: "Resampled allometric scaling translates pre-clinical no-effect doses to a human-equivalent dose with credible intervals, and the standard safety factor is applied before any Layer 4 handoff.",
+                chips: ["Credible intervals", "Standard safety factor", "ICH M3(R2)"],
+                color: "blue",
+              },
+              {
+                tag: "L2 · Pharmacodynamics",
+                title: "Real-Assay PD Coupling",
+                desc: "Pharmacodynamic coupling is seeded with curated, real-assay potency data for the nearest validated reference compound — never synthetic, never imputed.",
+                chips: ["Curated bioactivity", "Real-assay anchoring", "Therapeutic-index ranking"],
+                color: "violet",
+              },
+              {
+                tag: "L4 · Safety Signal",
+                title: "Real-World AE Calibration",
+                desc: "First-in-human safety inputs are calibrated against real-world pharmacovigilance signal for the nearest validated reference class — backing the Investigator's Brochure with grounded evidence.",
+                chips: ["Pharmacovigilance signal", "Regulator-aligned", "Real-world grounded"],
+                color: "emerald",
+              },
+            ].map(({ tag, title, desc, chips, color }) => {
+              const tone =
+                color === "violet"  ? { bd: "border-violet-500/20",  bg: "bg-violet-500/4",  tx: "text-violet-400",  chip: "border-violet-500/15 text-violet-400/70",  pill: "border-violet-500/30 bg-violet-500/10 text-violet-300"  } :
+                color === "emerald" ? { bd: "border-emerald-500/20", bg: "bg-emerald-500/4", tx: "text-emerald-400", chip: "border-emerald-500/15 text-emerald-400/70", pill: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" } :
+                                       { bd: "border-blue-500/20",    bg: "bg-blue-500/4",    tx: "text-blue-400",    chip: "border-blue-500/15 text-blue-400/70",    pill: "border-blue-500/30 bg-blue-500/10 text-blue-300"    };
+              return (
+                <div key={title} className={`rounded-2xl border ${tone.bd} ${tone.bg} p-6`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className={`text-[10px] uppercase tracking-widest font-semibold mb-0.5 ${tone.tx}`}>{tag}</div>
+                      <div className="text-[14px] font-bold text-white">{title}</div>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${tone.pill}`}>Live</span>
                   </div>
-                  <div>
-                    <div className="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mb-0.5">L3 · Animal Cohort PBPK</div>
-                    <div className="text-[14px] font-bold text-white">Multi-Species Two-Compartment PBPK</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">Live</span>
-              </div>
-              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
-                Two-compartment PBPK solver (central + peripheral) with RK4 numerical integration
-                at 1-minute steps, run across rat, dog, and monkey. Parameters from PK-Sim OSP physiology:
-                organ volumes, inter-compartmental clearance, and allometric scaling (BW^0.75) per ICH M3(R2).
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {["RK4 ODE Solver", "Allometric Scaling (ICH M3(R2))", "Multi-Species (rat · dog · monkey)", "PK-Sim Physiology"].map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/15 text-blue-400/70">{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* 2 — NHANES Population Generator */}
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/4 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#3b82f6" strokeWidth="1.5">
-                      {[4, 10, 16, 22].map((x, i) => (
-                        <g key={x}>
-                          <circle cx={x} cy="9" r="2.5" opacity={1 - i * 0.2} />
-                          <path d={`M${x - 3} 17 Q${x} 13 ${x + 3} 17`} opacity={1 - i * 0.2} fill="none" />
-                        </g>
-                      ))}
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mb-0.5">L3 · Allometric Scaling</div>
-                    <div className="text-[14px] font-bold text-white">NOAEL → HED with Bootstrap CIs</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">Live</span>
-              </div>
-              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
-                Bootstrap-resampled allometric scaling with species-specific correction factors —
-                BW^0.75 for clearance, BW^1.0 for volume — applied to the L3 NOAEL.
-                Human-equivalent dose surfaces with 90% credible intervals per ICH M3(R2),
-                and the 1/10 NOAEL safety factor is applied before any L4 handoff.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {["NOAEL → HED", "Bootstrap 90% CIs", "1/10 Safety Factor", "ICH M3(R2)"].map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-blue-500/15 text-blue-400/70">{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* 3 — ChEMBL PD Model */}
-            <div className="rounded-2xl border border-violet-500/20 bg-violet-500/4 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#8b5cf6" strokeWidth="1.5">
-                      <path d="M4 20 Q8 8 12 14 Q16 20 20 4" />
-                      <line x1="4" y1="14" x2="20" y2="14" strokeDasharray="2 2" opacity="0.4" />
-                      <text x="14" y="11" fill="#8b5cf6" fontSize="5" fontFamily="monospace">EC₅₀</text>
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-violet-400 uppercase tracking-widest font-semibold mb-0.5">L2 · QSP/PD Coupling</div>
-                    <div className="text-[14px] font-bold text-white">ChEMBL Emax Parameters</div>
+                  <p className="text-[12px] text-slate-500 leading-relaxed mb-4">{desc}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {chips.map(t => (
+                      <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full border ${tone.chip}`}>{t}</span>
+                    ))}
                   </div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 font-semibold">Live</span>
-              </div>
-              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
-                The L2 Confirmation pipeline queries ChEMBL for IC50 / Ki values of the closest
-                validated reference. Geometric mean potency seeds the Emax / Hill model
-                (E = Emax × C^n / (EC50^n + C^n)), grounding the QSP/PD coupling and TI ranking
-                in real assay data — never in synthetic estimates.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {["ChEMBL Bioactivity API", "Emax / Hill Model", "IC50 → EC50 Mapping", "2.4M Compounds"].map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-violet-500/15 text-violet-400/70">{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* 4 — FAERS Safety Calibration */}
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/4 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#22c55e" strokeWidth="1.5">
-                      <path d="M12 3 L4 7 L4 13 Q4 18 12 21 Q20 18 20 13 L20 7 Z" />
-                      <path d="M9 12 L11 14 L15 10" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-semibold mb-0.5">L4 · IND Label Signal</div>
-                    <div className="text-[14px] font-bold text-white">FAERS AE Calibration</div>
-                  </div>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-semibold">Live</span>
-              </div>
-              <p className="text-[12px] text-slate-500 leading-relaxed mb-4">
-                The L4 Phase 1 Planner pulls the top adverse-event signals from openFDA FAERS
-                (MedDRA preferred terms + real report counts) for the closest validated reference
-                class — pre-populating the Investigator's Brochure / WARNINGS AND PRECAUTIONS draft
-                with real-world pharmacovigilance evidence rather than fabricated frequencies.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {["openFDA FAERS API", "MedDRA Terms", "20M+ AE Reports", "Real-World Signal"].map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/15 text-emerald-400/70">{t}</span>
-                ))}
-              </div>
-            </div>
+              );
+            })}
 
           </div>
 
-          {/* Data sources summary bar */}
-          <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+          {/* Trust summary bar */}
+          <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-5 flex items-center justify-between flex-wrap gap-4">
             <div>
-              <div className="text-[11px] font-semibold text-white mb-0.5">SMILES stays in the browser; the AI Service only ever sees fingerprints</div>
-              <div className="text-[11px] text-slate-500">L1 runs in-browser (RDKit.js) · L2/L3/L4 run server-side on fingerprints + structured evidence · no SMILES, no proprietary IP egress</div>
+              <div className="text-[12px] font-semibold text-white mb-0.5">Structural inputs stay client-side — the platform only ever processes one-way derived signals</div>
+              <div className="text-[11px] text-slate-500">Layer 1 runs in your browser · Layers 2–4 process derived signals server-side · no structural data leaves your environment</div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
               {[
-                { label: "ChEMBL",   sub: "2.4M compounds", color: "violet" },
-                { label: "openFDA",  sub: "20M+ AE reports", color: "emerald" },
-                { label: "PK-Sim",   sub: "OSP Physiology",  color: "blue" },
-                { label: "ToxCast",  sub: "Animal-PK xref",  color: "blue" },
-              ].map(({ label, sub, color }) => (
+                { label: "Curated PK",       color: "blue"    },
+                { label: "Real-World AE",    color: "emerald" },
+                { label: "Real-Assay PD",    color: "violet"  },
+                { label: "Reg. Physiology",  color: "blue"    },
+              ].map(({ label, color }) => (
                 <div key={label} className={`text-center px-3 py-2 rounded-xl border ${
                   color === "violet"  ? "border-violet-500/20 bg-violet-500/5"
                   : color === "emerald" ? "border-emerald-500/20 bg-emerald-500/5"
                   : "border-blue-500/20 bg-blue-500/5"
                 }`}>
                   <div className={`text-[11px] font-bold ${color === "violet" ? "text-violet-300" : color === "emerald" ? "text-emerald-300" : "text-blue-300"}`}>{label}</div>
-                  <div className="text-[9px] text-slate-600 mt-0.5">{sub}</div>
                 </div>
               ))}
             </div>
@@ -844,23 +841,23 @@ export function Landing() {
             </p>
           </div>
 
-          {/* Split architecture diagram */}
+          {/* Split architecture diagram — capability-level only */}
           <div className="grid md:grid-cols-2 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/8 mb-12">
             {/* Client side */}
             <div className="bg-[#0d0f17] p-8">
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400" />
-                <div className="text-[11px] font-semibold uppercase tracking-widest text-emerald-500">Your Browser · Client-side</div>
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-emerald-500">Your Device · Client-side</div>
               </div>
               <div className="space-y-2.5">
                 {[
-                  "SMILES string (molecule structure)",
-                  "2D / 3D structure rendering",
-                  "Molecular property calculation (RDKit.js)",
-                  "Morgan fingerprint generation",
-                  "SDF / MOL2 file parsing",
-                  "Project storage (IndexedDB, encrypted)",
-                  "Export & download generation",
+                  "Molecular structure handling",
+                  "2D and 3D structure visualisation",
+                  "Local property calculation",
+                  "One-way signal derivation",
+                  "Structure file import and parsing",
+                  "Encrypted local project storage",
+                  "Export and download generation",
                 ].map(item => (
                   <div key={item} className="flex items-center gap-2 text-[13px] text-slate-300">
                     <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -882,16 +879,16 @@ export function Landing() {
             <div className="bg-[#07080c] p-8">
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-2 h-2 rounded-full bg-violet-400" />
-                <div className="text-[11px] font-semibold uppercase tracking-widest text-violet-500">Hakase API · Server-side</div>
+                <div className="text-[11px] font-semibold uppercase tracking-widest text-violet-500">Platform API · Server-side</div>
               </div>
               <div className="space-y-2.5">
                 {[
-                  "ML ADMET prediction (from fingerprint only)",
-                  "ESM2 protein druggability — L2 Stage 1",
-                  "AutoDock Vina docking — L2 Stage 2",
-                  "ML affinity cross-check — L2 Stage 3",
-                  "FEP free-energy refinement (RunPod GPU, opt-in) — L2 Stage 5",
-                  "User authentication",
+                  "Inference over derived signals only",
+                  "Confirmation-layer compute",
+                  "Pharmacokinetic projections",
+                  "Optional accelerated refinement",
+                  "Provenance, sealing, audit trail",
+                  "Authentication and access control",
                 ].map(item => (
                   <div key={item} className="flex items-center gap-2 text-[13px] text-slate-300">
                     <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -903,9 +900,9 @@ export function Landing() {
               </div>
               <div className="mt-6 pt-5 border-t border-white/5 space-y-1.5">
                 {[
-                  "Never receives SMILES",
-                  "Never stores molecular structures",
-                  "Fingerprints discarded immediately after inference",
+                  "Never receives molecular structures",
+                  "Never stores structural inputs",
+                  "Derived signals discarded after inference",
                 ].map(item => (
                   <div key={item} className="flex items-center gap-2 text-[11px] text-slate-600">
                     <svg className="w-3 h-3 text-red-500/50 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -957,28 +954,28 @@ export function Landing() {
                 color: "emerald",
                 border: "border-emerald-500/20",
                 bg: "bg-emerald-500/5",
-                label: "RDKit.js WebAssembly",
-                desc: "The world's most widely used open-source chemistry toolkit — compiled to WebAssembly and running at near-native speed inside your browser. SMILES validation in <50ms. Property calculation in <100ms. Fingerprint generation in <20ms. Used by Pfizer, Novartis, and most major pharma.",
+                label: "Client-side compute",
+                desc: "Industry-standard chemistry primitives run natively on your machine. Structure parsing, validation, property calculation, and one-way signal derivation all happen locally — no structural data needs to travel anywhere.",
               },
               {
                 color: "violet",
                 border: "border-violet-500/20",
                 bg: "bg-violet-500/5",
-                label: "Fingerprint-only inference",
-                desc: "We convert your molecule into a 2048-bit Morgan fingerprint — a mathematical summary that cannot be reverse-engineered back into the original structure (published research: Chemoinformatics, Wiley 2018). Only this fingerprint travels to our server, encrypted via TLS 1.3. Like sending a blurred image: the AI can still make predictions, but can never reconstruct the original.",
+                label: "Inference on derived signals only",
+                desc: "The platform sees a one-way derived signal — mathematically irreversible to the original molecule. Like sending a fingerprint instead of the person: enough to predict, never enough to reconstruct.",
               },
               {
                 color: "blue",
                 border: "border-blue-500/20",
                 bg: "bg-blue-500/5",
-                label: "IndexedDB local storage",
-                desc: "All projects are saved in your browser's built-in database, encrypted at rest using AES-256 via the Web Crypto API. Your saved molecules live on your machine — Hakase servers have zero access. Projects persist across sessions until you choose to delete them.",
+                label: "Encrypted local storage",
+                desc: "Projects are encrypted at rest on your device. Your saved candidates and history live on your machine — platform servers have zero access. Inspect the network traffic yourself if you'd like to verify it.",
               },
             ].map(({ color, border, bg, label, desc }) => (
               <div key={label} className={`rounded-2xl border ${border} ${bg} p-6`}>
                 <div className={`text-[9px] uppercase tracking-widest font-semibold mb-3 ${
                   color === "emerald" ? "text-emerald-500" : color === "violet" ? "text-violet-500" : "text-blue-500"
-                }`}>Technical Pillar</div>
+                }`}>Trust Pillar</div>
                 <h3 className="text-[15px] font-bold text-white mb-3">{label}</h3>
                 <p className="text-[12px] text-slate-500 leading-relaxed">{desc}</p>
               </div>
@@ -988,8 +985,7 @@ export function Landing() {
           {/* Proof statement */}
           <div className="mt-10 text-center">
             <p className="text-[13px] text-slate-600 max-w-2xl mx-auto">
-              Open-source chemistry software (RDKit) runs in your browser, standard browser storage APIs hold your data,
-              and you can verify this architecture by inspecting network traffic — you will never see a SMILES string leave your machine.
+              Standard, well-understood primitives run on your device. The platform only ever receives one-way derived signals — and you can verify this architecture by inspecting the network traffic yourself.
             </p>
           </div>
 
@@ -1019,10 +1015,10 @@ export function Landing() {
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 px-8 py-6 flex items-center justify-between text-[12px] text-slate-600">
         <div className="flex items-center gap-2">
-          <img src={hakaseLogo} alt="HakaseAI" className="h-5 w-auto object-contain opacity-70" />
-          <span>BioDigital Twin Platform · v1.0</span>
+          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-5 w-auto object-contain opacity-70" />
+          <span>BioDigital Twin Platform · {RELEASE.version} · {RELEASE.date}</span>
         </div>
-        <div>Hakase AI · March 2026 · Confidential</div>
+        <div>Hakase AI · {RELEASE.date} · Confidential</div>
       </footer>
     </div>
   );

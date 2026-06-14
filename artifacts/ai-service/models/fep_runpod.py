@@ -1,15 +1,16 @@
-"""Free-energy refinement (TIES relative-binding-FEP) via RunPod Serverless.
+"""Free-energy refinement (TIES relative-binding-FEP) — GPU dispatch layer.
 
 L2 Stage 5 — opt-in GPU job. Submits a relative-binding-FEP job (Ligand A → B
-in a given PDB receptor) to a RunPod Serverless endpoint that runs the actual
-OpenMM + OpenFF Sage + TIES protocol on an A100/H100. Worker container is
-out-of-scope for this repo; this module only handles the dispatch / poll /
-result-shape contract.
+in a given PDB receptor) to a GPU worker endpoint that runs the actual
+OpenMM + OpenFF Sage + TIES protocol on an A100/H100.
+
+GPU provider is selected via the GPU_PROVIDER env var (default: runpod).
+See gpu_dispatch.py and .env.example for the full list of env vars per provider.
 
 Strict project policy:
-- NO fabricated ΔΔG. If RUNPOD_API_KEY or RUNPOD_FEP_ENDPOINT_ID is unset,
-  any submission attempt raises and the UI surfaces the exact reason.
-- NO silent fallback. RunPod errors propagate verbatim.
+- NO fabricated ΔΔG. If GPU provider credentials are unset, any submission
+  attempt raises and the UI surfaces the exact reason.
+- NO silent fallback. Provider errors propagate verbatim.
 
 Worker I/O contract (the container the user provisions on RunPod must honour):
   Input  JSON: {
@@ -44,34 +45,122 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import tempfile
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 from typing import Optional
 
-import requests
+import requests as _req
+
+from models import gpu_dispatch
+
+# ── Local GPU execution (GPU_PROVIDER=local) ─────────────────────────────────
+# Used when the backend runs directly on a GPU machine (RunPod Pod, etc.)
+# Runs OpenMM + OpenFF Sage + TIES-MD via subprocess in a temp directory.
+
+RT_KCAL = 0.5922  # k_B * T at 298 K in kcal/mol
+_LOCAL_ENGINE = "OpenMM 8.x + OpenFF Sage 2.2 + TIES-MD (local GPU)"
+_LOCAL_FF     = "openff-2.2.0"
 
 
-RUNPOD_BASE = "https://api.runpod.ai/v2"
-RUNPOD_TIMEOUT_S = 30  # per-HTTP-call timeout (job runs in background on RunPod side)
+def _fetch_pdb(pdb_id: str, dest: Path) -> None:
+    url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
+    r = _req.get(url, timeout=30)
+    r.raise_for_status()
+    dest.write_bytes(r.content)
 
 
-def _env(key: str) -> Optional[str]:
-    v = os.environ.get(key)
-    if v is None or not v.strip():
-        return None
-    return v.strip()
+def _smiles_to_mol2(smiles: str, name: str, out: Path) -> None:
+    res = subprocess.run(
+        ["obabel", f"-:{smiles}", "-omol2", f"-O{out}", "--gen3d", f"--title={name}"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"obabel failed: {res.stderr[-500:]}")
+
+
+def _run_fep_locally(payload: dict) -> dict:
+    """Run a TIES-MD FEP calculation directly on the local GPU."""
+    lig_a  = payload["ligand_a_smiles"]
+    lig_b  = payload["ligand_b_smiles"]
+    pdb_id = payload["pdb_id"]
+    n_lam  = int(payload.get("n_lambda_windows", 12))
+    n_rep  = int(payload.get("n_replicas", 3))
+    ns_win = float(payload.get("ns_per_window", 5.0))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+        receptor = work / f"{pdb_id}.pdb"
+        _fetch_pdb(pdb_id, receptor)
+
+        mol_a = work / "lig_a.mol2"
+        mol_b = work / "lig_b.mol2"
+        _smiles_to_mol2(lig_a, "LIG_A", mol_a)
+        _smiles_to_mol2(lig_b, "LIG_B", mol_b)
+
+        out_json = work / "results.json"
+        cmd = [
+            "ties_ana",
+            "--engine", "openmm",
+            "--legs", "bound", "free",
+            "--lambdas", str(n_lam),
+            "--reps",    str(n_rep),
+            "--ns",      str(ns_win),
+            "--lig_a",   str(mol_a),
+            "--lig_b",   str(mol_b),
+            "--protein", str(receptor),
+            "--output",  str(out_json),
+            "--workdir", str(work / "ties_run"),
+        ]
+        t0 = time.time()
+        res = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=int(ns_win * n_lam * n_rep * 600 + 3600),
+        )
+        elapsed = (time.time() - t0) / 60.0
+        if res.returncode != 0:
+            raise RuntimeError(f"TIES-MD failed:\n{res.stderr[-2000:]}")
+        if not out_json.exists():
+            raise RuntimeError("TIES-MD produced no results.json")
+
+        raw = json.loads(out_json.read_text())
+        ddg     = float(raw["ddG"])
+        ddg_err = float(raw.get("ddG_err", raw.get("ddG_uncertainty", 0.0)))
+        windows = [
+            {
+                "lambda":          float(w["lambda"]),
+                "dG_kcal_mol":     float(w["dG"]),
+                "stderr_kcal_mol": float(w.get("err", w.get("stderr", 0.0))),
+            }
+            for w in raw.get("windows", [])
+        ]
+        return {
+            "ddg_kcal_mol":            ddg,
+            "ddg_uncertainty_kcalmol": ddg_err,
+            "ddg_kT":                  ddg / RT_KCAL,
+            "windows":                 windows,
+            "wallclock_minutes":       elapsed,
+            "gpu_minutes":             elapsed,
+            "engine_version":          _LOCAL_ENGINE,
+            "force_field":             _LOCAL_FF,
+            "warnings":                [],
+        }
+
+
+# Poll every 30 s; FEP runs can take many hours.
+_POLL_INTERVAL_S = 30
+_POLL_DEADLINE_S = 36 * 3600  # 36 h hard cap
 
 
 def runpod_configured() -> tuple[bool, str]:
-    """(is_configured, missing_reason). Used by the endpoint to refuse honestly."""
-    if not _env("RUNPOD_API_KEY"):
-        return False, "RUNPOD_API_KEY environment secret is not set"
-    if not _env("RUNPOD_FEP_ENDPOINT_ID"):
-        return False, "RUNPOD_FEP_ENDPOINT_ID environment secret is not set"
-    return True, ""
+    """(is_configured, missing_reason). Delegates to gpu_dispatch so this
+    works regardless of which GPU_PROVIDER is active."""
+    return gpu_dispatch.is_configured("fep")
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +178,7 @@ class FepJobResult:
     engine_version:          str
     force_field:             str
     warnings:                list[str]
-    runpod_job_id:           str
+    provider_job_id:         str   # opaque ID from whichever GPU provider ran the job
 
 
 @dataclass
@@ -109,8 +198,8 @@ class FepJob:
 
 _JOBS: dict[str, FepJob] = {}
 _JOBS_LOCK = threading.Lock()
-# Single worker — multiple in-flight $50 FEP jobs is a footgun.
-_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fep-runpod")
+# Single worker — multiple in-flight $50+ FEP jobs is a footgun.
+_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fep-gpu")
 
 
 def _set(job_id: str, **fields):
@@ -128,17 +217,18 @@ def get_job(job_id: str) -> Optional[dict]:
         if not job:
             return None
         return {
-            "job_id":          job.job_id,
-            "status":          job.status,
-            "ligand_a_smiles": job.ligand_a_smiles,
-            "ligand_b_smiles": job.ligand_b_smiles,
-            "pdb_id":          job.pdb_id,
-            "progress":        job.progress,
-            "started_at":      job.started_at,
-            "finished_at":     job.finished_at,
-            "runpod_job_id":   job.runpod_job_id,
-            "error":           job.error,
-            "result":          asdict(job.result) if job.result else None,
+            "job_id":           job.job_id,
+            "status":           job.status,
+            "ligand_a_smiles":  job.ligand_a_smiles,
+            "ligand_b_smiles":  job.ligand_b_smiles,
+            "pdb_id":           job.pdb_id,
+            "progress":         job.progress,
+            "started_at":       job.started_at,
+            "finished_at":      job.finished_at,
+            "provider_job_id":  job.runpod_job_id,   # kept as runpod_job_id on the dataclass for compat
+            "gpu_provider":     gpu_dispatch.GPU_PROVIDER,
+            "error":            job.error,
+            "result":           asdict(job.result) if job.result else None,
         }
 
 
@@ -150,13 +240,14 @@ def submit_fep(
     n_replicas:       int = 3,
     ns_per_window:    float = 5.0,
 ) -> str:
-    """Submit a relative-binding-FEP job. Raises if RunPod is not configured —
+    """Submit a relative-binding-FEP job.
+    Raises if the configured GPU provider is not ready —
     the caller (FastAPI handler) translates that into a 503 with the exact reason."""
     ok, reason = runpod_configured()
     if not ok:
         raise RuntimeError(
-            f"RunPod is not configured: {reason}. "
-            f"Stage 5 free-energy refinement requires RunPod Serverless credentials. "
+            f"GPU provider ({gpu_dispatch.GPU_PROVIDER}) is not configured: {reason}. "
+            f"Stage 5 free-energy refinement requires GPU backend credentials. "
             f"Per project policy, no ΔΔG estimate is fabricated when the GPU backend is unavailable."
         )
 
@@ -178,7 +269,7 @@ def submit_fep(
 
 
 # ---------------------------------------------------------------------------
-# Pipeline (RunPod Serverless dispatch + poll)
+# Pipeline — provider-agnostic dispatch + poll via gpu_dispatch
 # ---------------------------------------------------------------------------
 
 def _run_job(
@@ -191,74 +282,61 @@ def _run_job(
     ns_per_window: float,
 ):
     t0 = time.time()
-    _set(job_id, status="running", started_at=t0, progress="submitting to RunPod")
+    provider = gpu_dispatch.GPU_PROVIDER
+    _set(job_id, status="running", started_at=t0,
+         progress=f"submitting to {provider}")
     try:
-        api_key     = _env("RUNPOD_API_KEY")
-        endpoint_id = _env("RUNPOD_FEP_ENDPOINT_ID")
-        # runpod_configured() was checked at submit_fep, but re-verify for thread safety
-        if not api_key or not endpoint_id:
-            raise RuntimeError("RunPod credentials disappeared between submit and dispatch")
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type":  "application/json",
-        }
+        # Scientific payload — identical regardless of GPU provider
         payload = {
-            "input": {
-                "ligand_a_smiles":  ligand_a_smiles,
-                "ligand_b_smiles":  ligand_b_smiles,
-                "pdb_id":           pdb_id,
-                "n_lambda_windows": n_lambda_windows,
-                "n_replicas":       n_replicas,
-                "ns_per_window":    ns_per_window,
-            }
+            "ligand_a_smiles":  ligand_a_smiles,
+            "ligand_b_smiles":  ligand_b_smiles,
+            "pdb_id":           pdb_id,
+            "n_lambda_windows": n_lambda_windows,
+            "n_replicas":       n_replicas,
+            "ns_per_window":    ns_per_window,
         }
 
-        # 1. Submit (async run)
-        run_url = f"{RUNPOD_BASE}/{endpoint_id}/run"
-        r = requests.post(run_url, headers=headers, json=payload, timeout=RUNPOD_TIMEOUT_S)
-        if r.status_code != 200:
-            raise RuntimeError(f"RunPod /run failed HTTP {r.status_code}: {r.text[:300]}")
-        data = r.json()
-        runpod_job_id = data.get("id")
-        if not runpod_job_id:
-            raise RuntimeError(f"RunPod /run returned no id: {data}")
-        _set(job_id, runpod_job_id=runpod_job_id, progress=f"queued on RunPod ({runpod_job_id})")
+        # ── LOCAL: run directly on this machine's GPU ──────────────────────
+        if provider == "local":
+            _set(job_id, runpod_job_id="local",
+                 progress="running TIES-MD on local GPU")
+            output = _run_fep_locally(payload)
+            _store_result(job_id, output, "local")
+            return
 
-        # 2. Poll status
-        status_url = f"{RUNPOD_BASE}/{endpoint_id}/status/{runpod_job_id}"
+        # 1. Submit — returns an opaque provider_job_id
+        provider_job_id = gpu_dispatch.submit(payload, "fep")
+        _set(job_id, runpod_job_id=provider_job_id,
+             progress=f"queued on {provider} ({provider_job_id})")
+
+        # 2. Poll until done, failed, or deadline exceeded
         # FEP runs can take many hours; poll every 30 s, hard cap at 36 h.
-        deadline = time.time() + 36 * 3600
+        deadline    = time.time() + _POLL_DEADLINE_S
         last_status = ""
         while time.time() < deadline:
-            time.sleep(30)
+            time.sleep(_POLL_INTERVAL_S)
             try:
-                rs = requests.get(status_url, headers=headers, timeout=RUNPOD_TIMEOUT_S)
-            except requests.RequestException as e:
+                status, output, progress_msg = gpu_dispatch.poll(provider_job_id, "fep")
+            except RuntimeError:
+                raise   # provider reported failure — propagate immediately
+            except Exception as e:
                 # Transient network errors — keep polling; don't kill a long job
                 _set(job_id, progress=f"poll transient error ({type(e).__name__}); retrying")
                 continue
-            if rs.status_code != 200:
-                raise RuntimeError(f"RunPod /status failed HTTP {rs.status_code}: {rs.text[:300]}")
-            sdata = rs.json()
-            rp_status = sdata.get("status", "UNKNOWN")
-            if rp_status != last_status:
-                last_status = rp_status
-                _set(job_id, progress=f"RunPod status: {rp_status}")
-            if rp_status == "COMPLETED":
-                output = sdata.get("output")
-                if output is None:
-                    raise RuntimeError("RunPod COMPLETED but no output payload")
-                _store_result(job_id, output, runpod_job_id)
+
+            if progress_msg != last_status:
+                last_status = progress_msg
+                _set(job_id, progress=progress_msg)
+
+            if status == "done":
+                _store_result(job_id, output, provider_job_id)
                 return
-            if rp_status in ("FAILED", "CANCELLED", "TIMED_OUT"):
-                err = sdata.get("error") or sdata.get("output") or "no error message"
-                raise RuntimeError(f"RunPod job {rp_status}: {err}")
-            # IN_QUEUE / IN_PROGRESS — keep polling
+            # status == "running" → keep polling
 
         raise RuntimeError(
-            f"RunPod job {runpod_job_id} exceeded 36 h poll window without completing. "
-            f"Job may still be running on RunPod — check the RunPod console with this id."
+            f"{provider} job {provider_job_id} exceeded {_POLL_DEADLINE_S // 3600} h "
+            f"poll window without completing. "
+            f"The job may still be running — check your {provider} console."
         )
     except Exception as e:
         _set(
@@ -267,9 +345,10 @@ def _run_job(
         )
 
 
-def _store_result(job_id: str, output: dict, runpod_job_id: str) -> None:
-    """Validate the worker's output JSON and convert to FepJobResult. Per project
-    policy, missing required fields raise — we never substitute defaults."""
+def _store_result(job_id: str, output: dict, provider_job_id: str) -> None:
+    """Validate the worker's output JSON and convert to FepJobResult.
+    Per project policy, missing required fields raise — we never substitute defaults.
+    The output contract is identical across GPU providers."""
     required = [
         "ddg_kcal_mol", "ddg_uncertainty_kcalmol", "ddg_kT",
         "windows", "wallclock_minutes", "gpu_minutes",
@@ -278,8 +357,9 @@ def _store_result(job_id: str, output: dict, runpod_job_id: str) -> None:
     missing = [k for k in required if k not in output]
     if missing:
         raise RuntimeError(
-            f"RunPod worker output missing required fields {missing}. "
-            f"Per project policy, no defaults are substituted. Worker payload keys: {list(output.keys())}"
+            f"GPU worker output missing required fields {missing}. "
+            f"Per project policy, no defaults are substituted. "
+            f"Worker payload keys: {list(output.keys())}"
         )
 
     result = FepJobResult(
@@ -292,7 +372,7 @@ def _store_result(job_id: str, output: dict, runpod_job_id: str) -> None:
         engine_version          = str(output["engine_version"]),
         force_field             = str(output["force_field"]),
         warnings                = list(output.get("warnings", [])),
-        runpod_job_id           = runpod_job_id,
+        provider_job_id         = provider_job_id,
     )
     _set(job_id, status="done", finished_at=time.time(),
          progress="complete", result=result)

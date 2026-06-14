@@ -4,6 +4,16 @@ let initPromise: Promise<void> | null = null;
 
 export interface MolecularProperties {
   isValid: boolean;
+  /**
+   * RDKit canonical SMILES of the desalted parent structure. This is the
+   * representation-invariant identity key for the molecule: two different
+   * input SMILES for the same compound (different atom ordering, kekulé vs
+   * aromatic, or a salt/counter-ion form) collapse to the SAME
+   * `canonicalSmiles`. Downstream engines hash and key ML calls off this
+   * field so equivalent inputs produce identical L1 values and verdicts.
+   * Empty string only when RDKit could not canonicalise.
+   */
+  canonicalSmiles: string;
   mw: number;
   logP: number;
   hbd: number;
@@ -125,6 +135,7 @@ export function getRDKitInstance(): any | null {
 
 const INVALID_PROPS: MolecularProperties = {
   isValid: false,
+  canonicalSmiles: "",
   mw: 0, logP: 0, hbd: 0, hba: 0, tpsa: 0, rotBonds: 0,
   qed_approx: 0, heavyAtoms: 0, numRings: 0, numAromaticRings: 0, numAtoms: 0,
   lipinskiMW: false, lipinskiLogP: false, lipinskiHBD: false,
@@ -136,12 +147,98 @@ const INVALID_PROPS: MolecularProperties = {
   numSpiroAtoms: 0, numBridgeheadAtoms: 0, numStereoCenters: 0, phi: 0,
 };
 
+/**
+ * Pick the largest organic fragment of a (possibly multi-component) canonical
+ * SMILES — i.e. strip salts / counter-ions / solvents. Prefers a fragment that
+ * contains carbon; ties broken by heavy-atom count. Deterministic.
+ */
+function pickLargestOrganicFragment(canon: string): string {
+  if (!canon.includes(".")) return canon;
+  const frags = canon.split(".").filter(Boolean);
+  if (frags.length === 0) return canon;
+  const heavyCount = (f: string) => (f.match(/Cl|Br|[BCNOPSFIbcnops]/g) || []).length;
+  const score = (f: string) => (/[Cc]/.test(f) ? 100000 : 0) + heavyCount(f);
+  return frags.reduce((best, f) => (score(f) > score(best) ? f : best), frags[0]);
+}
+
+/**
+ * Neutralise carboxylate anions left behind after salt-stripping (the
+ * dominant pharma salt class: Na⁺/K⁺/Ca²⁺/choline carboxylates), so that a
+ * carboxylate salt and its free acid map to the same parent. The patterns are
+ * carboxylate-SPECIFIC — they require a carbon adjacent to the `[O-]` and a
+ * carbonyl, so they can never match a nitro (`[N+](=O)[O-]`), N-oxide,
+ * sulfonate (`S(=O)(=O)[O-]`) or phosphonate oxygen. Anything we change is
+ * re-parsed and re-canonicalised by RDKit, so an unexpected edit that yields
+ * an invalid molecule is discarded.
+ */
+function neutralizeCarboxylate(s: string): string {
+  return s
+    .replace(/C\(=O\)\[O-\]/g, "C(=O)O")
+    .replace(/C\(\[O-\]\)=O/g, "C(O)=O")
+    .replace(/\[O-\]C=O/g, "OC=O");
+}
+
+/**
+ * Canonicalise a SMILES to its representation-invariant identity key:
+ * desalted parent + carboxylate-neutralised + RDKit canonical SMILES. Returns
+ * null when RDKit is not ready or the structure is invalid. Pure and
+ * deterministic — the same molecule always maps to the same string regardless
+ * of how it was typed (atom ordering, kekulé vs aromatic, salt/counter-ion
+ * form, or carboxylate-salt vs free-acid protonation).
+ */
+export function canonicalizeSmiles(input: string): string | null {
+  if (!rdkit || !input?.trim()) return null;
+  let mol: any = null;
+  try {
+    mol = rdkit.get_mol(input.trim());
+    if (!mol || !mol.is_valid()) return null;
+    let canon: string;
+    try { canon = mol.get_smiles(); } catch { return null; }
+    if (typeof canon !== "string" || !canon) return null;
+    const parent = pickLargestOrganicFragment(canon);
+    const target = neutralizeCarboxylate(parent);
+    // No desalting and no neutralisation needed → canonical form is final.
+    if (parent === canon && target === parent) return canon;
+    let mol2: any = null;
+    try {
+      mol2 = rdkit.get_mol(target);
+      if (mol2 && mol2.is_valid()) {
+        const c2 = mol2.get_smiles();
+        if (typeof c2 === "string" && c2) return c2;
+      }
+      // Neutralisation produced something invalid — fall back to the
+      // (still desalted) parent, re-canonicalised when possible.
+      if (target !== parent) {
+        let mol3: any = null;
+        try {
+          mol3 = rdkit.get_mol(parent);
+          if (mol3 && mol3.is_valid()) {
+            const c3 = mol3.get_smiles();
+            if (typeof c3 === "string" && c3) return c3;
+          }
+        } finally { mol3?.delete?.(); }
+      }
+      return parent;
+    } finally { mol2?.delete?.(); }
+  } catch {
+    return null;
+  } finally {
+    mol?.delete?.();
+  }
+}
+
 export function getMolecularProperties(smiles: string): MolecularProperties | null {
   if (!rdkit || !smiles.trim()) return null;
 
   let mol: any = null;
   try {
-    mol = rdkit.get_mol(smiles.trim());
+    // Canonicalise + desalt FIRST so descriptors are computed on the parent
+    // structure. This guarantees that equivalent SMILES (different ordering,
+    // aromaticity, or salt form) of the same compound yield identical
+    // descriptors → identical L1 values and verdicts.
+    const canonicalSmiles = canonicalizeSmiles(smiles) ?? "";
+    const parseTarget = canonicalSmiles || smiles.trim();
+    mol = rdkit.get_mol(parseTarget);
     if (!mol || !mol.is_valid()) {
       return { ...INVALID_PROPS };
     }
@@ -220,7 +317,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
       // is an OPTIMISTIC bound when those broader alerts fire.
       let alertsCount = 0;
       try {
-        const pharm = detectPharmacophores(smiles);
+        const pharm = detectPharmacophores(parseTarget);
         if (pharm) {
           alertsCount =
             (pharm.hasMichaelAcceptor ? 1 : 0) +
@@ -255,6 +352,7 @@ export function getMolecularProperties(smiles: string): MolecularProperties | nu
 
     return {
       isValid: true,
+      canonicalSmiles,
       mw:       parseFloat(mw.toFixed(1)),
       logP:     parseFloat(logP.toFixed(2)),
       hbd, hba,

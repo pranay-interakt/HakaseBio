@@ -172,18 +172,9 @@ function hashSmiles(smiles: string): number {
   return h;
 }
 
-/**
- * Deterministic seeded PRNG using the mulberry32 algorithm.
- * Produces a float in [0, 1) from a uint32 seed.
- * Replaces the former Math.sin LCG which had poor spectral properties
- * and was not reproducible across JS engines.
- */
-function seededRandom(seed: number): number {
-  let t = ((seed >>> 0) + 0x6D2B79F5) >>> 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
+// NOTE: the former `seededRandom` (mulberry32 PRNG) has been removed. Every
+// L1 small-molecule output is now a deterministic point estimate or a real
+// ML/QSAR value — no synthetic per-molecule noise anywhere in this engine.
 
 function cypRisk(ic50: number): "Low" | "Moderate" | "High" {
   if (ic50 > 20) return "Low";
@@ -604,7 +595,13 @@ export function runInVitroSimulation(
   // Prefer Kd from the overlay over the positional `predictedKd_nM` so
   // callers that pass both stay consistent (Kd_nM is the canonical channel).
   const effectiveKd_nM = overlay.Kd_nM !== null ? overlay.Kd_nM : predictedKd_nM;
-  const seed = hashSmiles(smiles);
+  // Representation-invariant identity key: every seed-derived choice (e.g. the
+  // cell-line pick) and every substructure scan keys off the canonical,
+  // desalted SMILES so two equivalent inputs for the same molecule produce
+  // identical L1 outputs. Falls back to the raw string only if RDKit could
+  // not canonicalise.
+  const canonSmiles = molProps.canonicalSmiles || smiles;
+  const seed = hashSmiles(canonSmiles);
   const mw = molProps.mw ?? 300;
   const logP = molProps.logP ?? 2.0;
   const tpsa = molProps.tpsa ?? 75;
@@ -621,7 +618,7 @@ export function runInVitroSimulation(
   const labuteASA = molProps.labuteASA ?? 100;
   const taProfile = getTherapeuticProfile(therapeuticArea);
 
-  const pharm = detectPharmacophores(smiles);
+  const pharm = detectPharmacophores(canonSmiles);
   const basicN = pharm?.basicAmineCount ?? 0;
   const acidicGroups = pharm?.acidicGroupCount ?? 0;
 
@@ -637,8 +634,6 @@ export function runInVitroSimulation(
     basicAmineCount: basicN,
     acidicGroupCount: acidicGroups,
   };
-
-  const r = (offset: number) => seededRandom(seed + offset);
 
   const basePIC50 = computeBaselinePIC50(
     mw, logP, tpsa, hbd, hba, rotBonds,
@@ -676,48 +671,56 @@ export function runInVitroSimulation(
   if (hasValidatedTarget) {
     provenance.doseResponse_IC50 = effectiveKd_nM !== null ? "ml" : "heuristic";
   }
-  const ec50_nM: number | null = hasValidatedTarget
-    ? ic50_nM_raw * clamp(0.85 + (hashSmiles(smiles + "ec50") % 100) / 500, 0.8, 1.2)
-    : null;
+  // EC50 — for a single-site competitive logistic dose-response the
+  // half-maximal concentration IS the IC50 by definition. The former
+  // SMILES-hash jitter multiplier had no physical meaning and is removed,
+  // so EC50 is now a defensible, deterministic value for any molecule.
+  const ec50_nM: number | null = ic50_nM;
 
+  // Hill coefficient — deterministic: base 1.0 (single-site mass action)
+  // with small, structure-based adjustments (extra aromatic rings, sp3
+  // content, a Michael-acceptor warhead → steeper slope). The former
+  // ±0.15 seeded-random term is removed so a molecule gives the same
+  // slope every run; the 1.0–1.5 range it now produces is physically
+  // sensible for an arbitrary new compound.
   const hillCoeffRaw = (() => {
     let h = 1.0;
     if (nArom >= 2) h += 0.15;
     if (fsp3 > 0.4) h += 0.1;
     if (pharm?.hasMichaelAcceptor) h += 0.3;
     if (rotBonds > 8) h -= 0.1;
-    return clamp(h + (r(3) - 0.5) * 0.3, 0.7, 3.0);
+    return clamp(h, 0.7, 3.0);
   })();
   const hillCoefficient: number | null = hasValidatedTarget ? hillCoeffRaw : null;
 
+  // Maximum inhibition (Emax) — deterministic. A competitive inhibitor
+  // approaches ~100 % effect at saturating dose; the former ±3 seeded-random
+  // term is removed. Structure adjustments stay deterministic.
   const maxInhibitionRaw = (() => {
     let m = 90;
     if (finalPIC50 > 7) m += 5;
     if (pharm?.hasMichaelAcceptor) m += 3;
     if (logP > 5) m -= 5;
-    return clamp(m + (r(4) - 0.5) * 6, 60, 100);
+    return clamp(m, 60, 100);
   })();
   const maxInhibition: number | null = hasValidatedTarget ? maxInhibitionRaw : null;
 
   // Curve only when target is validated; otherwise empty array (the UI's
   // dose-response chart renders its no-data state for length === 0).
   //
-  // Noise model: heteroscedastic Gaussian with σ = 4 % of Emax (maxInhibitionRaw).
-  // Uses Box-Muller transform on two independent seededRandom calls to yield
-  // N(0, 1), then scales by the heteroscedastic σ.  This more closely matches
-  // real plate-reader CVs (3–6 % at plateau) compared to the previous uniform
-  // ±1 % additive noise which underestimates variance at low concentrations.
+  // Clean predicted 4-parameter logistic (Hill) curve:
+  //   response = Emax / (1 + (IC50 / conc)^Hill)
+  // The former synthetic Box-Muller "plate-reader noise" is removed — a
+  // predicted curve must not masquerade as noisy measured data. Genuine
+  // uncertainty belongs in a confidence band derived from the IC50
+  // prediction error, not in fabricated scatter. The curve is now fully
+  // deterministic and well-formed for any molecule.
   const curve: DoseResponsePoint[] = [];
   if (hasValidatedTarget) {
-    const sigma = maxInhibitionRaw * 0.04; // heteroscedastic: 4 % of Emax
     for (let i = -2; i <= 5; i += 0.5) {
       const conc = Math.pow(10, i);
       const response = maxInhibitionRaw / (1 + Math.pow(ic50_nM_raw / conc, hillCoeffRaw));
-      // Box-Muller: two uniform samples → standard normal
-      const u1 = Math.max(1e-10, r(200 + i * 10));
-      const u2 = r(201 + i * 10);
-      const gaussianNoise = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      curve.push({ concentration: conc, response: clamp(response + gaussianNoise * sigma, 0, 100) });
+      curve.push({ concentration: conc, response: clamp(response, 0, 100) });
     }
   }
 
@@ -915,31 +918,66 @@ export function runInVitroSimulation(
   let topOffTargets: SelectivityData["topOffTargets"] = [];
 
   if (hasValidatedScreen) {
-    totalTargets = 50 + Math.round(r(18) * 50 + heavyAtoms);
-    const offTargetLogP = logP > 4 ? 12 : logP > 2 ? 6 : 3;
-    const offTargetShape = nArom > 3 ? 4 : 0;
-    const offTargetBase = offTargetLogP + offTargetShape;
-    offTargetHits = Math.round(clamp(offTargetBase * (0.6 + fsp3 * 0.4), 0, 25));
-    kinaseScore = clamp(1 - (offTargetHits / totalTargets) * 10, 0, 1);
+    const offTargetNames = taProfile.offTargetPanelNames;
+    // ── In-silico off-target liability model (deterministic, no RNG) ──────
+    // The prior implementation fabricated the panel size (`50 + jitter*50`)
+    // and the per-target selectivity ratios (`r(40+i)*30`) with a seeded
+    // PRNG — a fake "tested against ~100 targets" wet-lab claim. There is no
+    // wet-lab off-target panel behind this engine, so we now report an
+    // honest IN-SILICO promiscuity prediction over the actual curated panel.
+    //
+    // Promiscuity index P∈[0,1] follows the physicochemical promiscuity
+    // drivers established by Leeson & Springthorpe (Nat Rev Drug Discov
+    // 2007), Azzaoui (ChemMedChem 2007) and Yang (J Chem Inf Model 2010):
+    // promiscuity rises with lipophilicity and basicity, and falls with
+    // 3D character (Fsp3) and polarity (TPSA). Deterministic — a molecule
+    // yields the same liability profile on every run.
+    const basicCenters = Math.max(0, basicN);
+    const promiscuity = clamp(
+      0.34
+      + 0.135 * (logP - 2.5)            // lipophilicity (strongest driver)
+      + 0.090 * Math.min(2, basicCenters) // basic amines → cation promiscuity
+      + 0.045 * Math.max(0, nArom - 2)  // flat polyaromatic shape
+      - 0.55  * (fsp3 - 0.32)           // sp3/3D character is protective
+      - 0.0016 * (tpsa - 75),           // polarity is protective
+      0, 1,
+    );
+    // The "panel" is the curated in-silico safety panel for this therapeutic
+    // area — report its REAL size, never a fabricated count. Null when no TA
+    // panel is defined (neutral profile).
+    totalTargets = offTargetNames.length > 0 ? offTargetNames.length : null;
+    kinaseScore = clamp(1 - promiscuity, 0, 1);
     selectivityClass =
       kinaseScore > 0.8 ? "Selective" : kinaseScore > 0.5 ? "Moderately Selective" : "Non-Selective";
 
-    const offTargetNames = taProfile.offTargetPanelNames;
-    // Even with hasValidatedScreen, the TA panel must be non-empty AND
-    // the on-target IC50 must be computable for off-target ratios to mean
-    // anything. Otherwise emit empty list.
-    if (offTargetNames.length > 0 && ic50_nM !== null) {
-      const ic50OnTarget = ic50_nM;
-      topOffTargets = Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
-        const nameIdx = (seed + i * 7) % offTargetNames.length;
-        const offRatio = 5 + (kappa2 + chi1v) * 2 + r(40 + i) * 30;
-        return {
-          name: offTargetNames[nameIdx],
-          ic50_nM: clamp(ic50OnTarget * offRatio * 0.5, 10, 50000),
-          selectivityRatio: clamp(offRatio, 1, 100),
-        };
-      });
+    if (totalTargets !== null) {
+      // Predicted count of panel members flagged as liabilities — a smooth
+      // deterministic function of promiscuity over the real panel size.
+      offTargetHits = Math.round(clamp(promiscuity * totalTargets, 0, totalTargets));
+
+      // Per-target predicted fold-selectivity, only when an on-target IC50
+      // exists (a ratio is meaningless without a reference potency). Targets
+      // are ranked most→least liable and assigned a MONOTONIC predicted
+      // selectivity gradient — a transparent ranking assumption, not random
+      // noise. Base ratio is set by promiscuity: promiscuous compounds have
+      // off-targets close to the on-target IC50 (small ratio).
+      if (ic50_nM !== null && offTargetHits > 0) {
+        const ic50OnTarget = ic50_nM;
+        // base fold-selectivity of the single most-liable off-target.
+        const baseRatio = clamp(Math.pow(10, 0.45 + 1.55 * (1 - promiscuity)), 2, 200);
+        topOffTargets = Array.from({ length: Math.min(offTargetHits, 5) }, (_, i) => {
+          // rank 0 = most liable (smallest ratio); each subsequent panel
+          // member is predicted progressively more selective.
+          const ratio = clamp(baseRatio * (1 + 0.6 * i), 2, 1000);
+          return {
+            name: offTargetNames[i % offTargetNames.length],
+            ic50_nM: clamp(ic50OnTarget * ratio, 10, 1_000_000),
+            selectivityRatio: +ratio.toFixed(1),
+          };
+        });
+      }
     }
+    provenance.selectivity = "heuristic"; // in-silico promiscuity proxy (no wet-lab panel)
   }
 
   // ── Cytotoxicity CC50 ───────────────────────────────────────────────────
@@ -987,7 +1025,7 @@ export function runInVitroSimulation(
 
   const bioactivation = runBioactivationAssessment(
     {
-      smiles,
+      smiles: canonSmiles,
       molecularWeight: mw,
       logP,
       tpsa,

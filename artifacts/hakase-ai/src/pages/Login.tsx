@@ -38,7 +38,7 @@ export function Login() {
           onClick={() => navigate("/")}
           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
         >
-          <img src={hakaseLogo} alt="HakaseAI" className="h-9 w-auto object-contain" />
+          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-9 w-auto object-contain" />
         </button>
         <button
           onClick={() => navigate("/")}

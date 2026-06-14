@@ -46,7 +46,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "dili_ml_rf.pkl")
-MODEL_VERSION = "1.1.0"  # bumped: added training_fps for AD scoring
+MODEL_VERSION = "1.2.0"  # bumped: deterministic training (canonical SMILES sort + n_jobs=1)
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
 DESCRIPTOR_NAMES = ["MolWt", "MolLogP", "TPSA", "HBD", "HBA", "FractionCSP3"]
@@ -57,13 +57,30 @@ FEATURE_DIM = MORGAN_NBITS + len(DESCRIPTOR_NAMES)
 # Featurization
 # --------------------------------------------------------------------------- #
 
+def _canonicalize(smiles: str) -> str | None:
+    """Return RDKit canonical SMILES, or None if unparseable.
+    Calling this before any ML inference ensures that any two SMILES strings
+    that represent the same molecule produce bit-identical feature vectors."""
+    from rdkit import Chem
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    return Chem.MolToSmiles(mol, canonical=True)
+
+
 def _featurize(smiles: str) -> np.ndarray | None:
-    """SMILES → fixed-size feature vector. Returns None on parse failure."""
+    """SMILES → fixed-size feature vector. Returns None on parse failure.
+    Always canonicalizes first so different SMILES for the same molecule give
+    identical feature vectors."""
     from rdkit import Chem
     from rdkit.Chem import AllChem, Crippen, rdMolDescriptors
     from rdkit.DataStructs import ConvertToNumpyArray
 
     mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    # Re-parse from canonical form to guarantee identical atom numbering
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol, canonical=True))
     if mol is None:
         return None
 
@@ -95,7 +112,13 @@ def _train() -> dict[str, Any]:
 
     logger.info("DILI-ML: downloading TDC DILI dataset (Xu et al. 2015)...")
     df = Tox(name="DILI").get_data()
-    smiles = df["Drug"].tolist()
+    # Sort by canonical SMILES so row order is deterministic regardless of
+    # network/cache fetch order. This eliminates training non-determinism
+    # when the model is retrained (e.g. after a cache miss).
+    from rdkit import Chem
+    df["_canon"] = df["Drug"].apply(lambda s: Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True) if Chem.MolFromSmiles(s) else s)
+    df = df.sort_values("_canon").reset_index(drop=True)
+    smiles = df["_canon"].tolist()
     y = df["Y"].astype(int).to_numpy()
 
     logger.info("DILI-ML: featurizing %d compounds...", len(smiles))
@@ -126,7 +149,7 @@ def _train() -> dict[str, Any]:
         n_estimators=400,
         max_depth=None,
         min_samples_leaf=2,
-        n_jobs=-1,
+        n_jobs=1,           # single-threaded: eliminates parallel non-determinism
         class_weight="balanced",
         random_state=42,
     )
@@ -134,7 +157,7 @@ def _train() -> dict[str, Any]:
     cv_auc_mean: float | None = None
     cv_auc_std: float | None = None
     try:
-        scores = cross_val_score(clf, X, y_arr, cv=5, scoring="roc_auc", n_jobs=-1)
+        scores = cross_val_score(clf, X, y_arr, cv=5, scoring="roc_auc", n_jobs=1)
         cv_auc_mean = float(scores.mean())
         cv_auc_std = float(scores.std())
         logger.info(
@@ -308,6 +331,13 @@ def predict_dili_ml(smiles: str) -> dict[str, Any]:
     """
     if not smiles or not smiles.strip():
         raise ValueError("smiles is required")
+
+    # Canonicalize before any ML inference — ensures different SMILES strings
+    # for the same molecule produce bit-identical results
+    canon = _canonicalize(smiles.strip())
+    if canon is None:
+        return _fallback_envelope(smiles, "rdkit_could_not_parse_smiles")
+    smiles = canon
 
     try:
         bundle = _load_model()

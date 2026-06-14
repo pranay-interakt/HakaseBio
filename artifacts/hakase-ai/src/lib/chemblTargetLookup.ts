@@ -1,4 +1,5 @@
 import type { SourceQuality } from "./sourceQuality";
+import { API_ROOT } from "./apiBase";
 
 export interface ChEMBLTargetHit {
   targetChemblId: string;
@@ -54,7 +55,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
 
   // Pass 1: exact-match
   try {
-    const res = await fetch(`/api/chembl/target-search?smiles=${encodeURIComponent(smiles)}`, {
+    const res = await fetch(`${API_ROOT}/api/chembl/target-search?smiles=${encodeURIComponent(smiles)}`, {
       signal: AbortSignal.timeout(30000),
     });
     if (res.ok) {
@@ -105,7 +106,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
 
   // Try v2 first
   try {
-    const res = await fetch(`/api/chembl/similar-targets/v2?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
+    const res = await fetch(`${API_ROOT}/api/chembl/similar-targets/v2?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
       signal: AbortSignal.timeout(60000),
     });
     if (res.ok) {
@@ -127,7 +128,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
 
   // Fallback: v1 (no quality payload)
   try {
-    const res = await fetch(`/api/chembl/similar-targets?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
+    const res = await fetch(`${API_ROOT}/api/chembl/similar-targets?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
       signal: AbortSignal.timeout(45000),
     });
     if (!res.ok) return { ...empty, status: "error", method: "none" };
@@ -154,7 +155,7 @@ async function enrichWithPdb(targets: ChEMBLTargetHit[]): Promise<ChEMBLTargetHi
   const pdbMap = new Map<string, { ids: string[]; count: number }>();
   await Promise.allSettled(accessions.map(async (acc) => {
     try {
-      const r = await fetch(`/api/pdb/by-uniprot?accession=${encodeURIComponent(acc)}`, { signal: AbortSignal.timeout(8000) });
+      const r = await fetch(`${API_ROOT}/api/pdb/by-uniprot?accession=${encodeURIComponent(acc)}`, { signal: AbortSignal.timeout(8000) });
       if (!r.ok) return;
       const d = await r.json();
       pdbMap.set(acc, { ids: (d.pdbIds ?? []).slice(0, 10), count: d.pdbCount ?? 0 });

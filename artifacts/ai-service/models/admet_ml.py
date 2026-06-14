@@ -182,6 +182,17 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
     if not smiles or not smiles.strip():
         raise ValueError("smiles is required")
 
+    # Canonicalize SMILES so any two representations of the same molecule
+    # produce identical predictions (Chemprop is graph-invariant but
+    # canonicalization removes any remaining string-level sensitivity).
+    try:
+        from rdkit import Chem as _Chem
+        _mol = _Chem.MolFromSmiles(smiles.strip())
+        if _mol is not None:
+            smiles = _Chem.MolToSmiles(_mol, canonical=True)
+    except Exception:
+        pass  # If RDKit unavailable, proceed with raw SMILES
+
     try:
         model = _load_model()
     except Exception as exc:  # noqa: BLE001 - any load failure → fallback
@@ -189,7 +200,12 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
 
     try:
         t0 = time.time()
-        raw = model.predict(smiles=smiles)
+        # Chemprop drops any batch of size 1 (dataset_size=1 < batch_size=64)
+        # which causes lightning's Rich progress teardown to crash with
+        # "IndexError: pop from empty list". Duplicating the SMILES ensures
+        # the batch is size 2 so nothing gets dropped; we only use iloc[0].
+        smiles_batch = [smiles, smiles]
+        raw = model.predict(smiles=smiles_batch)
         inference_time_ms = round((time.time() - t0) * 1000, 1)
         flat = _normalize_result(raw, smiles)
     except Exception as exc:  # noqa: BLE001 - runtime inference error → fallback

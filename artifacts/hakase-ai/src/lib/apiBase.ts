@@ -1,0 +1,3 @@
+// All API calls use relative paths — /api/...
+// This works whether frontend and backend are on the same machine or proxied.
+export const API_ROOT = "";

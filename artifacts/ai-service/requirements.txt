@@ -1,0 +1,47 @@
+# HakaseAI — AI service dependencies
+# Install with: pip install -r requirements.txt
+# rdkit must be installed separately: conda install -c conda-forge rdkit
+#   or: pip install rdkit
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+requests>=2.31.0
+httpx>=0.27.0
+
+# rdkit — install via conda (preferred) or pip:
+#   conda install -c conda-forge rdkit
+#   pip install rdkit
+# Required by: admet.py, molecular_properties.py, binding_ml.py, solubility_ml.py
+rdkit>=2023.9.1
+
+# Antibody numbering — ANARCI (BSD-3, Dunbar & Deane 2016; commercial-safe).
+# Enables EXACT IMGT CDR numbering in the antibody engine. Also needs the HMMER
+# binary:  conda install -c bioconda hmmer   (or)   apt-get install hmmer
+# If ANARCI or HMMER is absent, the antibody engine automatically falls back to
+# its motif-anchored CDR heuristic — so this dependency is optional.
+anarci
+
+# ── GPU_PROVIDER=local (RunPod Pod / any GPU server) ─────────────────────────
+# These are installed automatically by pnpm backend when GPU_PROVIDER=local.
+# They are heavy — skip on CPU-only machines by keeping GPU_PROVIDER unset or
+# setting it to runpod/aws/azure (cloud dispatch needs none of these locally).
+#
+# Boltz-2 co-folding (MIT license):
+#   pip install boltz
+# boltz>=0.4.0
+#
+# FEP/TIES free energy (OpenMM + OpenFF + TIES-MD):
+#   pip install openmm openff-toolkit openff-interchange openmmforcefields ties-md
+# openmm>=8.1.0
+# openff-toolkit>=0.16.0
+# openff-interchange>=0.3.0
+# openmmforcefields>=0.12.0
+# ties-md>=1.7.0
+# openbabel-wheel>=3.1.1   # or: apt install openbabel
+
+# ── GPU_PROVIDER=aws  → requires boto3 ───────────────────────────────────────
+# Install: pip install boto3
+# boto3>=1.34.0
