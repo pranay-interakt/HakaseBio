@@ -353,9 +353,15 @@ export interface TrialResults {
 }
 
 function clamp(v: number, lo = 0, hi = 1) { return Math.max(lo, Math.min(hi, v)); }
-function jitter(base: number, range: number, seed: number): number {
-  const v = Math.sin(seed * 9301 + 49297) * 233280;
-  return Math.max(0, base + (v - Math.floor(v) - 0.5) * range * 2);
+/**
+ * Deterministic identity — see cohortSim.ts for rationale. The old PRNG-based
+ * jitter() added synthetic per-run noise on top of model outputs, which made
+ * the same inputs produce different numbers each time and gave the (correct)
+ * impression that the platform was making things up. Signature preserved so
+ * existing call sites compile; the noise term is zeroed.
+ */
+function jitter(base: number, _range: number, _seed: number): number {
+  return Math.max(0, base);
 }
 function hashStr(s: string): number {
   let h = 0;

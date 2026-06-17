@@ -274,16 +274,33 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
       {sim && (
         <div className="grid grid-cols-4 gap-2">
           {[
-            { l: "Go/No-Go", v: sim.goNogo, good: sim.goNogo === "GO" },
-            { l: "Lipinski", v: `${sim.lipinski.violations}/4 viol.`, good: sim.lipinski.violations <= 1 },
-            { l: "QED~", v: sim.qed_approx.toFixed(2), good: sim.qed_approx > 0.5 },
-            { l: "SA Score", v: sim.saScore.toFixed(1), good: sim.saScore <= 4 },
-          ].map(m => (
-            <div key={m.l} className={`rounded-lg px-2.5 py-2 text-center border ${m.good ? "border-emerald-500/15 bg-emerald-500/5" : "border-red-500/15 bg-red-500/5"}`}>
-              <div className="text-[8px] text-slate-600 uppercase">{m.l}</div>
-              <div className={`text-[12px] font-bold mt-0.5 ${m.good ? "text-emerald-400" : "text-red-400"}`}>{m.v}</div>
-            </div>
-          ))}
+            { l: "Go/No-Go", v: sim.goNogo, good: sim.goNogo === "GO", known: sim.goNogo === "KNOWN-LIABILITY-NO-GO" },
+            { l: "Lipinski", v: `${sim.lipinski.violations}/4 viol.`, good: sim.lipinski.violations <= 1, known: false },
+            { l: "QED~", v: sim.qed_approx.toFixed(2), good: sim.qed_approx > 0.5, known: false },
+            { l: "SA Score", v: sim.saScore.toFixed(1), good: sim.saScore <= 4, known: false },
+          ].map(m => {
+            // Tri-state color:
+            //  - "good"  → emerald  (GO / WATCH-clean)
+            //  - "known" → rose+amber  (KNOWN-LIABILITY-NO-GO — published clinical liability, NOT a model rejection)
+            //  - else    → red     (novel-compound NO-GO from the model stack)
+            const tone = m.good
+              ? { border: "border-emerald-500/15", bg: "bg-emerald-500/5", text: "text-emerald-400" }
+              : m.known
+                ? { border: "border-rose-500/30", bg: "bg-rose-500/8", text: "text-rose-300" }
+                : { border: "border-red-500/15", bg: "bg-red-500/5", text: "text-red-400" };
+            return (
+              <div
+                key={m.l}
+                className={`rounded-lg px-2.5 py-2 text-center border ${tone.border} ${tone.bg}`}
+                title={m.known ? "Published clinical liability — matched a known drug. Distinct from a novel-compound NO-GO." : undefined}
+              >
+                <div className="text-[8px] text-slate-600 uppercase">{m.l}</div>
+                <div className={`text-[12px] font-bold mt-0.5 ${tone.text}`}>
+                  {m.known ? "KNOWN-NO-GO" : m.v}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -395,12 +412,12 @@ export function LayerAiPanel(props: LayerAiPanelProps) {
   const layerFlags = flags?.filter(f => f.originLayer <= layer) ?? [];
 
   return (
-    <div className={`border ${cfg.border} rounded-xl overflow-hidden bg-white/[0.015]`}>
+    <div className={`border ${cfg.border} rounded-2xl overflow-hidden bg-white/[0.015] shadow-[0_10px_34px_-16px_rgba(0,0,0,0.8)]`}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <div className="flex items-center gap-2.5">
-          <Sparkles className={`w-3.5 h-3.5 ${cfg.accent}`} />
-          <span className="text-[12px] font-semibold text-white">{cfg.title}</span>
-          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${cfg.badge}`}>Hakase AI v2</span>
+          <span className="hk-icon-tile"><Sparkles className={`w-3.5 h-3.5 ${cfg.accent}`} /></span>
+          <span className="hk-display text-[16px] text-white">{cfg.title}</span>
+          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border border-white/10 ${cfg.badge}`}>Hakase AI v2</span>
         </div>
         {loading ? (
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400">

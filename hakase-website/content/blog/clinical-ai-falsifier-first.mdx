@@ -1,0 +1,36 @@
+---
+title: "Falsifier-first clinical AI: protocol intelligence that knows when it's wrong"
+description: "Hakase Clinical treats every protocol decision as a hypothesis with a confirmation slot. Here's why that changes trial economics."
+date: "2026-04-02"
+author: "Hakase Clinical"
+tag: "Clinical"
+readTime: "7 min read"
+---
+
+The default mode of clinical AI is "score and serve" — a model ranks options
+and the team picks one. The model is rarely told whether the chosen option
+actually worked.
+
+Hakase Clinical inverts that. Every protocol intelligence output ships with:
+
+- **A predicted outcome distribution** (e.g. P10 / P50 / P90 enrollment timelines).
+- **A confirmation slot** — the real outcome that will eventually land.
+- **A falsifier** — the condition under which the prediction is wrong.
+
+When the real readouts arrive, they slot in automatically. The model improves
+where it should and admits where it shouldn't.
+
+## What changes for sponsors
+
+- Site selection stops being a static ranking and becomes a confidence-tracked
+  recommendation.
+- Safety signal detection (PRR / ROR, Evans 2001 WHO) runs continuously against
+  20M+ FAERS reports, with confirmation pairs.
+- GO / NO-GO recommendations carry their own evidence ladder — auditable for
+  regulators and defensible for boards.
+
+## The economic argument
+
+Falsifier-first AI is more expensive to build and cheaper to operate. It costs
+more because every prediction needs a confirmation contract. It costs less
+because drift is caught early and the team stops paying for false confidence.

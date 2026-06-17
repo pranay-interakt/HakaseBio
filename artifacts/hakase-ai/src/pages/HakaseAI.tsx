@@ -3,6 +3,7 @@ import hakaseLogo from "@assets/image_1773504202272.png";
 import {
   initChemistry,
   getMolecularProperties,
+  canonicalizeSmiles,
   generateFingerprint,
   isReady,
   type MolecularProperties,
@@ -94,11 +95,17 @@ import {
   predictDiliMl,
   predictAdmetMl,
   predictCardiotox,
+  predictReactiveMets,
+  predictBsep,
+  predictApplicabilityDomain,
   predictPeptide,
   predictAntibody,
   type DiliMlResult,
   type MlAdmetResult,
   type CardiotoxResult,
+  type ReactiveMetsResult,
+  type BsepResult,
+  type ApplicabilityDomainResult,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
@@ -111,6 +118,13 @@ import {
 import { parseFasta, validateSequence } from "@/components/PeptideAnalysisPanel";
 import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter";
 import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
+import { computeL1Scorecard, type L1Scorecard, type EvidenceSupport } from "@/lib/l1Scorecard";
+import { EvidenceNoveltyPanel } from "@/components/EvidenceNoveltyPanel";
+import { BenefitRiskCard } from "@/components/BenefitRiskCard";
+import { PreclinicalEvidenceCard } from "@/components/PreclinicalEvidenceCard";
+import { fetchPeptideMlSignal } from "@/lib/peptideL1Plus";
+import { computePeptideL1Scorecard, type PeptideScorecard } from "@/lib/peptideL1Scorecard";
+import { computeAntibodyL1Scorecard, type AntibodyScorecard } from "@/lib/antibodyL1Scorecard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,7 +146,7 @@ import {
   Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe, Sparkles, MessageCircle,
   TestTube2, Rabbit, Stethoscope, TrendingDown, ArrowUpRight,
   Cpu, ShieldAlert, GitMerge, Stamp, DoorOpen, Wrench, Syringe,
-  Sun, Moon, Workflow
+  Sun, Moon, Workflow, BookMarked
 } from "lucide-react";
 // 4-Layer Pre-Clinical Architecture (April 2026 redesign).
 // L1 In Vitro → L2 Confirmation (In-Silico ↔ Ex-Vivo) → L3 Animal Cohort → L4 First In Human.
@@ -404,6 +418,8 @@ export function HakaseAI() {
     setPeptideL2(null);
     setPeptideFastaHeader(undefined);
     setPeptideMods(defaultPeptideModification());
+    setPeptideScorecard(null);
+    setAntibodyScorecard(null);
     setAntibodyHeavy("");
     setAntibodyLight("");
     setAntibodyFormatHint("");
@@ -425,6 +441,9 @@ export function HakaseAI() {
     setAdmetMl(null);
     setCardiotoxMl(null);
     setSolubilityMl(null);
+    setReactiveMets(null);
+    setBsepResult(null);
+    setAdResult(null);
 
     // L1 simulation outputs
     setSimResults(null);
@@ -453,6 +472,8 @@ export function HakaseAI() {
   const [peptideFastaHeader, setPeptideFastaHeader] = useState<string | undefined>(undefined);
   const [peptideMods, setPeptideMods] = useState<PeptideModification>(defaultPeptideModification());
   const [showModPanel, setShowModPanel] = useState(false);
+  const [peptideScorecard, setPeptideScorecard] = useState<PeptideScorecard | null>(null);
+  const [antibodyScorecard, setAntibodyScorecard] = useState<AntibodyScorecard | null>(null);
   // ── Peptide environment parameters ─────────────────────────────────────────
   const [peptidePh, setPeptidePh] = useState(7.4);
   const [peptideIonicStrength, setPeptideIonicStrength] = useState(150.0);
@@ -581,6 +602,16 @@ export function HakaseAI() {
   const [solubilityMl, setSolubilityMl] = useState<SolubilityMlResult | null>(null);
   const solubilityMlSeqRef = useRef(0);
   const [solubilityMlLoading, setSolubilityMlLoading] = useState(false);
+  // ── New mechanistic safety signals ───────────────────────────────────────
+  const [reactiveMets, setReactiveMets] = useState<import("@/lib/aiService").ReactiveMetsResult | null>(null);
+  const reactiveMetsSeqRef = useRef(0);
+  const [reactiveMetsLoading, setReactiveMetsLoading] = useState(false);
+  const [bsepResult, setBsepResult] = useState<import("@/lib/aiService").BsepResult | null>(null);
+  const bsepSeqRef = useRef(0);
+  const [bsepLoading, setBsepLoading] = useState(false);
+  const [adResult, setAdResult] = useState<import("@/lib/aiService").ApplicabilityDomainResult | null>(null);
+  const adSeqRef = useRef(0);
+  const [adLoading, setAdLoading] = useState(false);
   // Empty string ("") is the canonical "no therapeutic area selected" value.
   // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
   // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
@@ -648,13 +679,14 @@ export function HakaseAI() {
       return;
     }
     const seq = ++solSeqRef.current;
+    const solSm = canonicalizeSmiles(sm) ?? sm;
     const fire = () => {
       setSolRuleLoading(true);
       setSolMlLoading(true);
-      predictProperties(sm)
+      predictProperties(solSm)
         .then(r => { if (solSeqRef.current === seq) { setSolRule(r); setSolRuleLoading(false); } })
         .catch(() => { if (solSeqRef.current === seq) { setSolRule(null); setSolRuleLoading(false); } });
-      predictSolubilityMl(sm)
+      predictSolubilityMl(solSm)
         .then(r => { if (solSeqRef.current === seq) { setSolMl(r); setSolMlLoading(false); } })
         .catch(() => { if (solSeqRef.current === seq) { setSolMl(null); setSolMlLoading(false); } });
     };
@@ -689,13 +721,14 @@ export function HakaseAI() {
       return;
     }
     const seq = ++bindingSeqRef.current;
+    const bSm = canonicalizeSmiles(sm) ?? sm;
     const fire = () => {
       setBindingChemblLoading(true);
       setBindingMlLoading(true);
-      predictBinding(sm, uid)
+      predictBinding(bSm, uid)
         .then(r => { if (bindingSeqRef.current === seq) { setBindingChembl(r); setBindingChemblLoading(false); } })
         .catch(() => { if (bindingSeqRef.current === seq) { setBindingChembl(null); setBindingChemblLoading(false); } });
-      predictBindingMl(sm, uid)
+      predictBindingMl(bSm, uid)
         .then(r => { if (bindingSeqRef.current === seq) { setBindingMl(r); setBindingMlLoading(false); } })
         .catch(() => { if (bindingSeqRef.current === seq) { setBindingMl(null); setBindingMlLoading(false); } });
     };
@@ -974,6 +1007,14 @@ export function HakaseAI() {
   // Independent of TA-prediction state so a manual TA selection cannot block
   // UniProt fill. Re-runs when the toggle flips so enabling auto-mode after
   // suggestions arrive still triggers propagation.
+  //
+  // FIX (2026-06-16): Auto-mode previously only assigned `uniprotId` and
+  // expected the user to click "Fetch" manually for PDB IDs to appear. That
+  // broke the end-to-end auto-fetch promise — the user picked auto-mode and
+  // got an accession but no structure metadata, and no PDB threaded into
+  // docking / co-folding outputs. Now we actually call the fetch handler so
+  // the full chain (UniProt → first PDB → /predict/structure → docking) runs
+  // automatically.
   useEffect(() => {
     if (!uniprotAutoMode) return;
     if (uniprotManual.current) return;
@@ -985,6 +1026,9 @@ export function HakaseAI() {
     setProteinInfo(null);
     setProteinError(null);
     setAlphafoldData(null);
+    // Kick the fetch immediately — without this the user sees the accession
+    // appear but the PDB chips stay empty until they click "Fetch".
+    handleProteinFetch(top.uniprotId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSuggestions, uniprotAutoMode]);
   // ─────────────────────────────────────────────────────────────────────
@@ -1140,6 +1184,10 @@ export function HakaseAI() {
   const l2ManualOverride = useRef({ species: false, study: false, route: false, formulation: false });
 
   // ── External DB enrichment state ──────────────────────────────────────────
+  // Read-across / novelty evidence (from EvidenceNoveltyPanel) feeds the L1
+  // scorecard's confidence model — measured-analogue support raises it,
+  // blind extrapolation on a truly novel structure caps it.
+  const [evidenceSupport, setEvidenceSupport] = useState<EvidenceSupport | null>(null);
   const [extBindingDB, setExtBindingDB]   = useState<BindingDBResult | null>(null);
   const [extChEMBL, setExtChEMBL]         = useState<ChEMBLMultiTargetResult | null>(null);
   const [extToxCast, setExtToxCast]       = useState<ToxCastResult | null>(null);
@@ -1404,8 +1452,16 @@ export function HakaseAI() {
       setAdmetMlError(null);
       setCardiotoxMl(null);
       setSolubilityMl(null);
+      setReactiveMets(null);
+      setBsepResult(null);
+      setAdResult(null);
       return;
     }
+    // Route ML through the canonical, desalted parent so the models score the
+    // exact structure the RDKit descriptors were computed on — equivalent /
+    // salt-variant SMILES of the same compound therefore receive identical ML
+    // predictions (and identical L1 verdicts).
+    const mlSm = molProps.canonicalSmiles || sm;
     const seqDili = ++diliMlSeqRef.current;
     const seqAdmet = ++admetMlSeqRef.current;
     const seqCardio = ++cardiotoxMlSeqRef.current;
@@ -1415,10 +1471,10 @@ export function HakaseAI() {
     setAdmetMlLoading(true);
     setCardiotoxMlLoading(true);
     setSolubilityMlLoading(true);
-    predictDiliMl(sm)
+    predictDiliMl(mlSm)
       .then(r => { if (diliMlSeqRef.current === seqDili) { setDiliMl(r); setDiliMlLoading(false); } })
       .catch(() => { if (diliMlSeqRef.current === seqDili) { setDiliMl(null); setDiliMlLoading(false); } });
-    predictAdmetMl(sm)
+    predictAdmetMl(mlSm)
       .then(r => { if (admetMlSeqRef.current === seqAdmet) { setAdmetMl(r); setAdmetMlError(null); setAdmetMlLoading(false); } })
       .catch(e => {
         if (admetMlSeqRef.current === seqAdmet) {
@@ -1429,14 +1485,34 @@ export function HakaseAI() {
       });
     // CardioTox-ML — dedicated hERG RF; preferred over ADMET-AI hERG head
     // when building the overlay (Wang/Karim 2016 patch-clamp-anchored).
-    predictCardiotox(sm)
+    predictCardiotox(mlSm)
       .then(r => { if (cardiotoxMlSeqRef.current === seqCardio) { setCardiotoxMl(r); setCardiotoxMlLoading(false); } })
       .catch(() => { if (cardiotoxMlSeqRef.current === seqCardio) { setCardiotoxMl(null); setCardiotoxMlLoading(false); } });
     // Solubility-ML — surfaces logS for the ADMET panel; also feeds L2 PBPK
     // dissolution. Silent fail leaves overlay's logS null (heuristic only).
-    predictSolubilityMl(sm)
+    predictSolubilityMl(mlSm)
       .then(r => { if (solubilityMlSeqRef.current === seqSol) { setSolubilityMl(r); setSolubilityMlLoading(false); } })
       .catch(() => { if (solubilityMlSeqRef.current === seqSol) { setSolubilityMl(null); setSolubilityMlLoading(false); } });
+    // Reactive metabolite structural alerts — 26 SMARTS patterns (Kalgutkar 2009).
+    // Critical alerts override the L1 verdict to NO-GO regardless of scorecard.
+    const seqRm = ++reactiveMetsSeqRef.current;
+    setReactiveMetsLoading(true);
+    predictReactiveMets(mlSm)
+      .then(r => { if (reactiveMetsSeqRef.current === seqRm) { setReactiveMets(r); setReactiveMetsLoading(false); } })
+      .catch(() => { if (reactiveMetsSeqRef.current === seqRm) { setReactiveMets(null); setReactiveMetsLoading(false); } });
+    // BSEP inhibition + phospholipidosis risk predictor (pharmacophore rule-based).
+    const seqBsep = ++bsepSeqRef.current;
+    setBsepLoading(true);
+    predictBsep(mlSm)
+      .then(r => { if (bsepSeqRef.current === seqBsep) { setBsepResult(r); setBsepLoading(false); } })
+      .catch(() => { if (bsepSeqRef.current === seqBsep) { setBsepResult(null); setBsepLoading(false); } });
+    // Applicability domain — Tanimoto NN vs training data. Conditions the
+    // displayed confidence tier on whether the scaffold is in-domain.
+    const seqAd = ++adSeqRef.current;
+    setAdLoading(true);
+    predictApplicabilityDomain(mlSm)
+      .then(r => { if (adSeqRef.current === seqAd) { setAdResult(r); setAdLoading(false); } })
+      .catch(() => { if (adSeqRef.current === seqAd) { setAdResult(null); setAdLoading(false); } });
   }, [smiles, rdkitReady, molProps?.isValid]);
 
   // ── DETERMINISTIC VERDICT GATE (part 1: pending tracker) ────────────────
@@ -1464,7 +1540,8 @@ export function HakaseAI() {
   // verdict is a pure function of (SMILES + ML overlay + target/TA), and
   // those inputs are deterministic the moment everything has landed.
   const mlOverlayPending =
-    diliMlLoading || admetMlLoading || cardiotoxMlLoading || solubilityMlLoading || bindingMlLoading;
+    diliMlLoading || admetMlLoading || cardiotoxMlLoading || solubilityMlLoading || bindingMlLoading ||
+    reactiveMetsLoading || bsepLoading || adLoading;
   const targetSuggestionPending = chemblLookupLoading || mlPanelLoading;
   const l1InputsPending = mlOverlayPending || targetSuggestionPending;
   const mlOverlaySettled = !mlOverlayPending;
@@ -1494,6 +1571,31 @@ export function HakaseAI() {
   // enriched with ML — so we surface a "Heuristic verdict (ML unavailable)"
   // banner so reviewers don't confuse it with the ML-enriched one.
   const mlOverlayUnavailable = mlOverlaySettled && !overlayHasAnyMl(mlOverlay);
+
+  // ── Unified L1 Go / Watch / No-Go scorecard ──────────────────────────────
+  // Single calibrated verdict over the real L1 outputs: flag-based hard
+  // No-Go overrides + weighted composite + ML-coverage-driven confidence.
+  // Recomputes whenever the ADMET / in-vitro results or the ML overlay change.
+  const l1Scorecard: L1Scorecard | null = useMemo(() => {
+    if (!simResults || !inVitroResults) return null;
+    return computeL1Scorecard({ admet: simResults, inVitro: inVitroResults, overlay: mlOverlay, evidenceSupport });
+  }, [simResults, inVitroResults, mlOverlay, evidenceSupport]);
+
+  // Single canonical L1 verdict used by EVERY L1 display and recommendation in
+  // this component, so the team never sees a NO-GO headline next to a "GO —
+  // advance" blurb. Prefers the unified scorecard (folds in ML hard vetoes);
+  // falls back to the arbitrated ADMET/in-vitro decision, then ADMET-only.
+  // Reactive metabolite critical alerts hard-veto to NO-GO (any critical
+  // structural alert is a development-stopping liability per FDA guidance).
+  const l1Verdict: "GO" | "WATCH" | "NO-GO" | "KNOWN-LIABILITY-NO-GO" | null = useMemo(() => {
+    // Hard veto: any critical reactive metabolite alert → NO-GO regardless of scorecard
+    if (reactiveMets && reactiveMets.critical_count > 0) return "NO-GO";
+    if (l1Scorecard) return l1Scorecard.verdict;
+    if (!simResults) return null;
+    return inVitroResults
+      ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
+      : simResults.goNogo;
+  }, [l1Scorecard, simResults, inVitroResults, reactiveMets]);
 
   // Ref-mirror of l1InputsPending so an async runSimulation can poll the
   // CURRENT pending state without re-rendering. Without this the closure
@@ -1649,9 +1751,9 @@ export function HakaseAI() {
           note: `ML — ${cite}; pKd=${bindingMl.prediction.pKd_predicted.toFixed(2)}`,
         };
       }
-      return evaluateCascadeGate(simResults, targetSuggestions, overrides, inVitroResults);
+      return evaluateCascadeGate(simResults, targetSuggestions, overrides, inVitroResults, null, l1Scorecard?.verdict ?? null);
     },
-    [simResults, targetSuggestions, diliMl, admetMl, bindingMl, inVitroResults],
+    [simResults, targetSuggestions, diliMl, admetMl, bindingMl, inVitroResults, l1Scorecard],
   );
   const [cascadeOverride, setCascadeOverride] = useState<CascadeOverrideRecord | null>(null);
 
@@ -1711,11 +1813,14 @@ export function HakaseAI() {
     const abs = simResults.admet.absorption;
     const logP = simResults.lipinski.logP;
     const mw = simResults.lipinski.mw;
-    // Use arbitrated Go/No-Go when in-vitro results are available; fall back to
-    // ADMET-only goNogo otherwise (inVitroResults may not be computed yet).
-    const goNogo = inVitroResults
-      ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
-      : simResults.goNogo;
+    // Canonical L1 verdict drives the L3 study design so the animal-cohort
+    // direction matches the headline verdict the team sees. Prefer the unified
+    // scorecard (folds in ML hard vetoes); fall back to the arbitrated
+    // ADMET/in-vitro decision, then ADMET-only goNogo.
+    const goNogo = l1Scorecard?.verdict
+      ?? (inVitroResults
+        ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
+        : simResults.goNogo);
 
     if (!l2ManualOverride.current.species) {
       if (tox > 0.6) setAnimalSpecies("dog_beagle");
@@ -1743,7 +1848,7 @@ export function HakaseAI() {
     l2ManualOverride.current = { species: false, study: false, route: false, formulation: false };
     setL2AutoConfigured(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simResults, inVitroResults]);
+  }, [simResults, inVitroResults, l1Scorecard]);
 
   const [haIOpsCtx, setHAIOpsCtx] = useState<HAIOpsContext>(createHAIOpsContext());
   const safetyFlags = haIOpsCtx.flags;
@@ -2503,9 +2608,21 @@ export function HakaseAI() {
       // Bridge L1 peptide results into L2-compatible format
       const l2 = preparePeptideL2(res, uniprotId, peptideMods);
       setPeptideL2(l2);
-      // Unlock Layer 2 — a completed biologic L1 advances the layer stepper
-      // exactly like a small-molecule run does, so the Confirmation tab and
-      // the "Continue to Confirmation" handoff become reachable.
+
+      // ── Fire ML classifiers and build peptide scorecard ────────────────────
+      // The ML signal is optional (backend may be warming up or offline).
+      // computePeptideL1Scorecard handles null gracefully — heuristic fallback.
+      (async () => {
+        const mlSig = await fetchPeptideMlSignal(peptideSequence);
+        const scorecard = computePeptideL1Scorecard({
+          result: res,
+          sequence: peptideSequence,
+          cyclic: peptideCyclic,
+          mlSignal: mlSig,
+        });
+        setPeptideScorecard(scorecard);
+      })();
+
       setSimStatus(prev => ({ ...prev, 1: "complete" }));
     } catch (e: any) {
       clearInterval(interval);
@@ -2550,7 +2667,23 @@ export function HakaseAI() {
       clearInterval(interval);
       setSimProgress(100);
       setAntibodyResult(res);
-      // Unlock Layer 2 — completed antibody L1 advances the layer stepper.
+
+      // ── Build antibody scorecard (async, non-blocking) ─────────────────────
+      (async () => {
+        let mlSig: AntibodyScorecard["confidence"] extends "High" ? never : any = null;
+        try {
+          const mlRes = await fetch("/api/ai/antibody-ml", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ heavy_chain: h, light_chain: l || null }),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (mlRes.ok) mlSig = await mlRes.json();
+        } catch { /* offline — graceful fallback */ }
+        const scorecard = computeAntibodyL1Scorecard({ result: res, mlSignal: mlSig });
+        setAntibodyScorecard(scorecard);
+      })();
+
       setSimStatus(prev => ({ ...prev, 1: "complete" }));
     } catch (e: any) {
       clearInterval(interval);
@@ -2735,15 +2868,12 @@ export function HakaseAI() {
   const layerColors = ["violet", "cyan", "amber", "emerald"] as const;
 
   return (
-    <div className={lightMode ? `h-screen bg-white text-slate-900 flex flex-col overflow-hidden font-['Inter'] hk-light` : `h-screen bg-[#07080c] text-white flex flex-col overflow-hidden font-['Inter']`} style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className={lightMode ? `hk-app-bg h-screen text-slate-900 flex flex-col overflow-hidden font-['Inter'] hk-light` : `hk-app-bg h-screen text-white flex flex-col overflow-hidden font-['Inter']`} style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Top Navigation Bar */}
       <header className={`h-14 flex items-center px-4 gap-4 shrink-0 z-50 ${lightMode ? 'border-b border-slate-200 bg-white shadow-sm' : 'border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md'}`}>
         {/* Logo */}
-        <div className="flex items-center gap-2 min-w-[160px]">
-          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-8 w-auto object-contain" />
-          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-500/40 text-violet-400">
-            v1.0
-          </Badge>
+        <div className="flex items-center min-w-[150px]">
+          <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-10 w-auto object-contain" />
         </div>
 
         {/* Layer Stepper */}
@@ -2763,10 +2893,11 @@ export function HakaseAI() {
             const isActive = activeLayer === layer;
             // Layer color mapping aligns with `layerColors` const above:
             // L1=violet (InVitro), L2=cyan (InSilico), L3=amber (ExVivo), L4=emerald (Animal Cohort).
-            const activeColor = layer === 1 ? "bg-violet-600/20 border-violet-500/50 text-violet-300"
+            const activeGlass = "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_8px_22px_-12px_rgba(0,0,0,0.7)] backdrop-blur-sm";
+            const activeColor = (layer === 1 ? "bg-violet-600/20 border-violet-500/50 text-violet-300"
               : layer === 2 ? "bg-cyan-600/20 border-cyan-500/50 text-cyan-300"
               : layer === 3 ? "bg-amber-600/20 border-amber-500/50 text-amber-300"
-              : "bg-emerald-600/20 border-emerald-500/50 text-emerald-300";
+              : "bg-emerald-600/20 border-emerald-500/50 text-emerald-300") + " " + activeGlass;
             const badgeColor = layer === 1 ? "border-violet-400 text-violet-400 bg-violet-400/10"
               : layer === 2 ? "border-cyan-400 text-cyan-400 bg-cyan-400/10"
               : layer === 3 ? "border-amber-400 text-amber-400 bg-amber-400/10"
@@ -2797,25 +2928,9 @@ export function HakaseAI() {
                   )}
                   <Icon className="w-3.5 h-3.5" />
                   {layerLabels[i]}
-                  {/* Evidence Hash Chain badge — short SHA-256 of the sealed
-                      block at this stage. Surfaces tamper-evident provenance
-                      next to the stepper checkmark. "—" while the stage hasn't
-                      sealed yet. See lib/preclinical-handoff/hashChain.ts. */}
-                  {(() => {
-                    const h = layer === 1 ? evidenceChain.l1
-                      : layer === 2 ? evidenceChain.l2
-                      : layer === 3 ? evidenceChain.l3
-                      : evidenceChain.l4;
-                    if (!h) return null;
-                    return (
-                      <span
-                        title={`Evidence hash (SHA-256) — ${h}`}
-                        className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-tight bg-slate-800/80 text-slate-400 border border-slate-700"
-                      >
-                        {shortHash(h)}
-                      </span>
-                    );
-                  })()}
+                  {/* Evidence hash chip removed from the stepper (it read as
+                      a random string); tamper-evident provenance still lives
+                      in the evidence/audit views and the handoff package. */}
                 </button>
                 {i < 3 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
@@ -2917,7 +3032,7 @@ export function HakaseAI() {
               <button
                 onClick={() => {
                   const verdict = activeLayer === 1 && simResults && inVitroResults
-                    ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
+                    ? (l1Verdict ?? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision)
                     : "GO";
                   if (verdict === "NO-GO") {
                     setHAIOpsCtx(prev => addOverride(prev, {
@@ -3327,7 +3442,7 @@ export function HakaseAI() {
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <TestTube2 className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-[15px] font-semibold text-white flex-1">Layer 1 — In Vitro Digital Twin</h2>
+                    <h2 className="hk-display text-[19px] text-white flex-1">Layer 1 — In Vitro Digital Twin</h2>
                     <button
                       onClick={() => setInputPanelOpen(false)}
                       className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-slate-300 transition-colors"
@@ -3341,8 +3456,8 @@ export function HakaseAI() {
 
                 <div className="p-5 space-y-5">
                   {/* ── Modality selector ─────────────────────────────────── */}
-                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
-                    <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1 block">Modality</label>
+                  <div className="hk-glass p-3">
+                    <label className="hk-eyebrow mb-1.5">Modality</label>
                     <div className="relative">
                       <select
                         value={l1Modality}
@@ -3884,7 +3999,7 @@ export function HakaseAI() {
                               return (
                                 <button
                                   key={sugg.uniprotId}
-                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); /* No auto-fetch — user clicks Fetch explicitly (no-preload policy) */ }}
+                                  onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); handleProteinFetch(sugg.uniprotId); /* auto-fetch on suggestion click — pulls UniProt → first PDB → /predict/structure so the PDB shows AND threads into docking/co-folding outputs immediately */ }}
                                   className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
                                 >
                                   {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
@@ -4011,7 +4126,10 @@ export function HakaseAI() {
                                             setPdbStructure(null);
                                             setProteinInfo(null);
                                             setProteinError(null);
-                                            // No auto-fetch — user clicks Fetch explicitly (no-preload policy)
+                                            // Auto-fetch now wired: pulls UniProt → first PDB → structure metadata so
+                                            // the PDB id appears and threads through to docking / co-folding outputs
+                                            // without a second click. (Was: no-preload — produced empty PDB column.)
+                                            handleProteinFetch(sugg.uniprotId);
                                           }}
                                           className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/35 transition-all"
                                         >
@@ -4152,7 +4270,10 @@ export function HakaseAI() {
                                                     setUniprotAutoMode(false);
                                                     setUniprotId(sugg.uniprotId);
                                                     setPdbId(pid);
-                                                    // No auto-fetch — user clicks Fetch explicitly (no-preload policy)
+                                                    // Auto-fetch wired: pulling the UniProt populates PDB chips +
+                                                    // the chosen PDB metadata fetches via the pdbId effect — together
+                                                    // they thread into docking / co-folding outputs.
+                                                    handleProteinFetch(sugg.uniprotId);
                                                   }}
                                                   className="px-1 py-px rounded bg-blue-500/10 border border-blue-500/25 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/40 text-[8px] font-mono transition-colors"
                                                   title={`Load PDB ${pid}`}
@@ -5259,7 +5380,7 @@ export function HakaseAI() {
                         ["TPSA",       simResults ? `${simResults.lipinski.tpsa.toFixed(0)} Å²`                     : "pending"],
                         ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`             : "pending"],
                         ["Toxicity",   simResults ? `${(simResults.admet.toxicity   * 100).toFixed(0)}%`             : "pending"],
-                        ["Go/No-Go",   simResults ? simResults.goNogo                                                 : "pending"],
+                        ["Go/No-Go",   l1Verdict ?? "pending"],
                         // RF#7 / §9 step 12: surface the cascade-gate
                         // evidence tier so the user sees the auto-cascade
                         // decision (heuristic / structural / inferred / ml /
@@ -5291,8 +5412,10 @@ export function HakaseAI() {
                       if (simResults.lipinski.mw > 500)        recs.push({ text: "MW > 500 Da — consider lead optimization to improve membrane permeability.", level: "warn" });
                       if (simResults.admet.absorption < 0.45)  recs.push({ text: "Low predicted absorption — review TPSA and HBD count. Bioisostere substitutions may improve F%.", level: "warn" });
                       if (recs.filter(r => r.level === "warn").length === 0) recs.push({ text: "Clean physicochemical profile — well-positioned to advance into L2 In Silico triage.", level: "ok" });
-                      if (simResults.goNogo === "GO")     recs.push({ text: "GO decision — advance to L2 Confirmation to reconcile in-silico/ex-vivo evidence before committing to L3 Animal Cohort spend.", level: "ok" });
-                      else if (simResults.goNogo === "WATCH") recs.push({ text: "WATCH decision — proceed with caution into L2 In Silico and monitor flagged liabilities through to L4.", level: "info" });
+                      if (l1Verdict === "GO")     recs.push({ text: "GO decision — advance to L2 Confirmation to reconcile in-silico/ex-vivo evidence before committing to L3 Animal Cohort spend.", level: "ok" });
+                      else if (l1Verdict === "WATCH") recs.push({ text: "WATCH decision — proceed with caution into L2 In Silico and monitor flagged liabilities through to L4.", level: "info" });
+                      else if (l1Verdict === "NO-GO") recs.push({ text: "NO-GO decision — a hard liability flag vetoes advancement. Re-design to remove the flagged risk and re-run L1 before committing L2/L3 spend.", level: "warn" });
+                      else if (l1Verdict === "KNOWN-LIABILITY-NO-GO") recs.push({ text: "KNOWN-LIABILITY NO-GO — this compound matches a published drug with a known clinical liability (e.g. withdrawn from market, black-box, measured hERG block). This is NOT a model rejection. Use the established mitigation strategy (e.g. metabolic blockade as in terfenadine → fexofenadine) or skip in favour of a clean analogue.", level: "warn" });
                     }
                     if (recs.length === 0) return null;
                     return (
@@ -5418,10 +5541,12 @@ export function HakaseAI() {
                     customPh={peptidePh}
                     ionicStrength={peptideIonicStrength}
                     disulfideBridges={peptideDisulfideBridges}
+                    l1Scorecard={peptideScorecard}
                     onClear={() => {
                       setPeptideSequence("");
                       setPeptideResult(null);
                       setPeptideError(null);
+                      setPeptideScorecard(null);
                       setSimStatus(prev => ({ ...prev, 1: "idle" }));
                     }}
                   />
@@ -5472,7 +5597,8 @@ export function HakaseAI() {
                     expressionHost={antibodyExpressionHost}
                     subclass={antibodySubclass}
                     targetAntigen={antibodyTargetAntigen}
-                    onClear={() => { setAntibodyHeavy(""); setAntibodyLight(""); setAntibodyResult(null); setAntibodyError(null); setSimStatus(prev => ({ ...prev, 1: "idle" })); }}
+                    l1Scorecard={antibodyScorecard}
+                    onClear={() => { setAntibodyHeavy(""); setAntibodyLight(""); setAntibodyResult(null); setAntibodyError(null); setAntibodyScorecard(null); setSimStatus(prev => ({ ...prev, 1: "idle" })); }}
                   />
                 )}
 
@@ -5531,6 +5657,7 @@ export function HakaseAI() {
                       molProps={molProps}
                       simResults={simResults}
                       inVitroResults={inVitroResults}
+                      l1Scorecard={l1Scorecard}
                       indication={indication}
                       l1AiReport={l1AiReport}
                       l1AiLoading={l1AiLoading}
@@ -5556,6 +5683,7 @@ export function HakaseAI() {
                       extChEMBL={extChEMBL}
                       mlAdmet={admetMl}
                       cardiotoxMl={cardiotoxMl}
+                      onEvidence={setEvidenceSupport}
                       onSelectTarget={(uid) => {
                         uniprotManual.current = true;
                         setUniprotAutoMode(false);
@@ -5581,6 +5709,149 @@ export function HakaseAI() {
                     />
                     <GracefulDegradationBanner warnings={dbDegradationWarnings.filter(w => (provenanceL1?.databaseQueries ?? []).some(q => q.database === w.database))} />
                     <CrossSourceConsistencyCheck simIC50_uM={inVitroResults?.doseResponse.ic50_nM != null ? inVitroResults.doseResponse.ic50_nM / 1000 : null} bindingDB={extBindingDB} />
+
+                    {/* ── Mechanistic Safety Signals ──────────────────────────────── */}
+                    {/* Reactive Metabolite Structural Alert Panel */}
+                    {(reactiveMets || reactiveMetsLoading) && (
+                      <div className="mx-6 mt-4 rounded-xl border border-white/10 bg-white/3 overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-white/2">
+                          <div className={`w-2 h-2 rounded-full ${reactiveMets?.critical_count ? "bg-red-500" : reactiveMets?.high_count ? "bg-orange-400" : reactiveMets?.moderate_count ? "bg-yellow-400" : "bg-emerald-400"}`} />
+                          <span className="text-[12px] font-semibold text-white/90 tracking-wide uppercase">Reactive Metabolite Alerts</span>
+                          {reactiveMets && (
+                            <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                              reactiveMets.rm_class === "High Risk" ? "bg-red-500/20 text-red-300" :
+                              reactiveMets.rm_class === "Moderate Risk" ? "bg-orange-500/20 text-orange-300" :
+                              reactiveMets.rm_class === "Low Risk" ? "bg-yellow-500/20 text-yellow-300" :
+                              "bg-emerald-500/20 text-emerald-300"
+                            }`}>{reactiveMets.rm_class}</span>
+                          )}
+                          {reactiveMetsLoading && <span className="ml-auto text-[11px] text-slate-500">Scanning…</span>}
+                        </div>
+                        {reactiveMets && (
+                          <div className="px-4 py-3 space-y-2">
+                            {reactiveMets.alert_count === 0 ? (
+                              <p className="text-[12px] text-slate-400">No structural alerts detected across 26 literature-curated SMARTS patterns.</p>
+                            ) : (
+                              <>
+                                <p className="text-[11px] text-slate-500 mb-2">
+                                  {reactiveMets.alert_count} alert{reactiveMets.alert_count !== 1 ? "s" : ""} found
+                                  {reactiveMets.critical_count > 0 && <span className="text-red-400 font-semibold"> · {reactiveMets.critical_count} CRITICAL</span>}
+                                  {reactiveMets.high_count > 0 && <span className="text-orange-400"> · {reactiveMets.high_count} high</span>}
+                                  {reactiveMets.moderate_count > 0 && <span className="text-yellow-400"> · {reactiveMets.moderate_count} moderate</span>}
+                                  {" · iDILI score "}<span className="font-semibold text-white/70">{reactiveMets.rm_score}/100</span>
+                                </p>
+                                <div className="space-y-2">
+                                  {reactiveMets.alerts.map(alert => (
+                                    <div key={alert.id} className={`rounded-lg px-3 py-2 border text-[11px] ${
+                                      alert.severity === "critical" ? "bg-red-950/30 border-red-500/30" :
+                                      alert.severity === "high" ? "bg-orange-950/30 border-orange-500/30" :
+                                      "bg-yellow-950/20 border-yellow-500/20"
+                                    }`}>
+                                      <div className="flex items-start gap-2">
+                                        <span className={`font-bold shrink-0 ${alert.severity === "critical" ? "text-red-400" : alert.severity === "high" ? "text-orange-400" : "text-yellow-400"}`}>
+                                          [{alert.severity.toUpperCase()}]
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-semibold text-white/80">{alert.name}</span>
+                                          {alert.match_count > 1 && <span className="text-slate-500 ml-1">×{alert.match_count}</span>}
+                                          <p className="text-slate-400 mt-0.5 leading-relaxed">{alert.mechanism}</p>
+                                          {alert.mitigation && (
+                                            <p className="text-slate-500 mt-0.5"><span className="text-slate-400">Mitigation:</span> {alert.mitigation}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* BSEP Inhibition + Phospholipidosis Panel */}
+                    {(bsepResult || bsepLoading) && (
+                      <div className="mx-6 mt-3 rounded-xl border border-white/10 bg-white/3 overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-white/2">
+                          <div className={`w-2 h-2 rounded-full ${bsepResult?.bsep.risk_class === "High" ? "bg-red-500" : bsepResult?.bsep.risk_class === "Moderate" ? "bg-orange-400" : bsepResult?.bsep.risk_class === "Low" ? "bg-yellow-400" : "bg-emerald-400"}`} />
+                          <span className="text-[12px] font-semibold text-white/90 tracking-wide uppercase">Transporter Safety</span>
+                          {bsepLoading && <span className="ml-auto text-[11px] text-slate-500">Predicting…</span>}
+                        </div>
+                        {bsepResult && (
+                          <div className="px-4 py-3 grid grid-cols-2 gap-3">
+                            <div className="rounded-lg bg-white/4 border border-white/8 p-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-white/80">BSEP Inhibition</span>
+                                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                  bsepResult.bsep.risk_class === "High" ? "bg-red-500/20 text-red-300" :
+                                  bsepResult.bsep.risk_class === "Moderate" ? "bg-orange-500/20 text-orange-300" :
+                                  bsepResult.bsep.risk_class === "Low" ? "bg-yellow-500/20 text-yellow-300" :
+                                  "bg-emerald-500/20 text-emerald-300"
+                                }`}>{bsepResult.bsep.risk_class}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 leading-relaxed">{bsepResult.bsep.rationale}</p>
+                              {bsepResult.bsep.ic50_estimate_uM && (
+                                <p className="text-[10px] text-slate-400 mt-1">Est. IC₅₀ ≈ {bsepResult.bsep.ic50_estimate_uM} µM</p>
+                              )}
+                            </div>
+                            <div className="rounded-lg bg-white/4 border border-white/8 p-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-white/80">Phospholipidosis</span>
+                                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                  bsepResult.phospholipidosis.risk_class === "High" ? "bg-red-500/20 text-red-300" :
+                                  bsepResult.phospholipidosis.risk_class === "Moderate" ? "bg-orange-500/20 text-orange-300" :
+                                  "bg-yellow-500/20 text-yellow-300"
+                                }`}>{bsepResult.phospholipidosis.risk_class}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 leading-relaxed">{bsepResult.phospholipidosis.rationale}</p>
+                              {bsepResult.phospholipidosis.cad_positive && (
+                                <p className="text-[10px] text-orange-400 mt-1 font-semibold">CAD-positive (cationic amphiphile)</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Applicability Domain Confidence Panel */}
+                    {(adResult || adLoading) && (
+                      <div className="mx-6 mt-3 rounded-xl border border-white/10 bg-white/3 overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-white/2">
+                          <div className={`w-2 h-2 rounded-full ${adResult?.ad_confidence === "High" ? "bg-emerald-400" : adResult?.ad_confidence === "Moderate" ? "bg-yellow-400" : "bg-red-400"}`} />
+                          <span className="text-[12px] font-semibold text-white/90 tracking-wide uppercase">Applicability Domain</span>
+                          {adResult && (
+                            <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                              adResult.ad_label === "In-domain" ? "bg-emerald-500/20 text-emerald-300" :
+                              adResult.ad_label === "Border-domain" ? "bg-yellow-500/20 text-yellow-300" :
+                              "bg-red-500/20 text-red-300"
+                            }`}>{adResult.ad_label}</span>
+                          )}
+                          {adLoading && <span className="ml-auto text-[11px] text-slate-500">Computing…</span>}
+                        </div>
+                        {adResult && (
+                          <div className="px-4 py-3">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-[11px] text-slate-400">Tanimoto NN similarity</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${adResult.ad_confidence === "High" ? "bg-emerald-400" : adResult.ad_confidence === "Moderate" ? "bg-yellow-400" : "bg-red-400"}`}
+                                  style={{ width: `${Math.round((adResult.nn_similarity ?? 0) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-mono font-semibold text-white/70">
+                                {adResult.nn_similarity != null ? adResult.nn_similarity.toFixed(2) : "—"}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-relaxed">{adResult.coverage_note}</p>
+                            {adResult.training_set_size && (
+                              <p className="text-[10px] text-slate-600 mt-1">Reference set: {adResult.training_set_size.toLocaleString()} compounds</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {provenanceL1 && <ProvenanceFooter provenance={provenanceL1} layer={1} />}
                     <div className="px-6 pb-6">
                       <ExternalDbPanel
@@ -5637,7 +5908,7 @@ export function HakaseAI() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-semibold text-cyan-300 uppercase tracking-widest">Layer 2</span>
-                    <h2 className="text-[14px] font-semibold text-white">Confirmation</h2>
+                    <h2 className="hk-display text-[18px] text-white">Confirmation</h2>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                     In-silico ↔ ex-vivo joint synthesis · evidence reconciliation before L3 Animal Cohort
@@ -5753,7 +6024,7 @@ export function HakaseAI() {
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Rabbit className="w-4 h-4 text-emerald-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 3 — Animal Cohort</h2>
+                    <h2 className="hk-display text-[19px] text-white">Layer 3 — Animal Cohort</h2>
                   </div>
                   <p className="text-[12px] text-slate-500">ICH M3(R2) rodent + non-rodent battery · PBPK allometric scaling · FIH dose projection</p>
                 </div>
@@ -5797,7 +6068,7 @@ export function HakaseAI() {
                             <Row label="Predicted Ki (nM)"   source="ai-service / DeepDTA-GBM"   value={simResults?.binding ? simResults.binding.primaryKi.toFixed(1) : "—"} />
                             <Row label="Plasma fu (%)"       source="L1 PPB sim"                 value={inVitroResults ? inVitroResults.plasmaProteinBinding.fuPercent.toFixed(2) : "—"} />
                             <Row label="Caco-2 Papp (×10⁻⁶)" source="L1 permeability sim"        value={inVitroResults ? inVitroResults.permeability.caco2Papp.toFixed(1) : "—"} />
-                            <Row label="L1 Go / No-Go"       source="L1 cascade gate"            value={simResults ? simResults.goNogo : "—"} />
+                            <Row label="L1 Go / No-Go"       source="Unified L1 scorecard"       value={l1Verdict ?? "—"} />
                           </div>
                         </div>
 
@@ -6000,9 +6271,9 @@ export function HakaseAI() {
                       if (logP < 0)    recs.push({ text: `LogP = ${logP.toFixed(2)} (very hydrophilic) — tissue penetration may be limited. IV dosing will give cleaner PK data than oral gavage.`, level: "info" });
                       if (simResults.admet.absorption < 0.45)  recs.push({ text: `Predicted absorption is only ${absPct}% — oral bioavailability will be low. Consider IV or IP route, or formulation enhancement to improve exposure.`, level: "warn" });
                       if (mw > 500) recs.push({ text: `MW = ${mw.toFixed(0)} Da exceeds 500 Da — membrane permeability may limit oral absorption. BCS Class II/IV formulations recommended.`, level: "warn" });
-                      if (simResults.goNogo === "NO-GO")   recs.push({ text: `L1 returned NO-GO (toxicity ${toxPct}%, absorption ${absPct}%). Animal study data may support re-assessment only if liabilities are formulation-addressable.`, level: "warn" });
-                      if (simResults.goNogo === "GO" && simResults.admet.toxicity <= 0.6) recs.push({ text: `L1 returned GO with clean profile (toxicity ${toxPct}%, absorption ${absPct}%). Standard allometric scaling and 1/10 HED starting dose apply.`, level: "ok" });
-                      if (simResults.goNogo === "WATCH") recs.push({ text: `L1 returned WATCH (toxicity ${toxPct}%, absorption ${absPct}%). Proceed with enhanced monitoring — plan additional satellite groups for TK sampling.`, level: "info" });
+                      if (l1Verdict === "NO-GO")   recs.push({ text: `L1 returned NO-GO (toxicity ${toxPct}%, absorption ${absPct}%). Animal study data may support re-assessment only if liabilities are formulation-addressable.`, level: "warn" });
+                      if (l1Verdict === "GO" && simResults.admet.toxicity <= 0.6) recs.push({ text: `L1 returned GO with clean profile (toxicity ${toxPct}%, absorption ${absPct}%). Standard allometric scaling and 1/10 HED starting dose apply.`, level: "ok" });
+                      if (l1Verdict === "WATCH") recs.push({ text: `L1 returned WATCH (toxicity ${toxPct}%, absorption ${absPct}%). Proceed with enhanced monitoring — plan additional satellite groups for TK sampling.`, level: "info" });
                       if (l2AutoConfigured) {
                         const configParts: string[] = [];
                         if (!l2ManualOverride.current.species) {
@@ -6206,7 +6477,7 @@ export function HakaseAI() {
                         ["LogP",       simResults ? simResults.lipinski.logP.toFixed(2)                        : "–"],
                         ["TPSA",       simResults ? `${simResults.lipinski.tpsa.toFixed(0)} Å²`               : "–"],
                         ["Absorption", simResults ? `${(simResults.admet.absorption * 100).toFixed(0)}%`       : "–"],
-                        ["Go/No-Go",   simResults ? simResults.goNogo                                           : "–"],
+                        ["Go/No-Go",   l1Verdict ?? "–"],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1">
                           <span className="text-slate-500">{k}</span>
@@ -6326,7 +6597,7 @@ export function HakaseAI() {
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Users className="w-4 h-4 text-blue-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 3 — Patient Cohort Twin</h2>
+                    <h2 className="hk-display text-[19px] text-white">Layer 3 — Patient Cohort Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure virtual patient population for PK/PD simulation</p>
                 </div>
@@ -6860,7 +7131,7 @@ export function HakaseAI() {
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
                     <Beaker className="w-4 h-4 text-emerald-400" />
-                    <h2 className="text-[15px] font-semibold text-white">Layer 4 — Trial Digital Twin</h2>
+                    <h2 className="hk-display text-[19px] text-white">Layer 4 — Trial Digital Twin</h2>
                   </div>
                   <p className="text-[11px] text-slate-500">Configure clinical trial design, endpoints, and simulation parameters</p>
                 </div>
@@ -8164,7 +8435,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
       )}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white/3 border border-white/5 rounded-lg p-3">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-2">ADMET Radar</div>
+          <div className="hk-eyebrow mb-2">ADMET Radar</div>
           <div className="flex items-center gap-2">
             <svg width="120" height="110" className="shrink-0">
               {[0.33, 0.66, 1].map(f => (
@@ -8188,7 +8459,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
           </div>
         </div>
         <div className="bg-white/3 border border-white/5 rounded-lg p-3 space-y-2">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Key Metrics</div>
+          <div className="hk-eyebrow mb-1">Key Metrics</div>
           {iv && (
             <>
               {iv.doseResponse.ic50_nM != null
@@ -8210,7 +8481,7 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
       {sim && (
         <div className="grid grid-cols-4 gap-2">
           {[
-            { l: "Go/No-Go", v: sim.goNogo, good: sim.goNogo === "GO" },
+            { l: "Go/No-Go", v: (iv ? arbitrateGoNogo(sim.goNogo, iv.overallRisk).decision : sim.goNogo), good: (iv ? arbitrateGoNogo(sim.goNogo, iv.overallRisk).decision : sim.goNogo) === "GO" },
             { l: "Lipinski", v: `${sim.lipinski.violations}/4 viol.`, good: sim.lipinski.violations <= 1 },
             { l: "QED~", v: sim.qed_approx.toFixed(2), good: sim.qed_approx > 0.5 },
             { l: "SA Score", v: sim.saScore.toFixed(1), good: sim.saScore <= 4 },
@@ -8241,7 +8512,7 @@ function L2AiPreSummary({ cr }: { cr: CohortResults | null }) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white/3 border border-white/5 rounded-lg p-3">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-2">PK Curve Preview</div>
+          <div className="hk-eyebrow mb-2">PK Curve Preview</div>
           <svg width={W} height={H} className="w-full" viewBox={`0 0 ${W} ${H}`}>
             <path d={curvePath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
             <line x1={pL} y1={H - pB} x2={W} y2={H - pB} stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
@@ -8252,7 +8523,7 @@ function L2AiPreSummary({ cr }: { cr: CohortResults | null }) {
           </div>
         </div>
         <div className="bg-white/3 border border-white/5 rounded-lg p-3 space-y-2">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Clinical PK</div>
+          <div className="hk-eyebrow mb-1">Clinical PK</div>
           <AiMiniBar label="Cmax" value={cmaxNg} max={5000} color="blue" />
           <AiMiniBar label="t½" value={cr.halfLifeHr} max={48} color="blue" />
           <AiMiniBar label="Responder %" value={cr.responderRate * 100} max={100} color={cr.responderRate >= 0.5 ? "emerald" : "amber"} />
@@ -8289,7 +8560,7 @@ function L3AiPreSummary({ tr }: { tr: TrialResults | null }) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white/3 border border-white/5 rounded-lg p-3 flex flex-col items-center">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-2">Success Probability</div>
+          <div className="hk-eyebrow mb-2">Success Probability</div>
           <svg width="110" height="75" viewBox="0 0 110 75">
             <circle cx={cx2} cy={cy2} r={rr} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" strokeLinecap="butt" strokeDasharray={`${trackLen} ${circ - trackLen}`} transform={rot} />
             <circle cx={cx2} cy={cy2} r={rr} fill="none" stroke={probColor} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${fillLen} ${circ - fillLen}`} transform={rot} />
@@ -8297,7 +8568,7 @@ function L3AiPreSummary({ tr }: { tr: TrialResults | null }) {
           </svg>
         </div>
         <div className="bg-white/3 border border-white/5 rounded-lg p-3 space-y-2">
-          <div className="text-[9px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Trial Metrics</div>
+          <div className="hk-eyebrow mb-1">Trial Metrics</div>
           <AiMiniBar label="Power" value={tr.power * 100} max={100} color={tr.power >= 0.8 ? "emerald" : "amber"} />
           <AiMiniBar label="p-Value" value={Math.max(0.001, tr.pValue) * 1000} max={50} color={tr.pValue < 0.05 ? "emerald" : "red"} />
           <AiMiniBar label="Success" value={prob} max={100} color={prob >= 70 ? "emerald" : prob >= 50 ? "amber" : "red"} />
@@ -9155,7 +9426,7 @@ function RegulatoryInsightCard({
       <div className="flex items-center gap-2">
         <Shield className={`w-4 h-4 ${accentColors[layer]}`} />
         <div>
-          <div className="text-[12px] font-semibold text-white">Regulatory Outlook</div>
+          <div className="hk-display text-[16px] text-white">Regulatory Outlook</div>
           <div className="text-[10px] text-slate-500">{subtitles[layer]} · {appType} · FDA/EMA</div>
         </div>
       </div>
@@ -9672,7 +9943,7 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Rabbit className="w-4 h-4 text-amber-400" />
-            <h3 className="text-[15px] font-semibold text-white">Animal Cohort Results</h3>
+            <h3 className="hk-display text-[18px] text-white">Animal Cohort Results</h3>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${riskBgs[ar.overallRisk]}`}>
               {ar.overallRisk.toUpperCase()} RISK
             </span>
@@ -10135,7 +10406,7 @@ function ProvenanceFooter({ provenance, layer }: { provenance: ProvenanceRecord;
 
 function Layer1Results({
   smiles,
-  molProps, simResults, inVitroResults, indication,
+  molProps, simResults, inVitroResults, l1Scorecard, indication,
   l1AiReport, l1AiLoading, l1AiError, l1AiStream, runL1AiAnalysis,
   uniprotId, pdbId, alphafoldPlddt, proteinName,
   bindingOn, toxOn, confidenceThreshold,
@@ -10147,11 +10418,13 @@ function Layer1Results({
   extChEMBL,
   mlAdmet,
   cardiotoxMl,
+  onEvidence,
 }: {
   smiles: string;
   molProps: MolecularProperties | null;
   simResults: SimResults | null;
   inVitroResults: InVitroResults | null;
+  l1Scorecard: L1Scorecard | null;
   indication: string;
   l1AiReport: Record<string, unknown> | null;
   l1AiLoading: boolean;
@@ -10178,12 +10451,14 @@ function Layer1Results({
   extChEMBL?: import("@/lib/chemblActivity").ChEMBLMultiTargetResult | null;
   mlAdmet?: MlAdmetResult | null;
   cardiotoxMl?: CardiotoxResult | null;
+  onEvidence?: (e: EvidenceSupport | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
   const [admetOpen, setAdmetOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [wetLabView, setWetLabView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [rationaleOpen, setRationaleOpen] = useState(false);
   const molName = simResults?.molName ?? "";
 
   const handleGeneratePdf = async () => {
@@ -10208,78 +10483,242 @@ function Layer1Results({
   };
 
   const iv = inVitroResults;
-  const goColor = !iv ? "emerald" : iv.overallRisk === "Low" ? "emerald" : iv.overallRisk === "Moderate" ? "yellow" : "red";
+  // Prefer ML scorecard verdict when available; fall back to heuristic
+  const sc = l1Scorecard;
+  const heuristicLabel = !iv ? "PENDING" : iv.overallRisk === "Low" ? "GO" : iv.overallRisk === "Moderate" ? "WATCH" : "NO-GO";
+  const goLabel = sc ? sc.verdict : heuristicLabel;
+  // A KNOWN-LIABILITY-NO-GO is still a NO-GO, but it reflects a documented
+  // clinical liability on a matched known drug — NOT a novel-compound model
+  // rejection. It gets a distinct warm amber/rose banner + a 📖 "KNOWN DRUG"
+  // badge so a reviewer can tell the two apart at a glance.
+  const isKnownLiability = goLabel === "KNOWN-LIABILITY-NO-GO";
+  const goDisplay = isKnownLiability ? "NO-GO" : goLabel;
+  const goColor = goLabel === "GO" ? "emerald"
+                : goLabel === "WATCH" ? "yellow"
+                : goLabel === "PENDING" ? "emerald"
+                : isKnownLiability ? "known"
+                : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
                 : goColor === "yellow"  ? "from-yellow-950/60 to-yellow-900/30 border-yellow-500/25"
+                : goColor === "known"   ? "from-amber-950/50 via-rose-950/30 to-rose-900/20 border-amber-500/30"
                 :                        "from-red-950/60 to-red-900/30 border-red-500/25";
-  const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : "text-red-400";
-  const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : "bg-red-400 shadow-red-400";
-  const goLabel = !iv ? "PENDING" : iv.overallRisk === "Low" ? "GO" : iv.overallRisk === "Moderate" ? "WATCH" : "NO-GO";
+  const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : goColor === "known" ? "text-amber-300" : "text-red-400";
+  const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : goColor === "known" ? "bg-amber-400 shadow-amber-400" : "bg-red-400 shadow-red-400";
+  const sevColor = (s: string) => s === "critical" ? "text-red-400 border-red-500/30 bg-red-500/10"
+                 : s === "warn" ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
+                 : "text-slate-400 border-white/10 bg-white/5";
 
   return (
-    <div className="space-y-4">
-      {/* Go/No-Go Summary Card */}
-      <div className={`bg-gradient-to-r ${goBg} border rounded-xl p-5`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] ${glowCls}`} />
-              <span className={`text-[20px] font-bold ${goText}`}>{goLabel}</span>
-              {iv && (iv.herg.ic50_uM < 10 || iv.bioactivation.mechanisticToxicities.some(t => t.confidence > 0.7)) && (
+    <div className="space-y-5">
+      {/* ── Single unified verdict banner — ML scorecard when available, heuristic fallback ── */}
+      <div className={`hk-aura bg-gradient-to-br ${goBg} border rounded-[20px] p-5 shadow-[0_20px_50px_-32px_rgba(0,0,0,0.9)]`}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] shrink-0 ${glowCls}`} />
+              <span className={`hk-display text-[26px] leading-[1.05] ${goText}`}>{goDisplay}</span>
+              {isKnownLiability && (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-200 font-semibold"
+                  title="This compound matched a known drug with a documented clinical liability (published evidence). This is NOT a novel-compound model rejection."
+                >
+                  <BookMarked className="w-2.5 h-2.5" /> KNOWN DRUG · documented liability
+                </span>
+              )}
+              {sc && (
+                <>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-semibold
+                    ${sc.confidenceLabel === "High" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : sc.confidenceLabel === "Moderate" ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                    : "border-red-500/30 bg-red-500/10 text-red-300"}`}>
+                    confidence {sc.confidenceLabel} · {(sc.confidence * 100).toFixed(0)}%
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-white/10 text-slate-400">
+                    ML safety coverage {(sc.mlCoverage * 100).toFixed(0)}%
+                  </span>
+                </>
+              )}
+              {iv && !sc && (iv.herg.ic50_uM < 10 || iv.bioactivation.mechanisticToxicities.some(t => t.confidence > 0.7)) && (
+                <span className="text-[9px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold border border-red-500/30 animate-pulse">
+                  REVIEW REQUIRED
+                </span>
+              )}
+              {sc && sc.flags.some(f => f.hardNoGo) && (
                 <span className="text-[9px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold border border-red-500/30 animate-pulse">
                   REVIEW REQUIRED
                 </span>
               )}
             </div>
-            <p className="text-[13px] text-white font-medium">
-              {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Confirmation (L2)" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {/* RF#5 / §9 step 10: was "Confidence Score". Renamed to
-                  "Composite Heuristic Score" because the underlying number
-                  is a weighted blend of physchem heuristics (QED, SA,
-                  rule-of-5, ADMET sub-scores) — NOT a calibrated probability
-                  of clinical success. The qualifier "(heuristic blend, not
-                  calibrated)" sits inline so the demo audience cannot
-                  read it as a Bayesian posterior. */}
-              Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
-              <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend, not calibrated)</span>
-              <span className="text-slate-600 ml-2">HAIOps Governed</span>
-            </p>
+            {sc ? (
+              <>
+                {/* Concise headline always visible; full rationale + reasoning
+                    reveal on click so the banner stays clean. */}
+                <button
+                  type="button"
+                  onClick={() => setRationaleOpen(o => !o)}
+                  aria-expanded={rationaleOpen}
+                  className="group mt-1 flex w-full items-start gap-1.5 text-left"
+                >
+                  <span className="text-[15px] text-white font-medium leading-relaxed">
+                    <span className="tabular-nums">L1 Score: {sc.score}/100</span>
+                    <span className="text-slate-400"> — {sc.headline.replace(/^(GO|WATCH|NO-GO|KNOWN-LIABILITY[ -]NO-GO)\s*—\s*/i, "").replace(/\s*\((?:L1\s+)?score[^)]*\)/i, "")}</span>
+                  </span>
+                  <ChevronDown className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-hover:text-slate-200 ${rationaleOpen ? "rotate-180" : ""}`} />
+                </button>
+                {rationaleOpen && (
+                  <div className="hk-rail mt-2.5 space-y-2.5 rounded-lg border border-white/10 bg-black/25 px-3.5 py-3">
+                    <div>
+                      <div className="hk-eyebrow mb-1.5">Reasoning</div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">{sc.rationale}</p>
+                    </div>
+                    <hr className="hk-divider" />
+                    <div>
+                      <div className="hk-eyebrow mb-1.5">Recommendation</div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">{sc.recommendation}</p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400 mt-2 flex items-center flex-wrap gap-x-1 gap-y-1">
+                  <span className="hk-eyebrow">ML Scorecard</span>
+                  <span className="text-slate-600 ml-1 text-[10px]">DILI-ML · CardioTox-ML · ADMET-AI · CamSol</span>
+                  <span className="hk-chip ml-1"><Shield className="w-2.5 h-2.5 text-cyan-400" /> HAIOps Governed</span>
+                  {!rationaleOpen && (
+                    <button type="button" onClick={() => setRationaleOpen(true)} className="ml-2 text-violet-400 hover:text-violet-300 hover:underline underline-offset-2">
+                      why this verdict?
+                    </button>
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[13px] text-white font-medium mt-1">
+                  {iv ? `In Vitro Score: ${(iv.inVitroScore * 100).toFixed(1)}% — ${iv.overallRisk === "Low" ? "Advance to Confirmation (L2)" : iv.overallRisk === "Moderate" ? "Review Safety Signals" : "Significant Risks Detected"}` : "Run simulation to generate in vitro results"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{simResults ? (simResults.confidence * 100).toFixed(1) : "—"}%</span>
+                  <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend · ML loading…)</span>
+                  <span className="text-slate-600 ml-2">HAIOps Governed</span>
+                </p>
+              </>
+            )}
           </div>
-          <div className="text-right">
-            <div className="text-[11px] text-slate-500 mb-2">Key metrics</div>
+          <div className="text-right shrink-0">
+            <div className="hk-eyebrow mb-2 justify-end">Key metrics</div>
             <div className="flex gap-1.5 flex-wrap justify-end">
               {iv && [
                 { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—" },
                 { l: "Perm", v: iv.permeability.caco2Class },
                 { l: "hERG", v: iv.herg.riskCategory },
               ].map(m => (
-                <Badge key={m.l} className="text-[9px] bg-white/5 text-slate-400">{m.l}: {m.v}</Badge>
+                <span key={m.l} className="hk-chip"><span className="text-slate-500">{m.l}</span><span className="hk-chip-mono text-slate-300">{m.v}</span></span>
               ))}
             </div>
           </div>
         </div>
+
+        {/* Assay metrics row */}
         <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
           {[
-            { label: "IC50",         val: iv?.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
-            { label: "Caco-2",       val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
-            { label: "CLint",        val: iv ? `${iv.metabolicStability.microsomalCLint.toFixed(1)} µL/min/mg` : "—", good: iv?.metabolicStability.microsomalClass !== "Unstable" },
-            { label: "fu%",          val: iv ? `${iv.plasmaProteinBinding.fuPercent.toFixed(1)}%` : "—", good: (iv?.plasmaProteinBinding.fuPercent ?? 0) > 5 },
-            { label: "hERG IC50",    val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
-            // RF#12 / §9 step 11: TI is not computable when ic50_nM is null
-            // (no validated on-target). Inv simulator emits TI=0 in that
-            // case as a structural placeholder; suppress the display rather
-            // than show "0×" which reads as a real measurement.
-            { label: "TI",           val: iv?.doseResponse.ic50_nM != null ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
+            { label: "IC50",      val: iv?.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
+            { label: "Caco-2",   val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
+            { label: "CLint",    val: iv ? `${iv.metabolicStability.microsomalCLint.toFixed(1)} µL/min/mg` : "—", good: iv?.metabolicStability.microsomalClass !== "Unstable" },
+            { label: "fu%",      val: iv ? `${iv.plasmaProteinBinding.fuPercent.toFixed(1)}%` : "—", good: (iv?.plasmaProteinBinding.fuPercent ?? 0) > 5 },
+            { label: "hERG IC50",val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
+            { label: "TI",       val: iv?.doseResponse.ic50_nM != null ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
           ].map(({ label, val, good }) => (
             <div key={label}>
-              <div className="text-[9px] text-slate-600 uppercase tracking-wider">{label}</div>
-              <div className={`text-[12px] font-semibold mt-0.5 ${good ? "text-emerald-400" : "text-red-400"}`}>{val}</div>
+              <div className="hk-kpi-label">{label}</div>
+              <div className={`hk-kpi-value text-[12px] mt-0.5 ${good ? "text-emerald-400" : "text-red-400"}`}>{val}</div>
             </div>
           ))}
         </div>
+
+        {/* ML scorecard flags — only when scorecard is present */}
+        {sc && sc.flags.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/8">
+            <div className="hk-eyebrow mb-2.5">
+              Liability flags
+              <span className="hk-chip ml-1.5 text-slate-400 normal-case tracking-normal font-normal">{sc.flags.filter(f => f.hardNoGo).length} hard · {sc.flags.filter(f => f.severity === "warn").length} watch</span>
+            </div>
+            <div className="space-y-1.5">
+              {sc.flags.map(f => {
+                const FlagIcon = f.hardNoGo ? ShieldAlert : f.severity === "warn" ? AlertTriangle : Info;
+                return (
+                <div key={f.id} className={`text-[10px] border rounded-lg px-2.5 py-2 ${sevColor(f.severity)}`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <FlagIcon className="w-3 h-3 shrink-0" />
+                    <span className="font-semibold">{f.label}</span>
+                    <span className="text-slate-400 hk-chip-mono">· {f.value} (threshold {f.threshold})</span>
+                    <span className="hk-chip text-[8px] py-0 text-slate-500">{f.source} · {f.provenance}</span>
+                  </div>
+                  <div className="text-slate-400 mt-1 leading-relaxed">{f.rationale}</div>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ML dimension scores — only when scorecard is present */}
+        {sc && (
+          <div className="mt-4 pt-4 border-t border-white/8">
+            <div className="hk-eyebrow mb-2.5">Weighted dimension scores</div>
+            <div className="flex gap-2 flex-wrap">
+              {sc.dimensions.map(d => (
+                <div key={d.dimension} className="hk-chip">
+                  <span className="text-slate-400">{d.dimension}</span>
+                  <span className={`hk-chip-mono font-semibold ${d.score >= 70 ? "text-emerald-400" : d.score >= 50 ? "text-amber-300" : "text-red-400"}`}>{d.score.toFixed(0)}</span>
+                  <span className="text-slate-600">w{(d.weight * 100).toFixed(0)}%</span>
+                  <span className="text-slate-600">· {d.provenance}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* FDA Benefit-Risk context — weighs the verdict's liabilities against
+          the indication's severity + unmet medical need (FDA 2023 Benefit-Risk
+          Framework). Informational; never overrides the safety verdict. */}
+      {sc && (
+        <BenefitRiskCard scorecard={sc} indication={indication} therapeuticArea={therapeuticArea} targetSymbol={proteinName || uniprotId} drugName={molName || simResults?.molName} />
+      )}
+
+      {/* ── HAIOps governance / directional-use banner — sits below the verdict
+          and benefit-risk. Every output is DIRECTIONAL decision-support fusing
+          all ML + rule-based predictions under HAIOps governance; it does not
+          replace wet-lab validation, and for novel chemistry the predictions
+          are extrapolations. */}
+      <div className="hk-panel hk-topline px-4 py-3 flex items-start gap-3">
+        <span className="hk-icon-tile mt-0.5"><Shield className="w-3.5 h-3.5" /></span>
+        <div className="min-w-0">
+          <div className="hk-eyebrow">HAIOps governed · directional decision-support</div>
+          <p className="text-[11px] leading-relaxed text-slate-300 mt-1.5">
+            This verdict fuses every ML and rule-based output (ADMET-AI, CardioTox-ML, DILI-ML, read-across,
+            structural alerts) into a single <span className="text-cyan-300 font-medium">direction</span> for this molecule under HAIOps governance.
+            It is <span className="text-slate-100 font-medium">not a substitute for wet-lab validation</span> — no AI is accurate enough to replace assays,
+            and for novel molecules every endpoint without a measured analogue is an extrapolation. Use it to prioritise and de-risk
+            <span className="text-slate-100 font-medium"> before</span> the lab, not instead of it.
+          </p>
+        </div>
+      </div>
+
+      {/* Evidence & Novelty — public-DB verification + measured-analogue
+          read-across for hERG / on-target IC50 / permeability. Self-fetching;
+          reports evidence support up so the scorecard confidence reflects how
+          much REAL measured data backs this novel compound. */}
+      {smiles && smiles.trim() && (
+        <EvidenceNoveltyPanel smiles={smiles} onEvidence={onEvidence} />
+      )}
+
+      {/* Trusted preclinical sources — NCATS Pharos (target validation) +
+          DailyMed (official FDA labels) + transparent source registry. */}
+      {smiles && smiles.trim() && (
+        <PreclinicalEvidenceCard
+          targetSymbol={proteinName || uniprotId}
+          drugName={molName || simResults?.molName}
+        />
+      )}
 
       {/* Composite heuristic score threshold warning (was "confidence
           threshold" — see §9 step 10). The number is a heuristic blend, not
@@ -10294,7 +10733,7 @@ function Layer1Results({
       )}
 
       {/* In Vitro Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-lg flex-wrap">
+      <div className="hk-tabbar flex-wrap">
         {[
           { id: "ml-admet",      label: "ML-Enhanced",   icon: Brain },
           { id: "dose-response", label: "Dose-Response", icon: TrendingUp },
@@ -10307,9 +10746,8 @@ function Layer1Results({
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
-              activeTab === id ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"
-            }`}
+            data-active={activeTab === id}
+            className="hk-tab flex-1 py-1.5 text-[11px]"
           >
             <Icon className="w-3 h-3" />
             {label}
@@ -10326,9 +10764,9 @@ function Layer1Results({
 
       {/* Dose-Response Tab */}
       {activeTab === "dose-response" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-[12px] font-semibold text-slate-300">Dose-Response Curve</h3>
+            <h3 className="hk-display text-[16px] text-slate-100">Dose-Response Curve</h3>
             <div className="flex items-center gap-2">
               {/* Wet-lab view toggle — only meaningful when a curve exists */}
               {iv.doseResponse.curve.length > 0 && iv.doseResponse.ic50_nM != null && (
@@ -10467,7 +10905,7 @@ function Layer1Results({
               </div>
             ))}
           </div>
-          <div className="bg-white/5 rounded-lg p-3">
+          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5">
             <div className="text-[10px] font-semibold text-slate-400 mb-2">Cell Viability ({iv.cellViability.cellLine})</div>
             <div className="grid grid-cols-3 gap-3">
               <div><div className="text-[9px] text-slate-500">CC50</div><div className="text-[12px] font-semibold text-white">{iv.cellViability.cc50_uM.toFixed(1)} µM</div></div>
@@ -10482,7 +10920,7 @@ function Layer1Results({
 
       {/* Permeability Tab */}
       {activeTab === "permeability" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <h3 className="text-[12px] font-semibold text-slate-300">Permeability & Absorption</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/5 rounded-lg p-4 space-y-3">
@@ -10513,18 +10951,18 @@ function Layer1Results({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/5 rounded-lg p-3">
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 mb-1">Efflux Ratio</div>
               <div className={`text-[16px] font-bold ${iv.permeability.effluxRatio < 2.5 ? "text-emerald-400" : "text-red-400"}`}>{iv.permeability.effluxRatio.toFixed(1)}</div>
               <div className="text-[9px] text-slate-500 mt-0.5">{iv.permeability.effluxRatio < 2.5 ? "Not P-gp limited" : "P-gp efflux likely"}</div>
             </div>
-            <div className="bg-white/5 rounded-lg p-3">
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 mb-1">P-gp Substrate</div>
               <div className={`text-[16px] font-bold ${iv.permeability.pgpSubstrate ? "text-amber-400" : "text-emerald-400"}`}>{iv.permeability.pgpSubstrate ? "Yes" : "No"}</div>
               <div className="text-[9px] text-slate-500 mt-0.5">{iv.permeability.pgpSubstrate ? "May limit oral absorption" : "No efflux concern"}</div>
             </div>
           </div>
-          <div className="bg-white/5 rounded-lg p-3">
+          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5">
             <div className="text-[10px] font-semibold text-slate-400 mb-2">Plasma Protein Binding</div>
             <div className="flex items-center gap-4">
               <div>
@@ -10547,7 +10985,7 @@ function Layer1Results({
 
       {/* Clearance Tab */}
       {activeTab === "clearance" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <h3 className="text-[12px] font-semibold text-slate-300">Metabolic Stability & CYP Panel</h3>
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -10555,7 +10993,7 @@ function Layer1Results({
               { l: "Hepatocyte CLint", v: `${iv.metabolicStability.hepatocyteCLint.toFixed(1)}`, u: "µL/min/10⁶", cls: iv.metabolicStability.hepatocyteClass },
               { l: "t½ (microsomal)", v: `${iv.metabolicStability.halfLifeMin.toFixed(0)}`, u: "min", cls: iv.metabolicStability.microsomalClass },
             ].map(m => (
-              <div key={m.l} className="bg-white/5 rounded-lg p-3 text-center">
+              <div key={m.l} className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5 text-center">
                 <div className="text-[9px] text-slate-500 mb-1">{m.l}</div>
                 <div className={`text-[18px] font-bold ${m.cls === "Stable" ? "text-emerald-400" : m.cls === "Moderate" ? "text-yellow-400" : "text-red-400"}`}>{m.v}</div>
                 <div className="text-[8px] text-slate-600">{m.u}</div>
@@ -10586,7 +11024,7 @@ function Layer1Results({
 
       {/* Safety Tab */}
       {activeTab === "safety" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <h3 className="text-[12px] font-semibold text-slate-300">Safety Assessment</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/5 rounded-lg p-4">
@@ -10644,7 +11082,7 @@ function Layer1Results({
             </div>
           </div>
           {iv.selectivity.topOffTargets.length > 0 && (
-            <div className="bg-white/5 rounded-lg p-3">
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3.5">
               <div className="text-[10px] font-semibold text-slate-400 mb-2">Top Off-Target Hits</div>
               <div className="space-y-1.5">
                 {iv.selectivity.topOffTargets.map((t, i) => (
@@ -10664,7 +11102,7 @@ function Layer1Results({
 
       {/* Mechanism Tab */}
       {activeTab === "mechanism" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-[12px] font-semibold text-slate-300">Mechanistic Toxicity Analysis</h3>
             <Badge className={`text-[9px] ${iv.bioactivation.overallBioactivationRisk === "Low" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" : iv.bioactivation.overallBioactivationRisk === "Moderate" ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" : "bg-red-500/15 text-red-400 border-red-500/30"}`}>
@@ -10744,9 +11182,9 @@ function Layer1Results({
 
       {/* Bioactivation Tab */}
       {activeTab === "bioactivation" && iv && (
-        <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+        <div className="hk-card space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-[12px] font-semibold text-slate-300">Metabolic Bioactivation Pathways</h3>
+            <h3 className="hk-display text-[16px] text-slate-100">Metabolic Bioactivation Pathways</h3>
             <div className="flex items-center gap-2">
               {iv.bioactivation.gshTrappingRecommended && (
                 <Badge className="text-[8px] bg-amber-500/15 text-amber-400 border-amber-500/30">GSH Trapping Recommended</Badge>
@@ -10866,7 +11304,7 @@ function Layer1Results({
         >
           <div className="flex items-center gap-2">
             <Activity className="w-3.5 h-3.5 text-violet-400" />
-            <span className="text-[12px] font-semibold text-slate-300">Directional ADMET Indicators</span>
+            <span className="hk-display text-[16px] text-slate-100">Directional ADMET Indicators</span>
             <Badge className="text-[8px] bg-violet-500/10 text-violet-400 border-violet-500/20">Computational</Badge>
           </div>
           {admetOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
@@ -10968,8 +11406,8 @@ function Layer1Results({
 function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molProps: MolecularProperties | null }) {
   if (!admet) {
     return (
-      <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
-        <h3 className="text-[12px] font-semibold text-slate-300 mb-4">ADMET Radar Chart</h3>
+      <div className="hk-card">
+        <h3 className="hk-display text-[16px] text-slate-100 mb-4">ADMET Radar Chart</h3>
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
           <Activity className="w-8 h-8" />
           <p className="text-[11px]">Run the simulation to populate the ADMET radar</p>
@@ -10998,8 +11436,8 @@ function ADMETRadarChart({ admet, molProps }: { admet: AdmetScores | null; molPr
     pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ") + "Z";
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
-      <h3 className="text-[12px] font-semibold text-slate-300 mb-4">ADMET Radar Chart</h3>
+    <div className="hk-card">
+      <h3 className="hk-display text-[16px] text-slate-100 mb-4">ADMET Radar Chart</h3>
       <div className="flex gap-6 items-center">
         <svg width="300" height="280" className="shrink-0">
           {/* Grid rings */}
@@ -11100,7 +11538,7 @@ function BindingHeatmap({ binding, uniprotId }: { binding: BindingEstimate | nul
   };
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[12px] font-semibold text-slate-300">Binding Affinity Heatmap</h3>
         {binding && (
@@ -11159,7 +11597,7 @@ function ToxicityPanel({ organs: realOrgans, toxAlerts: realAlerts }: { organs: 
     :               { border: "border-red-500/25 bg-red-500/5",        bar: "bg-red-500",     text: "text-red-400" };
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+    <div className="hk-card space-y-4">
       <div>
         <h3 className="text-[12px] font-semibold text-slate-300 mb-3">Organ Toxicity Signals</h3>
         <div className="grid grid-cols-3 gap-3">
@@ -11228,7 +11666,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
   ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[12px] font-semibold text-slate-300">Batch Comparison</h3>
         <div className="flex gap-2">
@@ -11424,7 +11862,7 @@ function PKPDCurves({ cr }: { cr: CohortResults | null }) {
     ].join(" ");
 
     return (
-      <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+      <div className="hk-card">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[12px] font-semibold text-slate-300">PK/PD Concentration Curve</h3>
           <div className="flex gap-3 text-[10px] text-slate-500">
@@ -11458,7 +11896,7 @@ function PKPDCurves({ cr }: { cr: CohortResults | null }) {
     dose * 14.2 * (Math.exp(-0.058 * t) - Math.exp(-0.693 * t)) / (0.693 - 0.058);
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">PK/PD Concentration Curves</h3>
       <svg width="100%" height="220" viewBox="0 0 520 220" className="overflow-visible">
         {[0, 50, 100, 150, 200].map(y => (
@@ -11516,7 +11954,7 @@ function ResponderChart({ cr }: { cr: CohortResults | null }) {
   });
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Responder Classification</h3>
       <div className="flex gap-6 items-center">
         <svg width="160" height="160" className="shrink-0">
@@ -11567,7 +12005,7 @@ function AETable({ cr }: { cr: CohortResults | null }) {
       ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Adverse Event Predictions</h3>
       <table className="w-full text-[11px]">
         <thead>
@@ -11619,7 +12057,7 @@ function SubgroupHeatmap({ cr }: { cr: CohortResults | null }) {
   };
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 overflow-x-auto">
+    <div className="hk-card overflow-x-auto">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Subgroup Analysis Heatmap</h3>
       <table className="text-[10px]">
         <thead>
@@ -11666,8 +12104,8 @@ function DoseResponseCurve({ cr }: { cr: CohortResults | null }) {
   const ciPath = `${ciHigh.map((v, i) => `${i === 0 ? "M" : "L"}${xScale(i)},${yScale(v)}`).join(" ")} ${ciLow.slice().reverse().map((v, i) => `L${xScale(doses.length - 1 - i)},${yScale(v)}`).join(" ")} Z`;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
-      <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Dose-Response Curve</h3>
+    <div className="hk-card">
+      <h3 className="hk-display text-[16px] text-slate-100 mb-4">Dose-Response Curve</h3>
       <svg width="100%" height="220" viewBox="0 0 540 220">
         {[0, 0.25, 0.5, 0.75, 1.0].map((v, i) => (
           <g key={i}>
@@ -11773,7 +12211,7 @@ function ProcovaComparison({ pr }: { pr: ProcovaResults }) {
   ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Design Comparison Summary</h3>
       <table className="w-full text-[11px]">
         <thead>
@@ -11813,7 +12251,7 @@ function ProcovaDualPower({ pr, powerTarget }: { pr: ProcovaResults; powerTarget
   const enhIdx = data.reduce((bi, d, i) => Math.abs(d.enhancedPower - powerTarget) < Math.abs(data[bi].enhancedPower - powerTarget) ? i : bi, 0);
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Dual Power Curve — Standard vs PROCOVA-Enhanced</h3>
       <svg width="100%" height="230" viewBox="0 0 540 230">
         {[0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((v, i) => (
@@ -11873,7 +12311,7 @@ function ProcovaEnrollment({ pr }: { pr: ProcovaResults }) {
   const yS = (v: number) => 180 - (v / maxN) * 160;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Enrollment Impact — Time to Target</h3>
       <svg width="100%" height="215" viewBox="0 0 540 215">
         {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
@@ -11923,7 +12361,7 @@ function ProcovaCostBreakdown({ pr }: { pr: ProcovaResults }) {
   const enhPerPt = pr.enhancedN > 0 ? Math.round((pr.enhancedCost * 1_000_000) / pr.enhancedN) : 0;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Cost Savings Breakdown</h3>
 
       <div className="grid grid-cols-3 gap-4 mb-5">
@@ -11988,7 +12426,7 @@ function ProcovaSensitivity({ pr, pctTarget, powerTarget }: { pr: ProcovaResults
   const ratios = [...new Set(grid.map(g => g.ratio))];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Sensitivity Analysis — Sample Size & Power</h3>
       <p className="text-[10px] text-slate-500 mb-4">Each cell shows the total sample size required to achieve ≥{pctTarget}% power. Green = viable, red = power drops below threshold.</p>
 
@@ -12063,7 +12501,7 @@ function ProcovaRegulatory() {
   ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+    <div className="hk-card space-y-4">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Regulatory Guidance — Prognostic Covariate Adjustment</h3>
 
       {sections.map(s => (
@@ -12218,7 +12656,7 @@ function SuccessProbGauge({ tr }: { tr: TrialResults | null }) {
   const rot = `rotate(135 ${cx} ${cy})`;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Trial Success Probability</h3>
       <div className="flex gap-8 items-center">
         <div className="relative">
@@ -12291,7 +12729,7 @@ function EnrollmentChart({ tr }: { tr: TrialResults | null }) {
   const ciArea = `${optimistic.map((v, i) => `${i === 0 ? "M" : "L"}${xS(i)},${yS(v)}`).join(" ")} ${pessimistic.slice().reverse().map((v, i) => `L${xS(24 - i)},${yS(v)}`).join(" ")} Z`;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Enrollment Trajectory</h3>
       <svg width="100%" height="210" viewBox="0 0 520 210">
         {[0, 62, 124, 186, 248].map((v, i) => (
@@ -12332,7 +12770,7 @@ function PowerCurve({ tr }: { tr: TrialResults | null }) {
   const yS = (v: number) => 180 - v * 160;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-2">Power Curve</h3>
       <svg width="100%" height="210" viewBox="0 0 540 210">
         {[0.6, 0.7, 0.8, 0.9, 1.0].map((v, i) => (
@@ -12369,7 +12807,7 @@ function BalanceReport({ cr }: { cr: CohortResults | null }) {
   ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Synthetic Arm Balance Report <span className="text-[10px] text-slate-600 font-normal">(SMD threshold: 0.10)</span></h3>
       <table className="w-full text-[11px]">
         <thead>
@@ -12427,7 +12865,7 @@ function SiteRanking({ tr }: { tr: TrialResults | null }) {
       ];
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Site Ranking Table</h3>
       <table className="w-full text-[11px]">
         <thead>
@@ -12477,7 +12915,7 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
   const perSite    = sites > 0 ? parseFloat((totalM / sites).toFixed(2)) : 0;
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5">
+    <div className="hk-card">
       <h3 className="text-[12px] font-semibold text-slate-300 mb-4">Cost Estimate Summary</h3>
       <div className="flex gap-6 items-start">
         <div className="flex-1">
@@ -12652,7 +13090,7 @@ function FirstInHumanPanel({
           <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto">
             <Activity className="w-8 h-8 text-emerald-400" />
           </div>
-          <h2 className="text-[16px] font-semibold text-white">Layer 4 — First In Human (Phase 1 Planner)</h2>
+          <h2 className="hk-display text-[20px] text-white">Layer 4 — First In Human (Phase 1 Planner)</h2>
           <p className="text-[12px] text-slate-500 leading-relaxed">
             The Phase 1 planner consumes a sealed §8 PreClinicalPackage built
             from the upstream L3 Animal Cohort cascade. Run L3 first to derive
@@ -12678,7 +13116,7 @@ function FirstInHumanPanel({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold text-emerald-300 uppercase tracking-widest">Layer 4</span>
-            <h2 className="text-[14px] font-semibold text-white">First In Human · Phase 1 Planner</h2>
+            <h2 className="hk-display text-[18px] text-white">First In Human · Phase 1 Planner</h2>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 border border-violet-500/30 text-violet-200 font-mono">v2.0.0 §8</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-0.5 truncate">

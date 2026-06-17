@@ -171,7 +171,25 @@ export function evaluateCascadeGate(
    * is ipTM-interpolated via `makeCofoldedQuality()`.
    */
   cofoldGate: CofoldGateResult | null = null,
+  /**
+   * Unified L1 scorecard verdict. Now includes the KNOWN-LIABILITY-NO-GO
+   * variant from the lookup-first path — a known clinical-liability drug
+   * still blocks auto-cascade (correctly), but the UI renders it in a
+   * distinct color so reviewers can tell the difference between a model
+   * rejection and a published-evidence block.
+   */
+  l1ScorecardVerdict: "GO" | "WATCH" | "NO-GO" | "KNOWN-LIABILITY-NO-GO" | null = null,
+  /**
+   * Optional applicability-domain envelope. When `adLabel === "Out-of-domain"`
+   * the per-output ML tier upgrades are demoted from `ml` (0.7) to
+   * `structural` (0.6) — an extrapolation cannot defensibly carry the same
+   * trust score as an in-domain ML prediction. This stops the gate from
+   * green-lighting an auto-cascade on the strength of ML signals that the
+   * model has no business making.
+   */
+  applicabilityDomain: { adLabel: "In-domain" | "Border-domain" | "Out-of-domain" | "Unknown" } | null = null,
 ): CascadeGateResult {
+  const outOfDomain = applicabilityDomain?.adLabel === "Out-of-domain";
   const detail = defaultDetail();
 
   // Override target_identification with live evidence from suggestions.
@@ -293,8 +311,34 @@ export function evaluateCascadeGate(
 
   const blockedBy: string[] = [];
 
-  if (simResults?.goNogo === "NO-GO") {
+  // Canonical verdict: the unified L1 scorecard when available, else the legacy
+  // ADMET goNogo. Keeps the cascade aligned with the headline L1 verdict.
+  // KNOWN-LIABILITY-NO-GO (lookup-first path) is treated as a hard block too;
+  // we tag the reason differently so the UI banner can phrase it as "blocked
+  // by a published clinical liability" rather than "model rejection".
+  const effectiveVerdict: "GO" | "WATCH" | "NO-GO" | "KNOWN-LIABILITY-NO-GO" | null =
+    l1ScorecardVerdict ?? simResults?.goNogo ?? null;
+  if (effectiveVerdict === "NO-GO") {
     blockedBy.push("NO-GO decision");
+  } else if (effectiveVerdict === "KNOWN-LIABILITY-NO-GO") {
+    blockedBy.push("KNOWN-LIABILITY-NO-GO (published clinical liability)");
+  }
+
+  // ── AD demotion: out-of-domain ML predictions can't carry full ML tier ────
+  // If the molecule is out-of-domain, walk back through the detail map and
+  // downgrade any tier=="ml" entry to tier=="structural". This keeps the ML
+  // SIGNAL visible (the note still says where it came from) but the
+  // QUALITY SCORE no longer crosses the cascade threshold on its own.
+  if (outOfDomain) {
+    for (const k of Object.keys(detail)) {
+      if (detail[k].tier === "ml") {
+        detail[k] = {
+          tier: "structural",
+          score: TIER_SCORE.structural,
+          note: `${detail[k].note} — DEMOTED: molecule out-of-domain (NN-Tanimoto < 0.40 to training set); ML prediction is an extrapolation`,
+        };
+      }
+    }
   }
   for (const k of SAFETY_KEYS) {
     if (detail[k as SafetyKey].score < SAFETY_MIN_SCORE) blockedBy.push(k);
@@ -308,8 +352,10 @@ export function evaluateCascadeGate(
   let reason: string;
   if (canAutoCascade) {
     reason = "All quality thresholds met — auto-cascade permitted.";
-  } else if (simResults?.goNogo === "NO-GO") {
-    reason = "NO-GO compound — manual review required regardless of data quality.";
+  } else if (effectiveVerdict === "NO-GO") {
+    reason = l1ScorecardVerdict === "NO-GO"
+      ? "Unified L1 scorecard returned NO-GO (hard liability veto) — manual review required before advancing to L2/L3."
+      : "NO-GO compound — manual review required regardless of data quality.";
   } else {
     const safetyBlocked = blockedBy.filter((k) => SAFETY_KEYS.includes(k as SafetyKey));
     if (safetyBlocked.length > 0) {

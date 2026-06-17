@@ -170,6 +170,53 @@ router.post("/ai/binding-ml", async (req, res) => {
   }
 });
 
+// ── New mechanistic safety endpoints ─────────────────────────────────────
+
+// Reactive metabolite structural alert scanner (26 SMARTS patterns, literature-curated)
+router.post("/ai/reactive-metabolites", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/reactive-metabolites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+// BSEP inhibition + phospholipidosis predictor
+router.post("/ai/bsep", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/bsep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+// Applicability domain (AD) confidence scorer
+router.post("/ai/applicability-domain", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/applicability-domain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 // L1 — Peptide-native property engine (physicochemical, stability, permeability, AMP, developability)
 router.post("/ai/peptide", async (req, res) => {
   try {

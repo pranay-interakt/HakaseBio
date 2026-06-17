@@ -21,8 +21,56 @@ import {
   BarChart3, LineChart, PieChart, Map, FileText, Settings2, Plus, Trash2,
   ChevronDown, ChevronUp, Zap, Clock, Target, Shield, Database, GitBranch,
   Microscope, Dna, HeartPulse, Brain, Layers, LayoutDashboard, Bell,
-  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe
+  Search, Menu, X, Filter, RefreshCw, Eye, Lock, Maximize2, Box, Globe,
+  Mail, LogOut, Star, Rocket, Crown, EyeOff
 } from "lucide-react";
+
+// ── Auth Types ────────────────────────────────────────────────────────
+type UserPlan = "pro" | "free";
+interface AuthUser {
+  email: string;
+  name: string;
+  initials: string;
+  plan: UserPlan;
+  avatar?: string;
+}
+
+// Pre-seeded accounts  (email → { password, user })
+const ACCOUNTS: Record<string, { password: string; user: AuthUser }> = {
+  "admin@hakase.ai": {
+    password: "Admin2024!",
+    user: { email: "admin@hakase.ai", name: "Admin", initials: "AD", plan: "pro" },
+  },
+  "pro@hakase.ai": {
+    password: "Pro2024!",
+    user: { email: "pro@hakase.ai", name: "Pro User", initials: "PU", plan: "pro" },
+  },
+  "test@test.com": {
+    password: "test123",
+    user: { email: "test@test.com", name: "Test User", initials: "TU", plan: "free" },
+  },
+};
+
+// ── Google SVG Icon ───────────────────────────────────────────────────
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
+
+// ── Apple SVG Icon ────────────────────────────────────────────────────
+function AppleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+    </svg>
+  );
+}
 
 type Layer = 1 | 2 | 3;
 type SimulationStatus = "idle" | "running" | "complete" | "error";
@@ -42,8 +90,253 @@ interface SecondaryEndpoint {
   timepoint: string;
 }
 
+// ── Login Page ────────────────────────────────────────────────────────
+function LoginPage({ onLogin }: { onLogin: (user: AuthUser) => void }) {
+  const [tab, setTab] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleEmailAuth = () => {
+    setError("");
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      if (tab === "login") {
+        const acct = ACCOUNTS[email.toLowerCase()];
+        if (!acct || acct.password !== password) {
+          setError("Invalid email or password.");
+          return;
+        }
+        onLogin(acct.user);
+      } else {
+        // Sign-up: create free account
+        if (!name.trim() || !email.trim() || password.length < 6) {
+          setError("Please fill all fields. Password must be 6+ chars.");
+          return;
+        }
+        const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+        onLogin({ email, name, initials, plan: "free" });
+      }
+    }, 900);
+  };
+
+  const handleGoogleLogin = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      onLogin({ email: "google.user@gmail.com", name: "Google User", initials: "GU", plan: "free" });
+    }, 1200);
+  };
+
+  const handleAppleLogin = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      onLogin({ email: "apple.user@icloud.com", name: "Apple User", initials: "AU", plan: "free" });
+    }, 1200);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#07080c] flex items-center justify-center p-4 font-['Inter']">
+      {/* Background glow */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-600/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-lg shadow-violet-500/30">
+              <Dna className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-2xl font-bold tracking-tight text-white">
+              Hakase<span className="text-violet-400">AI</span>
+            </span>
+          </div>
+          <p className="text-slate-400 text-sm">Biological Digital Twin Platform</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-[#0d0f17] border border-white/10 rounded-2xl p-8 shadow-2xl">
+          {/* Tab switcher */}
+          <div className="flex bg-white/5 rounded-xl p-1 mb-6">
+            {(["login", "signup"] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setError(""); }}
+                className={`flex-1 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  tab === t ? "bg-violet-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {t === "login" ? "Sign In" : "Sign Up"}
+              </button>
+            ))}
+          </div>
+
+          {/* OAuth buttons */}
+          <div className="space-y-3 mb-5">
+            <button
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2.5 px-4 rounded-xl text-[13px] transition-all disabled:opacity-60 shadow-sm"
+            >
+              <GoogleIcon className="w-5 h-5" />
+              Continue with Google
+            </button>
+            <button
+              onClick={handleAppleLogin}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-black hover:bg-gray-900 text-white font-medium py-2.5 px-4 rounded-xl text-[13px] transition-all disabled:opacity-60 border border-white/10"
+            >
+              <AppleIcon className="w-5 h-5" />
+              Continue with Apple
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-white/8" />
+            <span className="text-[11px] text-slate-600">or continue with email</span>
+            <div className="flex-1 h-px bg-white/8" />
+          </div>
+
+          {/* Email form */}
+          <div className="space-y-3">
+            {tab === "signup" && (
+              <div>
+                <Label className="text-[12px] text-slate-400 mb-1.5 block">Full Name</Label>
+                <Input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Dr. Jane Smith"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-violet-500/50 h-10 text-[13px]"
+                />
+              </div>
+            )}
+            <div>
+              <Label className="text-[12px] text-slate-400 mb-1.5 block">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-violet-500/50 h-10 text-[13px] pl-9"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-[12px] text-slate-400 mb-1.5 block">Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+                  placeholder={tab === "signup" ? "Min. 6 characters" : "••••••••"}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:border-violet-500/50 h-10 text-[13px] pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleEmailAuth}
+              disabled={loading}
+              className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-[13px] transition-all mt-1 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Authenticating…</>
+              ) : tab === "login" ? "Sign In" : "Create Account"}
+            </button>
+          </div>
+
+          {/* Admin hint */}
+          <div className="mt-5 p-3 bg-violet-500/5 border border-violet-500/15 rounded-xl">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Crown className="w-3.5 h-3.5 text-violet-400" />
+              <span className="text-[11px] text-violet-400 font-semibold">Admin / Pro Test Credentials</span>
+            </div>
+            <div className="text-[11px] text-slate-500 space-y-0.5">
+              <div><span className="text-slate-400">Email:</span> admin@hakase.ai &nbsp;|&nbsp; <span className="text-slate-400">PW:</span> Admin2024!</div>
+              <div className="text-[10px] text-slate-600">All layers unlocked · Full Pro access</div>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-center text-[11px] text-slate-600 mt-4">
+          By continuing, you agree to Hakase's Terms of Service and Privacy Policy.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Coming Soon Modal ─────────────────────────────────────────────────
+function ComingSoonModal({ layerName, onClose }: { layerName: string; onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-[#0d0f17] border border-white/12 rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300">
+          <X className="w-4 h-4" />
+        </button>
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-700/20 border border-violet-500/25 flex items-center justify-center mx-auto mb-4">
+          <Rocket className="w-7 h-7 text-violet-400" />
+        </div>
+        <h2 className="text-white font-bold text-lg mb-2">{layerName} — Coming Soon</h2>
+        <p className="text-slate-400 text-[13px] leading-relaxed mb-5">
+          The <span className="text-violet-300 font-medium">{layerName}</span> simulation layer is available on the <span className="text-violet-300 font-medium">Pro plan</span>. Upgrade to unlock all three digital twin layers.
+        </p>
+        <div className="flex gap-1 mb-5">
+          {["Animal & In-Vivo Models", "Patient Cohort Twin", "Clinical Trial Twin"].map((f, i) => (
+            <div key={i} className="flex-1 bg-violet-500/8 border border-violet-500/15 rounded-lg py-2 px-1">
+              <div className="text-[9px] text-violet-400/70 text-center leading-snug">{f}</div>
+            </div>
+          ))}
+        </div>
+        <button className="w-full bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 text-white font-semibold py-2.5 rounded-xl text-[13px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20">
+          <Star className="w-4 h-4" /> Upgrade to Pro
+        </button>
+        <button onClick={onClose} className="mt-2.5 text-[12px] text-slate-500 hover:text-slate-300 transition-colors w-full">
+          Maybe later
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ── Main App (auth-wrapped) ───────────────────────────────────────────
 export function HakaseAI() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  if (!user) return <LoginPage onLogin={setUser} />;
+  return <HakaseAIApp user={user} onLogout={() => setUser(null)} />;
+}
+
+function HakaseAIApp({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
+  const isPro = user.plan === "pro";
   const [activeLayer, setActiveLayer] = useState<Layer>(1);
+  const [comingSoonLayer, setComingSoonLayer] = useState<string | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [simStatus, setSimStatus] = useState<Record<Layer, SimulationStatus>>({
     1: "idle",
     2: "idle",
@@ -393,14 +686,24 @@ export function HakaseAI() {
             const Icon = layerIcons[i];
             const status = getLayerStatus(layer);
             const isActive = activeLayer === layer;
+            const isLocked = !isPro && layer > 1;
+            const layerDisplayNames = ["Molecular", "Animal", "In-Human Trial"];
             return (
               <div key={layer} className="flex items-center">
                 <button
-                  onClick={() => setActiveLayer(layer)}
-                  disabled={status === "disabled"}
+                  onClick={() => {
+                    if (isLocked) {
+                      setComingSoonLayer(layerDisplayNames[i]);
+                    } else if (status !== "disabled") {
+                      setActiveLayer(layer);
+                    }
+                  }}
+                  disabled={status === "disabled" && !isLocked}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 ${
                     isActive
                       ? "bg-violet-600/20 border border-violet-500/50 text-violet-300"
+                      : isLocked
+                      ? "text-slate-500 hover:bg-white/5 cursor-pointer opacity-70"
                       : status === "complete"
                       ? "text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
                       : status === "available"
@@ -408,7 +711,9 @@ export function HakaseAI() {
                       : "text-slate-600 cursor-not-allowed"
                   }`}
                 >
-                  {status === "complete" ? (
+                  {isLocked ? (
+                    <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  ) : status === "complete" ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border ${
@@ -418,7 +723,8 @@ export function HakaseAI() {
                     </div>
                   )}
                   <Icon className="w-3.5 h-3.5" />
-                  {layerLabels[i]}
+                  {layerDisplayNames[i]}
+                  {isLocked && <span className="text-[9px] bg-violet-500/15 text-violet-400 px-1 py-0.5 rounded border border-violet-500/20 ml-0.5">Pro</span>}
                 </button>
                 {i < 2 && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 mx-0.5" />
@@ -430,17 +736,58 @@ export function HakaseAI() {
 
         {/* Right nav actions */}
         <div className="flex items-center gap-2 min-w-[160px] justify-end">
+          {isPro && (
+            <Badge className="text-[9px] bg-violet-500/15 text-violet-300 border-violet-500/30 gap-1 px-2">
+              <Crown className="w-2.5 h-2.5" /> Pro
+            </Badge>
+          )}
           <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
             <Bell className="w-4 h-4" />
           </button>
           <button className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors">
             <Settings2 className="w-4 h-4" />
           </button>
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-[11px] font-bold">
-            HC
+          {/* User avatar + dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(p => !p)}
+              className="flex items-center gap-1.5 hover:bg-white/5 rounded-lg px-1.5 py-1 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-[11px] font-bold text-white">
+                {user.initials}
+              </div>
+              <ChevronDown className="w-3 h-3 text-slate-500" />
+            </button>
+            {showUserMenu && (
+              <div className="absolute right-0 top-10 w-52 bg-[#12141e] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/8">
+                  <div className="text-[13px] font-semibold text-white">{user.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                  <div className={`text-[10px] mt-1 font-medium ${isPro ? "text-violet-400" : "text-slate-500"}`}>
+                    {isPro ? "✦ Pro Plan" : "Free Plan"}
+                  </div>
+                </div>
+                {!isPro && (
+                  <button className="w-full flex items-center gap-2 px-4 py-2.5 text-[12px] text-violet-300 hover:bg-violet-500/10 transition-colors">
+                    <Star className="w-3.5 h-3.5" /> Upgrade to Pro
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowUserMenu(false); onLogout(); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-[12px] text-slate-400 hover:bg-white/5 hover:text-red-400 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
+
+      {/* Coming Soon Modal */}
+      {comingSoonLayer && (
+        <ComingSoonModal layerName={comingSoonLayer} onClose={() => setComingSoonLayer(null)} />
+      )}
 
       {/* Simulation Status Bar */}
       {(simStatus[activeLayer] === "running") && (
@@ -467,11 +814,18 @@ export function HakaseAI() {
           </span>
           {activeLayer < 3 && (
             <button
-              onClick={() => setActiveLayer((activeLayer + 1) as Layer)}
+              onClick={() => {
+                const nextLayer = (activeLayer + 1) as Layer;
+                const layerDisplayNames = ["Molecular", "Animal", "In-Human Trial"];
+                if (!isPro && nextLayer > 1) {
+                  setComingSoonLayer(layerDisplayNames[nextLayer - 1]);
+                } else {
+                  setActiveLayer(nextLayer);
+                }
+              }}
               className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
             >
-              Continue to {layerLabels[activeLayer]} Simulation
-              <ArrowRight className="w-3.5 h-3.5" />
+              {!isPro && activeLayer >= 1 ? <><Lock className="w-3 h-3" /> Unlock Next Layer</> : <>Continue to {layerLabels[activeLayer]} Simulation <ArrowRight className="w-3.5 h-3.5" /></>}
             </button>
           )}
         </div>
@@ -2344,6 +2698,7 @@ function Layer1Results() {
         {[
           { id: "admet", label: "ADMET Radar", icon: Activity },
           { id: "binding", label: "Binding", icon: Microscope },
+          { id: "ic50", label: "IC₅₀ / Dose", icon: TrendingUp },
           { id: "toxicity", label: "Toxicity", icon: Shield },
           { id: "batch", label: "Batch Table", icon: BarChart3 },
         ].map(({ id, label, icon: Icon }) => (
@@ -2362,6 +2717,7 @@ function Layer1Results() {
 
       {activeTab === "admet" && <ADMETRadarChart />}
       {activeTab === "binding" && <BindingHeatmap />}
+      {activeTab === "ic50" && <IC50Panel />}
       {activeTab === "toxicity" && <ToxicityPanel />}
       {activeTab === "batch" && <BatchTable />}
 
@@ -2476,6 +2832,216 @@ function ADMETRadarChart() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── IC50 / Dose-Response Panel ────────────────────────────────────────
+function IC50Panel() {
+  const [activeRef, setActiveRef] = useState("compound");
+
+  // Hill equation: E = Emax * C^n / (IC50^n + C^n)
+  const hillIC50 = 12.4; // nM
+  const hillN = 1.42;
+  const emax = 0.97;
+  const hill = (c: number) => emax * Math.pow(c, hillN) / (Math.pow(hillIC50, hillN) + Math.pow(c, hillN));
+
+  // Reference drugs
+  const refs: Record<string, { name: string; ic50: number; n: number; emax: number; color: string }> = {
+    compound: { name: "Ibuprofen-Analog-001", ic50: 12.4, n: 1.42, emax: 0.97, color: "#8b5cf6" },
+    erlotinib: { name: "Erlotinib", ic50: 2.0, n: 1.1, emax: 0.94, color: "#3b82f6" },
+    gefitinib: { name: "Gefitinib", ic50: 33.0, n: 1.3, emax: 0.89, color: "#22c55e" },
+  };
+
+  // Log-spaced concentrations 0.1 → 10000 nM (40 points)
+  const concentrations = Array.from({ length: 40 }, (_, i) => Math.pow(10, -1 + i * (4 / 39)));
+
+  // SVG dimensions
+  const svgW = 520, svgH = 200;
+  const pad = { l: 45, r: 20, t: 15, b: 30 };
+  const plotW = svgW - pad.l - pad.r;
+  const plotH = svgH - pad.t - pad.b;
+
+  const logMin = Math.log10(0.1), logMax = Math.log10(10000);
+  const xScale = (c: number) => pad.l + ((Math.log10(c) - logMin) / (logMax - logMin)) * plotW;
+  const yScale = (e: number) => pad.t + plotH - e * plotH;
+
+  const curve = (ic50: number, n: number, em: number) =>
+    concentrations.map(c => {
+      const e = em * Math.pow(c, n) / (Math.pow(ic50, n) + Math.pow(c, n));
+      return `${xScale(c).toFixed(1)},${yScale(e).toFixed(1)}`;
+    }).join(" ");
+
+  // IC50 x-position for marker
+  const ic50X = xScale(hillIC50);
+
+  // X-axis tick concentrations
+  const xTicks = [0.1, 1, 10, 100, 1000, 10000];
+
+  // Dose table data: fixed concentrations
+  const doseConcNM = [1, 3, 10, 30, 100, 300, 1000];
+  const doseRows = doseConcNM.map(c => {
+    const inhibition = hill(c);
+    const normDose = c / 1000; // rough µg/mL equivalent
+    return {
+      conc: c < 1000 ? `${c} nM` : `${c / 1000} µM`,
+      inhibition: (inhibition * 100).toFixed(1),
+      effect: inhibition < 0.2 ? "Minimal" : inhibition < 0.5 ? "Partial" : inhibition < 0.8 ? "Substantial" : "Near-max",
+      effColor: inhibition < 0.2 ? "#ef4444" : inhibition < 0.5 ? "#eab308" : inhibition < 0.8 ? "#22c55e" : "#06b6d4",
+    };
+  });
+
+  return (
+    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[12px] font-semibold text-slate-300">IC₅₀ Dose-Response Curve</h3>
+        <div className="flex gap-1">
+          {Object.entries(refs).map(([key, ref]) => (
+            <button
+              key={key}
+              onClick={() => setActiveRef(key)}
+              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                activeRef === key
+                  ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
+                  : "border-white/8 text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {ref.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Key metrics row — updates with selected compound */}
+      {(() => {
+        const sel = refs[activeRef];
+        const pIC50 = (9 - Math.log10(sel.ic50)).toFixed(2);
+        // R² varies slightly per compound (mock)
+        const r2 = activeRef === "compound" ? "0.994" : activeRef === "erlotinib" ? "0.988" : "0.981";
+        const metrics = [
+          { label: "IC₅₀", val: `${sel.ic50} nM` },
+          { label: "Hill (n)", val: sel.n.toFixed(2) },
+          { label: "Emax", val: `${(sel.emax * 100).toFixed(1)}%` },
+          { label: "R²", val: r2 },
+          { label: "pIC₅₀", val: pIC50 },
+        ];
+        return (
+          <div className="grid grid-cols-5 gap-2">
+            {metrics.map(({ label, val }) => (
+              <div key={label} className="bg-white/3 border border-white/6 rounded-lg p-2.5 text-center">
+                <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">{label}</div>
+                <div className="text-[13px] font-bold text-emerald-400">{val}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Curve SVG */}
+      <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} className="overflow-visible">
+        {/* Grid */}
+        {[0, 0.25, 0.5, 0.75, 1.0].map(v => (
+          <g key={v}>
+            <line x1={pad.l} y1={yScale(v)} x2={svgW - pad.r} y2={yScale(v)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            <text x={pad.l - 4} y={yScale(v) + 3} fill="#4b5563" fontSize="8" textAnchor="end">{(v * 100).toFixed(0)}%</text>
+          </g>
+        ))}
+        {xTicks.map(c => (
+          <g key={c}>
+            <line x1={xScale(c)} y1={pad.t} x2={xScale(c)} y2={svgH - pad.b} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+            <text x={xScale(c)} y={svgH - pad.b + 10} fill="#4b5563" fontSize="8" textAnchor="middle">
+              {c >= 1000 ? `${c/1000}µM` : `${c}nM`}
+            </text>
+          </g>
+        ))}
+
+        {/* Y-axis label */}
+        <text x="9" y={pad.t + plotH / 2} fill="#6b7280" fontSize="8" textAnchor="middle" transform={`rotate(-90 9 ${pad.t + plotH / 2})`}>Inhibition %</text>
+
+        {/* 50% inhibition reference */}
+        <line x1={pad.l} y1={yScale(0.5)} x2={svgW - pad.r} y2={yScale(0.5)} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="4,3" />
+
+        {/* Background reference curves (faint) */}
+        {Object.entries(refs).filter(([k]) => k !== activeRef).map(([_, ref]) => (
+          <polyline key={ref.name} points={curve(ref.ic50, ref.n, ref.emax)} fill="none" stroke={ref.color} strokeWidth="1.5" opacity="0.3" />
+        ))}
+
+        {/* Active/highlighted compound curve */}
+        {(() => {
+          const sel = refs[activeRef];
+          const selX = xScale(sel.ic50);
+          return (
+            <>
+              <polyline points={curve(sel.ic50, sel.n, sel.emax)} fill="none" stroke={sel.color} strokeWidth="2.5" />
+              <line x1={selX} y1={pad.t} x2={selX} y2={yScale(0.5)} stroke={sel.color} strokeWidth="1" strokeDasharray="3,2" opacity="0.7" />
+              <line x1={pad.l} y1={yScale(0.5)} x2={selX} y2={yScale(0.5)} stroke={sel.color} strokeWidth="1" strokeDasharray="3,2" opacity="0.7" />
+              <circle cx={selX} cy={yScale(0.5)} r="4" fill={sel.color} />
+              <text x={selX + 6} y={yScale(0.5) - 4} fill={sel.color} fontSize="9" fontWeight="600">IC₅₀ = {sel.ic50} nM</text>
+            </>
+          );
+        })()}
+      </svg>
+
+      {/* Legend */}
+      <div className="flex gap-4 flex-wrap">
+        {Object.values(refs).map(ref => (
+          <div key={ref.name} className="flex items-center gap-1.5">
+            <div className="w-5 h-0.5 rounded" style={{ backgroundColor: ref.color }} />
+            <span className="text-[10px] text-slate-500">{ref.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Dose table */}
+      <div>
+        <h4 className="text-[11px] font-semibold text-slate-400 mb-2">Inhibition by Concentration</h4>
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="border-b border-white/8">
+              {["Concentration", "Inhibition %", "Effect Level", "Hill Prediction"].map(h => (
+                <th key={h} className="text-left py-1.5 pr-4 text-slate-600 font-medium text-[10px]">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {doseRows.map(row => (
+              <tr key={row.conc} className="border-b border-white/4 hover:bg-white/3">
+                <td className="py-1.5 pr-4 text-slate-300 font-mono">{row.conc}</td>
+                <td className="py-1.5 pr-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${row.inhibition}%`, backgroundColor: row.effColor }} />
+                    </div>
+                    <span className="font-semibold" style={{ color: row.effColor }}>{row.inhibition}%</span>
+                  </div>
+                </td>
+                <td className="py-1.5 pr-4">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ color: row.effColor, backgroundColor: row.effColor + "18" }}>
+                    {row.effect}
+                  </span>
+                </td>
+                <td className="py-1.5 pr-4 text-slate-500 text-[10px]">
+                  E = Emax × C^n / (IC₅₀^n + C^n)
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Hill equation display */}
+      <div className="bg-white/3 border border-white/6 rounded-lg p-3">
+        <div className="text-[10px] text-slate-500 mb-1 font-medium">Hill Equation Fit</div>
+        <div className="font-mono text-[12px] text-violet-300">
+          E(C) = 0.97 × C<sup>1.42</sup> / (12.4<sup>1.42</sup> + C<sup>1.42</sup>)
+        </div>
+        <div className="flex gap-4 mt-2 text-[10px] text-slate-500">
+          <span>R² = <span className="text-emerald-400">0.994</span></span>
+          <span>RMSE = <span className="text-emerald-400">0.008</span></span>
+          <span>95% CI IC₅₀: <span className="text-slate-300">10.1–15.2 nM</span></span>
+          <span>Selectivity index: <span className="text-emerald-400">14.5×</span></span>
         </div>
       </div>
     </div>

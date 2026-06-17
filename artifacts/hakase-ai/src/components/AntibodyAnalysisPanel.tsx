@@ -22,6 +22,7 @@ import {
   type AntibodyLiability,
 } from "@/lib/aiService";
 import { LayerAiPanel } from "@/components/LayerAiPanel";
+import { type AntibodyScorecard } from "@/lib/antibodyL1Scorecard";
 
 // Trastuzumab (Herceptin) variable domains — a one-click example.
 const EXAMPLE_VH =
@@ -264,6 +265,8 @@ export interface AntibodyAnalysisPanelProps {
   subclass: string;
   targetAntigen: string;
   onClear: () => void;
+  /** ML-backed L1 scorecard — arrives async after main result */
+  l1Scorecard?: AntibodyScorecard | null;
 }
 
 export function AntibodyAnalysisPanel({
@@ -283,6 +286,7 @@ export function AntibodyAnalysisPanel({
   subclass,
   targetAntigen,
   onClear,
+  l1Scorecard,
 }: AntibodyAnalysisPanelProps) {
   const [copied, setCopied] = useState(false);
   const [pdfGen, setPdfGen] = useState(false);
@@ -292,12 +296,16 @@ export function AntibodyAnalysisPanel({
   const [integrityVerified, setIntegrityVerified] = useState(false);
   const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
 
-  // Map antibody verdict string → GO/WATCH/NO-GO
-  const goVerdict: "GO" | "WATCH" | "NO-GO" | null = !result
+  // Map antibody verdict string → GO/WATCH/NO-GO (prefer ML scorecard when available)
+  const heuristicVerdict: "GO" | "WATCH" | "NO-GO" | null = !result
     ? null
     : result.summary.verdict.startsWith("PASS")   ? "GO"
     : result.summary.verdict.startsWith("REVIEW")  ? "WATCH"
     : "NO-GO";
+  const goVerdict: "GO" | "WATCH" | "NO-GO" | null =
+    l1Scorecard ? l1Scorecard.verdict : heuristicVerdict;
+  const scorecardScore = l1Scorecard?.score ?? null;
+  const scorecardConfidence = l1Scorecard?.confidence ?? null;
 
   const verdictTone = !result
     ? "slate"
@@ -434,9 +442,29 @@ export function AntibodyAnalysisPanel({
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] text-white font-medium mt-1">{result.summary.verdict}</p>
+                <p className="text-[13px] text-white font-medium mt-1">
+                  {l1Scorecard
+                    ? `L1 Score: ${scorecardScore}% — ${l1Scorecard.flags.length > 0 ? l1Scorecard.flags[0].label : result.summary.verdict}`
+                    : result.summary.verdict}
+                </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {result.inferred_format} · {result.summary.n_liabilities_total} total liabilities detected
+                  {l1Scorecard
+                    ? <>
+                        <span className="font-semibold text-violet-300">ML Scorecard</span>
+                        <span className={`font-semibold ml-1 ${goText}`}>{scorecardScore}%</span>
+                        <span className="text-slate-600 ml-1 text-[10px]">(TAP framework · CamSol CDR)</span>
+                        {scorecardConfidence && (
+                          <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-semibold
+                            ${scorecardConfidence === "High" ? "bg-emerald-500/20 text-emerald-300"
+                            : scorecardConfidence === "Medium" ? "bg-amber-500/20 text-amber-300"
+                            : "bg-red-500/20 text-red-300"}`}>
+                            {scorecardConfidence} confidence
+                          </span>
+                        )}
+                        <span className="text-slate-600 ml-2">· {result.summary.n_liabilities_total} total liabilities</span>
+                      </>
+                    : <>{result.inferred_format} · {result.summary.n_liabilities_total} total liabilities detected</>
+                  }
                   <span className="text-slate-600 ml-2">HAIOps Governed</span>
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-500 font-medium border-t border-white/5 pt-1.5">

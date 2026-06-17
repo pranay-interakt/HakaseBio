@@ -759,6 +759,79 @@ export async function predictBindingMl(
 }
 
 // ---------------------------------------------------------------------------
+// Mechanistic safety — reactive metabolites, BSEP, applicability domain
+// ---------------------------------------------------------------------------
+
+export interface ReactiveMetaboliteAlert {
+  id: string;
+  name: string;
+  smarts: string;
+  severity: "critical" | "high" | "moderate";
+  match_count: number;
+  mechanism: string;
+  examples: string;
+  mitigation: string;
+  reference: string;
+}
+
+export interface ReactiveMetsResult {
+  smiles: string;
+  alerts: ReactiveMetaboliteAlert[];
+  alert_count: number;
+  critical_count: number;
+  high_count: number;
+  moderate_count: number;
+  rm_score: number;        // 0–100
+  rm_class: "High Risk" | "Moderate Risk" | "Low Risk" | "Negligible";
+  in_domain: boolean;
+  model_info: Record<string, unknown>;
+}
+
+export interface BsepResult {
+  smiles: string;
+  bsep: {
+    risk_class: "High" | "Moderate" | "Low" | "Negligible";
+    score: number;         // 0–100
+    rationale: string;
+    factors: string[];
+    ic50_estimate_uM: string | null;
+    recommended_assay: string;
+  };
+  phospholipidosis: {
+    risk_class: "High" | "Moderate" | "Low";
+    score: number;
+    rationale: string;
+    factors: string[];
+    cad_positive: boolean;
+    recommended_assay: string;
+  };
+  model_info: Record<string, unknown>;
+}
+
+export interface ApplicabilityDomainResult {
+  smiles: string;
+  ad_score: number | null;    // Tanimoto nearest-neighbour [0,1]
+  ad_label: "In-domain" | "Border-domain" | "Out-of-domain" | "Unknown";
+  ad_confidence: "High" | "Moderate" | "Low";
+  nn_similarity: number | null;
+  coverage_note: string;
+  training_set_size?: number;
+  model_info: Record<string, unknown>;
+}
+
+export async function predictReactiveMets(smiles: string): Promise<ReactiveMetsResult> {
+  return post<ReactiveMetsResult>("/reactive-metabolites", { smiles });
+}
+
+export async function predictBsep(smiles: string): Promise<BsepResult> {
+  return post<BsepResult>("/bsep", { smiles });
+}
+
+export async function predictApplicabilityDomain(smiles: string): Promise<ApplicabilityDomainResult> {
+  return post<ApplicabilityDomainResult>("/applicability-domain", { smiles });
+}
+
+// ---------------------------------------------------------------------------
 // L2 Stage 2 — AutoDock Vina docking (async job)
 // ---------------------------------------------------------------------------
 

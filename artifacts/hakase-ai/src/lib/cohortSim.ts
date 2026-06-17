@@ -57,10 +57,19 @@ export interface CohortResults {
   dataSources: CohortDataSources;
 }
 
-function jitter(base: number, range: number, seed: number): number {
-  const v = Math.sin(seed * 9301 + 49297) * 233280;
-  const f = v - Math.floor(v);
-  return Math.max(0, Math.min(1, base + (f - 0.5) * range * 2));
+/**
+ * Deterministic clamp — replaces the old `jitter()` that added a seeded PRNG
+ * noise wave on top of model outputs. Synthetic noise made the same inputs
+ * produce visually-different numbers across re-runs and gave the (correct)
+ * impression that the platform was making things up. The function signature
+ * is preserved so call-sites compile unchanged; the noise term is zeroed.
+ *
+ * If a future call genuinely needs population variance, it must be sourced
+ * from a real reference (NHANES, FAERS, ClinicalTrials.gov outcomes, etc.)
+ * and tagged with provenance — not invented from a sine-of-seed PRNG.
+ */
+function jitter(base: number, _range: number, _seed: number): number {
+  return Math.max(0, Math.min(1, base));
 }
 
 function hashStr(s: string): number {

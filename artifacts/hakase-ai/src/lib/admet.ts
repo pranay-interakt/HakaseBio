@@ -85,7 +85,19 @@ export interface SimResults {
    * ECFP fragment-score component. See L1_SIMULATION_AUDIT.md §9 step 8.
    */
   saScore:   number;
-  goNogo:    "GO" | "WATCH" | "NO-GO";
+  /**
+   * L1 triage verdict.
+   *  - "GO" / "WATCH" / "NO-GO" — the three standard outcomes from the
+   *    rule-based / ML-driven path on novel chemistry.
+   *  - "KNOWN-LIABILITY-NO-GO" — the compound matched a known drug in the
+   *    drug-lookup table AND that drug has a published, measured liability
+   *    that drove a clinical withdrawal or black-box (e.g. terfenadine →
+   *    hERG, cerivastatin → DILI). Different from a novel-compound NO-GO:
+   *    the model didn't reject it, the published evidence did. UI must
+   *    render this in a different color (rose / amber rather than red) so
+   *    reviewers can tell the difference at a glance.
+   */
+  goNogo:    "GO" | "WATCH" | "NO-GO" | "KNOWN-LIABILITY-NO-GO";
   /**
    * Composite Heuristic Score in [0, 1].
    * NOT a calibrated probability. Computed as a weighted sum of ADMET
@@ -219,23 +231,9 @@ function clamp(v: number, lo = 0, hi = 1): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-/**
- * Deterministic seeded PRNG using the mulberry32 algorithm.
- * Produces a float in [0, 1) from a uint32 seed.
- * Replaces the former Math.sin LCG which had poor spectral properties
- * and was not reproducible across JS engines.
- */
-function mulberry32(seed: number): number {
-  let t = (seed + 0x6D2B79F5) >>> 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
-
-function jitter(base: number, range: number, seed: number): number {
-  const pseudo = mulberry32(seed >>> 0);
-  return clamp(base + (pseudo - 0.5) * range * 2);
-}
+// NOTE: the former `mulberry32` PRNG and `jitter()` helper have been removed.
+// Every ADMET 5-axis score is a deterministic point estimate or a real
+// ML/QSAR value — there is no synthetic per-molecule noise in this engine.
 
 function hashSmiles(smiles: string): number {
   let h = 0;
@@ -260,12 +258,16 @@ export function runAdmetSimulation(
   mlOverlay: MlOverlay | null = null,
 ): SimResults {
   const { mw, logP, hbd, hba, tpsa, rotBonds, qed_approx } = molProps;
+  // Representation-invariant identity key — equivalent / salt-variant SMILES
+  // for the same molecule collapse to the same canonical string, so every
+  // substructure scan and seed-derived choice is reproducible across inputs.
+  const canonSmiles = molProps.canonicalSmiles || smiles;
   // Seed retained for downstream deterministic offsets (organ-risk noise,
   // structural-alert keys). The 5-axis ADMET scores themselves are now
   // deterministic point estimates — cosmetic jitter removed (a single
   // molecule must give the same answer every run; spread belongs to
   // population-level simulations, not single-molecule QSPR).
-  const seed = hashSmiles(smiles);
+  const seed = hashSmiles(canonSmiles);
   const taMod = getAdmetModifiers(therapeuticArea);
   const overlay = mlOverlay ?? emptyOverlay();
   const provenance: Record<string, "ml" | "heuristic" | "experimental"> = {};
@@ -273,7 +275,7 @@ export function runAdmetSimulation(
   // Pharmacophore profile — detected once, reused by the absorption
   // calibration below, the hERG heuristic, and the genotoxicity / Ames
   // fallback block. RDKit-backed when ready.
-  const pharmAmes = detectPharmacophores(smiles);
+  const pharmAmes = detectPharmacophores(canonSmiles);
   // Descriptor bundle for the calibrated QSPR/QSAR fallback models
   // (l1Calibration.ts) — every field is a real RDKit descriptor or
   // pharmacophore count already available here.
@@ -507,7 +509,7 @@ export function runAdmetSimulation(
   // always returns the same hits (deterministic — no randomness). ML signals
   // below are still primary; structural scan supplements and independently
   // catches reactive motifs that probabilistic models may miss.
-  const structAlerts = runStructuralAlertScan(smiles);
+  const structAlerts = runStructuralAlertScan(canonSmiles);
 
   // Genotoxicity — AMES ML if available, else the full structural scan.
   // For concordance detail, extract matched motif names for the detail string.

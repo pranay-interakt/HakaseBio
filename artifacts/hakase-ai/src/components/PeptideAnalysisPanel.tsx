@@ -48,6 +48,7 @@ import {
   type PeptideResult,
   type ModificationSuggestion,
 } from "@/lib/aiService";
+import { type PeptideScorecard } from "@/lib/peptideL1Scorecard";
 import { LayerAiPanel } from "@/components/LayerAiPanel";
 
 // ── AA validation + FASTA parsing ─────────────────────────────────────────────
@@ -176,6 +177,8 @@ interface Props {
   l1AiStream: string;
   runL1AiAnalysis: () => void;
   onClear: () => void;
+  /** ML-backed L1 scorecard — arrives async after main result */
+  l1Scorecard?: PeptideScorecard | null;
 }
 
 export function PeptideAnalysisPanel({
@@ -195,6 +198,7 @@ export function PeptideAnalysisPanel({
   ionicStrength,
   disulfideBridges,
   onClear,
+  l1Scorecard,
 }: Props & { customPh: number; ionicStrength: number; disulfideBridges: string }) {
   const [copied, setCopied] = useState(false);
   const [pdfGen, setPdfGen] = useState(false);
@@ -244,7 +248,7 @@ export function PeptideAnalysisPanel({
     (0.35 * stabilityScore + 0.25 * aggScore + 0.20 * proteaseScore + 0.20 * permScore) * 100
   );
 
-  const overallVerdict: "GO" | "WATCH" | "NO-GO" | null =
+  const heuristicVerdict: "GO" | "WATCH" | "NO-GO" | null =
     !result ? null
     : (highAgg && !instabilityOk) || (proteaseSites > 5 && !instabilityOk) || (criticalImmuno && criticalChem)
     ? "NO-GO"
@@ -252,9 +256,22 @@ export function PeptideAnalysisPanel({
     ? "GO"
     : "WATCH";
 
+  // Prefer ML scorecard verdict when available
+  const overallVerdict: "GO" | "WATCH" | "NO-GO" | null =
+    l1Scorecard ? l1Scorecard.verdict : heuristicVerdict;
+  const displayScore = l1Scorecard ? l1Scorecard.score : inVitroScore;
+  const scorecardConfidence = l1Scorecard?.confidence ?? null;
+  const mlHemolysisProb = l1Scorecard?.mlSignal?.hemolysis_prob ?? null;
+
   // Verdict rationale — concise text used inside the summary card
   const verdictText =
-    overallVerdict === "GO"
+    l1Scorecard
+      ? (l1Scorecard.flags.length > 0
+          ? `${l1Scorecard.flags[0].label} — ${overallVerdict === "GO" ? "Advance to L2 Confirmation" : overallVerdict === "NO-GO" ? "Significant liabilities detected" : "Review safety signals"}`
+          : overallVerdict === "GO" ? "Stable scaffold · low aggregation risk — Advance to L2 Confirmation"
+          : overallVerdict === "NO-GO" ? "Critical liabilities detected — Do not advance"
+          : "Safety signals require review before advancing")
+      : overallVerdict === "GO"
       ? `Stable scaffold · low aggregation risk · ${proteaseSites} protease cleavage site${proteaseSites !== 1 ? "s" : ""} — Advance to L2 Confirmation`
       : overallVerdict === "NO-GO"
       ? `${!instabilityOk ? "Unstable scaffold (II " + (pc?.instability_index ?? "—") + ") · " : ""}${highAgg ? "High aggregation risk · " : ""}${proteaseSites > 5 ? proteaseSites + " protease cleavage sites" : "Critical safety flags"} — Significant liabilities detected`
@@ -306,12 +323,15 @@ export function PeptideAnalysisPanel({
   const fParenteral = dev?.oral_potential ? "Oral: moderate (cyclic scaffold)" : "Parenteral: ~100% (IV/SC)";
 
   // ── Cytotoxicity & Selectivity Index helpers ───────────────────────────────
-  // Hemolysis risk — cationic + amphipathic = hemolytic (Shai & Oren 2001)
-  const hemolysisRisk =
+  // Hemolysis risk — prefer ML HemoPI-2 probability when scorecard is available
+  const hemolysisRiskHeuristic =
     !pc ? "—"
     : (pc.net_charge_pH7 > 3 && pc.hydrophobic_moment > 0.5) ? "High"
     : (pc.net_charge_pH7 > 1.5 || pc.hydrophobic_moment > 0.4) ? "Moderate"
     : "Low";
+  const hemolysisRisk = mlHemolysisProb != null
+    ? (mlHemolysisProb >= 0.65 ? "High" : mlHemolysisProb >= 0.35 ? "Moderate" : "Low")
+    : hemolysisRiskHeuristic;
   const hemTone = hemolysisRisk === "High" ? "text-red-400" : hemolysisRisk === "Moderate" ? "text-amber-400" : "text-emerald-400";
   // Selectivity index — ratio of cytotoxic dose to antimicrobial dose
   // AMP score >4 with high hemolysis = narrow window
@@ -405,11 +425,28 @@ export function PeptideAnalysisPanel({
                 </div>
                 {/* Score + rationale */}
                 <p className="text-[13px] text-white font-medium mt-1">
-                  In Vitro Score: {inVitroScore}% — {verdictText}
+                  L1 Score: {displayScore}% — {verdictText}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{inVitroScore}%</span>
-                  <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend, not calibrated)</span>
+                  {l1Scorecard
+                    ? <>
+                        <span className="font-semibold text-violet-300">ML Scorecard</span>
+                        <span className={`font-semibold ${goText} ml-1`}>{displayScore}%</span>
+                        <span className="text-slate-600 ml-1 text-[10px]">(HemoPI-2 · CAMP v3 · CPPsite 2.0)</span>
+                        {scorecardConfidence && (
+                          <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-semibold
+                            ${scorecardConfidence === "High" ? "bg-emerald-500/20 text-emerald-300"
+                            : scorecardConfidence === "Medium" ? "bg-amber-500/20 text-amber-300"
+                            : "bg-red-500/20 text-red-300"}`}>
+                            {scorecardConfidence} confidence
+                          </span>
+                        )}
+                      </>
+                    : <>
+                        Composite Heuristic Score: <span className={`font-semibold ${goText}`}>{displayScore}%</span>
+                        <span className="text-slate-600 ml-1 text-[10px]">(heuristic blend · ML loading…)</span>
+                      </>
+                  }
                   <span className="text-slate-600 ml-2">HAIOps Governed</span>
                 </p>
               </div>
@@ -480,11 +517,11 @@ export function PeptideAnalysisPanel({
           </div>
 
           {/* Score threshold warning */}
-          {inVitroScore < 50 && (
+          {displayScore < 50 && (
             <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2 flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-[10px] text-amber-300 leading-relaxed">
-                <span className="font-semibold">Below in-vitro score threshold</span> — composite score {inVitroScore}% reflects significant structural liabilities (instability, aggregation, or protease susceptibility). Consider sequence engineering before advancing.
+                <span className="font-semibold">Below in-vitro score threshold</span> — composite score {displayScore}% reflects significant structural liabilities (instability, aggregation, or protease susceptibility). Consider sequence engineering before advancing.
               </div>
             </div>
           )}
@@ -1045,7 +1082,10 @@ export function PeptideAnalysisPanel({
                   <div className="text-[10px] text-slate-500 mb-1">Hemolysis Risk</div>
                   <div className={`text-[13px] font-semibold ${hemTone}`}>{hemolysisRisk}</div>
                   <div className="text-[9px] text-slate-600 mt-0.5">
-                    Charge z={pc?.net_charge_pH7?.toFixed(1) ?? "—"} · μH={pc?.hydrophobic_moment?.toFixed(2) ?? "—"} (Shai & Oren 2001)
+                    {mlHemolysisProb != null
+                      ? <>ML HemoPI-2: {(mlHemolysisProb * 100).toFixed(1)}% · GBC classifier</>
+                      : <>Charge z={pc?.net_charge_pH7?.toFixed(1) ?? "—"} · μH={pc?.hydrophobic_moment?.toFixed(2) ?? "—"} (Shai & Oren 2001)</>
+                    }
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/[0.03] border border-white/8 p-3">
@@ -1679,7 +1719,7 @@ export function PeptideAnalysisPanel({
                 {/* Checklist */}
                 <div className="space-y-1.5 border-t border-white/5 pt-2.5">
                   {[
-                    { label: "Hemolysis Risk Check", status: hemolysisRisk === "High" ? "FAIL" : "PASS", detail: `Predicted: ${hemolysisRisk} risk (cationic + amphipathic ratio)` },
+                    { label: "Hemolysis Risk Check", status: hemolysisRisk === "High" ? "FAIL" : "PASS", detail: mlHemolysisProb != null ? `ML HemoPI-2: ${(mlHemolysisProb*100).toFixed(1)}% probability (${hemolysisRisk})` : `Predicted: ${hemolysisRisk} risk (cationic + amphipathic ratio)` },
                     { label: "Aggregation Risk Check", status: highAgg ? "FAIL" : "PASS", detail: `${agg?.n_regions ?? 0} AGGRESCAN hotspots flagged` },
                     { label: "Proteolytic Cleavage Density", status: proteaseSites > 5 ? "FAIL" : "PASS", detail: `${proteaseSites} cleavage sites across 9 enzymes` },
                     { label: "Chemical Liability Severity", status: criticalChem ? "FAIL" : "PASS", detail: `Toll/Reactive groups: ${chem?.risk ?? "Low"}` },

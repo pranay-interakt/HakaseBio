@@ -50,7 +50,7 @@ import type {
 
 export interface MlOverlay {
   // ── Absorption ─────────────────────────────────────────────────────────
-  /** ADMET-AI Caco2_Wang — log papp in 10⁻⁶ cm/s (raw GNN output, NOT log10). */
+  /** ADMET-AI Caco2_Wang — Papp in 10⁻⁶ cm/s (converted from ADMET-AI log10 cm/s output). */
   caco2_Papp_1e6_cm_s: number | null;
   /** ADMET-AI HIA_Hou — probability of human intestinal absorption [0, 1]. */
   hia_probability: number | null;
@@ -262,7 +262,11 @@ export function buildMlOverlay(input: BuildMlOverlayInput): MlOverlay {
   if (a && a.source === "ml" && a.ml_available) {
     const s = a.structured;
     // Absorption
-    o.caco2_Papp_1e6_cm_s = endpointNumber(s.absorption, "Caco2_Wang");
+    // Caco2_Wang is reported by ADMET-AI in log10(Papp cm/s); convert to
+    // linear 10⁻⁶ cm/s so inVitroSim can directly clamp/compare.
+    // e.g., –4.7 log(cm/s) → 10^(–4.7+6) = 20 ×10⁻⁶ cm/s.
+    const caco2Log = endpointNumber(s.absorption, "Caco2_Wang");
+    o.caco2_Papp_1e6_cm_s = caco2Log !== null ? Math.pow(10, caco2Log + 6) : null;
     o.hia_probability     = endpointNumber(s.absorption, "HIA_Hou");
     o.bioavailability_F   = endpointNumber(s.absorption, "Bioavailability_Ma");
     o.pgp_substrate_prob  = endpointNumber(s.absorption, "Pgp_Broccatelli");

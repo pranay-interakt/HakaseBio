@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -81,7 +82,7 @@
   /* Border */
   --border: 228 20% 14%;
   --input: 228 18% 16%;
-  --ring: 262 83% 65%;
+  --ring: 186 82% 54%;
 
   /* Card — slightly lighter than background */
   --card: 228 25% 6%;
@@ -94,7 +95,7 @@
   --popover-border: 228 20% 14%;
 
   /* Primary — violet */
-  --primary: 262 83% 62%;
+  --primary: 186 78% 46%;
   --primary-foreground: 0 0% 100%;
 
   /* Secondary */
@@ -114,7 +115,7 @@
   --destructive-foreground: 0 0% 100%;
 
   /* Charts */
-  --chart-1: 262 83% 62%;
+  --chart-1: 186 78% 46%;
   --chart-2: 217 91% 60%;
   --chart-3: 158 64% 52%;
   --chart-4: 45 93% 58%;
@@ -124,11 +125,11 @@
   --sidebar: 228 28% 5%;
   --sidebar-foreground: 210 40% 88%;
   --sidebar-border: 228 20% 10%;
-  --sidebar-primary: 262 83% 62%;
+  --sidebar-primary: 186 78% 46%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 228 25% 10%;
   --sidebar-accent-foreground: 210 30% 75%;
-  --sidebar-ring: 262 83% 65%;
+  --sidebar-ring: 186 82% 54%;
 
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
@@ -287,7 +288,7 @@ html.hk-light {
 
   --border: 220 14% 88%;
   --input: 220 14% 88%;
-  --ring: 262 83% 58%;
+  --ring: 184 72% 42%;
 
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
@@ -297,7 +298,7 @@ html.hk-light {
   --popover-foreground: 222 47% 11%;
   --popover-border: 220 14% 90%;
 
-  --primary: 262 83% 58%;
+  --primary: 184 72% 42%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 30 20% 96%;             /* Slightly warm tint to match background */
@@ -307,7 +308,7 @@ html.hk-light {
   --muted-foreground: 215 16% 47%;     /* Slate-500/600 readable on white */
 
   --accent: 220 14% 93%;
-  --accent-foreground: 262 83% 50%;
+  --accent-foreground: 184 72% 40%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
@@ -315,11 +316,11 @@ html.hk-light {
   --sidebar: 0 0% 100%;                /* Pure white sidebar */
   --sidebar-foreground: 222 30% 25%;
   --sidebar-border: 220 14% 90%;
-  --sidebar-primary: 262 83% 58%;
+  --sidebar-primary: 184 72% 42%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 220 14% 95%;
   --sidebar-accent-foreground: 222 30% 20%;
-  --sidebar-ring: 262 83% 58%;
+  --sidebar-ring: 184 72% 42%;
 
   --button-outline: rgba(15, 23, 42, 0.10);
   --badge-outline: rgba(15, 23, 42, 0.06);
@@ -501,8 +502,8 @@ html.hk-light body,
 }
 .hk-light [class*="from-violet-950"][class*="to-violet-900"],
 .hk-light [class*="from-purple-950"][class*="to-purple-900"] {
-  background-image: linear-gradient(to right, rgba(139, 92, 246, 0.10), rgba(139, 92, 246, 0.04)) !important;
-  border-color: rgba(139, 92, 246, 0.35) !important;
+  background-image: linear-gradient(to right, rgba(20, 184, 166, 0.10), rgba(20, 184, 166, 0.04)) !important;
+  border-color: rgba(20, 184, 166, 0.35) !important;
 }
 .hk-light [class*="from-blue-950"][class*="to-blue-900"],
 .hk-light [class*="from-indigo-950"][class*="to-indigo-900"] {
@@ -543,7 +544,7 @@ html.hk-light body,
 .hk-light [class*="bg-violet-500/15"],
 .hk-light [class*="bg-violet-400/8"],
 .hk-light [class*="bg-violet-400/10"] {
-  background-color: rgba(139, 92, 246, 0.05) !important;
+  background-color: rgba(20, 184, 166, 0.05) !important;
 }
 .hk-light [class*="bg-cyan-600/8"],
 .hk-light [class*="bg-cyan-600/10"],
@@ -996,7 +997,7 @@ html.hk-light body,
 .hk-light textarea:focus,
 .hk-light select:focus {
   border-color: hsl(var(--ring)) !important;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
 }
 
 /* ── Focus ring color for buttons ─────────────────────────────────── */
@@ -1017,7 +1018,7 @@ html.hk-light body,
   stroke: #d6d3cb !important;
 }
 .hk-light .hk-animated-grid .hk-glow-violet {
-  background-color: rgba(139, 92, 246, 0.10) !important;
+  background-color: rgba(20, 184, 166, 0.10) !important;
 }
 .hk-light .hk-animated-grid .hk-glow-blue {
   background-color: rgba(59, 130, 246, 0.08) !important;
@@ -1028,7 +1029,7 @@ html.hk-light body,
 
 /* ── Logo "v1.0" version chip in NavBar ───────────────────────────── */
 .hk-light nav button img + span {
-  background-color: rgba(139, 92, 246, 0.10) !important;
+  background-color: rgba(20, 184, 166, 0.10) !important;
   color: #6d28d9 !important;
 }
 
@@ -1159,3 +1160,345 @@ html.hk-light body,
 .wet-lab-report .wet-lab-chart svg { width: 100%; height: auto; display: block; }
 .wet-lab-report .wet-lab-chart figcaption { margin-top: 8px; font-size: 11px; color: #475569; font-style: italic; text-align: center; }
 .wet-lab-report .chart-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px; border-radius: 4px; font-size: 12px; }
+
+/* ── L1 verdict badges ─────────────────────────────────────────────────────
+ * Three visually-distinct verdict tones so a reviewer can tell at a glance
+ * whether a NO-GO is the model rejecting novel chemistry vs. the lookup-first
+ * path recognising a published clinical liability.
+ *
+ *   .verdict-go               — emerald     (advance)
+ *   .verdict-watch            — amber       (monitor)
+ *   .verdict-nogo             — red         (novel-compound NO-GO from model)
+ *   .verdict-known-liability  — rose+amber  (KNOWN-LIABILITY-NO-GO from lookup)
+ *
+ * The rose-on-amber tone is deliberate: rose ≠ red, so the eye immediately
+ * differentiates a literature liability ("we knew this would fail") from a
+ * model rejection ("the model thinks this will fail").
+ */
+.verdict-go             { background-color: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+.verdict-watch          { background-color: rgba(245, 158, 11, 0.08); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.verdict-nogo           { background-color: rgba(239, 68, 68, 0.10);  color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+.verdict-known-liability{ background-color: rgba(244, 63, 94, 0.10);  color: #fb7185; border: 1px dashed rgba(251, 191, 36, 0.6); }
+.verdict-known-liability::before { content: "📖 "; opacity: 0.85; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HAKASE BRAND SYSTEM — reusable, opt-in design tokens
+   ───────────────────────────────────────────────────────────────────────
+   Anchored to the logo: cyan (#22d3ee, the cap + "AI") → violet (#8b5cf6,
+   the platform primary). These classes give the app a single, deliberate
+   visual language — panels, eyebrow labels, chips, rails and KPIs — so the
+   UI reads as designed rather than assembled from ad-hoc translucent boxes.
+
+   IMPORTANT: this layer is ADDITIVE and opt-in. It does not restyle existing
+   Tailwind utilities, so the established dark theme and the light-mode (.hk-
+   light) overrides are untouched. Value semantics (emerald = good, amber =
+   watch, red = fail) are never expressed here — they stay on their existing
+   Tailwind classes.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --hk-cyan:        #22d3ee;
+  --hk-cyan-soft:   #67e8f9;
+  --hk-cyan-deep:   #0e7490;
+  /* Hakase brand is cyan→teal (the logo cap + "AI"). The former "violet"
+     slot is repurposed to teal so the whole design system reads on-brand. */
+  --hk-violet:      #14b8a6;
+  --hk-violet-soft: #5eead4;
+  --hk-violet-deep: #0f766e;
+  --hk-brand-grad:  linear-gradient(120deg, var(--hk-cyan), var(--hk-violet));
+
+  /* Direction A — editorial display face for headings (Fraunces serif). */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+  /* Panel surface — a faint top-lit gradient + hairline + depth shadow.
+     Replaces flat bg-white/5 boxes with something that has material. */
+  --hk-panel-bg:     linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.006));
+  --hk-panel-border: rgba(148,163,184,0.14);
+  --hk-panel-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 34px -16px rgba(0,0,0,0.8);
+  --hk-hairline:     rgba(148,163,184,0.12);
+  --hk-surface-1:    rgba(255,255,255,0.028);
+  --hk-surface-2:    rgba(255,255,255,0.05);
+}
+
+.hk-light {
+  --hk-cyan-soft:   #0e7490;
+  --hk-violet-soft: #6d28d9;
+  --hk-panel-bg:     #ffffff;
+  --hk-panel-border: var(--hk-border);
+  --hk-panel-shadow: var(--hk-shadow-md);
+  --hk-hairline:     var(--hk-border);
+  --hk-surface-1:    var(--hk-surface2);
+  --hk-surface-2:    var(--hk-surface3);
+}
+
+/* Editorial display heading (Direction A). Apply to panel/section titles and
+   the verdict word for the Lumera-style serif character. Slightly tightened
+   tracking; weight 500 reads premium without going heavy. */
+.hk-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
+
+/* Material panel */
+.hk-panel {
+  background: var(--hk-panel-bg);
+  border: 1px solid var(--hk-panel-border);
+  border-radius: 18px;
+  box-shadow: var(--hk-panel-shadow);
+}
+
+/* App backdrop — subtle depth instead of a flat fill, in BOTH modes. Dark:
+   deep ink with faint cyan/violet corner glows. Light: warm paper with a soft
+   cool wash. Applied to the dashboard root so it shows through the gutters and
+   between cards, giving the whole surface a designed, layered feel. */
+.hk-app-bg {
+  background:
+    radial-gradient(1100px 560px at 12% -6%, rgba(34,211,238,0.055), transparent 55%),
+    radial-gradient(1000px 520px at 100% 0%, rgba(20,184,166,0.07), transparent 52%),
+    radial-gradient(900px 600px at 50% 120%, rgba(34,211,238,0.04), transparent 60%),
+    #090b10;
+}
+.hk-light.hk-app-bg,
+.hk-light .hk-app-bg {
+  background:
+    radial-gradient(1100px 560px at 90% -8%, #eaf2ee, transparent 55%),
+    radial-gradient(900px 520px at 0% 0%, #f0eee6, transparent 50%),
+    #f7f6f1 !important;
+}
+
+/* Direction B card — the airy editorial content card (dark). Soft top-lit
+   surface, generous 24px padding, large 20px radius, gentle depth. Replaces
+   the cramped flat bg-[#0d0f17] rounded-xl p-5 pattern across the dashboard. */
+.hk-card {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.005)),
+    #0c0e13;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 18px 44px -28px rgba(0,0,0,0.85);
+}
+.hk-light .hk-card {
+  background: #ffffff;
+  border-color: #ece9e0;
+  box-shadow: 0 1px 2px rgba(20,30,25,0.04), 0 14px 40px -24px rgba(20,30,25,0.18);
+}
+.hk-light .hk-panel {
+  box-shadow: 0 1px 2px rgba(20,30,25,0.04), 0 14px 40px -24px rgba(20,30,25,0.16);
+}
+
+/* ── De-purple → Hakase cyan/teal across the whole dashboard ──────────────
+   The app shipped with a violet primary; Hakase's identity is the cyan/teal
+   of the logo. These override the SOLID violet utilities (the `~=` selector
+   matches the exact class token, so opacity variants like `bg-violet-600/20`
+   used by the per-stage stepper are left untouched) and the common violet
+   text/border accents. Result: buttons, links and accents read teal/cyan. */
+[class~="bg-violet-600"]      { background-color: #0d9488 !important; }
+[class~="bg-violet-500"]      { background-color: #14b8a6 !important; }
+[class~="bg-violet-700"]      { background-color: #0f766e !important; }
+[class~="hover:bg-violet-500"]:hover { background-color: #14b8a6 !important; }
+[class~="hover:bg-violet-600"]:hover { background-color: #0d9488 !important; }
+[class~="text-violet-200"],
+[class~="text-violet-300"],
+[class~="text-violet-400"]    { color: #2dd4bf !important; }
+.hk-light [class~="text-violet-200"],
+.hk-light [class~="text-violet-300"],
+.hk-light [class~="text-violet-400"] { color: #0f766e !important; }
+[class~="border-violet-500/40"],
+[class~="border-violet-500/30"],
+[class~="border-violet-500/20"] { border-color: rgba(20,184,166,0.4) !important; }
+[class~="bg-violet-500/10"],
+[class~="bg-violet-500/15"],
+[class~="bg-violet-600/10"]   { background-color: rgba(20,184,166,0.12) !important; }
+
+/* Brand top-accent — a thin cyan→violet hairline along the panel's top edge.
+   Implemented as a layered background (NOT a pseudo-element) so it can coexist
+   with .hk-aura on the same element. Opt-in via .hk-topline. */
+.hk-topline {
+  background-image:
+    linear-gradient(90deg, transparent 6%, rgba(34,211,238,0.55) 30%, rgba(20,184,166,0.55) 70%, transparent 94%),
+    var(--hk-panel-bg);
+  background-repeat: no-repeat;
+  background-size: 100% 2px, 100% 100%;
+  background-position: top left, center;
+}
+
+/* Eyebrow label — the small uppercase section header, branded: a short
+   cyan→violet tick precedes tracked, tinted text. */
+.hk-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hk-cyan-soft);
+}
+.hk-eyebrow::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hk-brand-grad);
+}
+
+/* Left accent rail — a slim brand-gradient bar marking a primary block. */
+.hk-rail { position: relative; padding-left: 14px; }
+.hk-rail::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 2px; bottom: 2px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--hk-brand-grad);
+  opacity: 0.9;
+}
+
+/* Pill chip — consistent, hairlined, optional mono for numbers. */
+.hk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--hk-hairline);
+  background: var(--hk-surface-1);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+.hk-light .hk-chip { color: var(--hk-text3); }
+.hk-chip-mono { font-family: var(--app-font-mono); font-variant-numeric: tabular-nums; }
+
+/* Brand gradient text — for a single hero word/figure, used sparingly. */
+.hk-brand-text {
+  background: var(--hk-brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Hairline divider with a soft brand-neutral fade. */
+.hk-divider {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--hk-hairline) 18%, var(--hk-hairline) 82%, transparent);
+}
+
+/* KPI cell — a labelled metric with tabular figures. */
+.hk-kpi-label { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+.hk-light .hk-kpi-label { color: var(--hk-text4); }
+.hk-kpi-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Subtle brand aura — a fixed, very faint cyan/violet glow for hero areas.
+   Apply to a positioned container; purely decorative. */
+.hk-aura { position: relative; isolation: isolate; }
+.hk-aura::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background:
+    radial-gradient(60% 120% at 0% 0%, rgba(34,211,238,0.06), transparent 60%),
+    radial-gradient(60% 120% at 100% 100%, rgba(20,184,166,0.07), transparent 60%);
+  z-index: -1;
+  pointer-events: none;
+}
+.hk-light .hk-aura::before { opacity: 0.5; }
+
+/* Icon tile — a small rounded brand-tinted square holding a line icon,
+   replacing bare inline emoji/glyphs. */
+.hk-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--hk-hairline);
+  background: var(--hk-surface-1);
+  color: var(--hk-cyan-soft);
+  flex-shrink: 0;
+}
+
+/* ── Glass surfaces (premium depth) ──────────────────────────────────────
+   Frosted, layered translucent panels with an inner top highlight and a soft
+   drop shadow — the "product" look. Use hk-glass for cards/sidebars and
+   hk-glass-strong for hero/elevated surfaces. */
+.hk-glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 18px 44px -22px rgba(0,0,0,0.85);
+}
+.hk-glass-strong {
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.09),
+    0 24px 60px -24px rgba(0,0,0,0.9);
+}
+.hk-light .hk-glass,
+.hk-light .hk-glass-strong {
+  background: rgba(255,255,255,0.72);
+  border-color: var(--hk-border);
+  box-shadow: var(--hk-shadow-lg);
+}
+
+/* Interactive hover lift for glass cards (works in dark + light). */
+.hk-hover-lift { transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
+.hk-hover-lift:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34,211,238,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 22px 52px -22px rgba(0,0,0,0.9);
+}
+
+/* ── Segmented tab bar ──────────────────────────────────────────────────── */
+.hk-tabbar {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--hk-surface-1);
+  border: 1px solid var(--hk-hairline);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.hk-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  color: #64748b;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+.hk-tab:hover { color: #cbd5e1; }
+.hk-light .hk-tab:hover { color: var(--hk-text2); }
+.hk-tab[data-active="true"] {
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(34,211,238,0.14), rgba(20,184,166,0.12));
+  border-color: rgba(34,211,238,0.30);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.hk-light .hk-tab[data-active="true"] {
+  color: var(--hk-text);
+  background: linear-gradient(180deg, rgba(34,211,238,0.12), rgba(20,184,166,0.10));
+  border-color: rgba(13,148,136,0.35);
+}
+
+/* Stepper pill (pipeline stages) — active stage gets a brand-tinted glass pill. */
+.hk-step-active {
+  background: linear-gradient(120deg, rgba(34,211,238,0.16), rgba(20,184,166,0.16)) !important;
+  border-color: rgba(34,211,238,0.40) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px -12px rgba(34,211,238,0.4);
+}

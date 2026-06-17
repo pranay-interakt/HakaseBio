@@ -175,7 +175,7 @@ export function NavBar({ sticky = false, anchorLinks = [] }: NavBarProps) {
         {/* Logo */}
         <button onClick={() => { navigate("/"); setMobileOpen(false); }} className="flex items-center gap-2.5 shrink-0">
           <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-9 w-auto object-contain" />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-400 font-mono">v1.1</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 font-mono"><span className="hk-brand-text font-semibold">v1.1</span></span>
         </button>
 
         {/* Desktop links */}

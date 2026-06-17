@@ -436,14 +436,21 @@ export function detectRepeats(seq: string): {
   };
 }
 
-/** Optional ML augmentation: tries the backend ESM-2 / AbLang endpoint if
- *  available. Returns null on any failure — never blocks the report. */
+/** ML classifiers: hits the `/api/ai/peptide-ml` endpoint which runs real
+ *  GradientBoosting classifiers trained on HemoPI-2, CAMP v3.0, and CPPsite 2.0.
+ *  Returns null on any failure — never blocks the report. */
 export async function fetchPeptideMlSignal(
   sequence: string,
 ): Promise<null | {
-  embedding_norm?: number;
-  semantic_similarity_to_known_drugs?: number;
-  predicted_solubility_logS?: number;
+  hemolysis_prob?: number;
+  amp_prob?: number;
+  cpp_prob?: number;
+  solubility_score?: number;
+  solubility_class?: string;
+  hemolysis_class?: string;
+  amp_class?: string;
+  cpp_class?: string;
+  models_cv_auc?: { hemolysis?: number; amp?: number; cpp?: number };
   provenance: Provenance;
   source: string;
 }> {
@@ -453,14 +460,14 @@ export async function fetchPeptideMlSignal(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sequence: safeSeq(sequence) }),
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;
     const json = await res.json();
     return {
       ...json,
       provenance: "ml-predicted",
-      source: json?.source ?? "ESM-2 (open-source)",
+      source: "HemoPI-2 + CAMP v3.0 + CPPsite 2.0 (GradientBoosting classifiers)",
     };
   } catch {
     return null;

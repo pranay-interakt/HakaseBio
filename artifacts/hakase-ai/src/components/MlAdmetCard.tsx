@@ -8,6 +8,7 @@ import {
   type CardiotoxResult,
 } from "@/lib/aiService";
 import type { AdmetScores } from "@/lib/admet";
+import { admetMeta, formatAdmetValue, admetAccuracyLabel, RELIABILITY_TONE, RELIABILITY_LABEL } from "@/lib/admetMeta";
 import { Badge } from "@/components/ui/badge";
 import {
   Sparkles,
@@ -200,12 +201,12 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
   }, [heuristicAdmet]);
 
   return (
-    <div className="bg-[#0d0f17] border border-white/8 rounded-xl p-5 space-y-4">
+    <div className="hk-glass hk-topline p-5 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-violet-400" />
-          <h3 className="text-[13px] font-semibold text-slate-200">ML-Enhanced ADMET</h3>
+          <span className="hk-icon-tile"><Brain className="w-4 h-4" /></span>
+          <h3 className="hk-display text-[17px] text-slate-100">ML-Enhanced ADMET</h3>
           {badge && (
             <Badge
               className={`text-[9px] ${
@@ -292,7 +293,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
           nothing is silently merged away. */}
       {result && result.source === "ml" && (
         <div>
-          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+          <div className="hk-eyebrow mb-3">
             Computational ADMET — Consensus View (ML × Rule-based)
           </div>
           <div className="grid grid-cols-5 gap-2">
@@ -316,7 +317,7 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
               return (
                 <div
                   key={axis}
-                  className={`rounded-lg p-2.5 space-y-1.5 border ${agreement?.bg ?? "bg-white/5"} ${agreement?.border ?? "border-white/10"}`}
+                  className={`hk-hover-lift rounded-xl p-2.5 space-y-1.5 border ${agreement?.bg ?? "bg-white/5"} ${agreement?.border ?? "border-white/10"}`}
                 >
                   <div className="flex items-start justify-between gap-1">
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">{BUCKET_LABELS[axis]}</div>
@@ -571,34 +572,50 @@ export function MlAdmetCard({ smiles, heuristicAdmet }: MlAdmetCardProps) {
       {/* Bucket details */}
       {result && result.source === "ml" && (
         <div className="space-y-3">
-          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            All ML Endpoints by Bucket
-          </div>
+          <div className="hk-eyebrow">All ML Endpoints by Bucket</div>
+          <p className="text-[9px] text-slate-500 -mt-1">
+            Each value carries its real unit and the model's published benchmark accuracy (AUROC for
+            probabilities, R² for regression). Endpoints whose benchmark R² is negative are marked
+            <span className="text-red-400 font-semibold"> unreliable</span> — the model is worse than
+            the dataset mean there, so don't trust the absolute number.
+          </p>
           {axes.map(bucket => {
             const entries = Object.entries(result.structured[bucket] || {});
             if (entries.length === 0) return null;
             return (
-              <div key={bucket} className="bg-white/5 rounded-lg p-3">
-                <div className="text-[10px] font-semibold text-slate-300 mb-2">{BUCKET_LABELS[bucket]}</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1.5">
+              <div key={bucket} className="bg-white/5 rounded-xl p-3 border border-white/8">
+                <div className="text-[10px] font-semibold text-slate-300 mb-2.5">{BUCKET_LABELS[bucket]}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-2">
                   {entries.map(([k, v]) => {
                     const f = formatValue(v);
+                    const meta = admetMeta(k);
                     const isProb = isProbabilityKey(k) && f.numeric !== null;
                     const tone = isProb && f.numeric !== null ? probTone(f.numeric, "high") : null;
+                    const valText = meta ? formatAdmetValue(k, v.value as number | string | null) : f.display;
+                    const accuracy = admetAccuracyLabel(k);
+                    const rel = meta?.reliability;
                     return (
-                      <div key={k} className="flex items-center justify-between gap-2 min-w-0">
+                      <div key={k} className="flex items-center justify-between gap-2 min-w-0 border-b border-white/5 pb-1.5 last:border-0">
+                        <div className="min-w-0">
+                          <div className="text-[10px] text-slate-300 truncate" title={k}>
+                            {meta?.name ?? k}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {accuracy && <span className="text-[8px] text-slate-600 font-mono">{accuracy}</span>}
+                            {rel && rel !== "high" && (
+                              <span className={`text-[8px] font-semibold ${RELIABILITY_TONE[rel]}`} title={RELIABILITY_LABEL[rel]}>
+                                {rel === "unreliable" ? "⚠ unreliable" : `${rel} reliability`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                         <span
-                          className="text-[10px] text-slate-400 truncate"
-                          title={v.label || k}
-                        >
-                          {k}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold tabular-nums ${
-                            tone ? tone.text : "text-slate-200"
+                          className={`text-[11px] font-semibold tabular-nums shrink-0 ${
+                            rel === "unreliable" ? "text-slate-500 line-through decoration-red-500/50" : tone ? tone.text : "text-slate-200"
                           }`}
+                          title={rel === "unreliable" ? "Benchmark R² < 0 — value not trustworthy" : undefined}
                         >
-                          {f.display}
+                          {valText}
                         </span>
                       </div>
                     );

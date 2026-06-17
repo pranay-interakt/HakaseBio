@@ -35,7 +35,7 @@ _TRAIN_METRICS: dict[str, Any] = {}
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 MODEL_PATH = os.path.join(CACHE_DIR, "cardiotox_rf.pkl")
-MODEL_VERSION = "1.1.0"  # bumped: added training_fps for AD scoring
+MODEL_VERSION = "1.2.0"  # bumped: deterministic training (canonical SMILES sort + n_jobs=1)
 MORGAN_NBITS = 1024
 MORGAN_RADIUS = 2
 
@@ -44,8 +44,20 @@ MORGAN_RADIUS = 2
 # Featurization
 # --------------------------------------------------------------------------- #
 
+def _canonicalize(smiles: str) -> str | None:
+    """Return RDKit canonical SMILES, or None if unparseable."""
+    from rdkit import Chem
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    return Chem.MolToSmiles(mol, canonical=True)
+
+
 def _featurize(smiles: str) -> np.ndarray | None:
     """Convert SMILES → fixed-size feature vector. Returns None on parse failure.
+
+    Always canonicalizes first — guarantees identical features for any two
+    SMILES strings representing the same molecule.
 
     Uses `rdMolDescriptors` (direct C++ binding) and `Crippen` rather than the
     high-level `rdkit.Chem.Descriptors` module, which transitively pulls in
@@ -57,6 +69,10 @@ def _featurize(smiles: str) -> np.ndarray | None:
     from rdkit.DataStructs import ConvertToNumpyArray
 
     mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    # Re-parse from canonical SMILES to guarantee identical atom numbering
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol, canonical=True))
     if mol is None:
         return None
 
@@ -114,7 +130,14 @@ def _train() -> dict[str, Any]:
 
     logger.info("CardioTox: downloading TDC hERG dataset...")
     df = Tox(name="hERG").get_data()
-    smiles = df["Drug"].tolist()
+    # Canonicalize and sort for deterministic training order
+    from rdkit import Chem as _Chem
+    df["_canon"] = df["Drug"].apply(
+        lambda s: _Chem.MolToSmiles(_Chem.MolFromSmiles(s), canonical=True)
+        if _Chem.MolFromSmiles(s) else s
+    )
+    df = df.sort_values("_canon").reset_index(drop=True)
+    smiles = df["_canon"].tolist()
     y = df["Y"].astype(int).to_numpy()
 
     logger.info("CardioTox: featurizing %d compounds...", len(smiles))
@@ -127,7 +150,7 @@ def _train() -> dict[str, Any]:
         n_estimators=300,
         max_depth=None,
         min_samples_leaf=2,
-        n_jobs=-1,
+        n_jobs=1,           # single-threaded: eliminates parallel non-determinism
         random_state=42,
         class_weight="balanced",
     )
@@ -140,7 +163,7 @@ def _train() -> dict[str, Any]:
     cv_auc_mean: float | None
     cv_auc_std: float | None
     try:
-        scores = cross_val_score(clf, X, y_kept, cv=5, scoring="roc_auc", n_jobs=-1)
+        scores = cross_val_score(clf, X, y_kept, cv=5, scoring="roc_auc", n_jobs=1)
         cv_auc_mean = float(np.mean(scores))
         cv_auc_std = float(np.std(scores))
     except Exception as exc:  # noqa: BLE001
@@ -339,6 +362,12 @@ def predict_cardiotox(smiles: str) -> dict[str, Any]:
     """
     if not smiles or not smiles.strip():
         raise ValueError("smiles is required")
+
+    # Canonicalize before inference — identical molecule = identical result
+    canon = _canonicalize(smiles.strip())
+    if canon is None:
+        return _fallback_envelope(smiles, "rdkit_could_not_parse_smiles")
+    smiles = canon
 
     try:
         bundle = _load_model()

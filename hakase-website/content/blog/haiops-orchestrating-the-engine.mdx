@@ -1,0 +1,35 @@
+---
+title: "HAIOps: the control plane that keeps an AI platform honest"
+description: "Orchestration, gates, governance, audit. A look at how HAIOps stitches predictions to confirmations across every Hakase module."
+date: "2026-05-08"
+author: "Platform Engineering"
+tag: "HAIOps"
+readTime: "6 min read"
+---
+
+When we describe HakaseAI to scientists, we say "one engine." When we describe
+it to platform engineers, we say "HAIOps."
+
+HAIOps is the operations layer underneath the modules. It does four jobs:
+
+1. **Orchestration.** Routes work across 35 specialist agents organized into 4
+   swarms, plus 4 BioDigital Twin curators.
+2. **Gates.** Enforces the falsifier registry — no prediction ships without a
+   confirmation slot.
+3. **Governance.** Tenant isolation, privacy-first defaults, never trains on
+   customer data.
+4. **Audit.** Signed, versioned, exportable evidence packs for V&V40 / MID3.
+
+## Why it lives outside the modules
+
+If gates lived inside each module, every product team would re-invent the same
+plumbing. By promoting gates and governance to a shared control plane, every
+module inherits the same evidence discipline. That's how a discovery prediction
+can travel cleanly into a clinical protocol and into a payer dossier without
+losing provenance.
+
+## What you see as a user
+
+HAIOps mostly stays out of the way. You see it when a prediction comes with a
+falsifier card attached, when an evidence pack auto-assembles for submission,
+or when a confirmation result quietly updates the priors behind your next run.
