@@ -10459,6 +10459,7 @@ function Layer1Results({
   const [wetLabView, setWetLabView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [rationaleOpen, setRationaleOpen] = useState(false);
+  const [dimsOpen, setDimsOpen] = useState(false);
   const molName = simResults?.molName ?? "";
 
   const handleGeneratePdf = async () => {
@@ -10659,11 +10660,21 @@ function Layer1Results({
           </div>
         )}
 
-        {/* ML dimension scores — only when scorecard is present */}
-        {sc && (
+        {/* ML dimension scores — collapsed by default to cut density */}
+        {sc && sc.dimensions.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/8">
-            <div className="hk-eyebrow mb-2.5">Weighted dimension scores</div>
-            <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setDimsOpen(o => !o)}
+              aria-expanded={dimsOpen}
+              className="flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200"
+            >
+              <ChevronDown className={`h-3 w-3 transition-transform ${dimsOpen ? "rotate-180" : ""}`} />
+              <span className="hk-eyebrow">Weighted dimension scores</span>
+              <span className="text-[10px] text-slate-500">({sc.dimensions.length})</span>
+            </button>
+            {dimsOpen && (
+            <div className="flex gap-2 flex-wrap mt-2.5">
               {sc.dimensions.map(d => (
                 <div key={d.dimension} className="hk-chip">
                   <span className="text-slate-400">{d.dimension}</span>
@@ -10673,6 +10684,7 @@ function Layer1Results({
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
       </div>

@@ -30,21 +30,25 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
   const [showSources, setShowSources] = useState(false);
   const [expanded, setExpanded] = useState(false); // collapsed by default to cut clutter
 
+  // Only fetch once the user opens the panel — avoids wasted calls when
+  // collapsed and the redundant Pharos call (Benefit-Risk already pulls it).
   useEffect(() => {
+    if (!expanded) return;
     let alive = true;
     setPharos(null);
     const t = (targetSymbol ?? "").trim();
     if (t && t !== "—") fetchPharosTarget(t).then(r => { if (alive) setPharos(r); }).catch(() => {});
     return () => { alive = false; };
-  }, [targetSymbol]);
+  }, [targetSymbol, expanded]);
 
   useEffect(() => {
+    if (!expanded) return;
     let alive = true;
     setDailymed(null);
     const n = (drugName ?? "").trim();
     if (n) fetchDailyMedLabel(n).then(r => { if (alive) setDailymed(r); }).catch(() => {});
     return () => { alive = false; };
-  }, [drugName]);
+  }, [drugName, expanded]);
 
   return (
     <div className="hk-panel hk-topline overflow-hidden">
