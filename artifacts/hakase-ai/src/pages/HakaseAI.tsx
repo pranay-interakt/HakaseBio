@@ -10689,18 +10689,12 @@ function Layer1Results({
           all ML + rule-based predictions under HAIOps governance; it does not
           replace wet-lab validation, and for novel chemistry the predictions
           are extrapolations. */}
-      <div className="hk-panel hk-topline px-4 py-3 flex items-start gap-3">
-        <span className="hk-icon-tile mt-0.5"><Shield className="w-3.5 h-3.5" /></span>
-        <div className="min-w-0">
-          <div className="hk-eyebrow">HAIOps governed · directional decision-support</div>
-          <p className="text-[11px] leading-relaxed text-slate-300 mt-1.5">
-            This verdict fuses every ML and rule-based output (ADMET-AI, CardioTox-ML, DILI-ML, read-across,
-            structural alerts) into a single <span className="text-cyan-300 font-medium">direction</span> for this molecule under HAIOps governance.
-            It is <span className="text-slate-100 font-medium">not a substitute for wet-lab validation</span> — no AI is accurate enough to replace assays,
-            and for novel molecules every endpoint without a measured analogue is an extrapolation. Use it to prioritise and de-risk
-            <span className="text-slate-100 font-medium"> before</span> the lab, not instead of it.
-          </p>
-        </div>
+      <div className="hk-panel px-4 py-2.5 flex items-center gap-2.5">
+        <Shield className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+        <p className="text-[11px] leading-snug text-slate-400">
+          <span className="text-slate-200 font-medium">HAIOps directional decision-support.</span>{" "}
+          Fuses all ML + rule-based outputs into one direction — to prioritise <span className="text-slate-200">before</span> the lab, not replace it.
+        </p>
       </div>
 
       {/* Evidence & Novelty — public-DB verification + measured-analogue

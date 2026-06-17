@@ -1148,7 +1148,7 @@ html.hk-light body,
 .wet-lab-report ul, .wet-lab-report ol { padding-left: 22px; margin: 8px 0 14px; }
 .wet-lab-report li { margin: 3px 0; }
 .wet-lab-report .katex { font-size: 1.05em; }
-.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
+.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #0e7490; padding-left: 14px; border-radius: 3px; }
 
 /* Note: print/PDF for the wet-lab report is handled by an off-screen
    iframe in WetLabReportView (handlePrint). That route gives a clean,
@@ -1184,8 +1184,8 @@ html.hk-light body,
 /* ═══════════════════════════════════════════════════════════════════════
    HAKASE BRAND SYSTEM — reusable, opt-in design tokens
    ───────────────────────────────────────────────────────────────────────
-   Anchored to the logo: cyan (#22d3ee, the cap + "AI") → violet (#8b5cf6,
-   the platform primary). These classes give the app a single, deliberate
+   Anchored to the logo: cyan (#22d3ee, the cap + "AI") → teal (#14b8a6),
+   the Hakase palette. These classes give the app a single, deliberate
    visual language — panels, eyebrow labels, chips, rails and KPIs — so the
    UI reads as designed rather than assembled from ad-hoc translucent boxes.
 

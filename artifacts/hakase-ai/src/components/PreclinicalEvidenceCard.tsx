@@ -28,6 +28,7 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
   const [pharos, setPharos] = useState<PharosTarget | null>(null);
   const [dailymed, setDailymed] = useState<DailyMedLabel | null>(null);
   const [showSources, setShowSources] = useState(false);
+  const [expanded, setExpanded] = useState(false); // collapsed by default to cut clutter
 
   useEffect(() => {
     let alive = true;
@@ -47,7 +48,12 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
 
   return (
     <div className="hk-panel hk-topline overflow-hidden">
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between border-b border-white/5 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+        aria-expanded={expanded}
+      >
         <div className="flex items-center gap-2.5">
           <span className="hk-icon-tile"><Library className="h-3.5 w-3.5" /></span>
           <div className="leading-tight">
@@ -55,8 +61,13 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
             <div className="hk-eyebrow mt-0.5">FDA · NLM · NCATS · EBI grade</div>
           </div>
         </div>
-      </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!expanded && <span className="text-[10px] text-slate-500 hidden sm:inline">Target validation · FDA labels · {TRUSTED_SOURCES.length} sources</span>}
+          <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </button>
 
+      {expanded && (
       <div className="px-4 py-3 space-y-3">
         {/* Pharos target development level — only render when loading or it
             actually returned (hide hard errors so there's no dead row). */}
@@ -129,6 +140,7 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
           it is not a regulatory determination and does not replace wet-lab or clinical validation.
         </p>
       </div>
+      )}
     </div>
   );
 }
