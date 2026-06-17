@@ -48,6 +48,16 @@ def _load_model() -> Any:
         if _MODEL is not None:
             return _MODEL
         try:
+            try:
+                import lightning.pytorch as pl
+                original_init = pl.Trainer.__init__
+                def patched_init(self, *args, **kwargs):
+                    kwargs["enable_progress_bar"] = False
+                    original_init(self, *args, **kwargs)
+                pl.Trainer.__init__ = patched_init
+            except Exception as patch_err:
+                logger.warning("Could not patch lightning.pytorch.Trainer: %s", patch_err)
+
             from admet_ai import ADMETModel  # type: ignore[import-not-found]
 
             t0 = time.time()
