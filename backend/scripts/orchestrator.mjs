@@ -87,6 +87,7 @@ const HEALTH_TIMEOUT   = Number(process.env.HEALTHCHECK_TIMEOUT_MS ?? "60000");
 const AI_DIR   = resolve(REPO_ROOT, "artifacts", "ai-service");
 const VENV     = resolve(REPO_ROOT, ".venv");
 const PYTHON   = IS_WIN ? resolve(VENV, "Scripts", "python.exe") : resolve(VENV, "bin", "python");
+const TSX      = IS_WIN ? resolve(REPO_ROOT, "node_modules", ".bin", "tsx.cmd") : resolve(REPO_ROOT, "node_modules", ".bin", "tsx");
 
 // ── Pretty logging ──────────────────────────────────────────────────────────
 const TAGS = {
@@ -181,8 +182,8 @@ const ai = new Child({
 const api = new Child({
   name: "api-server",
   tag:  TAGS.api,
-  cmd:  "pnpm",
-  args: ["--filter", "@workspace/api-server", "run", "dev"],
+  cmd:  TSX,
+  args: ["artifacts/api-server/src/index.ts"],
   cwd:  REPO_ROOT,
   env:  { PORT, NODE_ENV },
 });
@@ -258,7 +259,7 @@ function setupWatchers() {
     try {
       fsWatch(d, { recursive: true }, (_evt, file) => {
         if (!file) return;
-        if (/(^|\/)__pycache__|\.pyc$|\.log$|\.tmp$|node_modules/.test(file)) return;
+        if (/(^|\/)(__pycache__|cache|node_modules)(\/|$)/.test(file) || /\.(pyc|log|tmp)$/.test(file)) return;
         log(`file change detected: ${relative(REPO_ROOT, resolve(d, file))} — scheduling reload`);
         clearTimeout(reloadTimer);
         reloadTimer = setTimeout(() => orchestrator.rebuildAndReload("watch"), RELOAD_DEBOUNCE);

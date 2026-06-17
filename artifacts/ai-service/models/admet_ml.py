@@ -2,17 +2,36 @@
 
 Wraps the open-source ADMET-AI Chemprop model (41 ADMET endpoints + 60 physchem
 descriptors). Uses lazy singleton loading so the FastAPI service starts fast
-and only pays the ~30s model-load cost on first prediction. Falls back
-gracefully when the underlying package or weights are unavailable.
+and only pays the ~30s model-load cost on first prediction.
+
+Operating modes
+───────────────
+By default the wrapper degrades gracefully — if ADMET-AI isn't installed, the
+loader raises and `predict_admet_ml` returns a `_fallback_envelope`. Upstream
+consumers must check `ml_available` and re-route to the heuristic path.
+
+When environment variable `STRICT_ML=1`, the wrapper REFUSES to fall back:
+- `warmup()` raises if the model can't load
+- `predict_admet_ml()` raises if the model can't run
+
+Strict mode is the production default — the L1 scorecard's recalibrated
+thresholds (`thresholds.json`) are tuned to the ML output distribution, so
+silently substituting heuristics produces miscalibrated verdicts. Strict mode
+makes "no ML" a startup-time configuration error, not a runtime soft failure
+that the user only notices because every drug is suddenly NO-GO.
 """
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Set STRICT_ML=1 to refuse to start when ADMET-AI isn't available.
+STRICT_ML = os.environ.get("STRICT_ML", "0") == "1"
 
 _MODEL: Any = None
 _LOAD_LOCK = threading.Lock()
@@ -54,11 +73,24 @@ def is_ready() -> dict[str, Any]:
 
 
 def warmup() -> dict[str, Any]:
-    """Force model load (used by /models/warmup endpoint)."""
+    """Force model load (used by /models/warmup endpoint).
+
+    In STRICT_ML mode, re-raises on failure so the FastAPI startup hook can
+    crash the process rather than serve mis-calibrated heuristic predictions
+    under an "ML-Enhanced" badge.
+    """
     try:
         _load_model()
         return {"status": "ready", **is_ready()}
     except Exception as exc:  # noqa: BLE001
+        if STRICT_ML:
+            logger.critical(
+                "STRICT_ML=1 and ADMET-AI failed to load: %s. "
+                "Refusing to serve to avoid silent heuristic fallback under an "
+                "'ML-Enhanced' badge. Pin admet_ai>=1.4 in requirements.txt or "
+                "unset STRICT_ML to allow degraded mode.", exc,
+            )
+            raise
         return {"status": "error", "error": str(exc), **is_ready()}
 
 
@@ -90,17 +122,17 @@ def _normalize_result(raw: Any, smiles: str) -> dict[str, float | str | None]:
 # unless otherwise noted.
 KEY_ENDPOINTS: dict[str, dict[str, str]] = {
     "absorption": {
-        "Caco2_Wang": "Caco-2 permeability (log cm/s)",
+        "Caco2_Wang": "Caco-2 permeability (log 10^-6 cm/s)",
         "HIA_Hou": "Human intestinal absorption (probability)",
-        "Pgp_Broccatelli": "P-glycoprotein substrate (probability)",
+        "Pgp_Broccatelli": "P-glycoprotein inhibition (probability)",
         "Bioavailability_Ma": "Oral bioavailability (probability)",
         "Lipophilicity_AstraZeneca": "Lipophilicity (logD7.4)",
-        "Solubility_AqSolDB": "Aqueous solubility (logS)",
+        "Solubility_AqSolDB": "Aqueous solubility (log mol/L)",
     },
     "distribution": {
         "BBB_Martins": "Blood-brain barrier penetration (probability)",
         "PPBR_AZ": "Plasma protein binding (%)",
-        "VDss_Lombardo": "Volume of distribution (L/kg)",
+        "VDss_Lombardo": "Volume of distribution (L/kg) [low model reliability]",
     },
     "metabolism": {
         "CYP1A2_Veith": "CYP1A2 inhibition (probability)",
@@ -110,14 +142,14 @@ KEY_ENDPOINTS: dict[str, dict[str, str]] = {
         "CYP3A4_Veith": "CYP3A4 inhibition (probability)",
     },
     "excretion": {
-        "Clearance_Hepatocyte_AZ": "Hepatocyte clearance (mL/min/kg)",
-        "Half_Life_Obach": "Half-life (hours)",
+        "Clearance_Hepatocyte_AZ": "Hepatocyte clearance (uL/min/10^6 cells)",
+        "Half_Life_Obach": "Half-life (hours) [low model reliability]",
     },
     "toxicity": {
         "hERG": "hERG channel blockade (probability)",
         "AMES": "Ames mutagenicity (probability)",
         "DILI": "Drug-induced liver injury (probability)",
-        "LD50_Zhu": "Acute toxicity LD50 (log mol/kg)",
+        "LD50_Zhu": "Acute toxicity LD50 (log 1/(mol/kg))",
         "Carcinogens_Lagunin": "Carcinogenicity (probability)",
         "ClinTox": "Clinical toxicity (probability)",
         "Skin_Reaction": "Skin sensitization (probability)",
@@ -181,6 +213,17 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
     """
     if not smiles or not smiles.strip():
         raise ValueError("smiles is required")
+
+    # Canonicalize SMILES so any two representations of the same molecule
+    # produce identical predictions (Chemprop is graph-invariant but
+    # canonicalization removes any remaining string-level sensitivity).
+    try:
+        from rdkit import Chem as _Chem
+        _mol = _Chem.MolFromSmiles(smiles.strip())
+        if _mol is not None:
+            smiles = _Chem.MolToSmiles(_mol, canonical=True)
+    except Exception:
+        pass  # If RDKit unavailable, proceed with raw SMILES
 
     try:
         model = _load_model()

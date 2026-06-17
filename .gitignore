@@ -63,3 +63,13 @@ data/
 .env.*
 !.env.example
 
+# Python compiled output and runtime cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+artifacts/ai-service/cache/*.pkl
+artifacts/ai-service/cache/*.npz
+

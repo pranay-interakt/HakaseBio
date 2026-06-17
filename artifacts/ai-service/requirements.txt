@@ -17,6 +17,29 @@ httpx>=0.27.0
 # Required by: admet.py, molecular_properties.py, binding_ml.py, solubility_ml.py
 rdkit>=2023.9.1
 
+# ── ADMET-AI ML stack — REQUIRED for ML provenance ──────────────────────────
+# Without these the ai-service silently degrades to heuristics while
+# UPSTREAM thinks it's getting ML predictions. The recalibrated L1 scorecard
+# (l1Scorecard.ts thresholds.json) is tuned to the ML output distribution,
+# not the heuristic one — running mismatched is the root cause of
+# "every known drug → NO-GO". Pin them; STRICT_ML=1 in env makes the service
+# refuse to start when these are absent (see admet_ml.warmup).
+admet_ai>=1.4.0
+chemprop>=1.7.0
+
+# ── PyTDC for applicability domain + DTA training corpora ──────────────────
+# Provides DILI, hERG_Karim, BindingDB downloads used by applicability_domain.py
+# and the BindingDB-scale DTA retraining script.
+PyTDC>=0.4.1
+
+# ── DTA backend (BindingDB-scale drug–target affinity) ─────────────────────
+# Replaces the 125-row legacy GBM in binding_ml.py for novel-target prediction.
+# Default backend is DeepPurpose MPNN-CNN pretrained on BindingDB (~1M pairs);
+# heavier PLAPT backend (~17 GB) is opt-in via HAKASE_DTA_BACKEND=plapt.
+# DeepPurpose pulls in torch — installs fine on CPU.
+DeepPurpose>=0.1.5
+transformers>=4.38.0  # only required when HAKASE_DTA_BACKEND=plapt
+
 # Antibody numbering — ANARCI (BSD-3, Dunbar & Deane 2016; commercial-safe).
 # Enables EXACT IMGT CDR numbering in the antibody engine. Also needs the HMMER
 # binary:  conda install -c bioconda hmmer   (or)   apt-get install hmmer

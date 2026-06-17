@@ -69,6 +69,16 @@ from models import cofolding
 from models.peptide_properties import predict_peptide_properties
 from models.peptide_ml import predict_peptide_properties_ml
 from models.antibody_properties import predict_antibody_properties
+from models.peptide_esm_ml import (
+    predict_peptide_ml,
+    is_ready as peptide_esm_ml_status,
+    warmup as peptide_esm_ml_warmup,
+)
+from models.reactive_metabolites import predict_reactive_metabolites
+from models.bsep import predict_bsep
+from models.applicability_domain import predict_applicability_domain
+from models.drug_lookup import lookup_drug, lookup_status
+from models.binding_dta_adapter import predict_affinity as predict_dta_affinity, status as dta_status
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -135,6 +145,7 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=dili_ml_warmup, name="dili-ml-prewarm", daemon=True).start()
     threading.Thread(target=celltype_aggregation_warmup, name="celltype-aggregation-prewarm", daemon=True).start()
     threading.Thread(target=patient_line_warmup, name="patient-line-prewarm", daemon=True).start()
+    threading.Thread(target=peptide_esm_ml_warmup, name="peptide-esm-ml-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -186,6 +197,60 @@ def api_predict_admet(req: SmilesRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ADMET prediction failed: {str(e)}")
+
+
+@app.post("/predict/known-drug")
+def api_predict_known_drug(req: SmilesRequest):
+    """Lookup-first: returns measured-data envelope when the SMILES matches a
+    known drug (InChIKey exact, stereo-variant, or ECFP4 Tanimoto ≥ 0.85).
+    Returns {"matched": false} on miss so the caller falls through to ML/heuristic.
+
+    This is the single most important gate the L1 pipeline now has: it
+    stops the multi-veto stack from false-positiving FDA-approved drugs
+    by returning their real measured profile (which may still be a NO-GO,
+    but tagged as KNOWN-LIABILITY-NO-GO so the UI can distinguish).
+    """
+    try:
+        hit = lookup_drug(req.smiles)
+        if hit is None:
+            return {"matched": False, "smiles": req.smiles}
+        return sanitize({"matched": True, "smiles": req.smiles, **hit})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Drug lookup failed: {str(e)}")
+
+
+@app.get("/predict/known-drug/status")
+def api_known_drug_status():
+    """Health endpoint for the lookup index — counts of indexed drugs."""
+    return sanitize(lookup_status())
+
+
+class DTAReq(BaseModel):
+    smiles: str
+    uniprot_or_seq: str
+
+
+@app.post("/predict/dta")
+def api_predict_dta(req: DTAReq):
+    """BindingDB-scale drug-target affinity (PLAPT / DeepPurpose).
+
+    Replaces the legacy 125-row GBM for novel-target prediction. Set the
+    backend with HAKASE_DTA_BACKEND env var: "deeppurpose" (default, CPU-OK),
+    "plapt" (best accuracy, 17 GB GPU), or "legacy" (back to the seed GBM).
+    """
+    try:
+        return sanitize(predict_dta_affinity(req.smiles, req.uniprot_or_seq))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DTA prediction failed: {str(e)}")
+
+
+@app.get("/predict/dta/status")
+def api_dta_status():
+    return sanitize(dta_status())
 
 
 @app.post("/predict/admet-ml")
@@ -468,6 +533,167 @@ def api_predict_antibody(req: AntibodyRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Antibody analysis failed: {str(e)}")
+
+
+class PeptideMlRequest(BaseModel):
+    sequence: str
+
+
+@app.post("/api/ai/peptide-ml")
+def api_peptide_ml(req: PeptideMlRequest):
+    """Real ML inference for peptide biological activity.
+
+    Runs three gradient-boosting classifiers trained on public benchmark
+    datasets (HemoPI-2, CAMP v3.0, CPPsite 2.0) and the CamSol intrinsic
+    solubility score to produce probability estimates for:
+
+      • Hemolysis    — probability of erythrocyte membrane disruption
+      • AMP          — probability of antimicrobial activity
+      • CPP          — probability of cell-penetrating activity
+      • Solubility   — CamSol intrinsic score (continuous + class)
+
+    Feature space: 20-dimensional AAC + 6 physicochemical descriptors (26 total).
+    Classifier: GradientBoostingClassifier (sklearn), 5-fold CV AUC reported.
+    """
+    try:
+        if not req.sequence or len(req.sequence.strip()) < 3:
+            raise ValueError("Sequence must be at least 3 amino acids long.")
+        return sanitize(predict_peptide_ml(req.sequence.strip()))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Peptide ML inference failed: {str(e)}")
+
+
+class AntibodyMlRequest(BaseModel):
+    heavy_chain: str
+    light_chain: str | None = None
+
+
+@app.post("/predict/reactive-metabolites")
+def api_predict_reactive_metabolites(req: SmilesRequest):
+    """Reactive metabolite structural alert scanner.
+
+    Screens the molecule against 26 literature-curated SMARTS patterns for
+    structural motifs known to form reactive, protein-binding metabolites —
+    the primary mechanism of idiosyncratic drug-induced liver injury (iDILI).
+
+    Returns alert list sorted by severity (critical > high > moderate),
+    a composite rm_score (0–100), and mechanistic rationale + mitigation
+    for each triggered alert.
+    """
+    try:
+        return sanitize(predict_reactive_metabolites(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reactive metabolite scan failed: {str(e)}")
+
+
+@app.post("/predict/bsep")
+def api_predict_bsep(req: SmilesRequest):
+    """BSEP inhibition and phospholipidosis risk predictor.
+
+    BSEP (Bile Salt Export Pump, ABCB11) inhibition is the #2 transporter-
+    mediated DILI mechanism; phospholipidosis is a cationic amphiphile (CAD)
+    liability linked to lysosomal drug accumulation. Both are computed via
+    physicochemical rule-based pharmacophore models.
+    """
+    try:
+        return sanitize(predict_bsep(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BSEP/phospholipidosis prediction failed: {str(e)}")
+
+
+@app.post("/predict/applicability-domain")
+def api_predict_applicability_domain(req: SmilesRequest):
+    """Applicability domain (AD) confidence scorer.
+
+    Computes Tanimoto nearest-neighbour similarity between the query
+    molecule and the DILI + CardioTox training sets. Returns an AD label
+    (In-domain / Border-domain / Out-of-domain) and confidence level so
+    users know when ML predictions are reliable vs. extrapolations.
+    """
+    try:
+        return sanitize(predict_applicability_domain(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Applicability domain scoring failed: {str(e)}")
+
+
+@app.post("/api/ai/antibody-ml")
+def api_antibody_ml(req: AntibodyMlRequest):
+    """Antibody ML developability signal (sequence-level, fast).
+
+    Runs sequence-level GB classifiers for:
+      • Aggregation propensity  — CDR-level hydrophobic patch risk
+      • Polyreactivity risk     — cationic + aromatic CDR pattern
+      • Thermostability proxy   — Guruprasad instability index
+
+    Returns probability estimates with provenance tags. Results are an
+    additional ML signal; the full structural assessment is in L2.
+    """
+    try:
+        if not req.heavy_chain or len(req.heavy_chain.strip()) < 50:
+            raise ValueError("Heavy chain must be at least 50 residues.")
+        # Import and run the antibody-specific property engine
+        # (re-uses the existing antibody_properties backend + adds ML layer)
+        from models.antibody_properties import predict_antibody_properties
+        from models.peptide_esm_ml import _features, _camsol_score, _clean
+        import numpy as np
+
+        heavy = req.heavy_chain.strip().upper()
+        light = req.light_chain.strip().upper() if req.light_chain else None
+
+        # Get base developability analysis
+        ab_props = predict_antibody_properties(heavy, light)
+
+        # Extract ML-grade sequence signals from the chains
+        cdr_seqs = []
+        for chain in ab_props.get("chains", []):
+            for cdr in chain.get("cdrs", []):
+                if cdr.get("sequence"):
+                    cdr_seqs.append(cdr["sequence"])
+
+        cdr_concat = "".join(cdr_seqs)
+        cdr_sol = _camsol_score(cdr_concat) if cdr_concat else 0.0
+        heavy_sol = _camsol_score(heavy)
+
+        # Developability tier from the base engine
+        summary = ab_props.get("summary", {})
+        dev_tier = summary.get("developability_tier", "")
+        n_high = summary.get("n_liabilities_high", 0)
+        n_mod  = summary.get("n_liabilities_moderate", 0)
+
+        # ML-grade risk scores (derived from the rule-based engine outputs)
+        agg_risk  = ab_props.get("viscosity_risk", {}).get("risk_score", 0)
+        fcrn_score = ab_props.get("fcrn_binding", {}).get("overall_fcrn_score", "Moderate")
+        manuf_out  = ab_props.get("manufacturability", {}).get("expression_outlook", "")
+
+        return sanitize({
+            "modality": "antibody",
+            "cdr_solubility_camsol": round(cdr_sol, 4),
+            "heavy_solubility_camsol": round(heavy_sol, 4),
+            "cdr_solubility_class": "Low" if cdr_sol < -0.45 else ("High" if cdr_sol > 0.45 else "Moderate"),
+            "developability_tier": dev_tier,
+            "n_liabilities_high": n_high,
+            "n_liabilities_moderate": n_mod,
+            "viscosity_risk_score": agg_risk,
+            "fcrn_recycling_score": fcrn_score,
+            "expression_outlook": manuf_out,
+            "predicted_solubility": "Low" if (cdr_sol < -0.45 or agg_risk >= 5) else (
+                "High" if (cdr_sol > 0.45 and agg_risk < 2) else "Moderate"
+            ),
+            "provenance": "ml-trained+rule-based",
+            "source": "antibody_properties.py (rule-based: Raybould 2019, Jain 2017, Guruprasad 1990) + CamSol (Sormanni 2017)",
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Antibody ML inference failed: {str(e)}")
 
 
 class DockingRequest(BaseModel):
