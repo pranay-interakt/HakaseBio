@@ -39,96 +39,122 @@ graph TD
 
 ## 🛠️ Developer Guide & Startup Instructions
 
-Follow these instructions to start the full-stack suite locally.
+Follow these detailed instructions to configure, install, and run the Hakase BioTwin platform locally.
 
 ### 1. **Prerequisites**
-Ensure you have the following installed on your machine:
+Ensure you have the following software installed on your machine:
 *   **Node.js** (v20 or higher)
-*   **pnpm** (Required package manager, do not use `npm` or `yarn`)
+*   **pnpm** (Workspace package manager; do not use `npm` or `yarn`)
 *   **Python** (v3.11 or higher)
-*   **Git** & **Git LFS** (required for model weight storage)
+*   **uv** (Fast Python package installer and resolver; highly recommended to avoid dependency conflicts)
+*   **PostgreSQL** (Local or remote running instance accepting connections)
+*   **Git & Git LFS** (Required for storing model weights and large datasets)
 
 ---
 
-### 2. **Installation**
+### 2. **Environment & Security Configuration (.env)**
 
-#### Step A: Install JS Dependencies
-From the repository root, install the pnpm workspace dependencies:
+> [!IMPORTANT]
+> **CRITICAL SECURITY POLICY:** Local environment `.env` files contain sensitive API credentials, local database paths, and secrets. **They are ignored by Git and must NEVER be committed to the repository.**
+
+#### Step A: Configure the Repository Root `.env`
+1. Copy the reference configuration template:
+   ```bash
+   cp .env.example .env
+   ```
+2. Open the newly created `.env` file and set the required database URL:
+   ```env
+   # PostgreSQL database connection URL (e.g. local DB named 'hakase_bio')
+   DATABASE_URL=postgresql://<username>@localhost:5432/hakase_bio
+   ```
+3. Set Anthropic and RunPod bypass variables for local development (defaults to `DUMMY` to bypass API keys):
+   ```env
+   ANTHROPIC_API_KEY=DUMMY
+   RUNPOD_API_KEY=DUMMY
+   ```
+
+#### Step B: Configure the Backend `.env`
+Copy the template to the backend folder so the API gateway can read port and database settings:
+```bash
+cp backend/.env.example backend/.env
+```
+Ensure the `DATABASE_URL` matches the connection string configured in the root `.env`.
+
+---
+
+### 3. **Installation & Virtual Environment Setup**
+
+#### Step A: Install Node.js Workspace Dependencies
+From the repository root, install all monorepo dependencies:
 ```bash
 pnpm install
 ```
 
-#### Step B: Install Python Dependencies & Model Warmup
-Create a virtual environment, activate it, and install dependencies from the workspace root:
+#### Step B: Initialize the Python Virtual Environment
+We use `uv` to resolve and synchronize Python packages cleanly. This ensures `rdkit` and `numpy` versions are aligned to NumPy 1.x (`numpy>=1.24.0,<2.0.0`) to prevent startup segmentation faults (`SIGSEGV`) and import errors:
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r pyproject.toml
+# Create the virtual environment
+uv venv .venv
+
+# Sync dependencies based on the locked requirements
+uv sync
 ```
-
-If your NumPy/RDKit versions complain, ensure they are pinned correctly (NumPy 2.x and RDKit 2026.x compatible packages are fully supported).
-
----
-
-### 3. **Starting the Services (Local Dev)**
-
-You can start the full stack using the built-in workspace scripts in two separate terminal windows (recommended), or start the individual services manually.
-
-#### Option A: Using the Workspace Scripts (Recommended)
-
-1.  **Terminal 1 (Backend)**: Start both the Python AI/ML Service and the Express API server concurrently:
-    ```bash
-    pnpm run backend:legacy
-    ```
-    *   **API Server:** `http://localhost:3000`
-    *   **AI Service:** `http://localhost:8090`
-
-2.  **Terminal 2 (Frontend)**: Start the Vite React client dev server:
-    ```bash
-    pnpm run frontend
-    ```
-    *   **Frontend Client:** `http://localhost:3001` (or `http://localhost:4000` depending on port availability)
+*Note: If you do not use `uv`, you can manually create a standard python virtual environment and run `.venv/bin/pip install -r pyproject.toml`.*
 
 ---
 
-#### Option B: Starting Services Manually
+### 4. **Database Migration**
 
-If you prefer to run the services individually:
+Initialize the PostgreSQL database schema using Drizzle Kit. Run this command from the repository root:
+```bash
+DATABASE_URL="postgresql://<username>@localhost:5432/hakase_bio" pnpm --filter @workspace/db run push
+```
+This will automatically verify connection credentials and synchronize the table schemas.
 
-1.  **Python AI/ML Service**:
-    ```bash
-    cd artifacts/ai-service
-    python main.py
-    ```
-    *   **URL:** `http://localhost:8090` (Configure `AI_SERVICE_PORT` in `.env` if needed)
+---
 
-2.  **Express API Middleware**:
-    ```bash
-    PORT=3000 DATABASE_URL="file:local.db" pnpm --filter @workspace/api-server dev
-    ```
-    *   **URL:** `http://localhost:3000`
+### 5. **Starting the Services (Local Dev)**
 
-3.  **Vite React Frontend**:
-    ```bash
-    PORT=3001 BASE_PATH="/" pnpm --filter @workspace/hakase-ai dev
-    ```
-    *   **URL:** `http://localhost:3001`
+You must run **two processes** concurrently. We recommend running them in separate terminal windows.
+
+#### 🖲️ Terminal 1: Backend Orchestrator
+From the repository root, start the single-command backend supervisor:
+```bash
+pnpm run backend:dev
+```
+The orchestrator will automatically boot and manage:
+- **Express API Gateway:** listening on `http://localhost:3000`
+- **FastAPI AI/ML Service:** listening on `http://localhost:8090`
+- **Model Warm-Up & Hot-Reloads:** Automatically pre-warms the DILI, hERG, Ames, and Binding-ML models, and watches file changes while ignoring cache changes.
+
+#### 🎨 Terminal 2: Vite React Frontend
+From the repository root, start the frontend developer server on the permitted origin port (`4000`):
+```bash
+PORT=4000 pnpm run frontend:dev
+```
+*   **Vite Dev Server URL:** `http://localhost:4000`
+*   Vite config automatically proxies all requests targeting `/api/*` to the gateway on port `3000` to prevent CORS issues.
 
 ---
 
 ## 🧪 Verification & Health Check
 
-Once the services are running, you can verify their connection and health:
+Once both services are running, verify communication via these health check endpoints:
 
 1.  **AI/ML Service Health check:**
     ```bash
     curl -s http://localhost:8090/health
     # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
     ```
-2.  **API Server Proxy Health check:**
+2.  **API Server Gateway Health check:**
     ```bash
-    curl -s http://localhost:3000/api/ai/health
+    curl -s http://localhost:3000/api/health
+    # Expect: {"status":"ok"}
+    ```
+3.  **Vite Dev Proxy Health check:**
+    ```bash
+    curl -s http://localhost:4000/api/ai/health
     # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
     ```
 
-If both verify successfully, open your browser to `http://localhost:3001/dashboard` (or the frontend port listed in your terminal) and you are ready to simulate preclinical twins!
+If all three verify successfully, open your browser to **`http://localhost:4000/dashboard`** to begin simulating digital twins!
