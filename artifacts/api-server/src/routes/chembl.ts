@@ -8,6 +8,108 @@ const HEADERS = {
   "User-Agent": "HakaseAI-BioDigitalTwin/1.0",
 };
 
+// ─── Reliable SMILES → ChEMBL molecule lookup ─────────────────────────────
+// ChEMBL's REST API is intermittently slow / 500-prone. Strategy:
+//  1. PubChem: SMILES → CID + InChI key (fast, reliable)
+//  2. PubChem: CID → ChEMBL registry ID xref (returns "CHEMBL25" etc)
+//  3. ChEMBL: /molecule/{ID}.json (enriches with max_phase, pref_name etc)
+//     — but we attempt this with a short 6s timeout and fall back to PubChem
+//     data if ChEMBL is unavailable.
+//  4. PubChem fallback: synthesize a minimal molecule-like object from PubChem
+//     drug classification data so the UI always gets something useful.
+async function resolveChemblMolecule(smiles: string): Promise<any | null> {
+  // Step 1 — PubChem: SMILES → CID
+  let cid: number | null = null;
+  let inchiKey: string | null = null;
+  try {
+    const pcUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles)}/property/InChIKey/JSON`;
+    const pcRes = await fetch(pcUrl, { signal: AbortSignal.timeout(8000) });
+    if (pcRes.ok) {
+      const pcData: any = await pcRes.json();
+      const prop = pcData?.PropertyTable?.Properties?.[0];
+      cid = prop?.CID ?? null;
+      inchiKey = prop?.InChIKey ?? null;
+    }
+  } catch { /* fall through */ }
+
+  // Step 2 — PubChem: CID → ChEMBL ID via xrefs
+  let chemblIdFromPubChem: string | null = null;
+  if (cid) {
+    try {
+      const xrefUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/RegistryID/JSON`;
+      const xRes = await fetch(xrefUrl, { signal: AbortSignal.timeout(8000) });
+      if (xRes.ok) {
+        const xData: any = await xRes.json();
+        const regIds: string[] = xData?.InformationList?.Information?.[0]?.RegistryID ?? [];
+        chemblIdFromPubChem = regIds.find((r: string) => /^CHEMBL\d+$/i.test(r)) ?? null;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Step 3 — ChEMBL direct lookup (short timeout — don't block on EBI outages)
+  if (chemblIdFromPubChem) {
+    try {
+      const molUrl = `${CHEMBL_BASE}/molecule/${encodeURIComponent(chemblIdFromPubChem)}.json`;
+      const molRes = await fetch(molUrl, { headers: HEADERS, signal: AbortSignal.timeout(6000) });
+      if (molRes.ok) {
+        const mol: any = await molRes.json();
+        if (mol?.molecule_chembl_id) return mol;
+      }
+    } catch { /* ChEMBL unavailable — fall through to PubChem stub */ }
+
+    // Step 4 — PubChem fallback: build a minimal ChEMBL-compatible object
+    // so the UI can display the drug name and ChEMBL ID even during EBI outages.
+    if (cid) {
+      try {
+        const synUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/synonyms/JSON`;
+        const synRes = await fetch(synUrl, { signal: AbortSignal.timeout(6000) });
+        let prefName: string | null = null;
+        if (synRes.ok) {
+          const synData: any = await synRes.json();
+          const syns: string[] = synData?.InformationList?.Information?.[0]?.Synonym ?? [];
+          // First synonym that's all alphabetic, short, and likely a common name/INN
+          prefName = syns.find((s: string) => /^[a-zA-Z][a-zA-Z\s\-]{1,25}$/.test(s)) ?? syns[0] ?? null;
+          if (prefName) prefName = prefName.toUpperCase();
+        }
+        // Synthesize a minimal molecule object compatible with ChEMBL schema
+        return {
+          molecule_chembl_id: chemblIdFromPubChem,
+          pref_name: prefName,
+          max_phase: null,       // unknown without ChEMBL — displayed as preclinical
+          withdrawn_flag: false,
+          first_approval: null,
+          molecule_type: "Small molecule",
+          _source: "pubchem_fallback",   // flag so callers know this is partial data
+        };
+      } catch { /* give up */ }
+
+      // Minimal stub if even PubChem properties fail
+      return {
+        molecule_chembl_id: chemblIdFromPubChem,
+        pref_name: null,
+        max_phase: null,
+        withdrawn_flag: false,
+        first_approval: null,
+        molecule_type: "Small molecule",
+        _source: "pubchem_fallback",
+      };
+    }
+  }
+
+  // Last resort — ChEMBL exact SMILES match
+  try {
+    const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__canonical_smiles__exact=${encodeURIComponent(smiles)}&limit=1`;
+    const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const data: any = await res.json();
+      const mol = data?.molecules?.[0];
+      if (mol) return mol;
+    }
+  } catch { /* give up */ }
+
+  return null;
+}
+
 router.get("/chembl/compound", async (req, res) => {
   const smiles = req.query.smiles as string | undefined;
   if (!smiles) {
@@ -16,14 +118,12 @@ router.get("/chembl/compound", async (req, res) => {
   }
 
   try {
-    const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__canonical_smiles__flexmatch=${encodeURIComponent(smiles)}&limit=1`;
-    const upstream = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
-    if (!upstream.ok) {
-      res.status(upstream.status).json({ error: `ChEMBL returned ${upstream.status}` });
+    const mol = await resolveChemblMolecule(smiles);
+    if (!mol) {
+      res.json({ molecules: [], page_meta: { total_count: 0 } });
       return;
     }
-    const data = await upstream.json();
-    res.json(data);
+    res.json({ molecules: [mol], page_meta: { total_count: 1 } });
   } catch (err: any) {
     res.status(502).json({ error: err?.message ?? "ChEMBL compound proxy error" });
   }
@@ -38,11 +138,7 @@ router.get("/chembl/development", async (req, res) => {
   const smiles = req.query.smiles as string | undefined;
   if (!smiles) { res.status(400).json({ error: "Provide ?smiles=<SMILES>" }); return; }
   try {
-    const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__canonical_smiles__flexmatch=${encodeURIComponent(smiles)}&limit=1`;
-    const up = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
-    if (!up.ok) { res.status(up.status).json({ error: `ChEMBL returned ${up.status}` }); return; }
-    const data: any = await up.json();
-    const m = data?.molecules?.[0];
+    const m = await resolveChemblMolecule(smiles);
     if (!m) { res.json({ found: false }); return; }
     res.json({
       found: true,
@@ -151,21 +247,14 @@ router.get("/chembl/target-search", async (req, res) => {
   }
 
   try {
-    const compUrl = `${CHEMBL_BASE}/molecule.json?molecule_structures__canonical_smiles__flexmatch=${encodeURIComponent(smiles)}&limit=1`;
-    const compRes = await fetch(compUrl, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
-    if (!compRes.ok) {
-      res.json({ targets: [], status: "compound_not_found" });
-      return;
-    }
-    const compData = (await compRes.json()) as { molecules?: any[] };
-    const molecules = compData?.molecules ?? [];
-    if (!molecules.length) {
+    const mol = await resolveChemblMolecule(smiles);
+    if (!mol) {
       res.json({ targets: [], status: "compound_not_found" });
       return;
     }
 
-    const chemblId = molecules[0].molecule_chembl_id;
-    const compoundName = molecules[0].pref_name ?? chemblId;
+    const chemblId = mol.molecule_chembl_id;
+    const compoundName = mol.pref_name ?? chemblId;
 
     const actUrl = `${CHEMBL_BASE}/activity.json?molecule_chembl_id=${encodeURIComponent(chemblId)}&limit=100`;
     const actRes = await fetch(actUrl, { headers: HEADERS, signal: AbortSignal.timeout(12000) });
