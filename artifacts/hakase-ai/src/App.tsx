@@ -11,6 +11,7 @@ import { Privacy } from "@/pages/Privacy";
 import { AdvancedV2 } from "@/pages/AdvancedV2";
 import { HAIOps } from "@/pages/HAIOps";
 import { IVIVE } from "@/pages/IVIVE";
+import BatchScreen from "@/pages/BatchScreen";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="/advanced-v2" component={AdvancedV2} />
           <Route path="/haiopsdna" component={HAIOps} />
           <Route path="/ivive" component={IVIVE} />
+          <Route path="/screen" component={BatchScreen} />
           <Route path="/dashboard" component={HakaseAI} />
           <Route path="/dashboard/:rest*" component={HakaseAI} />
           <Route component={Landing} />

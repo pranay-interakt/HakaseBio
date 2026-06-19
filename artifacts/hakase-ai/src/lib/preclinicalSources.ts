@@ -122,6 +122,64 @@ export async function fetchDailyMedLabel(drugOrIngredient: string): Promise<Dail
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 3. ChEMBL development stage — translational progression of this structure
+// ─────────────────────────────────────────────────────────────────────────
+/**
+ * How far this exact chemotype has progressed: ChEMBL max_phase
+ * (4 = approved, 1–3 = clinical phases, 0/null = preclinical/research) plus
+ * withdrawn flag and first-approval year. A bio/translational signal — does a
+ * structure like this have clinical precedent? — not a drug label.
+ */
+export interface ChemblDevelopment {
+  status: SourceStatus;
+  found: boolean;
+  chemblId: string | null;
+  prefName: string | null;
+  phase: string;
+  withdrawn: boolean;
+  firstApproval: number | null;
+  url: string | null;
+  note: string;
+  error?: string;
+}
+
+function phaseLabel(maxPhase: number | string | null): string {
+  const p = typeof maxPhase === "string" ? parseFloat(maxPhase) : maxPhase;
+  if (p === 4) return "Approved drug";
+  if (p === 3) return "Phase III";
+  if (p === 2) return "Phase II";
+  if (p === 1) return "Phase I";
+  if (p != null && p > 0) return "Early clinical";
+  return "Preclinical / research-stage";
+}
+
+export async function fetchChemblDevelopment(smiles: string): Promise<ChemblDevelopment> {
+  const base: ChemblDevelopment = {
+    status: "unavailable", found: false, chemblId: null, prefName: null,
+    phase: "Preclinical / research-stage", withdrawn: false, firstApproval: null,
+    url: null, note: "ChEMBL development stage not queried.",
+  };
+  const s = (smiles ?? "").trim();
+  if (!s) return { ...base, error: "no SMILES" };
+  try {
+    const j = await getJson(`${API_ROOT}/api/chembl/development?smiles=${encodeURIComponent(s)}`);
+    if (!j?.found) {
+      return { ...base, status: "ok", found: false, note: "No ChEMBL record — novel chemotype, no clinical precedent." };
+    }
+    const phase = phaseLabel(j.maxPhase);
+    return {
+      status: "ok", found: true,
+      chemblId: j.chemblId ?? null, prefName: j.prefName ?? null,
+      phase, withdrawn: !!j.withdrawn, firstApproval: j.firstApproval ?? null,
+      url: j.chemblId ? `https://www.ebi.ac.uk/chembl/compound_report_card/${j.chemblId}/` : null,
+      note: `ChEMBL: ${phase}${j.firstApproval ? ` (first approval ${j.firstApproval})` : ""}${j.withdrawn ? " — WITHDRAWN" : ""}.`,
+    };
+  } catch (e: any) {
+    return { ...base, error: e?.message ?? String(e) };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Transparent registry of trusted sources the platform draws on
 // ─────────────────────────────────────────────────────────────────────────
 export interface TrustedSource {

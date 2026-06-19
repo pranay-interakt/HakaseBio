@@ -25,6 +25,7 @@ from models.drug_target import predict_binding
 from models.protein import predict_protein
 from models.admet_ml import (
     predict_admet_ml,
+    predict_admet_ml_batch,
     is_ready as admet_ml_status,
     warmup as admet_ml_warmup,
 )
@@ -262,6 +263,21 @@ def api_predict_admet_ml(req: SmilesRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ADMET-ML prediction failed: {str(e)}")
+
+
+class BatchSmilesRequest(BaseModel):
+    smiles: list[str]
+
+
+@app.post("/predict/admet-ml/batch")
+def api_predict_admet_ml_batch(req: BatchSmilesRequest):
+    """Library-scale ADMET-AI: one model call over a list of SMILES."""
+    try:
+        return sanitize(predict_admet_ml_batch(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ADMET-ML batch failed: {str(e)}")
 
 
 @app.post("/predict/cardiotox")

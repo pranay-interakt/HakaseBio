@@ -6,10 +6,10 @@
  * fail-soft; informational only.
  */
 import { useState, useEffect } from "react";
-import { Library, ExternalLink, ChevronDown, Target as TargetIcon, ShieldCheck } from "lucide-react";
+import { Library, ExternalLink, ChevronDown, Target as TargetIcon, ShieldCheck, FlaskConical } from "lucide-react";
 import {
-  fetchPharosTarget, fetchDailyMedLabel, TRUSTED_SOURCES,
-  type PharosTarget, type DailyMedLabel,
+  fetchPharosTarget, fetchDailyMedLabel, fetchChemblDevelopment, TRUSTED_SOURCES,
+  type PharosTarget, type DailyMedLabel, type ChemblDevelopment,
 } from "@/lib/preclinicalSources";
 
 const TDL_TONE: Record<string, string> = {
@@ -22,11 +22,13 @@ const TDL_TONE: Record<string, string> = {
 export interface PreclinicalEvidenceCardProps {
   targetSymbol?: string;   // gene symbol or UniProt for Pharos
   drugName?: string;       // molecule / matched-drug name for DailyMed
+  smiles?: string;         // structure for ChEMBL development-stage lookup
 }
 
-export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalEvidenceCardProps) {
+export function PreclinicalEvidenceCard({ targetSymbol, drugName, smiles }: PreclinicalEvidenceCardProps) {
   const [pharos, setPharos] = useState<PharosTarget | null>(null);
   const [dailymed, setDailymed] = useState<DailyMedLabel | null>(null);
+  const [chembl, setChembl] = useState<ChemblDevelopment | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [expanded, setExpanded] = useState(false); // collapsed by default to cut clutter
 
@@ -49,6 +51,15 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
     if (n) fetchDailyMedLabel(n).then(r => { if (alive) setDailymed(r); }).catch(() => {});
     return () => { alive = false; };
   }, [drugName, expanded]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    let alive = true;
+    setChembl(null);
+    const s = (smiles ?? "").trim();
+    if (s) fetchChemblDevelopment(s).then(r => { if (alive) setChembl(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, [smiles, expanded]);
 
   return (
     <div className="hk-panel hk-topline overflow-hidden">
@@ -112,6 +123,29 @@ export function PreclinicalEvidenceCard({ targetSymbol, drugName }: PreclinicalE
             <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
               {dailymed.note}{" "}
               {dailymed.url && dailymed.count ? <a href={dailymed.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-cyan-300 hover:text-cyan-200">View label<ExternalLink className="h-2.5 w-2.5" /></a> : null}
+            </p>
+          )}
+        </div>
+        )}
+
+        {/* ChEMBL development stage — bio/translational progression of this structure */}
+        {(chembl == null || chembl.status === "ok") && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <FlaskConical className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-200">Clinical progression · ChEMBL</span>
+            </div>
+            {chembl?.status === "ok" && chembl.found && (
+              <span className={`text-[10px] font-semibold rounded-full border px-2 py-0.5 ${chembl.withdrawn ? "border-red-500/40 bg-red-500/10 text-red-300" : chembl.phase === "Approved drug" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : chembl.phase.startsWith("Phase") || chembl.phase === "Early clinical" ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-violet-500/40 bg-violet-500/10 text-violet-200"}`}>{chembl.withdrawn ? "Withdrawn" : chembl.phase}</span>
+            )}
+          </div>
+          {chembl == null ? (
+            <p className="text-[10px] text-slate-500 mt-1.5">{smiles ? "Checking clinical precedent…" : "Enter a SMILES to check clinical precedent."}</p>
+          ) : (
+            <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+              {chembl.note}{" "}
+              {chembl.url ? <a href={chembl.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-cyan-300 hover:text-cyan-200">ChEMBL<ExternalLink className="h-2.5 w-2.5" /></a> : null}
             </p>
           )}
         </div>

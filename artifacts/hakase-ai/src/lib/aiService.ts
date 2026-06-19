@@ -732,6 +732,24 @@ export async function predictAdmetMl(smiles: string): Promise<MlAdmetResult> {
   return post<MlAdmetResult>("/admet-ml", { smiles });
 }
 
+export interface MlAdmetBatchRow {
+  smiles: string;
+  found: boolean;
+  error?: string;
+  structured?: MlAdmetStructured;
+}
+export interface MlAdmetBatchResult {
+  results: MlAdmetBatchRow[];
+  count: number;
+  ml_available: boolean;
+  model_info: { engine?: string; inference_time_ms?: number; batch_size?: number };
+}
+
+/** Library-scale ADMET-AI — one model call over the whole list of SMILES. */
+export async function predictAdmetMlBatch(smiles: string[]): Promise<MlAdmetBatchResult> {
+  return post<MlAdmetBatchResult>("/admet-ml/batch", { smiles });
+}
+
 export async function predictDiliMl(smiles: string): Promise<DiliMlResult> {
   return post<DiliMlResult>("/dili-ml", { smiles });
 }

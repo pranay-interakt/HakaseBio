@@ -2872,8 +2872,11 @@ export function HakaseAI() {
       {/* Top Navigation Bar */}
       <header className={`h-14 flex items-center px-4 gap-4 shrink-0 z-50 ${lightMode ? 'border-b border-slate-200 bg-white shadow-sm' : 'border-b border-white/8 bg-[#0d0f17]/90 backdrop-blur-md'}`}>
         {/* Logo */}
-        <div className="flex items-center min-w-[150px]">
+        <div className="flex items-center gap-3 min-w-[150px]">
           <img src={hakaseLogo} alt="HakaseAI" className="hk-logo h-10 w-auto object-contain" />
+          <a href="/screen" title="Batch library screening" className="hidden md:inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-medium text-cyan-300 hover:bg-cyan-500/20 transition-colors">
+            <TestTube2 className="w-3 h-3" /> Batch screen
+          </a>
         </div>
 
         {/* Layer Stepper */}
@@ -9536,17 +9539,27 @@ function RegulatoryInsightCard({
                   {fdaLabelStatus === "success" && verified.length > 0 && (
                     <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
                   )}
+                  <span className="px-1.5 py-0.5 rounded text-[8px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">DailyMed (SPL) links</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {namesToShow.map(d => (
-                    <span key={d} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] ${fdaLabelStatus === "success" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-white/5 border-white/10 text-slate-400"}`}>
+                    <a
+                      key={d}
+                      href={`https://dailymed.nlm.nih.gov/dailymed/search.cfm?query=${encodeURIComponent(d)}&labeltype=all`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`Open ${d}'s official FDA label (DailyMed)`}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] transition-colors hover:border-cyan-500/40 ${fdaLabelStatus === "success" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-white/5 border-white/10 text-slate-400"}`}
+                    >
                       {d}
                       {fdaLabelData[d]?.boxed === true && (
                         <span className="px-1 rounded text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">BOXED ⚠</span>
                       )}
-                    </span>
+                      <ArrowUpRight className="w-2.5 h-2.5 opacity-60" />
+                    </a>
                   ))}
                 </div>
+                <p className="text-[8px] text-slate-600 mt-1">openFDA verifies the drug + boxed-warning status; each name links to its official FDA label on DailyMed.</p>
               </div>
             );
           })()}
@@ -10723,6 +10736,7 @@ function Layer1Results({
         <PreclinicalEvidenceCard
           targetSymbol={proteinName || uniprotId}
           drugName={molName || simResults?.molName}
+          smiles={smiles}
         />
       )}
 

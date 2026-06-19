@@ -29,6 +29,35 @@ router.get("/chembl/compound", async (req, res) => {
   }
 });
 
+/**
+ * ChEMBL development stage — how far this exact structure has progressed
+ * clinically. max_phase: 4 = approved, 1-3 = clinical phases, 0/null =
+ * preclinical/research. Bio-relevant translational signal (not a drug label).
+ */
+router.get("/chembl/development", async (req, res) => {
+  const smiles = req.query.smiles as string | undefined;
+  if (!smiles) { res.status(400).json({ error: "Provide ?smiles=<SMILES>" }); return; }
+  try {
+    const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__canonical_smiles__flexmatch=${encodeURIComponent(smiles)}&limit=1`;
+    const up = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+    if (!up.ok) { res.status(up.status).json({ error: `ChEMBL returned ${up.status}` }); return; }
+    const data: any = await up.json();
+    const m = data?.molecules?.[0];
+    if (!m) { res.json({ found: false }); return; }
+    res.json({
+      found: true,
+      chemblId: m.molecule_chembl_id ?? null,
+      prefName: m.pref_name ?? null,
+      maxPhase: m.max_phase ?? null,
+      withdrawn: !!m.withdrawn_flag,
+      firstApproval: m.first_approval ?? null,
+      moleculeType: m.molecule_type ?? null,
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: err?.message ?? "ChEMBL development proxy error" });
+  }
+});
+
 router.get("/chembl/activities", async (req, res) => {
   const chemblId = req.query.chembl_id as string | undefined;
   if (!chemblId) {
