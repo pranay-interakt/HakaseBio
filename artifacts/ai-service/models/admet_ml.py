@@ -271,3 +271,94 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
             "reference": "https://github.com/swansonk14/admet_ai",
         },
     }
+
+
+def predict_admet_ml_batch(smiles_list: list[str], limit: int = 500) -> dict[str, Any]:
+    """Run ADMET-AI over a LIBRARY of SMILES in a single model call.
+
+    ADMET-AI's `model.predict()` natively accepts a list and returns one
+    DataFrame row per molecule, so we run inference ONCE for the whole batch
+    (the single-molecule path's [s, s] duplication hack is unnecessary and
+    wasteful at scale). Each SMILES is RDKit-validated/canonicalised first;
+    invalid ones are returned flagged rather than silently dropped.
+
+    Returns:
+      {
+        "results": [ { "smiles", "found": true, "structured", ... }
+                     | { "smiles", "found": false, "error": "invalid SMILES" } ],
+        "count": <valid count>, "ml_available": bool, "model_info": {...},
+      }
+    """
+    if not isinstance(smiles_list, list) or len(smiles_list) == 0:
+        raise ValueError("smiles_list (non-empty) is required")
+
+    try:
+        from rdkit import Chem as _Chem
+    except Exception:
+        _Chem = None  # type: ignore
+
+    # Validate + canonicalise, preserving original order and de-duplicating.
+    cleaned: list[str] = []
+    valid: list[str] = []          # canonical SMILES sent to the model
+    invalid: list[str] = []
+    seen: set[str] = set()
+    for raw_smi in smiles_list[: max(1, limit)]:
+        s = (raw_smi or "").strip()
+        if not s:
+            invalid.append(raw_smi)
+            continue
+        canon = s
+        if _Chem is not None:
+            mol = _Chem.MolFromSmiles(s)
+            if mol is None:
+                invalid.append(s)
+                continue
+            canon = _Chem.MolToSmiles(mol, canonical=True)
+        if canon in seen:
+            continue
+        seen.add(canon)
+        cleaned.append(s)
+        valid.append(canon)
+
+    if not valid:
+        return {"results": [{"smiles": s, "found": False, "error": "invalid SMILES"} for s in invalid],
+                "count": 0, "ml_available": False, "model_info": {}}
+
+    try:
+        model = _load_model()
+    except Exception as exc:  # noqa: BLE001
+        return {"results": [_fallback_envelope(s, f"model_load_failed: {exc}") | {"found": False} for s in valid],
+                "count": 0, "ml_available": False, "model_info": {}}
+
+    # Pad a size-1 batch to avoid the Chemprop dataset_size<batch_size teardown.
+    query = valid if len(valid) >= 2 else (valid + valid)
+    t0 = time.time()
+    raw = model.predict(smiles=query)
+    inference_time_ms = round((time.time() - t0) * 1000, 1)
+
+    results: list[dict[str, Any]] = []
+    for i, canon in enumerate(valid):
+        try:
+            row = raw.iloc[[i]] if hasattr(raw, "iloc") else raw
+            flat = _normalize_result(row, canon)
+            results.append({
+                "smiles": canon,
+                "found": True,
+                "ml_available": True,
+                "structured": _structured_view(flat),
+            })
+        except Exception as exc:  # noqa: BLE001
+            results.append({"smiles": canon, "found": False, "error": f"normalize_failed: {exc}"})
+    for s in invalid:
+        results.append({"smiles": s, "found": False, "error": "invalid SMILES"})
+
+    return {
+        "results": results,
+        "count": len(valid),
+        "ml_available": True,
+        "model_info": {
+            "engine": "ADMET-AI v2 (Chemprop-RDKit GNN ensemble)",
+            "inference_time_ms": inference_time_ms,
+            "batch_size": len(valid),
+        },
+    }
