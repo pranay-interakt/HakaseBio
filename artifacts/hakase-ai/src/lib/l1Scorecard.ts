@@ -628,11 +628,28 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   );
   dim("Drug-likeness", dlScore, 0.10, "heuristic",
     `QED ${admet.qed_approx.toFixed(2)}, Ro5 violations ${viol}, SA ${admet.saScore.toFixed(1)}`);
-  if (viol >= HARD.lipinskiViolations) {
+  // CHEMOTYPE-AWARE Ro5 gate. Beyond-Rule-of-5 modalities — PROTAC / molecular-
+  // glue degraders, macrocycles, peptidomimetics — INTENTIONALLY break Lipinski
+  // (MW ~700–1100+, high logP, many rotatable bonds). Ro5 is the wrong
+  // developability filter for them, so violations must NOT be a development-
+  // stopping veto; they become a developability WATCH that says "this needs
+  // modality-specific developability work (solubility/permeability/route)",
+  // not "stop". (Doak & Lokey, bRo5 chemical space; Edmondson PROTAC dev rules.)
+  // Only classic small molecules (≤ bRo5) get the hard Ro5 veto.
+  const mw = admet.lipinski.mw;
+  const rotB = admet.lipinski.rotBonds;
+  const beyondRo5 = mw >= 700 || (mw >= 600 && rotB >= 10);
+  if (!beyondRo5 && viol >= HARD.lipinskiViolations) {
     flag({ id: "ro5_hard", label: "Gross drug-likeness failure", severity: "critical",
       source: "Lipinski Ro5", provenance: "heuristic",
       value: `${viol} violations`, threshold: `≥ ${HARD.lipinskiViolations}`,
-      rationale: "Three or more Ro5 violations predict poor oral absorption and high developability risk.", hardNoGo: true });
+      rationale: "Three or more Ro5 violations on a classic small molecule predict poor oral absorption and high developability risk.", hardNoGo: true });
+  } else if (beyondRo5) {
+    flag({ id: "bro5_watch", label: "Beyond-Rule-of-5 / degrader space", severity: "warn",
+      source: "bRo5 developability (Doak/Lokey)", provenance: "heuristic",
+      value: `MW ${mw.toFixed(0)}, ${viol} Ro5 violations, ${rotB} rot. bonds`,
+      threshold: "MW ≥ 700 or MW ≥ 600 & ≥10 rot. bonds",
+      rationale: "Beyond-Rule-of-5 / degrader (PROTAC, molecular glue, macrocycle) chemistry: Ro5 violations are EXPECTED for this modality and are not a hard stop. Developability (solubility, permeability, oral exposure, metabolic stability) needs modality-specific assessment — advance with that as the priority, not a veto.", hardNoGo: false });
   } else if (viol >= WATCH.lipinskiViolations) {
     flag({ id: "ro5_watch", label: "Borderline drug-likeness", severity: "warn",
       source: "Lipinski Ro5", provenance: "heuristic",
