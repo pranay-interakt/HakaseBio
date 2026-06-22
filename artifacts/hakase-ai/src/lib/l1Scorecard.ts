@@ -406,14 +406,45 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   // Per OECD (Q)SAR principle 3, predictions outside the domain are
   // extrapolations and may not drive a development-stopping verdict.
   const es0 = input.evidenceSupport ?? null;
+
+  // ── CHEMOTYPE / MODALITY AWARENESS ─────────────────────────────────────
+  // The hard gates below were written for classic Rule-of-5 small molecules.
+  // Novel modalities — PROTAC / molecular-glue degraders, macrocycles, covalent
+  // inhibitors — are exactly what biotechs bring for a fresh read, and applying
+  // small-molecule assumptions to them produces FALSE stops. Classify once from
+  // data already computed, then route every gate through it:
+  //  • beyondRo5  → the ADMET ML models are OUT of their training domain
+  //    (Doak/Lokey bRo5; a GNN trained on Ro5 space cannot reliably score a
+  //    ~1000-Da degrader) → their predictions are extrapolations, so they
+  //    ESCALATE for an assay rather than issue a confident veto.
+  //  • covalentIntent → the reactive warhead is INTENDED (osimertinib,
+  //    ibrutinib, sotorasib are covalent) → a reactive-electrophile alert is a
+  //    "confirm selectivity" flag, not a hard stop. GENOTOXIC / DNA-reactive
+  //    alerts still veto — that is a real liability in any modality.
+  const _mw = admet.lipinski.mw;
+  const _rotB = admet.lipinski.rotBonds;
+  const beyondRo5 = _mw >= 700 || (_mw >= 600 && _rotB >= 10);
+  const rejectHits = (admet.structuralAlerts?.hits ?? []).filter(h => h.alert.severity === "reject");
+  const genotoxicReject = rejectHits.some(h => h.alert.category === "Genotoxic");
+  const covalentIntent = rejectHits.length > 0 && !genotoxicReject
+    && rejectHits.every(h => h.alert.category === "ReactiveElectrophile"
+      || h.alert.category === "Alkylating" || h.alert.category === "ReactiveMetabolite");
+  const nonClassicChemotype = beyondRo5;
+
+  // A non-classic chemotype is, by definition, outside the ADMET ML models'
+  // applicability domain → force AD confidence to None so their safety
+  // predictions ESCALATE (REVIEW) instead of vetoing on an extrapolation.
   const adConf: CalAdConfidence =
-    ad?.adConfidence ? (ad.adConfidence as CalAdConfidence)
+    nonClassicChemotype ? "None"
+    : ad?.adConfidence ? (ad.adConfidence as CalAdConfidence)
     : es0 ? es0.bestAdConfidence
     : "Low";
   // Kept for the legacy GO-guard below: true when the molecule is demonstrably
-  // out of the applicability domain (explicit AD label or no measured support).
+  // out of the applicability domain (explicit AD label, no measured support, or
+  // a non-classic chemotype the models were never trained on).
   const outOfDomain =
-    (AD_DISABLES_HARD_VETO && ad?.adLabel === "Out-of-domain") || adConf === "None";
+    (AD_DISABLES_HARD_VETO && ad?.adLabel === "Out-of-domain") || adConf === "None"
+    || nonClassicChemotype;
   const fitTable = input.calibration ?? null;
   // Orthogonal contradiction for the hERG veto, built from MEASURED ChEMBL
   // analogues — if they say "weak/non-blocker" we withhold a high-ML-prob veto.
@@ -635,10 +666,8 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   // stopping veto; they become a developability WATCH that says "this needs
   // modality-specific developability work (solubility/permeability/route)",
   // not "stop". (Doak & Lokey, bRo5 chemical space; Edmondson PROTAC dev rules.)
-  // Only classic small molecules (≤ bRo5) get the hard Ro5 veto.
-  const mw = admet.lipinski.mw;
-  const rotB = admet.lipinski.rotBonds;
-  const beyondRo5 = mw >= 700 || (mw >= 600 && rotB >= 10);
+  // Only classic small molecules (≤ bRo5) get the hard Ro5 veto. (beyondRo5 is
+  // classified once in the chemotype block above.)
   if (!beyondRo5 && viol >= HARD.lipinskiViolations) {
     flag({ id: "ro5_hard", label: "Gross drug-likeness failure", severity: "critical",
       source: "Lipinski Ro5", provenance: "heuristic",
@@ -647,7 +676,7 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   } else if (beyondRo5) {
     flag({ id: "bro5_watch", label: "Beyond-Rule-of-5 / degrader space", severity: "warn",
       source: "bRo5 developability (Doak/Lokey)", provenance: "heuristic",
-      value: `MW ${mw.toFixed(0)}, ${viol} Ro5 violations, ${rotB} rot. bonds`,
+      value: `MW ${_mw.toFixed(0)}, ${viol} Ro5 violations, ${_rotB} rot. bonds`,
       threshold: "MW ≥ 700 or MW ≥ 600 & ≥10 rot. bonds",
       rationale: "Beyond-Rule-of-5 / degrader (PROTAC, molecular glue, macrocycle) chemistry: Ro5 violations are EXPECTED for this modality and are not a hard stop. Developability (solubility, permeability, oral exposure, metabolic stability) needs modality-specific assessment — advance with that as the priority, not a veto.", hardNoGo: false });
   } else if (viol >= WATCH.lipinskiViolations) {
@@ -658,14 +687,31 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   }
 
   // ── 11. STRUCTURAL HARD-REJECT ALERTS (deterministic chemistry) ────────
+  // CHEMOTYPE-AWARE: a GENOTOXIC / DNA-reactive reject is a real stop in any
+  // modality → hard veto. But a reactive-electrophile / alkylating reject on a
+  // COVALENT-BY-DESIGN inhibitor (the only rejects are electrophilic warheads,
+  // none genotoxic) is the INTENDED mechanism — covalent drugs (osimertinib,
+  // ibrutinib, sotorasib, dacomitinib) all carry these motifs. So that becomes
+  // a "confirm covalent selectivity / off-target reactivity" WATCH, not a veto.
   const sa = admet.structuralAlerts;
   if (sa?.scanRan && sa.rejectCount > 0) {
-    flag({ id: "struct_hard", label: "Structural hard-reject alert", severity: "critical",
-      source: "Structural alert scan (Brenk/BMS/NIH)", provenance: "experimental",
-      value: sa.rejectNames.slice(0, 3).join("; ") + (sa.rejectCount > 3 ? " +more" : ""),
-      threshold: "any hard-reject motif",
-      rationale: "Reactive / genotoxic substructures are deterministic chemical liabilities that veto advancement irrespective of probabilistic ML scores.",
-      hardNoGo: true });
+    if (covalentIntent) {
+      flag({ id: "covalent_warhead_watch", label: "Covalent warhead — confirm selectivity", severity: "warn",
+        source: "Structural alert scan (reactive-electrophile, no genotoxic)", provenance: "experimental",
+        value: sa.rejectNames.slice(0, 3).join("; ") + (sa.rejectCount > 3 ? " +more" : ""),
+        threshold: "reactive-electrophile motif (no DNA-reactive alert)",
+        rationale: "Reactive-electrophile motif with NO genotoxic alert — consistent with an intended covalent warhead (the mechanism of osimertinib, ibrutinib, sotorasib). Not a hard stop: confirm on-target covalent selectivity and characterise off-target/proteome reactivity (e.g. activity-based protein profiling) before advancing.",
+        hardNoGo: false });
+    } else {
+      flag({ id: "struct_hard", label: "Structural hard-reject alert", severity: "critical",
+        source: "Structural alert scan (Brenk/BMS/NIH)", provenance: "experimental",
+        value: sa.rejectNames.slice(0, 3).join("; ") + (sa.rejectCount > 3 ? " +more" : ""),
+        threshold: "any hard-reject motif",
+        rationale: genotoxicReject
+          ? "Genotoxic / DNA-reactive substructure — a deterministic chemical liability that vetoes advancement in any modality (ICH S2)."
+          : "Reactive / genotoxic substructures are deterministic chemical liabilities that veto advancement irrespective of probabilistic ML scores.",
+        hardNoGo: true });
+    }
   }
 
   // ── 11b. REACTIVE-METABOLITE CRITICAL ALERTS (deterministic chemistry) ──
@@ -678,6 +724,26 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
       threshold: "any critical bioactivation motif",
       rationale: "Bioactivation to reactive metabolites is a deterministic chemical liability linked to idiosyncratic hepatotoxicity and IADRs; a critical alert vetoes advancement irrespective of probabilistic ML scores.",
       hardNoGo: true });
+  }
+
+  // ── 11c. CHEMOTYPE TRANSPARENCY (info — never changes the verdict) ──────
+  // Tell the reviewer which modality rules applied, so they can see WHY the
+  // small-molecule hard gates were relaxed for this molecule.
+  if (nonClassicChemotype) {
+    flag({ id: "chemotype_bro5", label: "Non-classic chemotype — ADMET models extrapolating", severity: "info",
+      source: "Chemotype classifier", provenance: "heuristic",
+      value: `MW ${_mw.toFixed(0)}, ${_rotB} rot. bonds (beyond Rule-of-5)`,
+      threshold: "outside the ADMET ML training domain",
+      rationale: "Beyond-Rule-of-5 / degrader / macrocycle chemistry sits outside the chemical space the ADMET ML models were trained on, so their predictions are EXTRAPOLATIONS. Safety signals therefore escalate for an orthogonal assay rather than issuing a confident stop, Ro5 is not applied as a veto, and confidence is capped. Treat the verdict as directional and confirm in vitro.",
+      hardNoGo: false });
+  }
+  if (covalentIntent) {
+    flag({ id: "chemotype_covalent", label: "Covalent-by-design chemotype", severity: "info",
+      source: "Chemotype classifier", provenance: "heuristic",
+      value: "reactive-electrophile warhead, no genotoxic alert",
+      threshold: "intended covalent mechanism",
+      rationale: "Reactive-electrophile motif with no DNA-reactive alert — treated as an intended covalent warhead, so the reactive-group alert is a confirm-selectivity flag rather than a hard stop. Characterise on-/off-target covalent selectivity (e.g. ABPP) before advancing.",
+      hardNoGo: false });
   }
 
   // ── 12. CYP DDI (metabolism modifier WATCH) ────────────────────────────
@@ -769,6 +835,9 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     const trulyNovelNoData = (es.noveltyScore ?? 0) > 0.9 && es.readAcrossCoverage <= 0;
     if (trulyNovelNoData) confidenceRaw = Math.min(confidenceRaw, 0.6); // honest ceiling for blind extrapolation
   }
+  // Non-classic chemotype (bRo5/degrader/macrocycle): the ADMET models are
+  // extrapolating, so cap confidence — the verdict is directional, not calibrated.
+  if (nonClassicChemotype) confidenceRaw = Math.min(confidenceRaw, 0.55);
   const confidence = +confidenceRaw.toFixed(2);
   const confidenceLabel: L1Scorecard["confidenceLabel"] =
     confidence >= 0.75 ? "High" : confidence >= 0.55 ? "Moderate" : "Low";
