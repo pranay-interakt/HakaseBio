@@ -844,20 +844,22 @@ export function HakaseAI() {
     fetchChEMBLTargets(currentSmiles)
       .then((result) => {
         if (chemblLookupRef.current !== currentSmiles) return;
-        if (result.status === "found") {
-          if (result.compoundName && result.compoundName !== result.compoundChemblId) {
-            setChemblCompoundName(result.compoundName);
-            setChemblCompoundId(result.compoundChemblId);
-            if (!molNameManual.current) {
-              setMolName(result.compoundName.charAt(0).toUpperCase() + result.compoundName.slice(1).toLowerCase());
-            }
-          } else if (result.compoundChemblId) {
-            setChemblCompoundId(result.compoundChemblId);
+        // Surface the identity whenever the compound RESOLVED — even if the
+        // target/activity fetch returned nothing (e.g. EBI degraded). Previously
+        // the name was only set on status "found", so a known drug whose
+        // activities couldn't load was mislabelled "novel".
+        if (result.compoundName && result.compoundName !== result.compoundChemblId) {
+          setChemblCompoundName(result.compoundName);
+          if (result.compoundChemblId) setChemblCompoundId(result.compoundChemblId);
+          if (!molNameManual.current) {
+            setMolName(result.compoundName.charAt(0).toUpperCase() + result.compoundName.slice(1).toLowerCase());
           }
-          if (result.targets.length > 0) {
-            const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
-            setChemblSuggestions(converted.length > 0 ? converted : []);
-          }
+        } else if (result.compoundChemblId) {
+          setChemblCompoundId(result.compoundChemblId);
+        }
+        if (result.status === "found" && result.targets.length > 0) {
+          const converted = convertChEMBLHitsToSuggestions(result.targets, result.compoundName);
+          setChemblSuggestions(converted.length > 0 ? converted : []);
         } else {
           setChemblSuggestions([]);
         }
@@ -870,6 +872,24 @@ export function HakaseAI() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activatedSmiles, activatedMolProps?.isValid]);
+
+  // ── Reliable identification override: the known-drug lookup (/api/ai/known-
+  // drug) resolves via SERVER-SIDE RDKit InChIKey + the offline seed, so it
+  // identifies common drugs even when EBI's ChEMBL API is down and the
+  // similarity/target-search path returns nothing. When it matches, it is the
+  // authoritative compound name/ID for the input panel — this is what stops a
+  // known drug (e.g. terfenadine) being mislabelled "novel" during an EBI outage.
+  useEffect(() => {
+    if (!knownDrug?.matched) return;
+    const d = knownDrug.matched_drug ?? {};
+    const id = (d as any).chembl_id as string | undefined;
+    const nm = (d as any).name as string | undefined;
+    if (id) setChemblCompoundId(id);
+    if (nm) {
+      setChemblCompoundName(nm);
+      if (!molNameManual.current) setMolName(nm.charAt(0).toUpperCase() + nm.slice(1).toLowerCase());
+    }
+  }, [knownDrug]);
 
   // ML-predicted polypharmacology panel — fires ONLY when:
   //   (a) ChEMBL lookup has returned (we're past loading), AND

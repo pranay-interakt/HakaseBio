@@ -81,6 +81,19 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
           method: "exact",
         };
       }
+      // Compound RESOLVED (api-server seed / InChIKey) but no targets came back
+      // (activities failed / none) — STILL return its identity so the input
+      // panel shows the name instead of falling through and mislabelling it
+      // "novel". Only fall through to similarity when nothing resolved at all.
+      if (data.compoundChemblId || data.compoundName) {
+        return {
+          compoundChemblId: data.compoundChemblId ?? "",
+          compoundName: data.compoundName ?? "",
+          targets: [],
+          status: "no_targets",
+          method: "exact",
+        };
+      }
     }
   } catch (e: any) {
     // If the FIRST ChEMBL call timed out / aborted, the network or upstream
