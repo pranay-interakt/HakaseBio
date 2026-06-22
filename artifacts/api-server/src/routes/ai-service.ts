@@ -217,6 +217,22 @@ router.post("/ai/applicability-domain", async (req, res) => {
   }
 });
 
+// L1 — Lookup-first known-drug resolver (live ChEMBL InChIKey). Returns the
+// measured published profile so approved/withdrawn drugs bypass the ML veto stack.
+router.post("/ai/known-drug", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/known-drug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 // L1 — Peptide-native property engine (physicochemical, stability, permeability, AMP, developability)
 router.post("/ai/peptide", async (req, res) => {
   try {
