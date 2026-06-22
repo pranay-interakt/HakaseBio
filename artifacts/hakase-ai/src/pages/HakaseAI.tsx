@@ -122,6 +122,7 @@ import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter"
 import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
 import { computeL1Scorecard, type L1Scorecard, type EvidenceSupport, type KnownDrugLookup, type ApplicabilityDomain } from "@/lib/l1Scorecard";
 import { API_ROOT } from "@/lib/apiBase";
+import { buildL1ValidationReport, type L1ValidationReport } from "@/lib/l1OutputValidation";
 import { EvidenceNoveltyPanel } from "@/components/EvidenceNoveltyPanel";
 import { BenefitRiskCard } from "@/components/BenefitRiskCard";
 import { PreclinicalEvidenceCard } from "@/components/PreclinicalEvidenceCard";
@@ -1640,6 +1641,21 @@ export function HakaseAI() {
         : null,
     });
   }, [simResults, inVitroResults, mlOverlay, evidenceSupport, knownDrugLookup, applicabilityDomain, reactiveMets]);
+
+  // Per-output validation — how trustworthy is EACH L1 number (provenance,
+  // model benchmark metric, applicability domain, sanity, tier). Annotation
+  // only; never changes a value or the verdict.
+  const validationReport: L1ValidationReport | null = useMemo(() => {
+    if (!simResults || !inVitroResults) return null;
+    return buildL1ValidationReport({
+      admet: simResults,
+      inVitro: inVitroResults,
+      overlay: mlOverlay,
+      applicabilityDomain,
+      knownDrugMatched: !!knownDrug?.matched,
+      evidenceSupport,
+    });
+  }, [simResults, inVitroResults, mlOverlay, applicabilityDomain, knownDrug, evidenceSupport]);
 
   // Single canonical L1 verdict used by EVERY L1 display and recommendation in
   // this component. The scorecard is now the SINGLE SOURCE OF TRUTH: it folds
@@ -5744,6 +5760,7 @@ export function HakaseAI() {
                       extChEMBL={extChEMBL}
                       mlAdmet={admetMl}
                       cardiotoxMl={cardiotoxMl}
+                      validationReport={validationReport}
                       onEvidence={setEvidenceSupport}
                       onSelectTarget={(uid) => {
                         uniprotManual.current = true;
@@ -10489,6 +10506,7 @@ function Layer1Results({
   extChEMBL,
   mlAdmet,
   cardiotoxMl,
+  validationReport,
   onEvidence,
 }: {
   smiles: string;
@@ -10522,6 +10540,7 @@ function Layer1Results({
   extChEMBL?: import("@/lib/chemblActivity").ChEMBLMultiTargetResult | null;
   mlAdmet?: MlAdmetResult | null;
   cardiotoxMl?: CardiotoxResult | null;
+  validationReport?: L1ValidationReport | null;
   onEvidence?: (e: EvidenceSupport | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState("ml-admet");
@@ -10877,7 +10896,7 @@ function Layer1Results({
           a deliberate "deep dive" zone rather than loose chrome. */}
       <div className="flex items-center gap-2 pt-1">
         <span className="hk-eyebrow">Detailed analyses</span>
-        <span className="text-[10px] text-slate-500">8 in-vitro views · pick one</span>
+        <span className="text-[10px] text-slate-500">9 in-vitro views · pick one</span>
       </div>
       <div className="hk-tabbar flex-wrap">
         {[
@@ -10889,6 +10908,7 @@ function Layer1Results({
           { id: "mechanism",     label: "Mechanism",     icon: GitBranch },
           { id: "bioactivation", label: "Bioactivation", icon: Zap },
           { id: "similar",       label: "Similar Compounds", icon: Beaker },
+          { id: "validation",    label: "Validation",    icon: CheckCircle2 },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -11513,6 +11533,86 @@ function Layer1Results({
               <Beaker className="w-7 h-7" />
               <p className="text-[11px]">Enter a valid SMILES to find similar known compounds.</p>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Validation — how trustworthy is every L1 output ── */}
+      {activeTab === "validation" && (
+        <div className="hk-card space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="hk-display text-[16px] text-slate-100">Output validation</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">Per-endpoint: provenance, model benchmark accuracy, applicability domain, sanity, and validation tier.</p>
+            </div>
+            {validationReport && (
+              <Badge className={`text-[8px] ${validationReport.overallConfidence === "High" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : validationReport.overallConfidence === "Moderate" ? "bg-amber-500/10 text-amber-300 border-amber-500/20" : "bg-red-500/10 text-red-300 border-red-500/20"}`}>
+                {validationReport.overallConfidence} confidence
+              </Badge>
+            )}
+          </div>
+
+          {!validationReport && (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
+              <CheckCircle2 className="w-8 h-8" />
+              <p className="text-[11px]">Run the simulation to validate the outputs.</p>
+            </div>
+          )}
+
+          {validationReport && (
+            <>
+              <div className="text-[11px] rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-slate-300">{validationReport.headline}</div>
+              {/* tier legend */}
+              <div className="flex flex-wrap gap-1.5 text-[8px]">
+                {[
+                  ["experimental","measured / deterministic","text-emerald-300 border-emerald-500/30"],
+                  ["model-validated","real ML, in-domain","text-cyan-300 border-cyan-500/30"],
+                  ["directional","heuristic — rank only","text-amber-300 border-amber-500/30"],
+                  ["extrapolated","ML out-of-domain","text-orange-300 border-orange-500/30"],
+                  ["unreliable","below-baseline model","text-red-300 border-red-500/30"],
+                ].map(([k,desc,cls]) => (
+                  <span key={k} className={`px-1.5 py-0.5 rounded-full border ${cls} bg-white/5`}>{k} · {desc}</span>
+                ))}
+              </div>
+              {(["Efficacy","Absorption","Distribution","Metabolism","Safety","Developability"] as const).map(group => {
+                const rows = validationReport.records.filter(r => r.group === group);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={group}>
+                    <div className="hk-eyebrow mb-1.5">{group}</div>
+                    <div className="space-y-1">
+                      {rows.map(r => {
+                        const tcls = r.tier === "experimental" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/5"
+                          : r.tier === "model-validated" ? "text-cyan-300 border-cyan-500/30 bg-cyan-500/5"
+                          : r.tier === "directional" ? "text-amber-300 border-amber-500/30 bg-amber-500/5"
+                          : r.tier === "extrapolated" ? "text-orange-300 border-orange-500/30 bg-orange-500/5"
+                          : "text-red-300 border-red-500/30 bg-red-500/10";
+                        return (
+                          <div key={r.endpoint} className={`border rounded-lg px-2.5 py-1.5 ${tcls}`}>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] text-slate-100 font-medium">{r.endpoint}</span>
+                              <span className="hk-chip-mono text-[10px] text-slate-300">{r.value}</span>
+                              <span className="ml-auto text-[8px] uppercase tracking-wide font-semibold">{r.tier}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5 text-[8px] text-slate-500">
+                              <span className="px-1 py-0.5 rounded bg-white/5">{r.provenance}</span>
+                              {r.modelMetric && <span className="hk-chip-mono">{r.modelMetric}</span>}
+                              {r.applicabilityDomain && <span>· {r.applicabilityDomain}</span>}
+                              <span>· sanity {r.sanity}</span>
+                              {r.orthogonal && <span>· {r.orthogonal}</span>}
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-0.5 leading-relaxed">{r.howValidated}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="text-[9px] text-slate-600 leading-relaxed">
+                Validation is annotation only — it never changes a value or the verdict. Metrics are the models' published TDC benchmark accuracy (AUROC/R²), not a claim about this specific molecule. "Unreliable" = the model scores below baseline on its own benchmark (e.g. Vdss, half-life) — do not rely on the absolute value.
+              </p>
+            </>
           )}
         </div>
       )}
