@@ -15,6 +15,7 @@ import opentargetsRouter  from "./opentargets";   // target-disease evidence
 import rcsbPdbRouter      from "./rcsb-pdb";       // crystal structure templates
 import fdaPsgRouter       from "./fda-psg";         // FDA PSG / BE intelligence
 import preclinicalRouter  from "./preclinical";    // NCATS Pharos + DailyMed (FDA SPL)
+import validationRouter   from "./validation";     // continuous-validation feedback log
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(opentargetsRouter);   // /opentargets/*
 router.use(rcsbPdbRouter);       // /rcsb/*
 router.use(fdaPsgRouter);        // /fda-psg/*
 router.use(preclinicalRouter);   // /preclinical/pharos, /preclinical/dailymed
+router.use(validationRouter);    // /validation/feedback (POST append, GET summary)
 
 export default router;

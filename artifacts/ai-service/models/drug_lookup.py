@@ -38,12 +38,37 @@ import logging
 import threading
 from typing import Any, Optional
 
+import requests
 from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
 
 from data.known_drugs import KNOWN_DRUGS, KnownDrug
 
 logger = logging.getLogger(__name__)
+
+# Live ChEMBL — the vendored KNOWN_DRUGS table is intentionally empty (no
+# hardcoded answers), so "is this a known drug?" is resolved against ChEMBL's
+# curated molecule registry by InChIKey. A compound only counts as a KNOWN DRUG
+# (and is allowed to bypass the ML safety stack) when ChEMBL says it reached the
+# clinic — max_phase >= 1 — or was withdrawn. Pure research compounds (max_phase
+# 0/null) return None so the normal ML/heuristic path still runs.
+_CHEMBL_BASE = "https://www.ebi.ac.uk/chembl/api/data"
+_CHEMBL_HEADERS = {"Accept": "application/json", "User-Agent": "HakaseAI-DrugLookup/1.0"}
+_CHEMBL_TIMEOUT = 8.0
+_CHEMBL_RETRIES = 2
+# Only the fields the lookup needs — keeps the ChEMBL payload tiny (~200 B vs a
+# multi-KB full record) so the call is fast and does not intermittently time out
+# (the large full record is what was flipping a known drug NO-GO ↔ REVIEW between
+# runs). NOTE: ChEMBL's `only=` only accepts a subset of fields for this endpoint
+# — molecule_chembl_id, pref_name, max_phase, withdrawn_flag are valid; adding
+# first_approval / withdrawn_reason etc. returns HTTP 500, so they are omitted
+# (the veto is driven by withdrawn_flag, and _chembl_to_kd degrades gracefully).
+_CHEMBL_FIELDS = "molecule_chembl_id,pref_name,max_phase,withdrawn_flag"
+# In-process cache of POSITIVE matches keyed by InChIKey. Once a structure has
+# resolved to a known drug it stays resolved for the life of the process, so a
+# later transient ChEMBL hiccup can never silently downgrade the verdict. Misses
+# are NOT cached (a transient failure must be retryable, not remembered as "novel").
+_LOOKUP_CACHE: dict[str, dict[str, Any]] = {}
 
 # ── Lazy index — built once on first lookup ─────────────────────────────────
 
@@ -82,9 +107,38 @@ def _mol_fp(mol) -> Optional[DataStructs.ExplicitBitVect]:
         return None
 
 
+def _load_seed_index() -> int:
+    """Load the vendored known-drug SEED — a snapshot of REAL ChEMBL records
+    (InChIKey-keyed) so the classic withdrawn set + common approved drugs resolve
+    INSTANTLY and OFFLINE. This is what keeps identification + the NO-GO verdict
+    working when EBI's live API is degraded (frequent HTTP 500s). Each entry is a
+    verified ChEMBL record (chembl_id + withdrawn_flag), not a fabricated value;
+    live ChEMBL remains the fallback for anything not in the seed.
+    Indexed directly by the stored InChIKey — no RDKit needed for the seed."""
+    import os, json
+    path = os.path.join(os.path.dirname(__file__), "..", "data", "known_drug_seed.json")
+    try:
+        with open(path) as f:
+            drugs = (json.load(f) or {}).get("drugs", [])
+    except Exception as e:  # noqa: BLE001 — seed is best-effort; live ChEMBL still works
+        logger.info("drug_lookup: no seed index loaded (%s)", e)
+        return 0
+    n = 0
+    for kd in drugs:
+        ik = kd.get("inchikey")
+        if not ik:
+            continue
+        _BY_INCHIKEY[ik] = kd
+        _BY_INCHIKEY_FIRSTBLOCK.setdefault(ik.split("-")[0], kd)
+        n += 1
+    return n
+
+
 def _build_index() -> None:
-    """One-time index build. Computes InChIKey + ECFP4 for every known drug."""
+    """One-time index build. Loads the vendored seed (instant, offline) and
+    computes InChIKey + ECFP4 for any locally vendored KNOWN_DRUGS records."""
     global _INDEX_READY
+    seeded = _load_seed_index()
     skipped = 0
     for kd in KNOWN_DRUGS:
         smi = kd.get("smiles", "")
@@ -105,7 +159,8 @@ def _build_index() -> None:
             _KD_LIST.append(kd)
             _KD_FPS.append(fp)
     logger.info(
-        "drug_lookup: indexed %d known drugs (%d skipped)", len(_KD_LIST), skipped
+        "drug_lookup: indexed %d seed + %d vendored known drugs (%d skipped)",
+        seeded, len(_KD_LIST), skipped,
     )
     _INDEX_READY = True
 
@@ -122,11 +177,121 @@ def _ensure_index() -> None:
 # ── Public API ──────────────────────────────────────────────────────────────
 
 
+def _chembl_to_kd(mol: dict[str, Any]) -> Optional[KnownDrug]:
+    """Map a ChEMBL molecule record → a KnownDrug envelope record.
+
+    Returns None when the molecule is NOT a clinical-stage / approved /
+    withdrawn drug (max_phase < 1 and not withdrawn) — i.e. a research-only
+    ChEMBL compound, which must still go through the ML safety stack.
+
+    No values are fabricated: status and withdrawal text come straight from
+    ChEMBL's curated fields.
+    """
+    chembl_id = mol.get("molecule_chembl_id")
+    withdrawn = bool(mol.get("withdrawn_flag"))
+    max_phase = mol.get("max_phase")
+    try:
+        max_phase_num = float(max_phase) if max_phase is not None else 0.0
+    except (TypeError, ValueError):
+        max_phase_num = 0.0
+
+    if not withdrawn and max_phase_num < 1:
+        return None  # research compound, not a known drug
+
+    if withdrawn:
+        status = "withdrawn"
+    elif max_phase_num >= 4:
+        status = "approved"
+    else:
+        status = "investigational"
+
+    liabilities: list[dict[str, Any]] = []
+    withdrawal_reason = None
+    if withdrawn:
+        reason = mol.get("withdrawn_reason")
+        year = mol.get("withdrawn_year")
+        country = mol.get("withdrawn_country")
+        parts = [p for p in (reason, country, str(year) if year else None) if p]
+        withdrawal_reason = "; ".join(parts) if parts else "Withdrawn from market (ChEMBL withdrawn_flag)"
+        liabilities.append({
+            "endpoint": "Market withdrawal",
+            "measured": 0,
+            "valueText": withdrawal_reason,
+            "source": f"ChEMBL {chembl_id}" if chembl_id else "ChEMBL",
+            "severity": "veto",
+        })
+
+    return {
+        "name": mol.get("pref_name") or chembl_id,
+        "status": status,
+        "max_phase": max_phase_num,
+        "first_approval": mol.get("first_approval"),
+        "chembl_id": chembl_id,
+        "withdrawal_reason": withdrawal_reason,
+        "liabilities": liabilities,
+    }
+
+
+def _max_phase_num(mol: dict[str, Any]) -> float:
+    try:
+        mp = mol.get("max_phase")
+        return float(mp) if mp is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _drug_rank(mol: dict[str, Any]) -> tuple[int, float]:
+    """Ranking key for choosing the most drug-like ChEMBL record among several
+    that share an InChIKey connectivity block. A withdrawn or higher-max_phase
+    record IS the drug we want to recognise; research-only stereo/tautomer
+    entries (max_phase None/0) rank lowest."""
+    return (1 if mol.get("withdrawn_flag") else 0, _max_phase_num(mol))
+
+
+def _chembl_query(params: str) -> Optional[KnownDrug]:
+    """Run a ChEMBL molecule.json query and map the BEST drug-like hit to a
+    KnownDrug. ChEMBL frequently holds several records for one structure — the
+    racemate, each enantiomer, salts, research duplicates — and the exact /
+    connectivity-block match can land on a max_phase=0 research entry while the
+    actual approved/withdrawn drug sits right beside it (e.g. cisapride: exact →
+    CHEMBL560739 max_phase None, while CHEMBL1729 is the withdrawn drug). So we
+    fetch several and pick the most drug-like (withdrawn, then highest max_phase).
+    Any network/parse failure returns None (→ caller falls through to ML)."""
+    # limit=10 is plenty to surface the drug record among stereo/salt variants;
+    # combined with only=<fields> the payload stays small and the call is fast.
+    url = f"{_CHEMBL_BASE}/molecule.json?{params}&only={_CHEMBL_FIELDS}&limit=10"
+    last_err: Any = None
+    for attempt in range(_CHEMBL_RETRIES):
+        try:
+            resp = requests.get(url, headers=_CHEMBL_HEADERS, timeout=_CHEMBL_TIMEOUT)
+            if not resp.ok:
+                last_err = f"HTTP {resp.status_code}"
+                continue
+            molecules = resp.json().get("molecules") or []
+            if not molecules:
+                return None  # genuine miss (query succeeded, no record)
+            best = max(molecules, key=_drug_rank)
+            return _chembl_to_kd(best)
+        except Exception as e:  # noqa: BLE001 — transient; retry then fall through
+            last_err = e
+    logger.info("drug_lookup: ChEMBL query failed (%s) — falling through to ML", last_err)
+    return None
+
+
 def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
     """Return measured-data envelope if the query matches a known drug.
 
-    Returns None on no-match so the caller can fall through to ML / heuristic
-    paths. Returns a dict with the following shape on a hit:
+    Resolution order:
+      0. vendored in-memory index (empty by default; honoured if repopulated)
+      1. live ChEMBL exact InChIKey  → match_type "exact"
+      2. live ChEMBL InChIKey first-block (stereo/salt variant) → "stereo-variant"
+      3. vendored Tanimoto NN (only if the index was populated) → close/structural
+
+    A ChEMBL hit only counts when ChEMBL marks the molecule as clinical-stage
+    (max_phase >= 1) or withdrawn — research compounds return None so the ML
+    safety stack still runs.
+
+    Returns None on no-match. On a hit returns:
       {
         "match_type": "exact" | "stereo-variant" | "close-analog" | "structural-analog",
         "match_confidence": float,
@@ -143,31 +308,47 @@ def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
     if mol is None:
         return None
 
-    _ensure_index()
-
-    # ── Tier 1: exact InChIKey ──────────────────────────────────────────────
     ikey = Chem.MolToInchiKey(mol)
-    if ikey in _BY_INCHIKEY:
-        kd = _BY_INCHIKEY[ikey]
-        return _envelope(kd, "exact", 1.0, 1.0)
-
-    # ── Tier 2: first-block InChIKey (stereo-variant) ───────────────────────
     fb = ikey.split("-")[0]
-    if fb in _BY_INCHIKEY_FIRSTBLOCK:
-        kd = _BY_INCHIKEY_FIRSTBLOCK[fb]
-        return _envelope(kd, "stereo-variant", 0.95, None)
 
-    # ── Tier 3–4: Tanimoto NN search ────────────────────────────────────────
-    query_fp = _mol_fp(mol)
-    if query_fp is None or not _KD_FPS:
-        return None
-    sims = DataStructs.BulkTanimotoSimilarity(query_fp, _KD_FPS)
-    best_i = max(range(len(sims)), key=lambda i: sims[i])
-    best_sim = float(sims[best_i])
-    if best_sim >= _CLOSE_THR:
-        return _envelope(_KD_LIST[best_i], "close-analog", 0.85, best_sim)
-    if best_sim >= _STRUCT_THR:
-        return _envelope(_KD_LIST[best_i], "structural-analog", 0.70, best_sim)
+    # ── Cache: a once-resolved known drug stays resolved (stability) ─────────
+    cached = _LOOKUP_CACHE.get(ikey)
+    if cached is not None:
+        return cached
+
+    # Cache only POSITIVE matches — a transient miss must stay retryable.
+    def _hit(env: dict[str, Any]) -> dict[str, Any]:
+        _LOOKUP_CACHE[ikey] = env
+        return env
+
+    # ── Tier 0: vendored index (empty by default) ───────────────────────────
+    _ensure_index()
+    if ikey in _BY_INCHIKEY:
+        return _hit(_envelope(_BY_INCHIKEY[ikey], "exact", 1.0, 1.0))
+    if fb in _BY_INCHIKEY_FIRSTBLOCK:
+        return _hit(_envelope(_BY_INCHIKEY_FIRSTBLOCK[fb], "stereo-variant", 0.95, None))
+
+    # ── Tier 1: live ChEMBL exact InChIKey ──────────────────────────────────
+    kd = _chembl_query(f"molecule_structures__standard_inchi_key__exact={ikey}")
+    if kd is not None:
+        return _hit(_envelope(kd, "exact", 1.0, 1.0))
+
+    # ── Tier 2: live ChEMBL stereo-variant (InChIKey connectivity block) ─────
+    kd = _chembl_query(f"molecule_structures__standard_inchi_key__istartswith={fb}-")
+    if kd is not None:
+        return _hit(_envelope(kd, "stereo-variant", 0.95, None))
+
+    # ── Tier 3–4: vendored Tanimoto NN (only if the index was populated) ─────
+    if _KD_FPS:
+        query_fp = _mol_fp(mol)
+        if query_fp is not None:
+            sims = DataStructs.BulkTanimotoSimilarity(query_fp, _KD_FPS)
+            best_i = max(range(len(sims)), key=lambda i: sims[i])
+            best_sim = float(sims[best_i])
+            if best_sim >= _CLOSE_THR:
+                return _hit(_envelope(_KD_LIST[best_i], "close-analog", 0.85, best_sim))
+            if best_sim >= _STRUCT_THR:
+                return _hit(_envelope(_KD_LIST[best_i], "structural-analog", 0.70, best_sim))
 
     return None
 

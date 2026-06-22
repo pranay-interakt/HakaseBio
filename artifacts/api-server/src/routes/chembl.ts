@@ -76,6 +76,27 @@ async function cachedFetch(
 }
 
 
+// ─── Offline-first known-drug seed ────────────────────────────────────────
+// A vendored snapshot of REAL ChEMBL records keyed by InChIKey connectivity
+// block (the first InChIKey segment, so flat/stereo/salt inputs all match). It
+// lets the common withdrawn + approved drugs resolve INSTANTLY even when EBI's
+// live ChEMBL API is degraded (it returns frequent HTTP 500s). Mirrors
+// ai-service/data/known_drug_seed.json; live ChEMBL stays the fallback for
+// anything not seeded. Each entry is a verified ChEMBL record, not fabricated.
+const KNOWN_DRUG_SEED: Record<string, { molecule_chembl_id: string; pref_name: string; max_phase: number; withdrawn_flag: boolean }> = {
+  "BSYNRYMUTXBXSQ": { molecule_chembl_id: "CHEMBL25", pref_name: "ASPIRIN", max_phase: 4.0, withdrawn_flag: false },
+  "SEERZIQQUAZTOL": { molecule_chembl_id: "CHEMBL1477", pref_name: "CERIVASTATIN", max_phase: 4.0, withdrawn_flag: true },
+  "DCSUBABJRXZOMT": { molecule_chembl_id: "CHEMBL1729", pref_name: "CISAPRIDE", max_phase: 4.0, withdrawn_flag: true },
+  "XGALLCVXEZPNRQ": { molecule_chembl_id: "CHEMBL939", pref_name: "GEFITINIB", max_phase: 4.0, withdrawn_flag: false },
+  "HEFNNWSXXWATRW": { molecule_chembl_id: "CHEMBL521", pref_name: "IBUPROFEN", max_phase: 4.0, withdrawn_flag: false },
+  "KTUFNOKKBVMGRW": { molecule_chembl_id: "CHEMBL941", pref_name: "IMATINIB", max_phase: 4.0, withdrawn_flag: false },
+  "PSIFNNKUMBGKDQ": { molecule_chembl_id: "CHEMBL191", pref_name: "LOSARTAN", max_phase: 4.0, withdrawn_flag: false },
+  "XZWYZXLIPXDOLR": { molecule_chembl_id: "CHEMBL1431", pref_name: "METFORMIN", max_phase: 4.0, withdrawn_flag: false },
+  "JZCPYUJPEARBJL": { molecule_chembl_id: "CHEMBL111", pref_name: "RIMONABANT", max_phase: 4.0, withdrawn_flag: true },
+  "VGKDLMBJGBXTGI": { molecule_chembl_id: "CHEMBL809", pref_name: "SERTRALINE", max_phase: 4.0, withdrawn_flag: false },
+  "GUGOEEXESWIERI": { molecule_chembl_id: "CHEMBL17157", pref_name: "TERFENADINE", max_phase: 4.0, withdrawn_flag: true },
+};
+
 // ─── Reliable SMILES → ChEMBL molecule lookup ─────────────────────────────
 // Goal: resolve a SMILES to its FULL ChEMBL molecule record (with correct
 // max_phase, pref_name, etc.) quickly and without depending on ChEMBL's heavy,
@@ -115,16 +136,30 @@ async function resolveChemblMolecule(smiles: string): Promise<any | null> {
     }
   } catch { /* fall through */ }
 
-  // Step 2 — PRIMARY: ChEMBL exact lookup by canonical InChIKey.
+  // Step 1b — OFFLINE-FIRST seed: resolve common known drugs instantly by
+  // InChIKey connectivity block, so identification works even when EBI is down.
   if (inchiKey) {
-    try {
-      const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__standard_inchi_key__exact=${encodeURIComponent(inchiKey)}&limit=1`;
-      const res = await cachedFetch(url, { headers: HEADERS }, 8000);
-      if (res.ok) {
-        const mol = (await res.json())?.molecules?.[0];
-        if (mol?.molecule_chembl_id) return mol;
-      }
-    } catch { /* fall through */ }
+    const seed = KNOWN_DRUG_SEED[inchiKey.split("-")[0]];
+    if (seed) return { ...seed, _source: "known-drug-seed" };
+  }
+
+  // Step 2 — PRIMARY: ChEMBL exact lookup by canonical InChIKey (retry on 5xx —
+  // EBI's structure endpoint 500s intermittently; a couple of quick retries ride
+  // through the flakiness without the cached error poisoning the result).
+  if (inchiKey) {
+    const url = `${CHEMBL_BASE}/molecule.json?molecule_structures__standard_inchi_key__exact=${encodeURIComponent(inchiKey)}&limit=1`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await cachedFetch(url, { headers: HEADERS }, 8000);
+        if (res.ok) {
+          const mol = (await res.json())?.molecules?.[0];
+          if (mol?.molecule_chembl_id) return mol;
+          break; // query succeeded but no record → genuine miss, stop retrying
+        }
+        // 5xx: drop the cached error so the retry actually re-hits EBI
+        if (res.status >= 500) _chemblCache.delete(url);
+      } catch { /* network error — retry */ }
+    }
   }
 
   // Step 3 — FALLBACK: ChEMBL flexmatch on the raw SMILES (structure-aware).

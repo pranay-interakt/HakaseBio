@@ -56,7 +56,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
   // Pass 1: exact-match
   try {
     const res = await fetch(`${API_ROOT}/api/chembl/target-search?smiles=${encodeURIComponent(smiles)}`, {
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
       const data = await res.json();
@@ -82,7 +82,16 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
         };
       }
     }
-  } catch { /* fall through to similarity */ }
+  } catch (e: any) {
+    // If the FIRST ChEMBL call timed out / aborted, the network or upstream
+    // (EBI) is down — the similarity passes would just time out too. Bail fast
+    // so the UI never appears frozen and the run-gate releases (ChEMBL target
+    // discovery is optional enrichment, not required for the simulation).
+    if (e?.name === "TimeoutError" || e?.name === "AbortError") {
+      return { ...empty, status: "error", method: "none" };
+    }
+    /* otherwise fall through to similarity */
+  }
 
   // Pass 2: similarity search — v2 (full quality payload) with v1 fallback.
   const mapV2Target = (t: any): ChEMBLTargetHit => ({
@@ -107,7 +116,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
   // Try v2 first
   try {
     const res = await fetch(`${API_ROOT}/api/chembl/similar-targets/v2?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(12000),
     });
     if (res.ok) {
       const data = await res.json();
@@ -129,7 +138,7 @@ export async function fetchChEMBLTargets(smiles: string): Promise<ChEMBLTargetSe
   // Fallback: v1 (no quality payload)
   try {
     const res = await fetch(`${API_ROOT}/api/chembl/similar-targets?smiles=${encodeURIComponent(smiles)}&threshold=70&limit=25`, {
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { ...empty, status: "error", method: "none" };
     const data = await res.json();

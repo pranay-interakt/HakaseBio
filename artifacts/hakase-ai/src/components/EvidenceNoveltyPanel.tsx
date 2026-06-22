@@ -144,6 +144,10 @@ export function EvidenceNoveltyPanel({ smiles, onTargetChemblId, onEvidence }: E
         readAcrossCoverage: ra.coverage,
         bestAdConfidence: bestAd(ra),
         noveltyScore: nov.noveltyScore,
+        // hERG read-across (measured analogues) → orthogonal contradiction
+        // signal for the calibration layer's veto gate in l1Scorecard.
+        hergReadAcrossNm: ra.herg?.status === "ok" ? ra.herg.estimate : null,
+        hergReadAcrossAd: ra.herg?.adConfidence ?? "None",
       });
     } catch {
       onEvidence?.(null);

@@ -160,6 +160,17 @@ export interface L1Scorecard {
   /** Fraction of safety-critical dimensions backed by real ML. */
   mlCoverage: number;
   recommendation: string;
+  /**
+   * Sub-classification of the verdict WITHOUT changing the verdict enum (so all
+   * downstream consumers keep working). "review-escalate" means: a strong
+   * predicted liability exists but the model is extrapolating / the prediction
+   * is not calibration-reliable / orthogonal evidence disagrees — so instead of
+   * a confident NO-GO the engine returns WATCH and asks for an orthogonal assay.
+   * This is the "abstain rather than issue a false stop" state.
+   */
+  verdictClass: "standard" | "review-escalate";
+  /** When verdictClass==="review-escalate", the per-signal reasons (calibration / AD / contradiction). */
+  escalateReasons?: string[];
   timestamp: string;
 }
 
@@ -186,6 +197,12 @@ export interface L1Scorecard {
  *   chemistry.
  */
 import THRESHOLDS from "./l1Thresholds.json";
+import {
+  assessVeto,
+  hergReadAcrossContradiction,
+  type AdConfidence as CalAdConfidence,
+  type FittedCalibration,
+} from "./calibration";
 
 const HARD = {
   herg: THRESHOLDS.hard_thresholds.herg,
@@ -321,6 +338,24 @@ export interface L1ScorecardInput {
    * composite).
    */
   evidenceSupport?: EvidenceSupport | null;
+  /**
+   * Optional per-endpoint fitted post-hoc calibration tables (Platt/isotonic)
+   * produced offline against the real TDC test split (scripts/fit_calibration.py).
+   * ABSENT by default — when not supplied the calibration layer reliability-weights
+   * the raw probability using the endpoint's real published AUROC instead of
+   * fabricating a calibration curve. Keyed by ADMET endpoint id (e.g. "DILI").
+   */
+  calibration?: Record<string, FittedCalibration> | null;
+  /**
+   * Optional reactive-metabolite structural-alert result
+   * (predictReactiveMets / /predict/reactive-metabolites). Any CRITICAL alert
+   * is a deterministic, development-stopping liability (Kalgutkar 2009; FDA
+   * reactive-metabolite guidance) and forces NO-GO. Folded in here so the
+   * scorecard verdict is the SINGLE SOURCE OF TRUTH — the UI no longer applies
+   * its own separate reactive-metabolite override that could disagree with
+   * `scorecard.verdict`/`score`/`headline`.
+   */
+  reactiveMetabolites?: { critical_count: number; high_count?: number } | null;
 }
 
 /** Compact read-across / novelty signal consumed by the confidence model. */
@@ -331,6 +366,16 @@ export interface EvidenceSupport {
   bestAdConfidence: AdConfidenceLevel;
   /** 0–1 documentation-novelty (noveltyResolver.noveltyScore). */
   noveltyScore?: number;
+  /**
+   * hERG read-across point estimate (nM) from MEASURED ChEMBL analogues, plus
+   * its applicability-domain confidence. Used as an ORTHOGONAL contradiction
+   * signal: if measured analogues say "weak/non-blocker" but the ML model says
+   * "blocker", the conformal layer withholds the hERG veto and escalates for an
+   * assay rather than issuing a false NO-GO. Optional — when absent the hERG
+   * veto is judged on the ML prediction's own reliability alone.
+   */
+  hergReadAcrossNm?: number | null;
+  hergReadAcrossAd?: AdConfidenceLevel;
 }
 
 export type AdConfidenceLevel = "High" | "Moderate" | "Low" | "None";
@@ -352,12 +397,37 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     return buildLookupShortCircuit(lookup, admet);
   }
 
-  // ── AD gating flag — drives downgrade of ML hard vetoes below ──────────
-  // An "Out-of-domain" molecule (NN-Tanimoto < 0.40) means the ML models
-  // have never seen this scaffold. Letting an extrapolation hard-veto a
-  // novel candidate is statistically indefensible — we keep the ML signal
-  // but demote it from `critical / hardNoGo=true` to `warn / hardNoGo=false`.
-  const outOfDomain = AD_DISABLES_HARD_VETO && ad?.adLabel === "Out-of-domain";
+  // ── Applicability-domain + calibration setup (Phases 1, 2, 4) ──────────
+  // The honest gate on "can a model prediction stop development?". Derive the
+  // molecule's applicability-domain confidence from the BEST available source:
+  // an explicit AD envelope if supplied, else the ChEMBL read-across nearest-
+  // neighbour support (real measured analogues), else "Low" when we have NO
+  // domain evidence at all — an extrapolating model must not confidently veto.
+  // Per OECD (Q)SAR principle 3, predictions outside the domain are
+  // extrapolations and may not drive a development-stopping verdict.
+  const es0 = input.evidenceSupport ?? null;
+  const adConf: CalAdConfidence =
+    ad?.adConfidence ? (ad.adConfidence as CalAdConfidence)
+    : es0 ? es0.bestAdConfidence
+    : "Low";
+  // Kept for the legacy GO-guard below: true when the molecule is demonstrably
+  // out of the applicability domain (explicit AD label or no measured support).
+  const outOfDomain =
+    (AD_DISABLES_HARD_VETO && ad?.adLabel === "Out-of-domain") || adConf === "None";
+  const fitTable = input.calibration ?? null;
+  // Orthogonal contradiction for the hERG veto, built from MEASURED ChEMBL
+  // analogues — if they say "weak/non-blocker" we withhold a high-ML-prob veto.
+  const hergContradiction = es0
+    ? hergReadAcrossContradiction({
+        mlBlockProb: o?.herg_blocker_prob ?? 0,
+        hardThreshold: HARD.herg,
+        readAcrossEstimateNm: es0.hergReadAcrossNm ?? null,
+        readAcrossAdConfidence: (es0.hergReadAcrossAd ?? "None") as CalAdConfidence,
+      })
+    : null;
+  // Collected when a strong ML liability is NOT calibration-reliable enough to
+  // veto — drives the WATCH·review-escalate verdict class instead of a false NO-GO.
+  const escalateReasons: string[] = [];
 
   const flags: L1Flag[] = [];
   const dims: L1DimensionScore[] = [];
@@ -402,27 +472,63 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     adProv.distribution === "ml" ? "ml" : "heuristic",
     `PPB ${inVitro.plasmaProteinBinding.bindingClass}, distribution composite ${(admet.admet.distribution * 100).toFixed(0)}/100`);
 
+  // ── 5–8. SAFETY ENDPOINTS — calibration-gated vetoes (Phases 2 & 4) ─────
+  // Each ML safety probability still scores a desirability dimension (the MPO
+  // composite is unchanged), but before it can issue a development-stopping
+  // NO-GO it is routed through assessVeto(). A hard veto is upheld ONLY when
+  // the molecule is in the applicability domain, the prediction clears the
+  // reliability bar, and the LOWER confidence bound still exceeds the hard
+  // threshold; otherwise the liability becomes an ESCALATE signal (→ WATCH ·
+  // review-escalate) so a safe out-of-domain compound never gets a false stop.
+  const mlSafetyVeto = (args: {
+    endpointId: string; prob: number; triggerProb?: number; watch: number; hard: number;
+    flagId: string; label: string; watchLabel: string; source: string;
+    dimLabel: string; dimWeight: number; dimDetail: string;
+    vetoRationale: string; watchRationale: string;
+    addDim?: boolean; contradiction?: { source: string; note: string } | null;
+  }) => {
+    const { prob, watch, hard } = args;
+    const trigger = args.triggerProb ?? prob;
+    if (args.addDim !== false) {
+      dim(args.dimLabel, safetyScore(prob, watch, hard), args.dimWeight, "ml", args.dimDetail);
+    }
+    if (trigger > hard) {
+      const va = assessVeto(args.endpointId, prob, hard, adConf, { fit: fitTable?.[args.endpointId] ?? null, contradiction: args.contradiction ?? null });
+      if (va.reliableForVeto) {
+        flag({ id: `${args.flagId}_hard`, label: args.label, severity: "critical",
+          source: args.source, provenance: "ml",
+          value: `p = ${pct(prob)}`, threshold: `> ${pct(hard)}`,
+          rationale: `${args.vetoRationale} ${va.vetoReason}`, hardNoGo: true });
+      } else {
+        escalateReasons.push(`${args.label}: ${va.vetoReason}`);
+        flag({ id: `${args.flagId}_escalate`, label: `${args.label} — escalate (unconfirmed in-silico)`, severity: "warn",
+          source: args.source, provenance: "ml",
+          value: `p = ${pct(prob)} · reliability ${pct(va.reliability)}`,
+          threshold: `> ${pct(hard)} but not calibration-reliable for a veto`,
+          rationale: `Strong predicted liability, held back from a hard NO-GO: ${va.vetoReason} (${va.basis}). Resolve with an orthogonal assay before a stop call.`,
+          hardNoGo: false });
+      }
+    } else if (trigger >= watch) {
+      flag({ id: `${args.flagId}_watch`, label: args.watchLabel, severity: "warn",
+        source: args.source, provenance: "ml",
+        value: `p = ${pct(prob)}`, threshold: `${pct(watch)}–${pct(hard)}`,
+        rationale: args.watchRationale, hardNoGo: false });
+    }
+  };
+
   // ── 5. SAFETY: hERG (cardiac) ──────────────────────────────────────────
   if (o?.herg_blocker_prob != null) {
     const p = o.herg_blocker_prob;
-    dim("Cardiac (hERG)", safetyScore(p, WATCH.herg, HARD.herg), 0.14, "ml",
-      `CardioTox-ML blocker probability ${pct(p)} (desirability transform, ICH S7B/E14)`);
-    if (p > HARD.herg) {
-      const veto = !outOfDomain;
-      flag({ id: "herg_hard", label: veto ? "hERG block — high cardiac risk" : "hERG block (out-of-domain — WATCH not hard)", severity: veto ? "critical" : "warn",
-        source: "CardioTox-ML (Wang/Karim hERG RF)", provenance: "ml",
-        value: `blocker p = ${pct(p)}`, threshold: `> ${pct(HARD.herg)}`,
-        rationale: veto
-          ? "Strong predicted hERG block implies torsadogenic / QT-prolongation liability that stops development absent structural mitigation."
-          : "Strong ML hERG signal but the molecule is outside the training applicability domain (NN-Tanimoto < 0.40). Downgraded to WATCH — confirm with patch-clamp before any go/no-go call.",
-        hardNoGo: veto });
-    } else if (p >= WATCH.herg) {
-      flag({ id: "herg_watch", label: "Moderate hERG signal", severity: "warn",
-        source: "CardioTox-ML", provenance: "ml",
-        value: `blocker p = ${pct(p)}`, threshold: `${pct(WATCH.herg)}–${pct(HARD.herg)}`,
-        rationale: "Borderline cardiac liability — confirm with patch-clamp and track the safety margin vs efficacious exposure.",
-        hardNoGo: false });
-    }
+    mlSafetyVeto({
+      endpointId: "hERG", prob: p, watch: WATCH.herg, hard: HARD.herg,
+      flagId: "herg", label: "hERG block — high cardiac risk", watchLabel: "Moderate hERG signal",
+      source: "CardioTox-ML (Wang/Karim hERG RF)",
+      dimLabel: "Cardiac (hERG)", dimWeight: 0.14,
+      dimDetail: `CardioTox-ML blocker probability ${pct(p)} (desirability transform, ICH S7B/E14)`,
+      vetoRationale: "Strong predicted hERG block implies torsadogenic / QT-prolongation liability that stops development absent structural mitigation.",
+      watchRationale: "Borderline cardiac liability — confirm with patch-clamp and track the safety margin vs efficacious exposure.",
+      contradiction: hergContradiction,
+    });
   } else {
     // heuristic hERG band from the in-vitro engine
     const cat = inVitro.herg.riskCategory;
@@ -440,23 +546,19 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   // ── 6. SAFETY: DILI (hepatic) ──────────────────────────────────────────
   if (o?.dili_prob != null) {
     const p = o.dili_prob;
-    dim("Hepatic (DILI)", safetyScore(p, WATCH.dili, HARD.dili), 0.14, "ml", `DILI-ML probability ${pct(p)} (${o.dili_risk_class ?? "—"}; desirability transform)`);
-    if (p > HARD.dili || o.dili_risk_class === "High") {
-      const veto = !outOfDomain;
-      flag({ id: "dili_hard", label: veto ? "DILI — high hepatotoxicity risk" : "DILI signal (out-of-domain — WATCH not hard)", severity: veto ? "critical" : "warn",
-        source: "DILI-ML (DILIrank RF)", provenance: "ml",
-        value: `p = ${pct(p)}${o.dili_risk_class ? `, class ${o.dili_risk_class}` : ""}`, threshold: `> ${pct(HARD.dili)} or class High`,
-        rationale: veto
-          ? "Predicted drug-induced liver injury is the leading cause of clinical attrition and post-market withdrawal."
-          : "Strong DILI-ML signal but scaffold is out-of-domain. Downgraded to WATCH — obtain in-vitro hepatocyte data before vetoing.",
-        hardNoGo: veto });
-    } else if (p >= WATCH.dili || o.dili_risk_class === "Moderate") {
-      flag({ id: "dili_watch", label: "Moderate DILI signal", severity: "warn",
-        source: "DILI-ML", provenance: "ml",
-        value: `p = ${pct(p)}`, threshold: `${pct(WATCH.dili)}–${pct(HARD.dili)}`,
-        rationale: "Monitor hepatic markers; consider covalent-/reactive-metabolite de-risking.",
-        hardNoGo: false });
-    }
+    // A model "High" risk-class label forces entry into the veto-assessment
+    // path even when the raw prob sits just under the hard line; the
+    // calibration layer then decides veto-vs-escalate on the real prob + AD.
+    const trig = o.dili_risk_class === "High" ? Math.max(p, HARD.dili + 1e-3) : p;
+    mlSafetyVeto({
+      endpointId: "DILI", prob: p, triggerProb: trig, watch: WATCH.dili, hard: HARD.dili,
+      flagId: "dili", label: "DILI — high hepatotoxicity risk", watchLabel: "Moderate DILI signal",
+      source: "DILI-ML (DILIrank RF)",
+      dimLabel: "Hepatic (DILI)", dimWeight: 0.14,
+      dimDetail: `DILI-ML probability ${pct(p)} (${o.dili_risk_class ?? "—"}; desirability transform)`,
+      vetoRationale: "Predicted drug-induced liver injury is the leading cause of clinical attrition and post-market withdrawal.",
+      watchRationale: "Monitor hepatic markers; consider covalent-/reactive-metabolite de-risking.",
+    });
   } else {
     dim("Hepatic (DILI)", admet.admet.toxicity * 100 * 0.9, 0.10, "heuristic", "No DILI-ML signal — using ADMET toxicity composite (heuristic)");
   }
@@ -464,23 +566,15 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   // ── 7. SAFETY: GENOTOXICITY (Ames) ─────────────────────────────────────
   if (o?.ames_prob != null) {
     const p = o.ames_prob;
-    dim("Genotoxicity (Ames)", safetyScore(p, WATCH.ames, HARD.ames), 0.10, "ml", `ADMET-AI Ames probability ${pct(p)} (desirability transform, ICH M7/S2(R1))`);
-    if (p > HARD.ames) {
-      const veto = !outOfDomain;
-      flag({ id: "ames_hard", label: veto ? "Mutagenicity (Ames) liability" : "Ames signal (out-of-domain — WATCH not hard)", severity: veto ? "critical" : "warn",
-        source: "ADMET-AI (Chemprop)", provenance: "ml",
-        value: `p = ${pct(p)}`, threshold: `> ${pct(HARD.ames)}`,
-        rationale: veto
-          ? "High predicted bacterial mutagenicity is a genotoxic stop unless a qualified control strategy applies."
-          : "Strong Ames-ML signal but scaffold is out-of-domain. Downgraded to WATCH — run a real Ames screen before vetoing.",
-        hardNoGo: veto });
-    } else if (p >= WATCH.ames) {
-      flag({ id: "ames_watch", label: "Borderline mutagenicity signal", severity: "warn",
-        source: "ADMET-AI", provenance: "ml",
-        value: `p = ${pct(p)}`, threshold: `${pct(WATCH.ames)}–${pct(HARD.ames)}`,
-        rationale: "Run an Ames screen and inspect structural alerts before advancing.",
-        hardNoGo: false });
-    }
+    mlSafetyVeto({
+      endpointId: "AMES", prob: p, watch: WATCH.ames, hard: HARD.ames,
+      flagId: "ames", label: "Mutagenicity (Ames) liability", watchLabel: "Borderline mutagenicity signal",
+      source: "ADMET-AI (Chemprop)",
+      dimLabel: "Genotoxicity (Ames)", dimWeight: 0.10,
+      dimDetail: `ADMET-AI Ames probability ${pct(p)} (desirability transform, ICH M7/S2(R1))`,
+      vetoRationale: "High predicted bacterial mutagenicity is a genotoxic stop unless a qualified control strategy applies.",
+      watchRationale: "Run an Ames screen and inspect structural alerts before advancing.",
+    });
   }
 
   // ── 8. SAFETY: OTHER TOX (ClinTox / Carcinogenicity) ───────────────────
@@ -492,25 +586,23 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     dim("Other toxicity", safetyScore(worst, WATCH.clintox, HARD.clintox), 0.06, "ml",
       `ClinTox/Carcinogen worst-case ${pct(worst)} (desirability transform)`);
   }
-  if (o?.clintox_prob != null && o.clintox_prob > HARD.clintox) {
-    const veto = !outOfDomain;
-    flag({ id: "clintox_hard", label: veto ? "High clinical-tox probability" : "ClinTox signal (out-of-domain — WATCH)", severity: veto ? "critical" : "warn",
-      source: "ADMET-AI ClinTox", provenance: "ml",
-      value: `p = ${pct(o.clintox_prob)}`, threshold: `> ${pct(HARD.clintox)}`,
-      rationale: veto
-        ? "Model predicts a high likelihood of clinical-trial toxicity failure."
-        : "ClinTox-ML signal but scaffold is out-of-domain. Downgraded to WATCH.",
-      hardNoGo: veto });
+  if (o?.clintox_prob != null) {
+    mlSafetyVeto({
+      endpointId: "ClinTox", prob: o.clintox_prob, watch: WATCH.clintox, hard: HARD.clintox,
+      flagId: "clintox", label: "High clinical-tox probability", watchLabel: "Moderate clinical-tox signal",
+      source: "ADMET-AI ClinTox", addDim: false, dimLabel: "", dimWeight: 0, dimDetail: "",
+      vetoRationale: "Model predicts a high likelihood of clinical-trial toxicity failure.",
+      watchRationale: "Elevated clinical-tox probability — corroborate with orthogonal tox readouts.",
+    });
   }
-  if (o?.carcinogen_prob != null && o.carcinogen_prob > HARD.carcinogen) {
-    const veto = !outOfDomain;
-    flag({ id: "carc_hard", label: veto ? "Carcinogenicity liability" : "Carcinogen signal (out-of-domain — WATCH)", severity: veto ? "critical" : "warn",
-      source: "ADMET-AI Carcinogens", provenance: "ml",
-      value: `p = ${pct(o.carcinogen_prob)}`, threshold: `> ${pct(HARD.carcinogen)}`,
-      rationale: veto
-        ? "High predicted rodent carcinogenicity."
-        : "Carcinogenicity-ML signal but scaffold is out-of-domain. Downgraded to WATCH.",
-      hardNoGo: veto });
+  if (o?.carcinogen_prob != null) {
+    mlSafetyVeto({
+      endpointId: "Carcinogens_Lagunin", prob: o.carcinogen_prob, watch: WATCH.carcinogen, hard: HARD.carcinogen,
+      flagId: "carc", label: "Carcinogenicity liability", watchLabel: "Moderate carcinogenicity signal",
+      source: "ADMET-AI Carcinogens", addDim: false, dimLabel: "", dimWeight: 0, dimDetail: "",
+      vetoRationale: "High predicted rodent carcinogenicity.",
+      watchRationale: "Elevated carcinogenicity probability — corroborate with orthogonal data.",
+    });
   }
 
   // ── 9. SELECTIVITY ─────────────────────────────────────────────────────
@@ -559,6 +651,18 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
       hardNoGo: true });
   }
 
+  // ── 11b. REACTIVE-METABOLITE CRITICAL ALERTS (deterministic chemistry) ──
+  // Folded into the scorecard so the verdict is the single source of truth.
+  const rm = input.reactiveMetabolites ?? null;
+  if (rm && rm.critical_count > 0) {
+    flag({ id: "reactive_met_hard", label: "Reactive-metabolite critical alert", severity: "critical",
+      source: "Reactive-metabolite SMARTS scan (Kalgutkar 2009)", provenance: "experimental",
+      value: `${rm.critical_count} critical alert${rm.critical_count === 1 ? "" : "s"}`,
+      threshold: "any critical bioactivation motif",
+      rationale: "Bioactivation to reactive metabolites is a deterministic chemical liability linked to idiosyncratic hepatotoxicity and IADRs; a critical alert vetoes advancement irrespective of probabilistic ML scores.",
+      hardNoGo: true });
+  }
+
   // ── 12. CYP DDI (metabolism modifier WATCH) ────────────────────────────
   const cypProbs = [o?.cyp3a4_inhibitor_prob, o?.cyp2d6_inhibitor_prob, o?.cyp2c9_inhibitor_prob].filter(
     (p): p is number => typeof p === "number" && Number.isFinite(p));
@@ -590,15 +694,47 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     d.weight = +(d.rawWeight / totalRaw).toFixed(4);
     dims.push({ dimension: d.dimension, score: +d.score.toFixed(1), weight: d.weight, provenance: d.provenance, detail: d.detail });
   }
-  const composite = +geometricComposite(rawDims.map(d => ({ score: d.score, weight: d.rawWeight }))).toFixed(1);
+  // Raw geometric composite over the dimensions that were actually computable —
+  // exposed unchanged as `compositeRaw` for transparency.
+  const compositeRawVal = +geometricComposite(rawDims.map(d => ({ score: d.score, weight: d.rawWeight }))).toFixed(1);
 
-  // ── Confidence: ML coverage of safety-critical dims + completeness ─────
+  // ── GRACEFUL MISSING-DATA HANDLING (confidence + composite regularisation) ─
+  // The canonical profile has ~10 axes including 4 safety axes (hERG, DILI,
+  // Ames, other-tox). When endpoints can't be computed (ML service down / no
+  // target / no off-target screen) the raw geometric mean is taken over FEWER
+  // axes — which makes a sparse profile both noisy AND prone to INFLATION:
+  // dropping a weak safety axis mechanically raises the mean, so "less data"
+  // can look like "safer molecule", and the score then swings when the missing
+  // signal finally lands. To degrade gracefully and consistently we:
+  //   1. measure completeness overall AND for the safety block specifically;
+  //   2. lower confidence smoothly with both; and
+  //   3. shrink the DECISION composite toward a neutral 50 prior in proportion
+  //      to the evidence we actually have, so missing data neither inflates the
+  //      ranking nor lets it swing to extremes. Full evidence → unchanged.
+  const EXPECTED_DIMS = 10;
+  const EXPECTED_SAFETY = 4; // hERG, DILI, Ames, other-tox
   const safetyDims = dims.filter(d => /hERG|DILI|Ames|toxicity/i.test(d.dimension));
   const safetyMl = safetyDims.filter(d => d.provenance === "ml").length;
   const mlCoverage = safetyDims.length > 0 ? +(safetyMl / safetyDims.length).toFixed(2) : 0;
-  // completeness: how many of the 10 canonical dimensions were computable.
-  const completeness = Math.min(1, dims.length / 9);
-  let confidenceRaw = clamp(0.35 + 0.45 * mlCoverage + 0.20 * completeness, 0, 1);
+  const dataCompleteness = clamp(rawDims.length / EXPECTED_DIMS, 0, 1);
+  const safetyCompleteness = clamp(safetyDims.length / EXPECTED_SAFETY, 0, 1);
+  // Safety completeness is weighted equally with overall completeness — a gap in
+  // the safety block is the most consequential kind of missing data.
+  const evidenceWeight = clamp(0.5 * dataCompleteness + 0.5 * safetyCompleteness, 0, 1);
+  const composite = +(compositeRawVal * evidenceWeight + 50 * (1 - evidenceWeight)).toFixed(1);
+
+  // Transparent INFO flag when safety evidence is partial — never changes the
+  // verdict (info severity), but tells the reviewer the call rests on partial
+  // data rather than leaving a thin profile to masquerade as a clean one.
+  if (safetyDims.length < EXPECTED_SAFETY) {
+    flag({ id: "safety_data_incomplete", label: `Safety data incomplete (${safetyDims.length}/${EXPECTED_SAFETY} axes)`,
+      severity: "info", source: "L1 data-completeness check", provenance: "heuristic",
+      value: `${safetyDims.length}/${EXPECTED_SAFETY} safety axes computed`, threshold: `${EXPECTED_SAFETY}/${EXPECTED_SAFETY}`,
+      rationale: "Some safety endpoints could not be computed (ML unavailable / missing input). The decision score is shrunk toward neutral and confidence lowered so a sparse profile is not mistaken for a clean one.",
+      hardNoGo: false });
+  }
+
+  let confidenceRaw = clamp(0.30 + 0.40 * mlCoverage + 0.15 * dataCompleteness + 0.15 * safetyCompleteness, 0, 1);
 
   // ── Read-across / novelty adjustment (evidence-aware confidence) ───────
   // A verdict corroborated by REAL measured analogues (read-across) is more
@@ -621,12 +757,27 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     confidence >= 0.75 ? "High" : confidence >= 0.55 ? "Moderate" : "Low";
 
   // ── Verdict ────────────────────────────────────────────────────────────
+  // Consensus / disagreement gate (Phase 4): a NO-GO is only issued when a
+  // DETERMINISTIC chemistry veto fires (Lipinski gross failure, a reactive /
+  // genotoxic structural reject) OR an ML safety prediction is calibration-
+  // reliable enough to veto (assessVeto upheld it — in-domain, reliable, lower
+  // bound over threshold, no orthogonal contradiction). When a strong ML
+  // liability exists but could NOT be confirmed in-silico, it was recorded in
+  // `escalateReasons` and the verdict is WATCH · review-escalate ("strong
+  // predicted liability — get an orthogonal assay") rather than a false NO-GO.
   const hardFlags = flags.filter(f => f.hardNoGo);
   const warnFlags = flags.filter(f => f.severity === "warn");
+  const hasEscalate = escalateReasons.length > 0;
 
   let verdict: L1Verdict;
+  let verdictClass: "standard" | "review-escalate" = "standard";
   if (hardFlags.length > 0) {
     verdict = "NO-GO";
+  } else if (hasEscalate) {
+    // Abstain rather than guess: a development-stopping signal that the model
+    // cannot stand behind escalates for orthogonal confirmation.
+    verdict = "WATCH";
+    verdictClass = "review-escalate";
   } else if (warnFlags.length > 0 || composite < WATCH.composite) {
     verdict = "WATCH";
   } else if (composite >= GO_COMPOSITE) {
@@ -685,7 +836,13 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   //  reaches this branch — included in the type union but unreachable here.)
   const score: number = (() => {
     if (verdict === "GO") return +clamp(composite, 70, 100).toFixed(1);
-    if (verdict === "WATCH") return +clamp(40 + (composite / 100) * 29, 40, 69).toFixed(1);
+    if (verdict === "WATCH") {
+      // review-escalate (strong unconfirmed liability) ranks BELOW a routine
+      // monitor-WATCH: [40,54] vs [55,69].
+      return verdictClass === "review-escalate"
+        ? +clamp(40 + (composite / 100) * 14, 40, 54).toFixed(1)
+        : +clamp(55 + (composite / 100) * 14, 55, 69).toFixed(1);
+    }
     // NO-GO: map into [1,39] and penalise additional hard liabilities.
     const base = (composite / 100) * 38;
     return +clamp(base - (hardFlags.length - 1) * 6, 1, 39).toFixed(1);
@@ -695,14 +852,20 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   const headline =
     verdict === "NO-GO"
       ? `NO-GO — ${hardFlags.length} hard liabilit${hardFlags.length === 1 ? "y" : "ies"} (L1 score ${score}/100)`
-      : verdict === "WATCH"
-        ? `WATCH — advance with monitoring (L1 score ${score}/100, ${warnFlags.length} flag${warnFlags.length === 1 ? "" : "s"})`
-        : `GO — favourable L1 profile (score ${score}/100)`;
+      : verdict === "WATCH" && verdictClass === "review-escalate"
+        ? `REVIEW — strong predicted liability not confirmable in-silico; escalate for an orthogonal assay (L1 score ${score}/100)`
+        : verdict === "WATCH"
+          ? `WATCH — advance with monitoring (L1 score ${score}/100, ${warnFlags.length} flag${warnFlags.length === 1 ? "" : "s"})`
+          : `GO — favourable L1 profile (score ${score}/100)`;
 
   const rationale = (() => {
     if (verdict === "NO-GO") {
       return `Vetoed by hard liabilit${hardFlags.length === 1 ? "y" : "ies"}: ${hardFlags.map(f => f.label).join("; ")}. ` +
-        `These are stage-gating risks: the triage score is held at ${score}/100 even though the raw endpoint composite is ${composite}/100 (a vetoed compound can still have otherwise-good properties). Structural modification or a qualified control strategy is required before advancing. Confidence in the call: ${confidenceLabel.toLowerCase()} (${pct(confidence)}; ML safety coverage ${pct(mlCoverage)}).`;
+        `These are stage-gating risks: the triage score is held at ${score}/100 even though the raw endpoint composite is ${compositeRawVal}/100 (a vetoed compound can still have otherwise-good properties). Structural modification or a qualified control strategy is required before advancing. Confidence in the call: ${confidenceLabel.toLowerCase()} (${pct(confidence)}; ML safety coverage ${pct(mlCoverage)}).`;
+    }
+    if (verdict === "WATCH" && verdictClass === "review-escalate") {
+      return `REVIEW / ESCALATE — one or more strong predicted liabilities could NOT be confirmed in-silico, so the engine abstains from a confident NO-GO rather than risk a false stop on a novel or out-of-domain molecule. Specifically: ${escalateReasons.join(" · ")}. ` +
+        `Triage score ${score}/100 (raw composite ${compositeRawVal}), confidence ${confidenceLabel.toLowerCase()} (${pct(confidence)}; ML safety coverage ${pct(mlCoverage)}). Run the named orthogonal assay (patch-clamp / hepatocyte / Ames) to resolve to GO or NO-GO.`;
     }
     if (verdict === "WATCH") {
       const reasons: string[] = [];
@@ -715,7 +878,7 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
         // downgrade" surface the user asked for.
         reasons.push(`GO withheld by conservative-verdict guard: ${downgradeReasons.join("; ")} — obtain the missing readouts to upgrade`);
       }
-      return `Advance with close monitoring. ${reasons.join("; ")}. Triage score ${score}/100 (raw composite ${composite}), confidence ${confidenceLabel.toLowerCase()} (${pct(confidence)}).`;
+      return `Advance with close monitoring. ${reasons.join("; ")}. Triage score ${score}/100 (raw composite ${compositeRawVal}), confidence ${confidenceLabel.toLowerCase()} (${pct(confidence)}).`;
     }
     return `Favourable across the available L1 dimensions with no hard or monitor-level liabilities. Triage score ${score}/100, confidence ${confidenceLabel.toLowerCase()} (${pct(confidence)}; ML safety coverage ${pct(mlCoverage)}). Recommend progressing to Layer 2 confirmation.`;
   })();
@@ -723,9 +886,11 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   const recommendation =
     verdict === "NO-GO"
       ? "Do not advance as-is. Re-design to remove the flagged liability, then re-run L1."
-      : verdict === "WATCH"
-        ? "Advance into Layer 2 confirmation with the flagged endpoints prioritised for orthogonal (ex-vivo / ML-ensemble) confirmation."
-        : "Advance to Layer 2 confirmation.";
+      : verdict === "WATCH" && verdictClass === "review-escalate"
+        ? "Do NOT treat as a clean WATCH. Prioritise the named orthogonal assay to confirm or clear the predicted liability before any go/no-go; the in-silico stack cannot responsibly decide this case alone."
+        : verdict === "WATCH"
+          ? "Advance into Layer 2 confirmation with the flagged endpoints prioritised for orthogonal (ex-vivo / ML-ensemble) confirmation."
+          : "Advance to Layer 2 confirmation.";
 
   // sort flags critical → warn → info
   const sevRank = { critical: 0, warn: 1, info: 2 } as const;
@@ -734,7 +899,7 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
   return {
     verdict,
     score,
-    compositeRaw: composite,
+    compositeRaw: compositeRawVal,
     confidence,
     confidenceLabel,
     headline,
@@ -743,6 +908,8 @@ export function computeL1Scorecard(input: L1ScorecardInput): L1Scorecard {
     dimensions: dims,
     mlCoverage,
     recommendation,
+    verdictClass,
+    escalateReasons: escalateReasons.length > 0 ? escalateReasons : undefined,
     timestamp: new Date().toISOString(),
   };
 }
@@ -868,6 +1035,9 @@ function buildLookupShortCircuit(lookup: KnownDrugLookup, admet: SimResults): L1
     ],
     mlCoverage: 0,
     recommendation,
+    // Known-drug verdicts rest on PUBLISHED measured evidence, not model
+    // extrapolation, so they are always "standard" (never review-escalate).
+    verdictClass: "standard",
     timestamp: new Date().toISOString(),
   };
 }

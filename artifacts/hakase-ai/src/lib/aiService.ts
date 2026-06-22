@@ -850,6 +850,45 @@ export async function predictApplicabilityDomain(smiles: string): Promise<Applic
 }
 
 // ---------------------------------------------------------------------------
+// Lookup-first known-drug resolver (live ChEMBL InChIKey). When the SMILES
+// matches a clinical-stage / approved / withdrawn drug, the L1 scorecard uses
+// this MEASURED published profile and bypasses the ML veto stack entirely.
+// `matched: false` on a miss → caller falls through to the ML/heuristic path.
+// ---------------------------------------------------------------------------
+export interface KnownDrugLiability {
+  endpoint: string;
+  measured: number;
+  valueText: string;
+  source: string;
+  severity: "veto" | "monitor";
+}
+
+export interface KnownDrugResult {
+  matched: boolean;
+  smiles: string;
+  match_type?: "exact" | "stereo-variant" | "close-analog" | "structural-analog";
+  match_confidence?: number;
+  tanimoto?: number | null;
+  matched_drug?: {
+    name?: string | null;
+    status?: "approved" | "withdrawn" | "investigational" | "reference";
+    max_phase?: number | null;
+    first_approval?: number | null;
+    chembl_id?: string | null;
+    withdrawal_reason?: string | null;
+    liabilities?: KnownDrugLiability[];
+  };
+  verdict_hint?: "KNOWN-LIABILITY-NO-GO" | "GO-KNOWN-CLEAN" | "WATCH-KNOWN";
+  veto_liabilities?: KnownDrugLiability[];
+  monitor_liabilities?: KnownDrugLiability[];
+  provenance?: string;
+}
+
+export async function predictKnownDrug(smiles: string): Promise<KnownDrugResult> {
+  return post<KnownDrugResult>("/known-drug", { smiles });
+}
+
+// ---------------------------------------------------------------------------
 // L2 Stage 2 — AutoDock Vina docking (async job)
 // ---------------------------------------------------------------------------
 

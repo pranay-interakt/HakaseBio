@@ -32,10 +32,35 @@ const CHEMBL = "https://www.ebi.ac.uk/chembl/api/data";
 /** Canonical hERG channel (KCNH2) target in ChEMBL. */
 export const HERG_TARGET_CHEMBL_ID = "CHEMBL240";
 
+// ── Resilience: EBI's ChEMBL API is intermittently 500-prone / slow. Read-across
+// is the strongest evidence we have for NOVEL chemistry (anchoring endpoints to
+// real measured analogues), so we must not lose it to a transient hiccup. A
+// short retry on 5xx/network errors rides through the flakiness, and successful
+// responses are cached for the session so repeat lookups (and re-runs of the
+// same molecule) are instant and survive a later outage. Genuine empty results
+// are returned normally (the caller maps them to "no-neighbors").
+const _raCache = new Map<string, any>();
+const RETRIES = 3;
+
 async function getJson(url: string): Promise<any> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const cached = _raCache.get(url);
+  if (cached !== undefined) return cached;
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (res.ok) {
+        const data = await res.json();
+        _raCache.set(url, data); // cache only real successes
+        return data;
+      }
+      if (res.status < 500) throw new Error(`HTTP ${res.status}`); // 4xx → don't retry
+      lastErr = new Error(`HTTP ${res.status}`); // 5xx → retry
+    } catch (e) {
+      lastErr = e; // timeout / network → retry
+    }
+  }
+  throw lastErr ?? new Error("read-across fetch failed");
 }
 
 // ─────────────────────────────────────────────────────────────────────────

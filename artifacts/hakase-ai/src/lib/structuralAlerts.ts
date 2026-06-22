@@ -565,7 +565,7 @@ const ALERT_LIBRARY: StructuralAlertDef[] = [
     library: "PAINS",
     name: "Catechol / 1,2-Dihydroxybenzene",
     smarts: [
-      "c1cc(O)c(O)cc1",          // 1,2-catechol
+      "c1cc([OX2H])c([OX2H])cc1",  // 1,2-catechol — require TWO free phenolic OH (not ethers)
     ],
     category: "PAINS",
     severity: "warn",
@@ -577,7 +577,7 @@ const ALERT_LIBRARY: StructuralAlertDef[] = [
     library: "PAINS",
     name: "Hydroquinone / 1,4-Dihydroxybenzene",
     smarts: [
-      "Oc1ccc(O)cc1",            // 1,4-dihydroxybenzene
+      "[OX2H]c1ccc([OX2H])cc1",  // 1,4-dihydroxybenzene — require TWO free phenolic OH, not ethers (avoids false hits on para-alkoxyphenols like tocopherol/chromanols)
     ],
     category: "PAINS",
     severity: "warn",
@@ -591,9 +591,15 @@ const ALERT_LIBRARY: StructuralAlertDef[] = [
     smarts: [
       "O=C1C=CC(=O)C=C1",        // p-benzoquinone ring
     ],
-    category: "PAINS",
+    // Categorised as ReactiveElectrophile (NOT PAINS) on purpose: its reject
+    // status rests on GENUINE covalent reactivity + Ames-positivity (Brenk also
+    // rejects it), not on assay-interference. This keeps the platform policy
+    // Phantom-PAINS-compliant (Capuzzi et al., JCIM 2017) — no alert whose ONLY
+    // basis is PAINS assay-interference is allowed to hard-veto; only
+    // deterministic reactive/genotoxic chemistry may, which p-quinone is.
+    category: "ReactiveElectrophile",
     severity: "reject",
-    rationale: "Potent 1,4-Michael acceptor + redox-active species. Covalently modifies Cys/Lys. Redox cycling generates ROS non-specifically. Ames positive. Standard PAINS exclusion across all assay formats (AlphaScreen, FP, HTRF). Brenk also classifies as reject.",
+    rationale: "Potent 1,4-Michael acceptor + redox-active species — covalently modifies Cys/Lys and redox-cycles to generate ROS; Ames positive. Deterministic reactive-electrophile liability (Brenk reject), independent of any assay-interference (PAINS) concern.",
     citation: "Baell & Holloway, J. Med. Chem. 2010. Brenk et al., ChemMedChem 2008.",
   },
   {

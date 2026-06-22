@@ -98,6 +98,7 @@ import {
   predictReactiveMets,
   predictBsep,
   predictApplicabilityDomain,
+  predictKnownDrug,
   predictPeptide,
   predictAntibody,
   type DiliMlResult,
@@ -106,6 +107,7 @@ import {
   type ReactiveMetsResult,
   type BsepResult,
   type ApplicabilityDomainResult,
+  type KnownDrugResult,
   type AiProteinResult,
   type ProteinMlResult,
   type AiPropertiesResult,
@@ -118,7 +120,7 @@ import {
 import { parseFasta, validateSequence } from "@/components/PeptideAnalysisPanel";
 import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter";
 import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
-import { computeL1Scorecard, type L1Scorecard, type EvidenceSupport } from "@/lib/l1Scorecard";
+import { computeL1Scorecard, type L1Scorecard, type EvidenceSupport, type KnownDrugLookup, type ApplicabilityDomain } from "@/lib/l1Scorecard";
 import { EvidenceNoveltyPanel } from "@/components/EvidenceNoveltyPanel";
 import { BenefitRiskCard } from "@/components/BenefitRiskCard";
 import { PreclinicalEvidenceCard } from "@/components/PreclinicalEvidenceCard";
@@ -444,6 +446,7 @@ export function HakaseAI() {
     setReactiveMets(null);
     setBsepResult(null);
     setAdResult(null);
+    setKnownDrug(null);
 
     // L1 simulation outputs
     setSimResults(null);
@@ -612,6 +615,11 @@ export function HakaseAI() {
   const [adResult, setAdResult] = useState<import("@/lib/aiService").ApplicabilityDomainResult | null>(null);
   const adSeqRef = useRef(0);
   const [adLoading, setAdLoading] = useState(false);
+  // Lookup-first known-drug resolver (live ChEMBL). When matched, the L1
+  // scorecard short-circuits to the measured published profile.
+  const [knownDrug, setKnownDrug] = useState<KnownDrugResult | null>(null);
+  const knownDrugSeqRef = useRef(0);
+  const [knownDrugLoading, setKnownDrugLoading] = useState(false);
   // Empty string ("") is the canonical "no therapeutic area selected" value.
   // Downstream engines (admet.ts, inVitroSim.ts) treat empty/null as a signal
   // to use NEUTRAL identity modifiers (multipliers = 1.0, no similar-drugs
@@ -1455,6 +1463,7 @@ export function HakaseAI() {
       setReactiveMets(null);
       setBsepResult(null);
       setAdResult(null);
+      setKnownDrug(null);
       return;
     }
     // Route ML through the canonical, desalted parent so the models score the
@@ -1513,6 +1522,14 @@ export function HakaseAI() {
     predictApplicabilityDomain(mlSm)
       .then(r => { if (adSeqRef.current === seqAd) { setAdResult(r); setAdLoading(false); } })
       .catch(() => { if (adSeqRef.current === seqAd) { setAdResult(null); setAdLoading(false); } });
+    // Lookup-first known-drug resolver — live ChEMBL InChIKey match. A hit lets
+    // the scorecard use the measured published profile (approved → GO, withdrawn
+    // → KNOWN-LIABILITY-NO-GO) and bypass the ML veto stack. Miss → ML path.
+    const seqKd = ++knownDrugSeqRef.current;
+    setKnownDrugLoading(true);
+    predictKnownDrug(mlSm)
+      .then(r => { if (knownDrugSeqRef.current === seqKd) { setKnownDrug(r); setKnownDrugLoading(false); } })
+      .catch(() => { if (knownDrugSeqRef.current === seqKd) { setKnownDrug(null); setKnownDrugLoading(false); } });
   }, [smiles, rdkitReady, molProps?.isValid]);
 
   // ── DETERMINISTIC VERDICT GATE (part 1: pending tracker) ────────────────
@@ -1541,7 +1558,7 @@ export function HakaseAI() {
   // those inputs are deterministic the moment everything has landed.
   const mlOverlayPending =
     diliMlLoading || admetMlLoading || cardiotoxMlLoading || solubilityMlLoading || bindingMlLoading ||
-    reactiveMetsLoading || bsepLoading || adLoading;
+    reactiveMetsLoading || bsepLoading || adLoading || knownDrugLoading;
   const targetSuggestionPending = chemblLookupLoading || mlPanelLoading;
   const l1InputsPending = mlOverlayPending || targetSuggestionPending;
   const mlOverlaySettled = !mlOverlayPending;
@@ -1576,26 +1593,66 @@ export function HakaseAI() {
   // Single calibrated verdict over the real L1 outputs: flag-based hard
   // No-Go overrides + weighted composite + ML-coverage-driven confidence.
   // Recomputes whenever the ADMET / in-vitro results or the ML overlay change.
+  // Adapt the known-drug resolver response (snake_case, live ChEMBL) into the
+  // scorecard's KnownDrugLookup shape. Only forwarded when actually matched, so
+  // a miss leaves the ML/heuristic verdict path intact.
+  const knownDrugLookup: KnownDrugLookup | null = useMemo(() => {
+    if (!knownDrug?.matched) return null;
+    const d = knownDrug.matched_drug ?? {};
+    return {
+      matched: true,
+      matchType: knownDrug.match_type,
+      matchConfidence: knownDrug.match_confidence,
+      tanimoto: knownDrug.tanimoto ?? null,
+      matchedDrugName: d.name ?? undefined,
+      matchedDrugStatus: d.status,
+      withdrawalReason: d.withdrawal_reason ?? undefined,
+      vetoLiabilities: knownDrug.veto_liabilities ?? d.liabilities?.filter(L => L.severity === "veto"),
+      monitorLiabilities: knownDrug.monitor_liabilities ?? d.liabilities?.filter(L => L.severity === "monitor"),
+    };
+  }, [knownDrug]);
+
+  // Adapt the applicability-domain envelope into the scorecard's shape so the
+  // out-of-domain hard-veto downgrade fires as designed.
+  const applicabilityDomain: ApplicabilityDomain | null = useMemo(() => {
+    if (!adResult) return null;
+    return {
+      adScore: adResult.ad_score,
+      adLabel: adResult.ad_label,
+      adConfidence: adResult.ad_confidence,
+      nnSimilarity: adResult.nn_similarity,
+      coverageNote: adResult.coverage_note,
+    };
+  }, [adResult]);
+
   const l1Scorecard: L1Scorecard | null = useMemo(() => {
     if (!simResults || !inVitroResults) return null;
-    return computeL1Scorecard({ admet: simResults, inVitro: inVitroResults, overlay: mlOverlay, evidenceSupport });
-  }, [simResults, inVitroResults, mlOverlay, evidenceSupport]);
+    return computeL1Scorecard({
+      admet: simResults,
+      inVitro: inVitroResults,
+      overlay: mlOverlay,
+      evidenceSupport,
+      knownDrugLookup,
+      applicabilityDomain,
+      reactiveMetabolites: reactiveMets
+        ? { critical_count: reactiveMets.critical_count, high_count: reactiveMets.high_count }
+        : null,
+    });
+  }, [simResults, inVitroResults, mlOverlay, evidenceSupport, knownDrugLookup, applicabilityDomain, reactiveMets]);
 
   // Single canonical L1 verdict used by EVERY L1 display and recommendation in
-  // this component, so the team never sees a NO-GO headline next to a "GO —
-  // advance" blurb. Prefers the unified scorecard (folds in ML hard vetoes);
-  // falls back to the arbitrated ADMET/in-vitro decision, then ADMET-only.
-  // Reactive metabolite critical alerts hard-veto to NO-GO (any critical
-  // structural alert is a development-stopping liability per FDA guidance).
+  // this component. The scorecard is now the SINGLE SOURCE OF TRUTH: it folds
+  // in the lookup-first known-drug short-circuit, ML hard vetoes, the AD
+  // downgrade, AND the reactive-metabolite critical-alert veto — so the verdict,
+  // score and headline can no longer disagree. Falls back to the arbitrated
+  // ADMET/in-vitro decision only when the scorecard hasn't computed yet.
   const l1Verdict: "GO" | "WATCH" | "NO-GO" | "KNOWN-LIABILITY-NO-GO" | null = useMemo(() => {
-    // Hard veto: any critical reactive metabolite alert → NO-GO regardless of scorecard
-    if (reactiveMets && reactiveMets.critical_count > 0) return "NO-GO";
     if (l1Scorecard) return l1Scorecard.verdict;
     if (!simResults) return null;
     return inVitroResults
       ? arbitrateGoNogo(simResults.goNogo, inVitroResults.overallRisk).decision
       : simResults.goNogo;
-  }, [l1Scorecard, simResults, inVitroResults, reactiveMets]);
+  }, [l1Scorecard, simResults, inVitroResults]);
 
   // Ref-mirror of l1InputsPending so an async runSimulation can poll the
   // CURRENT pending state without re-rendering. Without this the closure
@@ -2865,7 +2922,7 @@ export function HakaseAI() {
   // of the architecture doc) and gated unreachable via HIDE_PATIENT_TRIAL_LAYERS.
   const layerIcons = [TestTube2, FlaskConical, Rabbit, Activity] as const;
   const layerLabels = ["In Vitro", "Confirmation", "Animal Cohort", "First In Human"] as const;
-  const layerColors = ["violet", "cyan", "amber", "emerald"] as const;
+  const layerColors = ["teal", "cyan", "amber", "emerald"] as const;
 
   return (
     <div className={lightMode ? `hk-app-bg h-screen text-slate-900 flex flex-col overflow-hidden font-['Inter'] hk-light` : `hk-app-bg h-screen text-white flex flex-col overflow-hidden font-['Inter']`} style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -2895,13 +2952,13 @@ export function HakaseAI() {
             const status = getLayerStatus(layer);
             const isActive = activeLayer === layer;
             // Layer color mapping aligns with `layerColors` const above:
-            // L1=violet (InVitro), L2=cyan (InSilico), L3=amber (ExVivo), L4=emerald (Animal Cohort).
+            // L1=teal (InVitro), L2=cyan (InSilico), L3=amber (ExVivo), L4=emerald (Animal Cohort).
             const activeGlass = "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_8px_22px_-12px_rgba(0,0,0,0.7)] backdrop-blur-sm";
-            const activeColor = (layer === 1 ? "bg-violet-600/20 border-violet-500/50 text-violet-300"
+            const activeColor = (layer === 1 ? "bg-teal-600/20 border-teal-500/50 text-teal-300"
               : layer === 2 ? "bg-cyan-600/20 border-cyan-500/50 text-cyan-300"
               : layer === 3 ? "bg-amber-600/20 border-amber-500/50 text-amber-300"
               : "bg-emerald-600/20 border-emerald-500/50 text-emerald-300") + " " + activeGlass;
-            const badgeColor = layer === 1 ? "border-violet-400 text-violet-400 bg-violet-400/10"
+            const badgeColor = layer === 1 ? "border-teal-400 text-teal-400 bg-teal-400/10"
               : layer === 2 ? "border-cyan-400 text-cyan-400 bg-cyan-400/10"
               : layer === 3 ? "border-amber-400 text-amber-400 bg-amber-400/10"
               : "border-emerald-400 text-emerald-400 bg-emerald-400/10";
@@ -3000,7 +3057,7 @@ export function HakaseAI() {
           >
             {lightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </button>
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-[11px] font-bold">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-[11px] font-bold">
             HC
           </div>
         </div>
@@ -3009,15 +3066,15 @@ export function HakaseAI() {
       {/* Simulation Status Bar — suppressed while the IVIVE handoff page is
           open so its own footer (Back / Proceed) is the only progression UI. */}
       {!iviveHandoffOpen && (simStatus[activeLayer] === "running") && (
-        <div className="h-10 bg-violet-900/30 border-b border-violet-500/20 flex items-center px-6 gap-4 shrink-0">
-          <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-          <span className="text-[12px] text-violet-300 font-medium">
+        <div className="h-10 bg-teal-900/30 border-b border-teal-500/20 flex items-center px-6 gap-4 shrink-0">
+          <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+          <span className="text-[12px] text-teal-300 font-medium">
             Layer {activeLayer} Simulation Running — {layerLabels[activeLayer - 1]}
           </span>
           <div className="flex-1 max-w-[300px]">
-            <Progress value={simProgress} className="h-1.5 bg-violet-900/50" />
+            <Progress value={simProgress} className="h-1.5 bg-teal-900/50" />
           </div>
-          <span className="text-[11px] text-violet-400">{Math.round(simProgress)}%</span>
+          <span className="text-[11px] text-teal-400">{Math.round(simProgress)}%</span>
           <button className="ml-auto text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1">
             <X className="w-3 h-3" /> Cancel
           </button>
@@ -3048,7 +3105,7 @@ export function HakaseAI() {
                   }
                   setActiveLayer((activeLayer + 1) as Layer);
                 }}
-                className="ml-auto flex items-center gap-1.5 text-[12px] bg-violet-600 hover:bg-violet-500 px-3 py-1 rounded-md font-medium transition-colors"
+                className="ml-auto flex items-center gap-1.5 text-[12px] bg-teal-600 hover:bg-teal-500 px-3 py-1 rounded-md font-medium transition-colors"
               >
                 Continue to {(layerLabels as readonly string[])[activeLayer]} →
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -3091,8 +3148,8 @@ export function HakaseAI() {
             <>
               {/* Current Project */}
               <div className="p-3 border-b border-white/8">
-                <div className="bg-violet-600/10 border border-violet-500/25 rounded-lg p-3">
-                  <div className="text-[12px] font-semibold text-violet-300 mb-1">Current Project</div>
+                <div className="bg-teal-600/10 border border-teal-500/25 rounded-lg p-3">
+                  <div className="text-[12px] font-semibold text-teal-300 mb-1">Current Project</div>
                   <div className="text-[11px] text-white font-medium truncate">{molName || "Unnamed Molecule"}</div>
                   <div className="text-[10px] text-slate-500 mt-0.5 truncate">{uniprotId || "No target"}</div>
                   {indication && (
@@ -3102,7 +3159,7 @@ export function HakaseAI() {
                     {([1, 2, 3] as Layer[]).map(l => (
                       <div key={l} className={`h-1 flex-1 rounded-full ${
                         simStatus[l] === "complete" ? "bg-emerald-500" :
-                        simStatus[l] === "running" ? "bg-violet-500 animate-pulse" :
+                        simStatus[l] === "running" ? "bg-teal-500 animate-pulse" :
                         "bg-white/10"
                       }`} />
                     ))}
@@ -3127,7 +3184,7 @@ export function HakaseAI() {
                         >
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300">{proj.molName}</span>
                           </div>
                           <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
                         </button>
@@ -3144,7 +3201,7 @@ export function HakaseAI() {
                         >
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300">{proj.molName}</span>
                           </div>
                           <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
                         </button>
@@ -3167,7 +3224,7 @@ export function HakaseAI() {
                         >
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-[11px] font-semibold text-slate-200 group-hover:text-white">{proj.name}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{proj.molName}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300">{proj.molName}</span>
                           </div>
                           <div className="text-[10px] text-slate-500 truncate">{proj.indication} · UniProt {proj.uniprotId}</div>
                         </button>
@@ -3215,7 +3272,7 @@ export function HakaseAI() {
 
                 <button
                   onClick={handleNewProject}
-                  className="w-full mt-3 py-2 text-[11px] text-violet-400 hover:text-violet-300 border border-dashed border-violet-500/30 hover:border-violet-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full mt-3 py-2 text-[11px] text-teal-400 hover:text-teal-300 border border-dashed border-teal-500/30 hover:border-teal-500/50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-3 h-3" /> New Project
                 </button>
@@ -3232,21 +3289,21 @@ export function HakaseAI() {
                   />
 
                   {/* 2. Import from Diagen */}
-                  <div className="border border-violet-500/30 rounded-lg overflow-hidden bg-violet-950/20">
+                  <div className="border border-teal-500/30 rounded-lg overflow-hidden bg-teal-950/20">
                     <button
                       onClick={() => { setDiagenOpen(v => !v); setDiagenResult(null); }}
-                      className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-violet-500/5 transition-colors"
+                      className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-teal-500/5 transition-colors"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="w-4 h-4 rounded bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shrink-0">
+                        <div className="w-4 h-4 rounded bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shrink-0">
                           <Dna className="w-2.5 h-2.5 text-white" />
                         </div>
-                        <div className="text-[10px] font-semibold text-violet-200 truncate">Import from Diagen</div>
+                        <div className="text-[10px] font-semibold text-teal-200 truncate">Import from Diagen</div>
                       </div>
-                      {diagenOpen ? <ChevronUp className="w-3 h-3 text-violet-400" /> : <ChevronDown className="w-3 h-3 text-violet-400" />}
+                      {diagenOpen ? <ChevronUp className="w-3 h-3 text-teal-400" /> : <ChevronDown className="w-3 h-3 text-teal-400" />}
                     </button>
                     {diagenOpen && (
-                      <div className="px-2.5 pb-2.5 space-y-2 border-t border-violet-500/15">
+                      <div className="px-2.5 pb-2.5 space-y-2 border-t border-teal-500/15">
                         <div className="pt-2">
                           <div className="text-[9px] text-slate-500 mb-1 uppercase tracking-wider">Mode</div>
                           <div className="grid grid-cols-3 gap-1">
@@ -3260,8 +3317,8 @@ export function HakaseAI() {
                                 onClick={() => { setDiagenMode(m.id); setDiagenResult(null); }}
                                 className={`py-1 px-1 rounded text-[9px] font-semibold border transition-all ${
                                   diagenMode === m.id
-                                    ? "bg-violet-600/20 border-violet-500/50 text-violet-200"
-                                    : "border-white/8 text-slate-500 hover:border-violet-500/25"
+                                    ? "bg-teal-600/20 border-teal-500/50 text-teal-200"
+                                    : "border-white/8 text-slate-500 hover:border-teal-500/25"
                                 }`}
                               >
                                 {m.label}
@@ -3279,20 +3336,20 @@ export function HakaseAI() {
                               onChange={e => { setDiagenJobId(e.target.value); setDiagenResult(null); }}
                               onKeyDown={e => e.key === "Enter" && handleDiagenFetch()}
                               placeholder={diagenMode === "batch" ? "DGN-BATCH-…" : "DGN-MOL-0047"}
-                              className="bg-white/5 border-violet-500/20 text-white text-[11px] focus:border-violet-500/60 h-7"
+                              className="bg-white/5 border-teal-500/20 text-white text-[11px] focus:border-teal-500/60 h-7"
                             />
                             <button
                               onClick={handleDiagenFetch}
                               disabled={!diagenJobId.trim() || diagenLoading}
-                              className="flex items-center gap-1 px-2 rounded bg-violet-600/30 border border-violet-500/40 text-violet-200 hover:bg-violet-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
+                              className="flex items-center gap-1 px-2 rounded bg-teal-600/30 border border-teal-500/40 text-teal-200 hover:bg-teal-600/40 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
                             >
                               {diagenLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                             </button>
                           </div>
                         </div>
                         {diagenResult && (
-                          <div className="bg-violet-500/5 border border-violet-500/25 rounded p-2 space-y-1.5">
-                            <div className="text-[10px] font-semibold text-violet-200 truncate">{diagenResult.name}</div>
+                          <div className="bg-teal-500/5 border border-teal-500/25 rounded p-2 space-y-1.5">
+                            <div className="text-[10px] font-semibold text-teal-200 truncate">{diagenResult.name}</div>
                             <div className="text-[9px] text-slate-500 truncate">Target: {diagenResult.targetName}</div>
                             <button
                               onClick={() => {
@@ -3304,7 +3361,7 @@ export function HakaseAI() {
                                 setDiagenOpen(false);
                                 setDiagenResult(null);
                               }}
-                              className="w-full flex items-center justify-center gap-1 py-1 rounded bg-violet-600/25 border border-violet-500/40 text-violet-200 hover:bg-violet-600/35 text-[10px] font-semibold"
+                              className="w-full flex items-center justify-center gap-1 py-1 rounded bg-teal-600/25 border border-teal-500/40 text-teal-200 hover:bg-teal-600/35 text-[10px] font-semibold"
                             >
                               <CheckCircle2 className="w-3 h-3" /> Create Project
                             </button>
@@ -3321,7 +3378,7 @@ export function HakaseAI() {
                       className="w-full flex items-center justify-between px-2.5 py-2 hover:bg-white/3 transition-colors"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <Globe className="w-3 h-3 text-violet-400 shrink-0" />
+                        <Globe className="w-3 h-3 text-teal-400 shrink-0" />
                         <span className="text-[10px] font-semibold text-slate-300 truncate">Import via API</span>
                       </div>
                       {apiImportOpen ? <ChevronUp className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
@@ -3342,7 +3399,7 @@ export function HakaseAI() {
                                 onClick={() => { setApiSource(src.id); setApiResult(null); setApiError(null); setApiCompoundId(""); }}
                                 className={`py-1 px-1 rounded text-[10px] font-medium border transition-all ${
                                   apiSource === src.id
-                                    ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                                    ? "bg-teal-600/20 border-teal-500/40 text-teal-300"
                                     : "border-white/10 text-slate-500 hover:border-white/20 hover:text-slate-400"
                                 }`}
                               >
@@ -3364,12 +3421,12 @@ export function HakaseAI() {
                                 apiSource === "unichem" ? "ChEMBL ID"           :
                                                           "ZINC ID"
                               }
-                              className="bg-white/5 border-white/10 text-white text-[11px] focus:border-violet-500/60 h-7"
+                              className="bg-white/5 border-white/10 text-white text-[11px] focus:border-teal-500/60 h-7"
                             />
                             <button
                               onClick={handleApiFetch}
                               disabled={!apiCompoundId.trim() || apiLoading}
-                              className="flex items-center gap-1 px-2 rounded bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
+                              className="flex items-center gap-1 px-2 rounded bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium shrink-0"
                             >
                               {apiLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                             </button>
@@ -3424,13 +3481,13 @@ export function HakaseAI() {
                 <div className={`w-10 flex flex-col items-center py-3 shrink-0 ${lightMode ? 'border-r border-slate-200 bg-slate-100' : 'border-r border-white/8 bg-[#0d0f17]/60'}`}>
                   <button
                     onClick={() => setInputPanelOpen(true)}
-                    className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-violet-300 transition-colors"
+                    className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-teal-300 transition-colors"
                     title="Expand input panel"
                   >
                     <Menu className="w-3.5 h-3.5" />
                   </button>
                   <div className="mt-3 flex flex-col items-center gap-2">
-                    <TestTube2 className="w-4 h-4 text-violet-400/70" />
+                    <TestTube2 className="w-4 h-4 text-teal-400/70" />
                     <div
                       className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest"
                       style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
@@ -3444,7 +3501,7 @@ export function HakaseAI() {
               <div className={`w-[420px] overflow-y-auto flex flex-col shrink-0 ${lightMode ? 'border-r border-slate-200 bg-white' : 'border-r border-white/8'}`}>
                 <div className="p-5 border-b border-white/8">
                   <div className="flex items-center gap-2 mb-1">
-                    <TestTube2 className="w-4 h-4 text-violet-400" />
+                    <TestTube2 className="w-4 h-4 text-teal-400" />
                     <h2 className="hk-display text-[19px] text-white flex-1">Layer 1 — In Vitro Digital Twin</h2>
                     <button
                       onClick={() => setInputPanelOpen(false)}
@@ -3465,7 +3522,7 @@ export function HakaseAI() {
                       <select
                         value={l1Modality}
                         onChange={(e) => setL1Modality(e.target.value as Modality)}
-                        className="w-full px-3 py-2 rounded bg-black/40 border border-white/10 text-[12px] font-semibold text-white outline-none focus:border-violet-500/50 appearance-none pr-8"
+                        className="w-full px-3 py-2 rounded bg-black/40 border border-white/10 text-[12px] font-semibold text-white outline-none focus:border-teal-500/50 appearance-none pr-8"
                       >
                         {MODALITY_REGISTRY.map((m) => (
                           <option key={m.id} value={m.id} disabled={!m.available}>
@@ -3483,14 +3540,14 @@ export function HakaseAI() {
                     <div className="space-y-3">
                       {/* ── Peptide mode: sequence input in sidebar ───────── */}
                       {l1Modality === "peptide" && (<>
-                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-2">
-                          <div className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider">Peptide Sequence</div>
+                        <div className="rounded-lg border border-teal-500/20 bg-teal-500/[0.04] p-3 space-y-2">
+                          <div className="text-[10px] text-teal-300 font-semibold uppercase tracking-wider">Peptide Sequence</div>
                           <textarea
                             value={peptideSequence}
                             onChange={e => setPeptideSequence(e.target.value.replace(/\s/g, "").toUpperCase())}
                             placeholder="e.g. ACDEFGHIKLM — single-letter AA codes"
                             rows={3}
-                            className="w-full bg-white/5 border border-white/10 text-white text-[11px] font-mono rounded px-2 py-1.5 resize-none focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                            className="w-full bg-white/5 border border-white/10 text-white text-[11px] font-mono rounded px-2 py-1.5 resize-none focus:outline-none focus:border-teal-500/60 placeholder:text-slate-600"
                           />
                           <div className="text-[10px] text-slate-600">
                             {peptideSequence.length > 0 ? `${peptideSequence.length} residues · analysis in results panel →` : "Enter sequence, results appear in the panel on the right"}
@@ -3507,7 +3564,7 @@ export function HakaseAI() {
                         </button>
 
                         {showModPanel && (
-                          <div className="rounded-lg border border-violet-500/15 bg-violet-500/[0.02] p-3 space-y-3">
+                          <div className="rounded-lg border border-teal-500/15 bg-teal-500/[0.02] p-3 space-y-3">
                             {/* Terminal caps */}
                             <div className="grid grid-cols-2 gap-2">
                               <div>
@@ -3515,7 +3572,7 @@ export function HakaseAI() {
                                 <select
                                   value={peptideMods.nTermCap}
                                   onChange={e => setPeptideMods(p => ({ ...p, nTermCap: e.target.value as any }))}
-                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-teal-500/50"
                                 >
                                   <option value="none">None</option>
                                   <option value="acetyl">Acetyl (Ac-)</option>
@@ -3527,7 +3584,7 @@ export function HakaseAI() {
                                 <select
                                   value={peptideMods.cTermCap}
                                   onChange={e => setPeptideMods(p => ({ ...p, cTermCap: e.target.value as any }))}
-                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-teal-500/50"
                                 >
                                   <option value="none">None</option>
                                   <option value="amide">Amide (-NH₂)</option>
@@ -3547,7 +3604,7 @@ export function HakaseAI() {
                                   if (v !== "none") setPeptideCyclic(true);
                                   else setPeptideCyclic(false);
                                 }}
-                                className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-teal-500/50"
                               >
                                 <option value="none">Linear (no cyclization)</option>
                                 <option value="head_to_tail">Head-to-tail</option>
@@ -3567,7 +3624,7 @@ export function HakaseAI() {
                                   setPeptideMods(p => ({ ...p, dAminoAcidPositions: positions }));
                                 }}
                                 placeholder="e.g. 2, 5, 8"
-                                className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                                className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-teal-500/50"
                               />
                             </div>
 
@@ -3582,7 +3639,7 @@ export function HakaseAI() {
                                     setPeptideMods(p => ({ ...p, pegylationSite: isNaN(v) || v < 0 ? null : v }));
                                   }}
                                   placeholder="Position"
-                                  className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-violet-500/50"
+                                  className="bg-black/30 border-white/10 text-white text-[10px] font-mono h-7 focus:border-teal-500/50"
                                 />
                                 {peptideMods.pegylationSite !== null && (
                                   <select
@@ -3610,7 +3667,7 @@ export function HakaseAI() {
                                       lipidationSite: lt !== "none" ? (p.lipidationSite ?? 0) : null,
                                     }));
                                   }}
-                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-violet-500/50"
+                                  className="w-full px-2 py-1 rounded bg-black/30 border border-white/10 text-[10px] text-white outline-none focus:border-teal-500/50"
                                 >
                                   <option value="none">None</option>
                                   <option value="palmitic">Palmitic acid (C16)</option>
@@ -3680,9 +3737,9 @@ export function HakaseAI() {
 
                       {/* ── Antibody mode: sequence inputs in sidebar ──────── */}
                       {l1Modality === "antibody" && (<>
-                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-3">
+                        <div className="rounded-lg border border-teal-500/20 bg-teal-500/[0.04] p-3 space-y-3">
                           <div>
-                            <label className="text-[10px] text-violet-300 font-semibold uppercase tracking-wider block mb-1">
+                            <label className="text-[10px] text-teal-300 font-semibold uppercase tracking-wider block mb-1">
                               Heavy / VHH chain *
                             </label>
                             <textarea
@@ -3690,7 +3747,7 @@ export function HakaseAI() {
                               onChange={(e) => setAntibodyHeavy(e.target.value)}
                               placeholder="Paste heavy-chain sequence…"
                               rows={3}
-                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-teal-500/60 placeholder:text-slate-600"
                             />
                           </div>
                           <div>
@@ -3702,7 +3759,7 @@ export function HakaseAI() {
                               onChange={(e) => setAntibodyLight(e.target.value)}
                               placeholder="Paste light-chain sequence…"
                               rows={2}
-                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] font-mono rounded px-2.5 py-1.5 resize-y focus:outline-none focus:border-teal-500/60 placeholder:text-slate-600"
                             />
                           </div>
                           <div>
@@ -3710,7 +3767,7 @@ export function HakaseAI() {
                               value={antibodyFormatHint}
                               onChange={(e) => setAntibodyFormatHint(e.target.value)}
                               placeholder="Format hint (e.g. IgG1, scFv)"
-                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] rounded px-2.5 py-1.5 focus:outline-none focus:border-violet-500/60 placeholder:text-slate-600"
+                              className="w-full bg-black/30 border border-white/10 text-white text-[11px] rounded px-2.5 py-1.5 focus:outline-none focus:border-teal-500/60 placeholder:text-slate-600"
                             />
                           </div>
                           <div className="flex gap-2 justify-end">
@@ -3789,7 +3846,7 @@ export function HakaseAI() {
                               }}
                               onKeyDown={e => { if (e.key === "Enter" && molProps?.isValid) handleAnalyzeMolecule(); }}
                               placeholder="Enter SMILES or paste any sequence..."
-                              className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-violet-500/60 focus:bg-white/8"
+                              className="bg-white/5 border-white/10 text-white text-[12px] font-mono pr-10 focus:border-teal-500/60 focus:bg-white/8"
                             />
                             {smiles && (
                               <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -3810,7 +3867,7 @@ export function HakaseAI() {
                             disabled={!molProps?.isValid || !smilesNeedsActivation}
                             className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
                               smilesNeedsActivation && molProps?.isValid
-                                ? "bg-gradient-to-r from-violet-600 to-violet-500 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:from-violet-500 hover:to-violet-400 animate-pulse"
+                                ? "bg-gradient-to-r from-teal-600 to-teal-500 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:from-teal-500 hover:to-teal-400 animate-pulse"
                                 : "bg-white/5 border border-white/10 text-slate-500 cursor-not-allowed"
                             }`}
                           >
@@ -3830,7 +3887,7 @@ export function HakaseAI() {
                               <div className="flex items-center gap-3 min-w-0">
                                 {mol2dSvg ? (
                                   <div
-                                    className="w-16 h-14 rounded border border-emerald-500/20 bg-white/[0.03] shrink-0 flex items-center justify-center overflow-hidden cursor-pointer hover:border-violet-500/40 transition-colors"
+                                    className="w-16 h-14 rounded border border-emerald-500/20 bg-white/[0.03] shrink-0 flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-500/40 transition-colors"
                                     onClick={() => setViewer3DOpen(true)}
                                     title="Click for interactive 3D view"
                                     dangerouslySetInnerHTML={{ __html: mol2dSvg.replace(/width=['"][^'"]*['"]/, 'width="100%"').replace(/height=['"][^'"]*['"]/, 'height="100%"') }}
@@ -3863,8 +3920,8 @@ export function HakaseAI() {
                                         MW {molProps.mw} Da · logP {molProps.logP} · HBD {molProps.hbd} · HBA {molProps.hba}
                                       </div>
                                       {chemblLookupLoading && (
-                                        <div className="text-violet-400 text-[9px] mt-0.5 flex items-center gap-1">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                                        <div className="text-teal-400 text-[9px] mt-0.5 flex items-center gap-1">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
                                           Identifying compound in ChEMBL…
                                         </div>
                                       )}
@@ -3896,7 +3953,7 @@ export function HakaseAI() {
                               <button
                                 onClick={() => setViewer3DOpen(true)}
                                 disabled={!molProps?.isValid}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-all text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-all text-[11px] font-medium disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                               >
                                 <Box className="w-3.5 h-3.5" />
                                 View 3D
@@ -3912,7 +3969,7 @@ export function HakaseAI() {
                         <Input
                           value={molName}
                           onChange={e => { molNameManual.current = true; setMolName(e.target.value); }}
-                          className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60"
+                          className="bg-white/5 border-white/10 text-white text-[12px] focus:border-teal-500/60"
                           placeholder="e.g. Compound-XYZ-001"
                         />
                       </FieldGroup>
@@ -3937,7 +3994,7 @@ export function HakaseAI() {
                       <div className="bg-blue-500/5 border border-blue-500/15 rounded-lg p-2.5 flex gap-2">
                         <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
                         <div className="text-[10px] text-slate-400 leading-relaxed">
-                          Enter a <span className="text-white font-medium">UniProt accession</span> (e.g. <span className="font-mono text-violet-300">P00533</span>) and click <span className="text-white font-medium">Fetch</span> to load the protein. Then optionally specify a <span className="text-white font-medium">PDB structure</span> for binding simulation — or let it auto-populate from the protein's known crystal structures.
+                          Enter a <span className="text-white font-medium">UniProt accession</span> (e.g. <span className="font-mono text-teal-300">P00533</span>) and click <span className="text-white font-medium">Fetch</span> to load the protein. Then optionally specify a <span className="text-white font-medium">PDB structure</span> for binding simulation — or let it auto-populate from the protein's known crystal structures.
                         </div>
                       </div>
 
@@ -3981,7 +4038,7 @@ export function HakaseAI() {
                           ) : (
                             <button
                               onClick={() => { uniprotManual.current = false; setUniprotAutoMode(true); }}
-                              className="text-[9px] text-violet-500 hover:text-violet-400 transition-colors"
+                              className="text-[9px] text-teal-500 hover:text-teal-400 transition-colors"
                             >
                               ↺ Auto-match
                             </button>
@@ -4003,9 +4060,9 @@ export function HakaseAI() {
                                 <button
                                   key={sugg.uniprotId}
                                   onClick={() => { uniprotManual.current = true; setUniprotAutoMode(false); setUniprotId(sugg.uniprotId); setPdbId(""); setPdbStructure(null); setProteinInfo(null); setProteinError(null); handleProteinFetch(sugg.uniprotId); /* auto-fetch on suggestion click — pulls UniProt → first PDB → /predict/structure so the PDB shows AND threads into docking/co-folding outputs immediately */ }}
-                                  className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-violet-400") : "text-slate-600 hover:text-violet-400"}`}
+                                  className={`text-[9px] transition-colors font-mono flex items-center gap-0.5 ${isActive ? (isChembl ? "text-emerald-400" : "text-teal-400") : "text-slate-600 hover:text-teal-400"}`}
                                 >
-                                  {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-violet-500") : "text-slate-700"}`}>({sugg.geneName})</span>
+                                  {sugg.uniprotId} <span className={`not-italic ${isActive ? (isChembl ? "text-emerald-500" : "text-teal-500") : "text-slate-700"}`}>({sugg.geneName})</span>
                                   <span className={`text-[7px] ml-0.5 ${confColor}`}>{confPct}%</span>
                                 </button>
                               );
@@ -4033,14 +4090,14 @@ export function HakaseAI() {
                                     onKeyDown={e => e.key === "Enter" && !uniprotIdInvalid && handleProteinFetch()}
                                     aria-invalid={uniprotIdInvalid}
                                     aria-describedby="uniprot-id-hint"
-                                    className={`bg-white/5 text-white text-[12px] pl-8 font-mono uppercase ${uniprotIdInvalid ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-violet-500/60"}`}
+                                    className={`bg-white/5 text-white text-[12px] pl-8 font-mono uppercase ${uniprotIdInvalid ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-teal-500/60"}`}
                                     placeholder="UniProt accession e.g. P00533"
                                   />
                                 </div>
                                 <button
                                   onClick={handleProteinFetch}
                                   disabled={!trimmedUniprot || uniprotIdInvalid || proteinLoading}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[11px] font-medium shrink-0"
                                 >
                                   {proteinLoading
                                     ? <><RefreshCw className="w-3 h-3 animate-spin" /> Fetching…</>
@@ -4068,7 +4125,7 @@ export function HakaseAI() {
                                     <Info className="w-3 h-3 text-slate-600 shrink-0 mt-0.5" />
                                     <span className="text-[9px] text-slate-600">
                                       UniProt accessions are 6–10 character protein identifiers. Find yours at{" "}
-                                      <span className="text-violet-500">uniprot.org</span> by searching the protein or gene name.
+                                      <span className="text-teal-500">uniprot.org</span> by searching the protein or gene name.
                                     </span>
                                   </>
                                 )}
@@ -4079,31 +4136,31 @@ export function HakaseAI() {
 
                         {/* Molecule-aware target suggestions */}
                         {targetSuggestions.length > 0 && (
-                          <div className="mt-2 rounded-xl border border-violet-500/20 bg-violet-500/5 overflow-hidden">
+                          <div className="mt-2 rounded-xl border border-teal-500/20 bg-teal-500/5 overflow-hidden">
                             <button
                               onClick={() => setTargetSuggOpen(v => !v)}
-                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-violet-300 hover:bg-violet-500/8 transition-colors"
+                              className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-teal-300 hover:bg-teal-500/8 transition-colors"
                             >
                               <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-3 h-3 text-violet-400" />
+                                <Sparkles className="w-3 h-3 text-teal-400" />
                                 <span>Molecule-Based Target Suggestions</span>
-                                <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-[9px]">{targetSuggestions.length}</span>
+                                <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-[9px]">{targetSuggestions.length}</span>
                               </div>
                               <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${targetSuggOpen ? "rotate-180" : ""}`} />
                             </button>
                             {targetSuggOpen && (
                               <div className="px-2 pb-2 space-y-1.5">
                                 <p className="text-[9px] text-slate-500 px-1 pb-1">
-                                  Ranked by structural and physicochemical match to your molecule. Click <span className="text-violet-400 font-medium">Use</span> to set a UniProt ID.
+                                  Ranked by structural and physicochemical match to your molecule. Click <span className="text-teal-400 font-medium">Use</span> to set a UniProt ID.
                                 </p>
                                 {targetSuggestions.map((sugg, i) => {
-                                  const barColor = sugg.color === "violet" ? "bg-violet-500"  :
+                                  const barColor = sugg.color === "violet" ? "bg-teal-500"  :
                                                    sugg.color === "blue"   ? "bg-blue-500"    :
                                                    sugg.color === "emerald"? "bg-emerald-500" :
                                                    sugg.color === "amber"  ? "bg-amber-500"   :
                                                    sugg.color === "red"    ? "bg-red-500"     :
                                                                              "bg-cyan-500";
-                                  const badgeColor = sugg.color === "violet" ? "bg-violet-500/15 text-violet-300 border-violet-500/25"  :
+                                  const badgeColor = sugg.color === "violet" ? "bg-teal-500/15 text-teal-300 border-teal-500/25"  :
                                                      sugg.color === "blue"   ? "bg-blue-500/15 text-blue-300 border-blue-500/25"        :
                                                      sugg.color === "emerald"? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25":
                                                      sugg.color === "amber"  ? "bg-amber-500/15 text-amber-300 border-amber-500/25"     :
@@ -4134,7 +4191,7 @@ export function HakaseAI() {
                                             // without a second click. (Was: no-preload — produced empty PDB column.)
                                             handleProteinFetch(sugg.uniprotId);
                                           }}
-                                          className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/35 transition-all"
+                                          className="shrink-0 px-2 py-1 rounded text-[9px] font-semibold bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/35 transition-all"
                                         >
                                           Use
                                         </button>
@@ -4213,7 +4270,7 @@ export function HakaseAI() {
                                                     {p.range_nM[1] < 1000 ? `${p.range_nM[1].toFixed(1)} nM` : `${(p.range_nM[1] / 1000).toFixed(2)} µM`}
                                                   </span>
                                                   {dominantAssay && (
-                                                    <span className="px-1 py-px rounded bg-violet-500/10 border border-violet-500/25 text-violet-300 font-mono text-[8px]">
+                                                    <span className="px-1 py-px rounded bg-teal-500/10 border border-teal-500/25 text-teal-300 font-mono text-[8px]">
                                                       {dominantAssay}
                                                     </span>
                                                   )}
@@ -4312,7 +4369,7 @@ export function HakaseAI() {
 
                         {/* Result card */}
                         {proteinInfo && (
-                          <div className="mt-2 bg-violet-500/5 border border-violet-500/20 rounded-lg p-2.5 space-y-2">
+                          <div className="mt-2 bg-teal-500/5 border border-teal-500/20 rounded-lg p-2.5 space-y-2">
                             <div className="flex items-center gap-2">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                               <span className="text-[11px] font-semibold text-emerald-300">{proteinInfo.gene} · {proteinInfo.name}</span>
@@ -4375,8 +4432,8 @@ export function HakaseAI() {
                                     </div>
                                   </div>
                                   {isHuge && core && (
-                                    <div className="bg-violet-500/10 border border-violet-500/25 rounded px-2 py-1.5">
-                                      <div className="text-[9px] text-violet-300 font-semibold mb-0.5">Druggable core domain</div>
+                                    <div className="bg-teal-500/10 border border-teal-500/25 rounded px-2 py-1.5">
+                                      <div className="text-[9px] text-teal-300 font-semibold mb-0.5">Druggable core domain</div>
                                       <div className="text-[10px] text-slate-300 font-mono">
                                         residues {core.start}–{core.end}
                                         <span className="text-slate-500"> · {core.length} aa · μpLDDT {core.meanPlddt}</span>
@@ -4672,7 +4729,7 @@ export function HakaseAI() {
                                     <button key={id} onClick={() => setPdbId(id)}
                                       className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-all border ${
                                         pdbId === id
-                                          ? "bg-violet-600/25 border-violet-500/40 text-violet-300"
+                                          ? "bg-teal-600/25 border-teal-500/40 text-teal-300"
                                           : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300 hover:border-white/20"
                                       }`}
                                     >{id}</button>
@@ -4764,7 +4821,7 @@ export function HakaseAI() {
                             const chip = (() => {
                               if (taProvenance.kind === "auto") return {
                                 label: "Auto", title: `Predicted from top target: ${taProvenance.source ?? "—"}`,
-                                cls: "bg-violet-500/10 border-violet-500/30 text-violet-300",
+                                cls: "bg-teal-500/10 border-teal-500/30 text-teal-300",
                               };
                               if (taProvenance.kind === "manual") return {
                                 label: "Manual", title: "Selected by user",
@@ -4794,12 +4851,12 @@ export function HakaseAI() {
                             setTaProvenance({ kind: "manual" });
                           }}
                         >
-                          <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px] focus:border-violet-500/60">
+                          <SelectTrigger className="bg-white/5 border-white/10 text-white text-[12px] focus:border-teal-500/60">
                             <SelectValue placeholder="— Not predicted —" />
                           </SelectTrigger>
                           <SelectContent className="bg-[#1a1d2b] border-white/10 text-white">
                             {["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"].map(a => (
-                              <SelectItem key={a} value={a} className="text-[12px] focus:bg-violet-600/20">{a}</SelectItem>
+                              <SelectItem key={a} value={a} className="text-[12px] focus:bg-teal-600/20">{a}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -4970,7 +5027,7 @@ export function HakaseAI() {
                               if (!finite(bbb) && !finite(ppb) && !finite(vd)) return null;
                               if (finite(bbb)) {
                                 const cls = bbb >= 0.5 ? "BBB-penetrant" : "BBB-restricted";
-                                const tone = bbb >= 0.5 ? "text-violet-300 border-violet-500/30 bg-violet-500/5"
+                                const tone = bbb >= 0.5 ? "text-teal-300 border-teal-500/30 bg-teal-500/5"
                                                         : "text-slate-300 border-white/10 bg-white/5";
                                 const extra = finite(ppb) ? ` · PPB ${(ppb * 100).toFixed(0)}%` : "";
                                 return { headline: `${cls} (${bbb.toFixed(2)})`, sub: `BBB_Martins${extra}`, tone };
@@ -5039,7 +5096,7 @@ export function HakaseAI() {
                               <div className="border-t border-white/5 pt-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">ADMET-AI summary</span>
-                                  <a href="#ml-admet-detail" className="text-[9px] text-violet-300/80 hover:text-violet-200 transition-colors">
+                                  <a href="#ml-admet-detail" className="text-[9px] text-teal-300/80 hover:text-teal-200 transition-colors">
                                     Full 5-axis panel ↓
                                   </a>
                                 </div>
@@ -5111,7 +5168,7 @@ export function HakaseAI() {
                       />
 
                       {fingerprintOn && (
-                        <div className="ml-4 pl-3 border-l border-violet-500/20">
+                        <div className="ml-4 pl-3 border-l border-teal-500/20">
                           <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Tissue Types</Label>
                           <div className="grid grid-cols-3 gap-1.5 mt-1.5">
                             {["Liver","Kidney","CNS","Cardiac","GI","Lung"].map(t => (
@@ -5120,7 +5177,7 @@ export function HakaseAI() {
                                 onClick={() => toggleTissue(t)}
                                 className={`py-1 px-2 rounded text-[10px] font-medium border transition-all ${
                                   tissueTypes.includes(t)
-                                    ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                                    ? "bg-teal-600/20 border-teal-500/40 text-teal-300"
                                     : "border-white/10 text-slate-500 hover:border-white/20"
                                 }`}
                               >
@@ -5136,7 +5193,7 @@ export function HakaseAI() {
                           value={confidenceThreshold}
                           onValueChange={setConfidenceThreshold}
                           min={0.5} max={0.95} step={0.05}
-                          className="[&_[role=slider]]:bg-violet-500 [&_[role=slider]]:border-0"
+                          className="[&_[role=slider]]:bg-teal-500 [&_[role=slider]]:border-0"
                         />
                         <div className="flex justify-between text-[10px] text-slate-600 mt-0.5">
                           <span>0.50 Low</span><span>0.95 High</span>
@@ -5159,7 +5216,7 @@ export function HakaseAI() {
                           </SelectTrigger>
                           <SelectContent className="bg-[#1a1d2b] border-white/10 text-white">
                             {["QED Score","Toxicity Risk (ascending)","Binding Affinity","Composite (weighted)"].map(o => (
-                              <SelectItem key={o} value={o.split(" ")[0]} className="text-[12px] focus:bg-violet-600/20">{o}</SelectItem>
+                              <SelectItem key={o} value={o.split(" ")[0]} className="text-[12px] focus:bg-teal-600/20">{o}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -5177,7 +5234,7 @@ export function HakaseAI() {
                                   setCompositeWeights(next);
                                 }}
                                 min={0} max={1} step={0.1}
-                                className="flex-1 [&_[role=slider]]:bg-violet-500 [&_[role=slider]]:border-0"
+                                className="flex-1 [&_[role=slider]]:bg-teal-500 [&_[role=slider]]:border-0"
                               />
                               <span className="text-[11px] text-slate-400 w-8 text-right">{compositeWeights[i].toFixed(1)}</span>
                             </div>
@@ -5370,10 +5427,10 @@ export function HakaseAI() {
                       )}
                     </div>
                   )}
-                  {l1Modality === "small_molecule" && (<div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                  {l1Modality === "small_molecule" && (<div className="rounded-xl border border-teal-500/25 bg-teal-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
-                      <ArrowRight className="w-3 h-3 text-violet-400 shrink-0" />
-                      <span className="text-[11px] font-semibold text-violet-300">L1 → L2 Cascade Preview</span>
+                      <ArrowRight className="w-3 h-3 text-teal-400 shrink-0" />
+                      <span className="text-[11px] font-semibold text-teal-300">L1 → L2 Cascade Preview</span>
                     </div>
                     <p className="text-[10px] text-slate-500">These in vitro properties will auto-populate Layer 2 Animal Cohort configuration:</p>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
@@ -5398,7 +5455,7 @@ export function HakaseAI() {
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1">
                           <span className="text-slate-500">{k}</span>
-                          <span className={v === "pending" ? "text-slate-600 italic" : "text-violet-300 font-semibold"}>{v}</span>
+                          <span className={v === "pending" ? "text-slate-600 italic" : "text-teal-300 font-semibold"}>{v}</span>
                         </div>
                       ))}
                     </div>
@@ -5444,7 +5501,7 @@ export function HakaseAI() {
                     <Button
                       onClick={runSimulation}
                       disabled={!rdkitReady || simStatus[1] === "running" || !smiles || (molProps !== null && !molProps.isValid)}
-                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                      className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                     >
                       {simStatus[1] === "running" ? (
                         <><RefreshCw className="w-4 h-4 animate-spin" /> Simulating…</>
@@ -5463,7 +5520,7 @@ export function HakaseAI() {
                     <Button
                       onClick={runPeptideSimulation}
                       disabled={peptideLoading || peptideSequence.trim().length < 2}
-                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                      className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                     >
                       {peptideLoading
                         ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
@@ -5480,7 +5537,7 @@ export function HakaseAI() {
                     <Button
                       onClick={runAntibodyAnalysis}
                       disabled={antibodyLoading || antibodyHeavy.replace(/[^A-Za-z]/g, "").length < 70}
-                      className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
+                      className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold h-10 gap-2 text-[13px] disabled:opacity-50"
                     >
                       {antibodyLoading
                         ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</>
@@ -5502,8 +5559,8 @@ export function HakaseAI() {
                 {/* ── Peptide modality: running animation ───────────────── */}
                 {l1Modality === "peptide" && simStatus[1] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    <div className="w-16 h-16 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-teal-400 animate-spin" style={{ animationDuration: "3s" }} />
                     </div>
                     <div className="text-[14px] font-medium text-white">Running Peptide Analysis</div>
                     <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
@@ -5515,8 +5572,8 @@ export function HakaseAI() {
                 {l1Modality === "peptide" && simStatus[1] === "idle" && !peptideResult && !peptideError && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                        <Dna className="w-7 h-7 text-violet-400/50" />
+                      <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                        <Dna className="w-7 h-7 text-teal-400/50" />
                       </div>
                       <div className="text-center">
                         <div className="text-[14px] font-medium text-slate-400">No peptide analysis yet</div>
@@ -5558,8 +5615,8 @@ export function HakaseAI() {
                 {/* ── Antibody modality: running animation ──────────────── */}
                 {l1Modality === "antibody" && simStatus[1] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    <div className="w-16 h-16 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-teal-400 animate-spin" style={{ animationDuration: "3s" }} />
                     </div>
                     <div className="text-[14px] font-medium text-white">Running Antibody Developability Analysis</div>
                     <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
@@ -5571,8 +5628,8 @@ export function HakaseAI() {
                 {l1Modality === "antibody" && simStatus[1] === "idle" && !antibodyResult && !antibodyError && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                        <Shield className="w-7 h-7 text-violet-400/50" />
+                      <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                        <Shield className="w-7 h-7 text-teal-400/50" />
                       </div>
                       <div className="text-center">
                         <div className="text-[14px] font-medium text-slate-400">No antibody analysis yet</div>
@@ -5609,8 +5666,8 @@ export function HakaseAI() {
                 {l1Modality === "small_molecule" && simStatus[1] === "idle" && (
                   <div className="flex flex-col items-center justify-center h-full gap-6">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                        <TestTube2 className="w-7 h-7 text-violet-400/50" />
+                      <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                        <TestTube2 className="w-7 h-7 text-teal-400/50" />
                       </div>
                       <div className="text-center">
                         <div className="text-[14px] font-medium text-slate-400">No simulation results yet</div>
@@ -5629,10 +5686,10 @@ export function HakaseAI() {
                               <button
                                 key={mode}
                                 onClick={() => { setViewer3DMode(mode); setViewer3DOpen(true); }}
-                                className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-white/4 border border-white/8 hover:border-violet-500/40 hover:bg-violet-500/5 transition-all group"
+                                className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl bg-white/4 border border-white/8 hover:border-teal-500/40 hover:bg-teal-500/5 transition-all group"
                               >
                                 <span className="text-xl">{icons[mode]}</span>
-                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300 transition-colors">{labels[mode]}</span>
+                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-teal-300 transition-colors">{labels[mode]}</span>
                               </button>
                             );
                           })}
@@ -5644,8 +5701,8 @@ export function HakaseAI() {
 
                 {l1Modality === "small_molecule" && simStatus[1] === "running" && (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-                      <Atom className="w-8 h-8 text-violet-400 animate-spin" style={{ animationDuration: "3s" }} />
+                    <div className="w-16 h-16 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
+                      <Atom className="w-8 h-8 text-teal-400 animate-spin" style={{ animationDuration: "3s" }} />
                     </div>
                     <div className="text-[14px] font-medium text-white">Running In Vitro Simulation</div>
                     <Progress value={simProgress} className="w-64 h-2 bg-white/10" />
@@ -6058,13 +6115,13 @@ export function HakaseAI() {
                         {/* L1 inputs */}
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <Database className="w-3.5 h-3.5 text-violet-400" />
+                            <Database className="w-3.5 h-3.5 text-teal-400" />
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">L1 In-Vitro Inputs</span>
                             <span className={`ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${simResults ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400/80" : "border-amber-500/30 bg-amber-500/8 text-amber-400/80"}`}>
                               {simResults ? "Live" : "Pending"}
                             </span>
                           </div>
-                          <div className="rounded-lg border border-violet-500/15 bg-violet-500/[0.03] px-3 py-1">
+                          <div className="rounded-lg border border-teal-500/15 bg-teal-500/[0.03] px-3 py-1">
                             <Row label="Compound"            source="L1 / chemistry.ts (RDKit)" value={simResults ? simResults.molName : "—"} />
                             <Row label="UniProt target"      source="L1 / UniProt KB API"       value={simResults ? simResults.uniprotId : "—"} />
                             <Row label="MW · LogP · TPSA"    source="RDKit descriptors"          value={simResults ? `${simResults.lipinski.mw.toFixed(0)} · ${simResults.lipinski.logP.toFixed(2)} · ${simResults.lipinski.tpsa.toFixed(0)}` : "—"} />
@@ -6333,7 +6390,7 @@ export function HakaseAI() {
                       <TestTube2 className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Species Selection</span>
                       {l2AutoConfigured && !l2ManualOverride.current.species && (
-                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                        <span className="text-[8px] bg-teal-500/15 text-teal-400 border border-teal-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -6367,7 +6424,7 @@ export function HakaseAI() {
                       <Clock className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Study Design</span>
                       {l2AutoConfigured && !l2ManualOverride.current.study && (
-                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                        <span className="text-[8px] bg-teal-500/15 text-teal-400 border border-teal-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -6399,7 +6456,7 @@ export function HakaseAI() {
                       <Activity className="w-3.5 h-3.5 text-amber-400" />
                       <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Route of Administration</span>
                       {l2AutoConfigured && !l2ManualOverride.current.route && (
-                        <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                        <span className="text-[8px] bg-teal-500/15 text-teal-400 border border-teal-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-2">
@@ -6427,7 +6484,7 @@ export function HakaseAI() {
                         <span className="text-[12px] font-semibold text-slate-300 uppercase tracking-widest">Formulation / Drug Delivery</span>
                         <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-semibold">FDA IIG</span>
                         {l2AutoConfigured && !l2ManualOverride.current.formulation && (
-                          <span className="text-[8px] bg-violet-500/15 text-violet-400 border border-violet-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
+                          <span className="text-[8px] bg-teal-500/15 text-teal-400 border border-teal-500/25 px-1.5 py-0.5 rounded font-semibold">L1 Auto</span>
                         )}
                       </div>
                       <div className="space-y-2">
@@ -6461,10 +6518,10 @@ export function HakaseAI() {
                       "Advance to Confirmation (L2)" button on the L1 card
                       is the recommended human review step before this
                       banner's animal results should be trusted for L4. */}
-                  <div className="rounded-xl border border-violet-500/25 bg-violet-500/6 p-3.5 space-y-2">
+                  <div className="rounded-xl border border-teal-500/25 bg-teal-500/6 p-3.5 space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
-                      <span className="text-[11px] font-semibold text-violet-300">
+                      <div className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                      <span className="text-[11px] font-semibold text-teal-300">
                         {simResults ? "Layer 1 → Layer 3 Cascade Applied" : "Layer 1 → Layer 3 Cascade Pending"}
                       </span>
                     </div>
@@ -6484,7 +6541,7 @@ export function HakaseAI() {
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1">
                           <span className="text-slate-500">{k}</span>
-                          <span className={v === "–" ? "text-slate-600" : "text-violet-300 font-semibold"}>{v}</span>
+                          <span className={v === "–" ? "text-slate-600" : "text-teal-300 font-semibold"}>{v}</span>
                         </div>
                       ))}
                     </div>
@@ -7871,12 +7928,12 @@ export function HakaseAI() {
                   onClick={() => setViewer3DMode(id)}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[12px] font-medium transition-all ${
                     viewer3DMode === id
-                      ? "bg-violet-600/30 border border-violet-500/40 text-violet-200 shadow-sm"
+                      ? "bg-teal-600/30 border border-teal-500/40 text-teal-200 shadow-sm"
                       : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                   }`}
                 >
                   {label}
-                  <span className={`text-[9px] font-normal ${viewer3DMode === id ? "text-violet-400" : "text-slate-600"}`}>{desc}</span>
+                  <span className={`text-[9px] font-normal ${viewer3DMode === id ? "text-teal-400" : "text-slate-600"}`}>{desc}</span>
                 </button>
               ))}
             </div>
@@ -7938,7 +7995,7 @@ function FieldGroup({ label, children, required, hint }: {
     <div className="space-y-1">
       <div className="flex items-center gap-1.5">
         <Label className="text-[11px] text-slate-400 font-medium">{label}</Label>
-        {required && <span className="text-[9px] text-violet-400 font-bold">*</span>}
+        {required && <span className="text-[9px] text-teal-400 font-bold">*</span>}
         {hint && <span className="text-[9px] text-slate-600 ml-auto">{hint}</span>}
       </div>
       {children}
@@ -7967,7 +8024,7 @@ function ToggleRow({ label, description, value, onChange, locked, disabled }: {
         checked={value}
         onCheckedChange={locked || disabled ? undefined : onChange}
         disabled={locked || disabled}
-        className="data-[state=checked]:bg-violet-600 shrink-0"
+        className="data-[state=checked]:bg-teal-600 shrink-0"
       />
     </div>
   );
@@ -7983,7 +8040,7 @@ function DualRangeField({ label, value, onChange, min, max, unit, color, require
         value={value as [number, number]}
         onValueChange={onChange}
         min={min} max={max}
-        className={`[&_[role=slider]]:border-0 ${color === "blue" ? "[&_[role=slider]]:bg-blue-500" : color === "emerald" ? "[&_[role=slider]]:bg-emerald-500" : "[&_[role=slider]]:bg-violet-500"}`}
+        className={`[&_[role=slider]]:border-0 ${color === "blue" ? "[&_[role=slider]]:bg-blue-500" : color === "emerald" ? "[&_[role=slider]]:bg-emerald-500" : "[&_[role=slider]]:bg-teal-500"}`}
       />
       <div className="flex justify-between text-[10px] text-slate-600 mt-0.5">
         <span>{min}{unit}</span><span>{max}{unit}</span>
@@ -8094,7 +8151,7 @@ function MolFileUpload({ onLoaded }: { onLoaded: (smiles: string, name?: string)
     ? "border-emerald-500/40 bg-emerald-500/5"
     : status === "error"
     ? "border-red-500/30 bg-red-500/5"
-    : "border-white/10 hover:border-violet-500/30 hover:bg-violet-500/5";
+    : "border-white/10 hover:border-teal-500/30 hover:bg-teal-500/5";
 
   return (
     <>
@@ -8104,8 +8161,8 @@ function MolFileUpload({ onLoaded }: { onLoaded: (smiles: string, name?: string)
         className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition-all group ${borderCls}`}>
         {status === "parsing" && (
           <div className="flex items-center justify-center gap-1.5">
-            <div className="w-2.5 h-2.5 border border-violet-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-[11px] text-violet-400">Parsing…</span>
+            <div className="w-2.5 h-2.5 border border-teal-400 border-t-transparent rounded-full animate-spin" />
+            <span className="text-[11px] text-teal-400">Parsing…</span>
           </div>
         )}
         {status === "ok" && (
@@ -8116,7 +8173,7 @@ function MolFileUpload({ onLoaded }: { onLoaded: (smiles: string, name?: string)
         )}
         {status === "idle" && (
           <>
-            <div className="text-[11px] font-medium text-slate-400 group-hover:text-violet-300">Import Structure File</div>
+            <div className="text-[11px] font-medium text-slate-400 group-hover:text-teal-300">Import Structure File</div>
             <div className="text-[9px] text-slate-600 mt-0.5">.sdf, .mol2, .mol — extracts SMILES</div>
           </>
         )}
@@ -8233,7 +8290,7 @@ function EmptyState({ icon: Icon, title, description }: { icon: any; title: stri
 
 // ── Layer AI Analysis Panel ───────────────────────────────────────────────
 const LAYER_AI_LABELS: Record<number, { title: string; subtitle: string; accent: string; border: string; badge: string; btn: string }> = {
-  1: { title: "In Vitro AI Analysis", subtitle: "Assay data · Permeability · Clearance · Safety", accent: "text-violet-400", border: "border-violet-500/20", badge: "bg-violet-500/10 text-violet-400", btn: "bg-violet-600 hover:bg-violet-500" },
+  1: { title: "In Vitro AI Analysis", subtitle: "Assay data · Permeability · Clearance · Safety", accent: "text-teal-400", border: "border-teal-500/20", badge: "bg-teal-500/10 text-teal-400", btn: "bg-teal-600 hover:bg-teal-500" },
   2: { title: "Clinical PK/PD AI Analysis", subtitle: "PBPK · Cohort response · Adverse events · Dosing", accent: "text-blue-400", border: "border-blue-500/20", badge: "bg-blue-500/10 text-blue-400", btn: "bg-blue-600 hover:bg-blue-500" },
   3: { title: "Trial & Regulatory AI Analysis", subtitle: "Trial design · Power · Regulatory pathway · GO/NO-GO", accent: "text-emerald-400", border: "border-emerald-500/20", badge: "bg-emerald-500/10 text-emerald-400", btn: "bg-emerald-600 hover:bg-emerald-500" },
 };
@@ -8309,7 +8366,7 @@ interface LayerAiPanelProps {
 
 function AiMiniBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = Math.min(100, (value / max) * 100);
-  const barColor = color === "violet" ? "bg-violet-500" : color === "blue" ? "bg-blue-500" : color === "emerald" ? "bg-emerald-500" : color === "amber" ? "bg-amber-500" : color === "red" ? "bg-red-500" : "bg-slate-500";
+  const barColor = color === "teal" ? "bg-teal-500" : color === "blue" ? "bg-blue-500" : color === "emerald" ? "bg-emerald-500" : color === "amber" ? "bg-amber-500" : color === "red" ? "bg-red-500" : "bg-slate-500";
   return (
     <div className="space-y-1">
       <div className="flex justify-between">
@@ -8413,10 +8470,10 @@ function L1AiPreSummary({ sim, iv, targetName, targetConfidence, targetArea }: {
   return (
     <div className="space-y-3">
       {targetName && (
-        <div className="bg-violet-500/5 border border-violet-500/15 rounded-lg px-4 py-3">
+        <div className="bg-teal-500/5 border border-teal-500/15 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
-            <Target className="w-3 h-3 text-violet-400" />
-            <span className="text-[10px] font-semibold text-violet-300 uppercase tracking-wider">Target Auto-Match</span>
+            <Target className="w-3 h-3 text-teal-400" />
+            <span className="text-[10px] font-semibold text-teal-300 uppercase tracking-wider">Target Auto-Match</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -8765,14 +8822,14 @@ function FullAiOverlay({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-violet-400" />
+            <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-teal-400" />
             </div>
             <div>
               <div className="text-[14px] font-semibold text-white">Full Project AI Analysis</div>
               <div className="text-[11px] text-slate-500">Integrated assessment across all 3 simulation layers</div>
             </div>
-            <span className="text-[9px] font-semibold px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Hakase AI v2</span>
+            <span className="text-[9px] font-semibold px-2 py-0.5 rounded bg-teal-500/10 text-teal-400">Hakase AI v2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/8 text-slate-400 hover:text-white transition-colors">
             <X className="w-4 h-4" />
@@ -8783,14 +8840,14 @@ function FullAiOverlay({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {!loading && !report && !error && (
             <div className="flex flex-col items-center justify-center h-64 text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-violet-400" />
+              <div className="w-16 h-16 rounded-2xl bg-teal-500/10 flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-teal-400" />
               </div>
               <div>
                 <div className="text-[14px] font-semibold text-white mb-1">Integrated Cross-Layer Analysis</div>
                 <div className="text-[12px] text-slate-500 max-w-[320px]">Synthesises molecular safety, PK/PD cohort data, and trial design into a single expert assessment</div>
               </div>
-              <button onClick={onRun} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-lg font-semibold text-[13px] transition-colors">
+              <button onClick={onRun} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-lg font-semibold text-[13px] transition-colors">
                 <Sparkles className="w-4 h-4" /> Generate Full Analysis
               </button>
             </div>
@@ -8799,10 +8856,10 @@ function FullAiOverlay({
           {loading && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-3 h-3 border border-violet-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3 h-3 border border-teal-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-[11px] text-slate-400 font-medium">Streaming analysis across all layers…</span>
               </div>
-              <pre className="text-[10px] text-violet-400 leading-relaxed whitespace-pre-wrap font-mono">{stream || "Connecting…"}</pre>
+              <pre className="text-[10px] text-teal-400 leading-relaxed whitespace-pre-wrap font-mono">{stream || "Connecting…"}</pre>
             </div>
           )}
 
@@ -8826,8 +8883,8 @@ function FullAiOverlay({
                   <div key={key} className="border border-white/6 rounded-xl overflow-hidden">
                     {/* Section header */}
                     <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
-                      <div className="w-[3px] h-4 rounded-full bg-violet-500" />
-                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-violet-400">{label}</span>
+                      <div className="w-[3px] h-4 rounded-full bg-teal-500" />
+                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-teal-400">{label}</span>
                     </div>
                     {/* Body */}
                     <div className="px-4 py-3">
@@ -8835,9 +8892,9 @@ function FullAiOverlay({
                         <ul className="space-y-2">
                           {(val as string[]).map((item, i) => (
                             <li key={i} className="flex items-start gap-3">
-                              <span className="mt-[6px] w-1 h-1 rounded-full bg-violet-500 flex-shrink-0" />
+                              <span className="mt-[6px] w-1 h-1 rounded-full bg-teal-500 flex-shrink-0" />
                               <span className="text-[12px] text-slate-300 leading-[1.7]">
-                                <RichText text={item} accent="text-violet-400" />
+                                <RichText text={item} accent="text-teal-400" />
                               </span>
                             </li>
                           ))}
@@ -8846,7 +8903,7 @@ function FullAiOverlay({
                         <div className="space-y-2">
                           {sentences.map((s, i) => (
                             <p key={i} className="text-[12px] text-slate-300 leading-[1.75]">
-                              <RichText text={s} accent="text-violet-400" />
+                              <RichText text={s} accent="text-teal-400" />
                             </p>
                           ))}
                         </div>
@@ -8863,7 +8920,7 @@ function FullAiOverlay({
             <div className="border border-white/6 rounded-xl overflow-hidden mt-2">
               <div className="px-4 py-2.5 border-b border-white/6 bg-white/2">
                 <div className="flex items-center gap-2">
-                  <MessageCircle className="w-3.5 h-3.5 text-violet-400" />
+                  <MessageCircle className="w-3.5 h-3.5 text-teal-400" />
                   <span className="text-[11px] font-semibold text-slate-300">Ask the Analysis</span>
                 </div>
               </div>
@@ -8874,7 +8931,7 @@ function FullAiOverlay({
                 {chatMessages.map((m, i) => (
                   <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
                     <div className={`text-[11px] leading-relaxed px-3 py-2 rounded-xl max-w-[85%] ${
-                      m.role === "user" ? "bg-violet-600/20 text-violet-200 rounded-tr-sm" : "bg-white/5 text-slate-300 rounded-tl-sm"
+                      m.role === "user" ? "bg-teal-600/20 text-teal-200 rounded-tr-sm" : "bg-white/5 text-slate-300 rounded-tl-sm"
                     }`}>{m.content}</div>
                   </div>
                 ))}
@@ -8887,12 +8944,12 @@ function FullAiOverlay({
                   onChange={e => onChatInputChange(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }}
                   placeholder="Ask about this compound…"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white px-3 py-1.5 placeholder-slate-600 focus:outline-none focus:border-violet-500/50"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white px-3 py-1.5 placeholder-slate-600 focus:outline-none focus:border-teal-500/50"
                 />
                 <button
                   onClick={() => sendChatMessage(chatInput)}
                   disabled={!chatInput.trim() || chatLoading}
-                  className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-white text-[11px] font-medium transition-colors"
+                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg text-white text-[11px] font-medium transition-colors"
                 >Send</button>
               </div>
             </div>
@@ -9150,9 +9207,9 @@ function SimulationDataSources({
   const refs: RefEntry[] = layer === 1 ? L1_REFS : layer === 2 ? L2_REFS : L3_REFS;
 
   const liveCount = sources.filter(s => s.status === "live").length;
-  const layerColor = layer === 1 ? "violet" : layer === 2 ? "blue" : "emerald";
-  const borderCls = layerColor === "violet" ? "border-violet-500/20" : layerColor === "blue" ? "border-blue-500/20" : "border-emerald-500/20";
-  const textAccent = layerColor === "violet" ? "text-violet-400" : layerColor === "blue" ? "text-blue-400" : "text-emerald-400";
+  const layerColor = layer === 1 ? "teal" : layer === 2 ? "blue" : "emerald";
+  const borderCls = layerColor === "teal" ? "border-teal-500/20" : layerColor === "blue" ? "border-blue-500/20" : "border-emerald-500/20";
+  const textAccent = layerColor === "teal" ? "text-teal-400" : layerColor === "blue" ? "text-blue-400" : "text-emerald-400";
 
   return (
     <div className={`border ${borderCls} rounded-xl overflow-hidden bg-white/[0.02]`}>
@@ -9289,7 +9346,7 @@ function RegulatoryInsightCard({
   const accelApproval = isOncology && hr < 0.70;
 
   const colorMap: Record<string, string> = {
-    slate: "text-slate-400", violet: "text-violet-400",
+    slate: "text-slate-400", teal: "text-teal-400",
     blue: "text-blue-400", amber: "text-amber-400",
     emerald: "text-emerald-400", red: "text-red-400",
   };
@@ -9297,7 +9354,7 @@ function RegulatoryInsightCard({
     emerald: "border-emerald-500/30 bg-emerald-500/5",
     blue:    "border-blue-500/30 bg-blue-500/5",
     amber:   "border-amber-500/30 bg-amber-500/5",
-    violet:  "border-violet-500/30 bg-violet-500/5",
+    teal:  "border-teal-500/30 bg-teal-500/5",
   };
 
   // ── openFDA live data ─────────────────────────────────────────────────
@@ -9417,10 +9474,10 @@ function RegulatoryInsightCard({
     3: "Development Pathway & Designation Strategy",
   };
   const accentColors: Record<number, string> = {
-    1: "text-violet-400", 2: "text-blue-400", 3: "text-emerald-400",
+    1: "text-teal-400", 2: "text-blue-400", 3: "text-emerald-400",
   };
   const borderAccents: Record<number, string> = {
-    1: "border-violet-500/20", 2: "border-blue-500/20", 3: "border-emerald-500/20",
+    1: "border-teal-500/20", 2: "border-blue-500/20", 3: "border-emerald-500/20",
   };
 
   return (
@@ -9470,13 +9527,13 @@ function RegulatoryInsightCard({
                 { study: "Carcinogenicity",                 note: "Rat + Mouse, 2-year",                        priority: isRare ? "Waivable" : "Phase III" },
               ].map(({ study, note, priority }) => (
                 <div key={study} className="flex items-start gap-2">
-                  <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${priority === "Urgent" ? "bg-red-400" : priority === "High" ? "bg-amber-400" : priority === "Required" ? "bg-violet-400" : "bg-slate-600"}`} />
+                  <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${priority === "Urgent" ? "bg-red-400" : priority === "High" ? "bg-amber-400" : priority === "Required" ? "bg-teal-400" : "bg-slate-600"}`} />
                   <div className="flex-1 flex items-baseline justify-between gap-2">
                     <div>
                       <span className="text-[11px] text-slate-200">{study}</span>
                       <span className="text-[10px] text-slate-500 ml-1.5 leading-snug">({note})</span>
                     </div>
-                    <span className={`text-[10px] shrink-0 font-medium ${priority === "Urgent" ? "text-red-400" : priority === "High" ? "text-amber-400" : priority === "Required" ? "text-violet-400" : "text-slate-500"}`}>
+                    <span className={`text-[10px] shrink-0 font-medium ${priority === "Urgent" ? "text-red-400" : priority === "High" ? "text-amber-400" : priority === "Required" ? "text-teal-400" : "text-slate-500"}`}>
                       {priority}
                     </span>
                   </div>
@@ -9537,7 +9594,7 @@ function RegulatoryInsightCard({
                     <span className="px-1.5 py-0.5 rounded text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">openFDA unreachable — names unverified</span>
                   )}
                   {fdaLabelStatus === "success" && verified.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono">LIVE · openFDA Labels</span>
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-teal-500/10 text-teal-400 border border-teal-500/20 font-mono">LIVE · openFDA Labels</span>
                   )}
                   <span className="px-1.5 py-0.5 rounded text-[8px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">DailyMed (SPL) links</span>
                 </div>
@@ -9549,7 +9606,7 @@ function RegulatoryInsightCard({
                       target="_blank"
                       rel="noreferrer"
                       title={`Open ${d}'s official FDA label (DailyMed)`}
-                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] transition-colors hover:border-cyan-500/40 ${fdaLabelStatus === "success" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" : "bg-white/5 border-white/10 text-slate-400"}`}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] transition-colors hover:border-cyan-500/40 ${fdaLabelStatus === "success" ? "bg-teal-500/10 border-teal-500/20 text-teal-300" : "bg-white/5 border-white/10 text-slate-400"}`}
                     >
                       {d}
                       {fdaLabelData[d]?.boxed === true && (
@@ -9575,10 +9632,10 @@ function RegulatoryInsightCard({
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: "MRSD Estimate",     val: `~${mrsdEst} ng/mL`,    note: "1/10 × Cmax (conservative)", color: "blue"    },
-                { label: "Dosing Interval",   val: dosInterval,             note: `t½ = ${halfLife.toFixed(1)} h`, color: "violet"  },
+                { label: "Dosing Interval",   val: dosInterval,             note: `t½ = ${halfLife.toFixed(1)} h`, color: "teal"  },
                 { label: "Grade ≥3 AE Rate",  val: `${(grade3Rate * 100).toFixed(1)}%`, note: grade3Rate > 0.15 ? "Exceeds 15% — DLT risk" : "Within acceptable range", color: grade3Rate > 0.15 ? "amber" : "emerald" },
               ].map(({ label, val, note, color }) => {
-                const cardBorder = color === "blue" ? "border-blue-500/20 bg-blue-500/5" : color === "violet" ? "border-violet-500/20 bg-violet-500/5" : color === "amber" ? "border-amber-500/20 bg-amber-500/5" : "border-emerald-500/20 bg-emerald-500/5";
+                const cardBorder = color === "blue" ? "border-blue-500/20 bg-blue-500/5" : color === "teal" ? "border-teal-500/20 bg-teal-500/5" : color === "amber" ? "border-amber-500/20 bg-amber-500/5" : "border-emerald-500/20 bg-emerald-500/5";
                 return (
                 <div key={label} className={`rounded-lg border p-2.5 ${cardBorder}`}>
                   <div className={`text-[13px] font-bold ${colorMap[color]}`}>{val}</div>
@@ -9692,7 +9749,7 @@ function RegulatoryInsightCard({
                 { name: "Breakthrough Therapy",    eligible: btEligible,    detail: "≥80% power, HR<0.75, substantial improvement",  color: "emerald" },
                 { name: "Fast Track",              eligible: ftEligible,    detail: "Serious condition + unmet medical need",          color: "blue"    },
                 { name: "Accelerated Approval",    eligible: accelApproval, detail: "Surrogate endpoint acceptable (HR<0.70)",         color: "amber"   },
-                { name: "Orphan Drug Designation", eligible: orphEligible,  detail: "< 200,000 US patients / year",                    color: "violet"  },
+                { name: "Orphan Drug Designation", eligible: orphEligible,  detail: "< 200,000 US patients / year",                    color: "teal"  },
               ].map(({ name, eligible, detail, color }) => (
                 <div key={name} className={`rounded-lg border p-2.5 ${eligible ? borderMap[color] : "border-white/5 opacity-40"}`}>
                   <div className="flex items-center gap-1.5 mb-1">
@@ -9711,7 +9768,7 @@ function RegulatoryInsightCard({
             <div className="space-y-2">
               {[
                 { phase: "IND-Enabling Studies",        duration: "6–9 months",   color: "slate"   },
-                { phase: "IND Filing + 30-day Review",  duration: "1–2 months",   color: "violet"  },
+                { phase: "IND Filing + 30-day Review",  duration: "1–2 months",   color: "teal"  },
                 { phase: "Phase I (Safety / Dose)",     duration: "12–18 months", color: "blue"    },
                 { phase: "Phase II (Proof of Concept)", duration: "18–30 months", color: "amber"   },
                 { phase: "Phase III (Pivotal — simulated)", duration: `${durMo} months`, color: "emerald" },
@@ -9946,7 +10003,7 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
   const groupColors: Record<string, string> = {
     control: "bg-slate-500/20 text-slate-300", low: "bg-blue-500/20 text-blue-300",
     mid: "bg-amber-500/20 text-amber-300", high: "bg-red-500/20 text-red-300",
-    recovery: "bg-emerald-500/20 text-emerald-300", satellite: "bg-violet-500/20 text-violet-300",
+    recovery: "bg-emerald-500/20 text-emerald-300", satellite: "bg-teal-500/20 text-teal-300",
   };
 
   return (
@@ -10135,7 +10192,7 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
         <div className="grid grid-cols-2 gap-3 mb-4">
           {[
             { label: "HED (BSA / Km method)", val: `${ar.hedBsa.toFixed(2)} mg/kg`, sub: `FDA 2005 guidance · Km=${ar.species.kmFactor}`, color: "blue" },
-            { label: "HED (PBPK-refined)", val: `${ar.hedPbpk.toFixed(2)} mg/kg`, sub: "Clearance-corrected allometric", color: "violet" },
+            { label: "HED (PBPK-refined)", val: `${ar.hedPbpk.toFixed(2)} mg/kg`, sub: "Clearance-corrected allometric", color: "teal" },
             { label: "Proposed FIH Dose", val: `${ar.fihDose.toFixed(1)} mg`, sub: `${ar.fihDoseMgKg.toFixed(3)} mg/kg · 1/10 HED (conservative)`, color: "emerald" },
             { label: "Safety Margin (NOAEL)", val: `${ar.safetyMarginNoael.toFixed(1)}×`, sub: `HED ÷ NOAEL · ${ar.safetyMarginNoael > 10 ? "Excellent" : ar.safetyMarginNoael > 5 ? "Acceptable" : "Narrow — review"}`, color: ar.safetyMarginNoael > 10 ? "emerald" : ar.safetyMarginNoael > 5 ? "amber" : "red" },
           ].map(m => (
@@ -10173,7 +10230,7 @@ function Layer2AnimalResults({ ar, molName }: { ar: AnimalCohortResults; molName
       <div className="p-4 rounded-xl bg-white/3 border border-white/8">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Shield className="w-3.5 h-3.5 text-violet-400" />
+            <Shield className="w-3.5 h-3.5 text-teal-400" />
             <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">IND-Enabling Regulatory Checklist</span>
           </div>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ar.indEnablingComplete ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25" : "bg-amber-500/15 text-amber-400 border border-amber-500/25"}`}>
@@ -10281,7 +10338,7 @@ function CrossSourceConsistencyCheck({ simIC50_uM, bindingDB }: { simIC50_uM: nu
       <div className="grid grid-cols-2 gap-3 mt-2">
         <div className="bg-white/3 rounded-lg p-2.5 border border-white/5">
           <div className="text-[9px] text-slate-500 mb-0.5">Simulation Engine</div>
-          <div className="text-[13px] font-bold text-violet-300">{simIC50_nM.toFixed(1)} nM</div>
+          <div className="text-[13px] font-bold text-teal-300">{simIC50_nM.toFixed(1)} nM</div>
           <div className="text-[9px] text-slate-500">inVitroSim.ts (RDKit-derived)</div>
         </div>
         <div className="bg-white/3 rounded-lg p-2.5 border border-white/5">
@@ -10372,10 +10429,10 @@ function OverrideBanner({ overrides }: { overrides: SafetyOverride[] }) {
 
 function ProvenanceFooter({ provenance, layer }: { provenance: ProvenanceRecord; layer: number }) {
   const [open, setOpen] = useState(false);
-  const layerColors: Record<number, string> = { 1: "violet", 2: "amber", 3: "blue", 4: "emerald" };
+  const layerColors: Record<number, string> = { 1: "teal", 2: "amber", 3: "blue", 4: "emerald" };
   const color = layerColors[layer] ?? "slate";
-  const borderCls = color === "violet" ? "border-violet-500/15" : color === "amber" ? "border-amber-500/15" : color === "blue" ? "border-blue-500/15" : "border-emerald-500/15";
-  const textCls = color === "violet" ? "text-violet-400" : color === "amber" ? "text-amber-400" : color === "blue" ? "text-blue-400" : "text-emerald-400";
+  const borderCls = color === "teal" ? "border-teal-500/15" : color === "amber" ? "border-amber-500/15" : color === "blue" ? "border-blue-500/15" : "border-emerald-500/15";
+  const textCls = color === "teal" ? "text-teal-400" : color === "amber" ? "text-amber-400" : color === "blue" ? "text-blue-400" : "text-emerald-400";
   return (
     <div className={`mx-4 mt-3 mb-2 border ${borderCls} rounded-lg overflow-hidden bg-white/2`}>
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
@@ -10473,6 +10530,14 @@ function Layer1Results({
   const [reportOpen, setReportOpen] = useState(false);
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const [dimsOpen, setDimsOpen] = useState(false);
+  // Evidence & regulatory context is collapsed by default to keep the default
+  // view calm. The panels inside stay MOUNTED (CSS-hidden, not unmounted) when
+  // collapsed so the self-fetching Evidence/read-across still runs and feeds the
+  // scorecard's applicability-domain + confidence model.
+  const [contextOpen, setContextOpen] = useState(false);
+  // Safety-critical (hard) flags always show; monitor/info flags collapse behind
+  // a toggle so the default verdict view stays calm without hiding stop-signals.
+  const [flagsOpen, setFlagsOpen] = useState(false);
   const molName = simResults?.molName ?? "";
 
   const handleGeneratePdf = async () => {
@@ -10506,18 +10571,26 @@ function Layer1Results({
   // rejection. It gets a distinct warm amber/rose banner + a 📖 "KNOWN DRUG"
   // badge so a reviewer can tell the two apart at a glance.
   const isKnownLiability = goLabel === "KNOWN-LIABILITY-NO-GO";
-  const goDisplay = isKnownLiability ? "NO-GO" : goLabel;
+  // REVIEW / ESCALATE: a WATCH whose scorecard verdictClass is "review-escalate"
+  // — a strong predicted liability the in-silico stack could NOT confirm (out of
+  // applicability domain / not calibration-reliable / contradicted by measured
+  // analogues). Shown distinctly (cyan "REVIEW") so reviewers don't mistake it
+  // for either a routine monitor-WATCH or a confident NO-GO.
+  const isReviewEscalate = goLabel === "WATCH" && sc?.verdictClass === "review-escalate";
+  const goDisplay = isKnownLiability ? "NO-GO" : isReviewEscalate ? "REVIEW" : goLabel;
   const goColor = goLabel === "GO" ? "emerald"
+                : isReviewEscalate ? "review"
                 : goLabel === "WATCH" ? "yellow"
                 : goLabel === "PENDING" ? "emerald"
                 : isKnownLiability ? "known"
                 : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
                 : goColor === "yellow"  ? "from-yellow-950/60 to-yellow-900/30 border-yellow-500/25"
+                : goColor === "review"  ? "from-cyan-950/60 to-sky-900/25 border-cyan-500/30"
                 : goColor === "known"   ? "from-amber-950/50 via-rose-950/30 to-rose-900/20 border-amber-500/30"
                 :                        "from-red-950/60 to-red-900/30 border-red-500/25";
-  const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : goColor === "known" ? "text-amber-300" : "text-red-400";
-  const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : goColor === "known" ? "bg-amber-400 shadow-amber-400" : "bg-red-400 shadow-red-400";
+  const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : goColor === "review" ? "text-cyan-300" : goColor === "known" ? "text-amber-300" : "text-red-400";
+  const glowCls = goColor === "emerald" ? "bg-emerald-400 shadow-emerald-400" : goColor === "yellow" ? "bg-yellow-400 shadow-yellow-400" : goColor === "review" ? "bg-cyan-400 shadow-cyan-400" : goColor === "known" ? "bg-amber-400 shadow-amber-400" : "bg-red-400 shadow-red-400";
   const sevColor = (s: string) => s === "critical" ? "text-red-400 border-red-500/30 bg-red-500/10"
                  : s === "warn" ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
                  : "text-slate-400 border-white/10 bg-white/5";
@@ -10526,7 +10599,22 @@ function Layer1Results({
     <div className="space-y-5">
       {/* ── Single unified verdict banner — ML scorecard when available, heuristic fallback ── */}
       <div className={`hk-aura bg-gradient-to-br ${goBg} border rounded-[20px] p-5 shadow-[0_20px_50px_-32px_rgba(0,0,0,0.9)]`}>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-4 flex-wrap">
+          {sc && (
+            <div className={`shrink-0 ${goText}`} title={`L1 triage score ${Math.round(sc.score)} / 100`}>
+              <svg viewBox="0 0 72 72" className="w-[68px] h-[68px]" aria-hidden="true">
+                <circle cx="36" cy="36" r="29" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="6" />
+                <circle
+                  cx="36" cy="36" r="29" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 29}
+                  strokeDashoffset={(2 * Math.PI * 29) * (1 - Math.min(100, Math.max(0, sc.score)) / 100)}
+                  transform="rotate(-90 36 36)"
+                />
+                <text x="36" y="38" textAnchor="middle" className="fill-current" fontSize="19" fontWeight="700">{Math.round(sc.score)}</text>
+                <text x="36" y="50" textAnchor="middle" className="fill-current" opacity="0.55" fontSize="8">/ 100</text>
+              </svg>
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px] shrink-0 ${glowCls}`} />
@@ -10537,6 +10625,14 @@ function Layer1Results({
                   title="This compound matched a known drug with a documented clinical liability (published evidence). This is NOT a novel-compound model rejection."
                 >
                   <BookMarked className="w-2.5 h-2.5" /> KNOWN DRUG · documented liability
+                </span>
+              )}
+              {isReviewEscalate && (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 font-semibold"
+                  title="A strong predicted liability could NOT be confirmed in-silico — the molecule is out of the model's applicability domain, the prediction is not calibration-reliable, or measured analogues disagree. The engine ABSTAINS from a confident NO-GO and asks for an orthogonal assay, rather than risk a false stop."
+                >
+                  <Shield className="w-2.5 h-2.5" /> ESCALATE · confirm with assay
                 </span>
               )}
               {sc && (
@@ -10575,7 +10671,7 @@ function Layer1Results({
                 >
                   <span className="text-[15px] text-white font-medium leading-relaxed">
                     <span className="tabular-nums">L1 Score: {sc.score}/100</span>
-                    <span className="text-slate-400"> — {sc.headline.replace(/^(GO|WATCH|NO-GO|KNOWN-LIABILITY[ -]NO-GO)\s*—\s*/i, "").replace(/\s*\((?:L1\s+)?score[^)]*\)/i, "")}</span>
+                    <span className="text-slate-400"> — {sc.headline.replace(/^(REVIEW|GO|WATCH|NO-GO|KNOWN-LIABILITY[ -]NO-GO)\s*—\s*/i, "").replace(/\s*\((?:L1\s+)?score[^)]*\)/i, "")}</span>
                   </span>
                   <ChevronDown className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-hover:text-slate-200 ${rationaleOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -10597,7 +10693,7 @@ function Layer1Results({
                   <span className="text-slate-600 ml-1 text-[10px]">DILI-ML · CardioTox-ML · ADMET-AI · CamSol</span>
                   <span className="hk-chip ml-1"><Shield className="w-2.5 h-2.5 text-cyan-400" /> HAIOps Governed</span>
                   {!rationaleOpen && (
-                    <button type="button" onClick={() => setRationaleOpen(true)} className="ml-2 text-violet-400 hover:text-violet-300 hover:underline underline-offset-2">
+                    <button type="button" onClick={() => setRationaleOpen(true)} className="ml-2 text-teal-400 hover:text-teal-300 hover:underline underline-offset-2">
                       why this verdict?
                     </button>
                   )}
@@ -10616,22 +10712,11 @@ function Layer1Results({
               </>
             )}
           </div>
-          <div className="text-right shrink-0">
-            <div className="hk-eyebrow mb-2 justify-end">Key metrics</div>
-            <div className="flex gap-1.5 flex-wrap justify-end">
-              {iv && [
-                { l: "IC50", v: iv.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—" },
-                { l: "Perm", v: iv.permeability.caco2Class },
-                { l: "hERG", v: iv.herg.riskCategory },
-              ].map(m => (
-                <span key={m.l} className="hk-chip"><span className="text-slate-500">{m.l}</span><span className="hk-chip-mono text-slate-300">{m.v}</span></span>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* Assay metrics row */}
-        <div className="mt-3 pt-3 border-t border-white/8 flex gap-4 flex-wrap">
+        {/* Signal strip — quiet metric tiles (replaces the duplicate hero chip
+            column + the old inline KPI row with one clean, scannable grid). */}
+        <div className="mt-4 pt-4 border-t border-white/8 grid grid-cols-3 sm:grid-cols-6 gap-2">
           {[
             { label: "IC50",      val: iv?.doseResponse.ic50_nM != null ? `${iv.doseResponse.ic50_nM.toFixed(1)} nM` : "—", good: (iv?.doseResponse.ic50_nM ?? 999) < 100 },
             { label: "Caco-2",   val: iv ? `${iv.permeability.caco2Papp.toFixed(1)} ×10⁻⁶` : "—", good: iv?.permeability.caco2Class !== "Low" },
@@ -10640,9 +10725,12 @@ function Layer1Results({
             { label: "hERG IC50",val: iv ? `${iv.herg.ic50_uM.toFixed(1)} µM` : "—", good: iv?.herg.riskCategory === "Low" },
             { label: "TI",       val: iv?.doseResponse.ic50_nM != null ? `${iv.cellViability.therapeuticIndex.toFixed(0)}×` : "—", good: (iv?.cellViability.therapeuticIndex ?? 0) > 30 },
           ].map(({ label, val, good }) => (
-            <div key={label}>
-              <div className="hk-kpi-label">{label}</div>
-              <div className={`hk-kpi-value text-[12px] mt-0.5 ${good ? "text-emerald-400" : "text-red-400"}`}>{val}</div>
+            <div key={label} className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-2">
+              <div className="hk-kpi-label text-[9px] flex items-center gap-1.5">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${good ? "bg-emerald-400" : "bg-amber-400"}`} />
+                {label}
+              </div>
+              <div className="hk-kpi-value text-[13px] mt-1 text-slate-100">{val}</div>
             </div>
           ))}
         </div>
@@ -10655,7 +10743,7 @@ function Layer1Results({
               <span className="hk-chip ml-1.5 text-slate-400 normal-case tracking-normal font-normal">{sc.flags.filter(f => f.hardNoGo).length} hard · {sc.flags.filter(f => f.severity === "warn").length} watch</span>
             </div>
             <div className="space-y-1.5">
-              {sc.flags.map(f => {
+              {sc.flags.filter(f => flagsOpen || f.severity === "critical").map(f => {
                 const FlagIcon = f.hardNoGo ? ShieldAlert : f.severity === "warn" ? AlertTriangle : Info;
                 return (
                 <div key={f.id} className={`text-[10px] border rounded-lg px-2.5 py-2 ${sevColor(f.severity)}`}>
@@ -10670,6 +10758,12 @@ function Layer1Results({
                 );
               })}
             </div>
+            {sc.flags.some(f => f.severity !== "critical") && (
+              <button type="button" onClick={() => setFlagsOpen(o => !o)} aria-expanded={flagsOpen} className="mt-2 flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200">
+                <ChevronDown className={`h-3 w-3 transition-transform ${flagsOpen ? "rotate-180" : ""}`} />
+                <span className="hk-eyebrow">{flagsOpen ? "Show fewer" : `Show ${sc.flags.filter(f => f.severity !== "critical").length} monitor flag${sc.flags.filter(f => f.severity !== "critical").length === 1 ? "" : "s"}`}</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -10702,18 +10796,10 @@ function Layer1Results({
         )}
       </div>
 
-      {/* FDA Benefit-Risk context — weighs the verdict's liabilities against
-          the indication's severity + unmet medical need (FDA 2023 Benefit-Risk
-          Framework). Informational; never overrides the safety verdict. */}
-      {sc && (
-        <BenefitRiskCard scorecard={sc} indication={indication} therapeuticArea={therapeuticArea} targetSymbol={proteinName || uniprotId} drugName={molName || simResults?.molName} />
-      )}
-
-      {/* ── HAIOps governance / directional-use banner — sits below the verdict
-          and benefit-risk. Every output is DIRECTIONAL decision-support fusing
-          all ML + rule-based predictions under HAIOps governance; it does not
-          replace wet-lab validation, and for novel chemistry the predictions
-          are extrapolations. */}
+      {/* ── HAIOps governance / directional-use banner — always visible. Every
+          output is DIRECTIONAL decision-support fusing all ML + rule-based
+          predictions under HAIOps governance; it does not replace wet-lab
+          validation, and for novel chemistry the predictions are extrapolations. */}
       <div className="hk-panel px-4 py-2.5 flex items-center gap-2.5">
         <Shield className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
         <p className="text-[11px] leading-snug text-slate-400">
@@ -10722,22 +10808,38 @@ function Layer1Results({
         </p>
       </div>
 
-      {/* Evidence & Novelty — public-DB verification + measured-analogue
-          read-across for hERG / on-target IC50 / permeability. Self-fetching;
-          reports evidence support up so the scorecard confidence reflects how
-          much REAL measured data backs this novel compound. */}
+      {/* ── Evidence & regulatory context — collapsed by default to keep the
+          dashboard calm. The panels stay MOUNTED (CSS-hidden, not unmounted)
+          when collapsed, so the self-fetching Evidence/read-across still runs
+          and feeds the scorecard's applicability-domain + confidence model:
+          FDA Benefit-Risk (severity × unmet need; never overrides safety),
+          novelty + measured-analogue read-across, and trusted preclinical
+          sources (NCATS Pharos target validation + DailyMed FDA labels). */}
       {smiles && smiles.trim() && (
-        <EvidenceNoveltyPanel smiles={smiles} onEvidence={onEvidence} />
-      )}
-
-      {/* Trusted preclinical sources — NCATS Pharos (target validation) +
-          DailyMed (official FDA labels) + transparent source registry. */}
-      {smiles && smiles.trim() && (
-        <PreclinicalEvidenceCard
-          targetSymbol={proteinName || uniprotId}
-          drugName={molName || simResults?.molName}
-          smiles={smiles}
-        />
+        <div className="hk-panel overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setContextOpen(o => !o)}
+            aria-expanded={contextOpen}
+            className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 text-cyan-300 shrink-0 transition-transform ${contextOpen ? "rotate-180" : ""}`} />
+            <span className="hk-eyebrow">Evidence &amp; regulatory context</span>
+            <span className="hidden sm:inline text-[10px] text-slate-500 truncate">Benefit–risk · novelty &amp; read-across · preclinical sources</span>
+            <span className="ml-auto text-[10px] text-slate-500">{contextOpen ? "Hide" : "Show"}</span>
+          </button>
+          <div className={contextOpen ? "px-3 pb-3 space-y-4 border-t border-white/8 pt-3" : "hidden"}>
+            {sc && (
+              <BenefitRiskCard scorecard={sc} indication={indication} therapeuticArea={therapeuticArea} targetSymbol={proteinName || uniprotId} drugName={molName || simResults?.molName} />
+            )}
+            <EvidenceNoveltyPanel smiles={smiles} onEvidence={onEvidence} />
+            <PreclinicalEvidenceCard
+              targetSymbol={proteinName || uniprotId}
+              drugName={molName || simResults?.molName}
+              smiles={smiles}
+            />
+          </div>
+        </div>
       )}
 
       {/* Composite heuristic score threshold warning (was "confidence
@@ -10752,10 +10854,15 @@ function Layer1Results({
         </div>
       )}
 
-      {/* In Vitro Tabs */}
+      {/* In Vitro detailed analyses — a labelled section so the tab row reads as
+          a deliberate "deep dive" zone rather than loose chrome. */}
+      <div className="flex items-center gap-2 pt-1">
+        <span className="hk-eyebrow">Detailed analyses</span>
+        <span className="text-[10px] text-slate-500">7 in-vitro views · pick one</span>
+      </div>
       <div className="hk-tabbar flex-wrap">
         {[
-          { id: "ml-admet",      label: "ML-Enhanced",   icon: Brain },
+          { id: "ml-admet",      label: "ADMET",         icon: Brain },
           { id: "dose-response", label: "Dose-Response", icon: TrendingUp },
           { id: "permeability",  label: "Permeability",  icon: Layers },
           { id: "clearance",     label: "Clearance",     icon: Activity },
@@ -10793,13 +10900,13 @@ function Layer1Results({
                 <div className="inline-flex rounded-md border border-white/10 overflow-hidden text-[10px]">
                   <button
                     onClick={() => setWetLabView(false)}
-                    className={`px-2.5 py-1 transition-colors ${!wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                    className={`px-2.5 py-1 transition-colors ${!wetLabView ? "bg-teal-500/20 text-teal-200" : "text-slate-500 hover:text-slate-300"}`}
                   >
                     Sleek
                   </button>
                   <button
                     onClick={() => setWetLabView(true)}
-                    className={`px-2.5 py-1 transition-colors border-l border-white/10 ${wetLabView ? "bg-violet-500/20 text-violet-200" : "text-slate-500 hover:text-slate-300"}`}
+                    className={`px-2.5 py-1 transition-colors border-l border-white/10 ${wetLabView ? "bg-teal-500/20 text-teal-200" : "text-slate-500 hover:text-slate-300"}`}
                     title="Wet-lab style assay report (raw RLU + 4PL fit + plate controls)"
                   >
                     Wet-Lab View
@@ -10856,7 +10963,7 @@ function Layer1Results({
                       <button
                         type="button"
                         onClick={() => onSelectTarget(topValidated.uniprotId)}
-                        className="mt-3 px-3 py-1.5 text-[10px] rounded-md bg-violet-500/15 border border-violet-500/40 text-violet-200 hover:bg-violet-500/25 transition-colors"
+                        className="mt-3 px-3 py-1.5 text-[10px] rounded-md bg-teal-500/15 border border-teal-500/40 text-teal-200 hover:bg-teal-500/25 transition-colors"
                         title="Set this UniProt as the target, then re-run the simulation to generate the curve"
                       >
                         Use {topValidated.geneName ?? topValidated.uniprotId} ({topValidated.uniprotId}) · {(topValidated.confidence * 100).toFixed(0)}% conf
@@ -10866,7 +10973,7 @@ function Layer1Results({
                   ) : (
                     <div className="text-[10px] text-slate-600 mt-1 text-center max-w-md">
                       No data is fabricated for unvalidated targets. Try a validated UniProt
-                      (e.g. <span className="font-mono text-violet-400">P00533</span> · EGFR) to see the curve.
+                      (e.g. <span className="font-mono text-teal-400">P00533</span> · EGFR) to see the curve.
                     </div>
                   )}
                 </div>
@@ -10921,7 +11028,7 @@ function Layer1Results({
             ].map(m => (
               <div key={m.l} className="bg-white/5 rounded-lg p-2.5 text-center">
                 <div className="text-[9px] text-slate-500 uppercase">{m.l}</div>
-                <div className="text-[13px] font-bold text-violet-300 mt-0.5">{m.v}</div>
+                <div className="text-[13px] font-bold text-teal-300 mt-0.5">{m.v}</div>
               </div>
             ))}
           </div>
@@ -10990,7 +11097,7 @@ function Layer1Results({
                 <div className="text-[9px] text-slate-500">Bound</div>
               </div>
               <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden flex">
-                <div className="bg-violet-500/60 h-full" style={{ width: `${iv.plasmaProteinBinding.boundPercent}%` }} />
+                <div className="bg-teal-500/60 h-full" style={{ width: `${iv.plasmaProteinBinding.boundPercent}%` }} />
                 <div className="bg-emerald-500/40 h-full" style={{ width: `${iv.plasmaProteinBinding.fuPercent}%` }} />
               </div>
               <div>
@@ -11156,7 +11263,7 @@ function Layer1Results({
               <div className="px-4 py-3 space-y-3">
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-1">Structural Alert</div>
-                  <div className="text-[10px] text-violet-300 font-medium">{tox.structuralAlert}</div>
+                  <div className="text-[10px] text-teal-300 font-medium">{tox.structuralAlert}</div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-1.5">Adverse Outcome Pathway</div>
@@ -11164,8 +11271,8 @@ function Layer1Results({
                     {tox.aopChain.map((step, si) => (
                       <div key={si} className="flex items-start gap-2">
                         <div className="flex flex-col items-center shrink-0 mt-0.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${si === tox.aopChain.length - 1 ? "bg-red-400" : "bg-violet-400/60"}`} />
-                          {si < tox.aopChain.length - 1 && <div className="w-px h-3 bg-violet-400/20" />}
+                          <div className={`w-1.5 h-1.5 rounded-full ${si === tox.aopChain.length - 1 ? "bg-red-400" : "bg-teal-400/60"}`} />
+                          {si < tox.aopChain.length - 1 && <div className="w-px h-3 bg-teal-400/20" />}
                         </div>
                         <span className={`text-[10px] leading-tight ${si === tox.aopChain.length - 1 ? "text-red-300 font-medium" : "text-slate-400"}`}>{step}</span>
                       </div>
@@ -11240,7 +11347,7 @@ function Layer1Results({
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div>
                     <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">Structural Motif</div>
-                    <div className="text-[10px] text-violet-300 font-medium">{pw.structuralMotif}</div>
+                    <div className="text-[10px] text-teal-300 font-medium">{pw.structuralMotif}</div>
                   </div>
                   <div>
                     <div className="text-[9px] uppercase tracking-wider text-slate-600 mb-0.5">CYP Enzyme(s)</div>
@@ -11293,7 +11400,7 @@ function Layer1Results({
               <div className="flex items-center gap-1.5 flex-wrap">
                 {["Parent Compound", "CYP Oxidation", "Reactive Intermediate", "Macromolecule Adduct", "Cellular Stress", "Organ Toxicity"].map((step, i) => (
                   <div key={i} className="flex items-center gap-1.5">
-                    <div className={`text-[9px] px-2 py-1 rounded ${i === 0 ? "bg-violet-500/15 text-violet-300" : i === 2 ? "bg-red-500/15 text-red-300" : i === 5 ? "bg-red-500/20 text-red-300 font-semibold" : "bg-white/5 text-slate-400"}`}>{step}</div>
+                    <div className={`text-[9px] px-2 py-1 rounded ${i === 0 ? "bg-teal-500/15 text-teal-300" : i === 2 ? "bg-red-500/15 text-red-300" : i === 5 ? "bg-red-500/20 text-red-300 font-semibold" : "bg-white/5 text-slate-400"}`}>{step}</div>
                     {i < 5 && <ArrowRight className="w-3 h-3 text-slate-600 shrink-0" />}
                   </div>
                 ))}
@@ -11323,9 +11430,9 @@ function Layer1Results({
           className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-violet-400" />
+            <Activity className="w-3.5 h-3.5 text-teal-400" />
             <span className="hk-display text-[16px] text-slate-100">Directional ADMET Indicators</span>
-            <Badge className="text-[8px] bg-violet-500/10 text-violet-400 border-violet-500/20">Computational</Badge>
+            <Badge className="text-[8px] bg-teal-500/10 text-teal-400 border-teal-500/20">Computational</Badge>
           </div>
           {admetOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
         </button>
@@ -11365,7 +11472,7 @@ function Layer1Results({
               onCloseInputPanel?.();
               setReportOpen(true);
             }}
-            className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-[12px] font-semibold gap-2 px-5 py-2.5 shadow-lg shadow-violet-500/20"
+            className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white text-[12px] font-semibold gap-2 px-5 py-2.5 shadow-lg shadow-teal-500/20"
             title="Generate the comprehensive wet-lab assay report (full-screen, Markdown + LaTeX)"
           >
             <FileText className="w-4 h-4" />
@@ -11562,7 +11669,7 @@ function BindingHeatmap({ binding, uniprotId }: { binding: BindingEstimate | nul
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[12px] font-semibold text-slate-300">Binding Affinity Heatmap</h3>
         {binding && (
-          <Badge className="text-[9px] bg-violet-500/10 text-violet-400 border-violet-500/20">
+          <Badge className="text-[9px] bg-teal-500/10 text-teal-400 border-teal-500/20">
             {binding.targetClass} · Rule-based estimate
           </Badge>
         )}
@@ -11690,7 +11797,7 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[12px] font-semibold text-slate-300">Batch Comparison</h3>
         <div className="flex gap-2">
-          <Badge className="text-[9px] bg-violet-500/10 text-violet-400 border-violet-500/20">Pareto-optimal highlighted</Badge>
+          <Badge className="text-[9px] bg-teal-500/10 text-teal-400 border-teal-500/20">Pareto-optimal highlighted</Badge>
           <Button variant="outline" size="sm" className="h-6 text-[10px] border-white/10 text-slate-400 gap-1">
             <Download className="w-3 h-3" /> CSV
           </Button>
@@ -11706,11 +11813,11 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
         </thead>
         <tbody>
           {rows.map(row => (
-            <tr key={row.rank} className={`border-b border-white/5 hover:bg-white/3 cursor-pointer ${row.pareto ? "bg-violet-500/3" : ""}`}>
+            <tr key={row.rank} className={`border-b border-white/5 hover:bg-white/3 cursor-pointer ${row.pareto ? "bg-teal-500/3" : ""}`}>
               <td className="py-2 pr-4 font-bold text-slate-500">{row.rank}</td>
               <td className="py-2 pr-4">
                 <div className="flex items-center gap-1.5">
-                  {row.pareto && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
+                  {row.pareto && <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />}
                   <span className={row.pareto ? "text-white" : "text-slate-400"}>{row.name}</span>
                 </div>
               </td>
@@ -11725,9 +11832,9 @@ function BatchTable({ simResults, molName }: { simResults: SimResults | null; mo
               <td className="py-2 pr-4">
                 <div className="flex items-center gap-2">
                   <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full" style={{ width: `${row.composite * 100}%` }} />
+                    <div className="h-full bg-teal-500 rounded-full" style={{ width: `${row.composite * 100}%` }} />
                   </div>
-                  <span className="font-semibold text-violet-300">{row.composite.toFixed(2)}</span>
+                  <span className="font-semibold text-teal-300">{row.composite.toFixed(2)}</span>
                 </div>
               </td>
             </tr>
@@ -11769,7 +11876,7 @@ function Layer2Results({ cohortResults, indication, simResults: sr2, aiReport: l
     { label: "2-Cpt PBPK",   active: ds?.pbpk === "2-compartment", color: "blue"   },
     { label: "NHANES Pop.",   active: ds?.population === "nhanes",  color: "blue"   },
     { label: ds?.pd === "chembl-live" ? "ChEMBL PD" : "Est. PD",
-      active: ds?.pd === "chembl-live", color: "violet" },
+      active: ds?.pd === "chembl-live", color: "teal" },
     { label: ds?.ae === "faers-live"  ? "FAERS AE"  : "Est. AE",
       active: ds?.ae === "faers-live",  color: ds?.ae === "faers-live" ? "emerald" : "slate" },
   ];
@@ -11794,12 +11901,12 @@ function Layer2Results({ cohortResults, indication, simResults: sr2, aiReport: l
           <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
             active
               ? color === "blue"   ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
-              : color === "violet" ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+              : color === "teal" ? "border-teal-500/30 bg-teal-500/10 text-teal-300"
               : color === "emerald"? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
               : "border-white/10 bg-white/5 text-slate-400"
               : "border-white/8 bg-white/3 text-slate-600"
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${active ? (color === "emerald" ? "bg-emerald-400" : color === "violet" ? "bg-violet-400" : "bg-blue-400") : "bg-slate-600"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? (color === "emerald" ? "bg-emerald-400" : color === "teal" ? "bg-teal-400" : "bg-blue-400") : "bg-slate-600"}`} />
             {label}
           </span>
         ))}
@@ -12509,7 +12616,7 @@ function ProcovaRegulatory() {
     {
       title: "ICH E9(R1) — Estimand Framework",
       status: "Compatible",
-      statusColor: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+      statusColor: "text-teal-400 bg-teal-500/10 border-teal-500/20",
       detail: "PROCOVA does not alter the estimand; it improves precision of the same treatment effect estimate. Fully compatible with the addendum on estimands and sensitivity analysis.",
     },
     {
@@ -12861,7 +12968,7 @@ function BalanceReport({ cr }: { cr: CohortResults | null }) {
           ))}
         </tbody>
       </table>
-      <button className="mt-3 text-[11px] text-violet-400 hover:text-violet-300 flex items-center gap-1.5 border border-violet-500/25 rounded-md px-3 py-1.5 hover:border-violet-500/40">
+      <button className="mt-3 text-[11px] text-teal-400 hover:text-teal-300 flex items-center gap-1.5 border border-teal-500/25 rounded-md px-3 py-1.5 hover:border-teal-500/40">
         <RefreshCw className="w-3 h-3" /> Re-run Matching with Adjusted Parameters
       </button>
     </div>
@@ -12972,7 +13079,7 @@ function CostSummary({ tr }: { tr: TrialResults | null }) {
           </div>
           <div className="flex gap-1 mt-3 justify-end">
             {["USD","EUR","JPY"].map(c => (
-              <button key={c} className={`text-[10px] px-2 py-1 rounded border ${c === "USD" ? "border-violet-500/40 bg-violet-500/10 text-violet-300" : "border-white/10 text-slate-500"}`}>
+              <button key={c} className={`text-[10px] px-2 py-1 rounded border ${c === "USD" ? "border-teal-500/40 bg-teal-500/10 text-teal-300" : "border-white/10 text-slate-500"}`}>
                 {c}
               </button>
             ))}
@@ -13137,7 +13244,7 @@ function FirstInHumanPanel({
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold text-emerald-300 uppercase tracking-widest">Layer 4</span>
             <h2 className="hk-display text-[18px] text-white">First In Human · Phase 1 Planner</h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 border border-violet-500/30 text-violet-200 font-mono">v2.0.0 §8</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 border border-teal-500/30 text-teal-200 font-mono">v2.0.0 §8</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-0.5 truncate">
             {molName} · package auto-fed from L3 Animal Cohort · MABEL / HED / IND-gate consumed internally

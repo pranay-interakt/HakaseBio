@@ -53,13 +53,13 @@ export async function fetchChemblAnimalPk(smiles: string): Promise<ChEMBLAnimalP
   };
   if (!smiles) return base;
   try {
-    const compRes = await fetch(`${API_ROOT}/api/chembl/compound?smiles=${encodeURIComponent(smiles)}`);
+    const compRes = await fetch(`${API_ROOT}/api/chembl/compound?smiles=${encodeURIComponent(smiles)}`, { signal: AbortSignal.timeout(12000) });
     if (!compRes.ok) return { ...base, status: "error" };
     const compData = await compRes.json();
     const chemblId = compData?.molecules?.[0]?.molecule_chembl_id ?? null;
     if (!chemblId) return base;
 
-    const r = await fetch(`${API_ROOT}/api/chembl/animal-pk?chembl_id=${encodeURIComponent(chemblId)}`);
+    const r = await fetch(`${API_ROOT}/api/chembl/animal-pk?chembl_id=${encodeURIComponent(chemblId)}`, { signal: AbortSignal.timeout(12000) });
     if (!r.ok) return { ...base, chemblId, status: "error" };
     const data = await r.json();
     const records: ChEMBLAnimalPkRecord[] = data?.records ?? [];
@@ -115,7 +115,7 @@ export async function fetchChEMBLMultiTarget(smiles: string): Promise<ChEMBLMult
   if (!smiles) return base;
 
   try {
-    const compoundRes = await fetch(`${API_ROOT}/api/chembl/compound?smiles=${encodeURIComponent(smiles)}`);
+    const compoundRes = await fetch(`${API_ROOT}/api/chembl/compound?smiles=${encodeURIComponent(smiles)}`, { signal: AbortSignal.timeout(12000) });
     if (!compoundRes.ok) return { ...base, status: "error" };
     const compoundData = await compoundRes.json();
 
@@ -126,7 +126,7 @@ export async function fetchChEMBLMultiTarget(smiles: string): Promise<ChEMBLMult
     const chemblId = mol.molecule_chembl_id;
     const compoundName = mol.pref_name ?? mol.molecule_chembl_id ?? "";
 
-    const activityRes = await fetch(`${API_ROOT}/api/chembl/activities?chembl_id=${encodeURIComponent(chemblId)}`);
+    const activityRes = await fetch(`${API_ROOT}/api/chembl/activities?chembl_id=${encodeURIComponent(chemblId)}`, { signal: AbortSignal.timeout(12000) });
     if (!activityRes.ok) return { ...base, compoundChemblId: chemblId, compoundName, status: "error" };
     const activityData = await activityRes.json();
 

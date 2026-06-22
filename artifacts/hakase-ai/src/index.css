@@ -466,6 +466,20 @@ html.hk-light body,
 .hk-light [class*="bg-white/10"] {
   background-color: var(--hk-surface3) !important;
 }
+/* Arbitrary-value white overlays (bg-white/[0.02], [0.03], [0.04], [0.015]…)
+   are NOT caught by the fractional rules above — Tailwind emits them as a
+   literal class. Without this they stay near-invisible (white-on-warm) in light
+   mode. Map the low-alpha arbitrary overlays to the warm surface tone so every
+   subtle panel/tile reads correctly in light theme app-wide. */
+.hk-light [class*="bg-white/[0.0"],
+.hk-light [class*="bg-white/[.0"] {
+  background-color: var(--hk-surface2) !important;
+}
+.hk-light [class*="bg-white/[0.1"],
+.hk-light [class*="bg-white/[0.12"],
+.hk-light [class*="bg-white/[0.15"] {
+  background-color: var(--hk-surface3) !important;
+}
 .hk-light [class*="bg-white/15"],
 .hk-light [class*="bg-white/20"],
 .hk-light [class*="bg-white/25"],
