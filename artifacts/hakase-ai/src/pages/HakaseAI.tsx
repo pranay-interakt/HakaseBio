@@ -121,6 +121,7 @@ import { parseFasta, validateSequence } from "@/components/PeptideAnalysisPanel"
 import { preparePeptideL2, type PeptideL2Results } from "@/lib/peptideL2Adapter";
 import { buildMlOverlay, overlayHasAnyMl } from "@/lib/mlOverlay";
 import { computeL1Scorecard, type L1Scorecard, type EvidenceSupport, type KnownDrugLookup, type ApplicabilityDomain } from "@/lib/l1Scorecard";
+import { API_ROOT } from "@/lib/apiBase";
 import { EvidenceNoveltyPanel } from "@/components/EvidenceNoveltyPanel";
 import { BenefitRiskCard } from "@/components/BenefitRiskCard";
 import { PreclinicalEvidenceCard } from "@/components/PreclinicalEvidenceCard";
@@ -10561,6 +10562,24 @@ function Layer1Results({
     }
   };
 
+  // ── Similar known compounds (read-across for novel chemistry) ───────────
+  // Lazy-loaded only when the "Similar Compounds" tab is opened, so it never
+  // slows the default view or fires a ChEMBL call that isn't needed.
+  interface SimilarCompound { chemblId: string; name: string | null; similarity: number; maxPhase: number | null; withdrawn: boolean; status: string; implication: string; chemblUrl: string; }
+  interface SimilarResp { compounds: SimilarCompound[]; count?: number; withdrawnHits?: number; approvedHits?: number; summary?: string; status?: string; }
+  const [similar, setSimilar] = useState<SimilarResp | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  useEffect(() => {
+    if (activeTab !== "similar" || !smiles?.trim()) return;
+    let cancelled = false;
+    setSimilarLoading(true); setSimilar(null);
+    fetch(`${API_ROOT}/api/chembl/similar-compounds?smiles=${encodeURIComponent(smiles)}&threshold=60`, { signal: AbortSignal.timeout(20000) })
+      .then(r => r.json())
+      .then((d: SimilarResp) => { if (!cancelled) { setSimilar(d); setSimilarLoading(false); } })
+      .catch(() => { if (!cancelled) { setSimilar({ compounds: [], status: "error" }); setSimilarLoading(false); } });
+    return () => { cancelled = true; };
+  }, [activeTab, smiles]);
+
   const iv = inVitroResults;
   // Prefer ML scorecard verdict when available; fall back to heuristic
   const sc = l1Scorecard;
@@ -10858,7 +10877,7 @@ function Layer1Results({
           a deliberate "deep dive" zone rather than loose chrome. */}
       <div className="flex items-center gap-2 pt-1">
         <span className="hk-eyebrow">Detailed analyses</span>
-        <span className="text-[10px] text-slate-500">7 in-vitro views · pick one</span>
+        <span className="text-[10px] text-slate-500">8 in-vitro views · pick one</span>
       </div>
       <div className="hk-tabbar flex-wrap">
         {[
@@ -10869,6 +10888,7 @@ function Layer1Results({
           { id: "safety",        label: "Safety",        icon: Shield },
           { id: "mechanism",     label: "Mechanism",     icon: GitBranch },
           { id: "bioactivation", label: "Bioactivation", icon: Zap },
+          { id: "similar",       label: "Similar Compounds", icon: Beaker },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -11420,6 +11440,80 @@ function Layer1Results({
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-600">
           <Activity className="w-8 h-8" />
           <p className="text-[11px]">Run the simulation first</p>
+        </div>
+      )}
+
+      {/* ── Similar Compounds (read-across for novel chemistry) ── */}
+      {activeTab === "similar" && (
+        <div className="hk-card space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="hk-display text-[16px] text-slate-100">Similar known compounds</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">Nearest ChEMBL neighbours by structure — their clinical fate is read-across direction for this molecule.</p>
+            </div>
+            <Badge className="text-[8px] bg-cyan-500/10 text-cyan-300 border-cyan-500/20">ChEMBL similarity ≥60%</Badge>
+          </div>
+
+          {similarLoading && (
+            <div className="flex items-center gap-2 py-8 justify-center text-slate-500 text-[11px]">
+              <Activity className="w-4 h-4 animate-pulse" /> Searching ChEMBL chemical space…
+            </div>
+          )}
+
+          {!similarLoading && similar && (similar.compounds?.length ?? 0) === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-500">
+              <Beaker className="w-7 h-7" />
+              <p className="text-[12px] text-slate-300 font-medium">No close known neighbours</p>
+              <p className="text-[11px] text-center max-w-md">
+                {similar.status === "error" || similar.status === "chembl_unavailable"
+                  ? "ChEMBL is unreachable right now — try again in a moment."
+                  : "Genuinely novel chemical space — no ChEMBL compound is ≥60% similar. Lean on the ML/ADMET direction and confirm in vitro."}
+              </p>
+            </div>
+          )}
+
+          {!similarLoading && similar && (similar.compounds?.length ?? 0) > 0 && (
+            <>
+              {similar.summary && (
+                <div className={`text-[11px] rounded-lg border px-3 py-2 ${(similar.withdrawnHits ?? 0) > 0 ? "border-red-500/30 bg-red-500/10 text-red-200" : "border-cyan-500/20 bg-cyan-500/5 text-slate-300"}`}>
+                  {(similar.withdrawnHits ?? 0) > 0 && <AlertTriangle className="inline w-3 h-3 mr-1 -mt-0.5" />}
+                  {similar.summary}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                {similar.compounds.map((c) => {
+                  const tone = c.withdrawn ? "border-red-500/30 bg-red-500/10"
+                    : c.status === "approved" ? "border-emerald-500/25 bg-emerald-500/5"
+                    : c.status.startsWith("clinical") ? "border-amber-500/25 bg-amber-500/5"
+                    : "border-white/10 bg-white/5";
+                  const stXt = c.withdrawn ? "text-red-300" : c.status === "approved" ? "text-emerald-300" : c.status.startsWith("clinical") ? "text-amber-300" : "text-slate-400";
+                  return (
+                    <div key={c.chemblId} className={`border rounded-lg px-3 py-2 ${tone}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="hk-chip-mono text-[12px] text-cyan-300 font-semibold">{c.similarity}%</span>
+                        <a href={c.chemblUrl} target="_blank" rel="noreferrer" className="text-[12px] text-slate-100 font-medium hover:underline">
+                          {c.name ?? c.chemblId}
+                        </a>
+                        <span className={`text-[9px] uppercase tracking-wide font-semibold ${stXt}`}>{c.status}</span>
+                        <span className="ml-auto text-[9px] text-slate-600">{c.chemblId}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">{c.implication}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                Read-across is an OECD-accepted way to anchor a novel compound to measured neighbours. A withdrawn or black-box neighbour is a liability signal to inspect in your scaffold; an approved neighbour is a developability precedent.
+              </p>
+            </>
+          )}
+
+          {!similar && !similarLoading && (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-600">
+              <Beaker className="w-7 h-7" />
+              <p className="text-[11px]">Enter a valid SMILES to find similar known compounds.</p>
+            </div>
+          )}
         </div>
       )}
 

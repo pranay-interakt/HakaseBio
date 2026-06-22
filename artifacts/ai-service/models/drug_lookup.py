@@ -353,9 +353,75 @@ def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
     return None
 
 
+# ── Evidence enrichment — WHY a drug is in its state ────────────────────────
+# ChEMBL's lighter by-ID endpoints (drug_warning, mechanism) are far more
+# reliable than structure search and carry the *reason*: warning_class
+# (cardiotoxicity / hepatotoxicity / …), withdrawal description + year, and the
+# mechanism of action. Best-effort + cached: identification NEVER depends on it,
+# so a known drug is still identified (and vetoed) when these calls fail.
+_EVIDENCE_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _chembl_evidence(chembl_id: Optional[str]) -> dict[str, Any]:
+    if not chembl_id:
+        return {}
+    if chembl_id in _EVIDENCE_CACHE:
+        return _EVIDENCE_CACHE[chembl_id]
+    ev: dict[str, Any] = {}
+    # drug_warning — the reason for withdrawal / black-box
+    try:
+        url = f"{_CHEMBL_BASE}/drug_warning.json?molecule_chembl_id={chembl_id}&limit=20"
+        resp = requests.get(url, headers=_CHEMBL_HEADERS, timeout=5)
+        if resp.ok:
+            warns = resp.json().get("drug_warnings") or []
+            classed = [w for w in warns if w.get("warning_class")]
+            best = classed[0] if classed else (warns[0] if warns else None)
+            if best:
+                ev["warning_class"] = best.get("warning_class")
+                ev["warning_type"] = best.get("warning_type")  # Withdrawn / Black Box Warning
+                ev["warning_description"] = best.get("warning_description")
+                ev["warning_year"] = best.get("warning_year")
+                ev["warning_country"] = best.get("warning_country")
+    except Exception:  # noqa: BLE001 — evidence is optional
+        pass
+    # mechanism — how it works
+    try:
+        url = f"{_CHEMBL_BASE}/mechanism.json?molecule_chembl_id={chembl_id}&limit=5"
+        resp = requests.get(url, headers=_CHEMBL_HEADERS, timeout=5)
+        if resp.ok:
+            mechs = resp.json().get("mechanisms") or []
+            if mechs:
+                ev["mechanism_of_action"] = mechs[0].get("mechanism_of_action")
+                ev["mechanism_target"] = mechs[0].get("target_chembl_id")
+                ev["action_type"] = mechs[0].get("action_type")
+    except Exception:  # noqa: BLE001
+        pass
+    _EVIDENCE_CACHE[chembl_id] = ev
+    return ev
+
+
 def _envelope(
     kd: KnownDrug, match_type: str, confidence: float, tanimoto: Optional[float]
 ) -> dict[str, Any]:
+    # Enrich with the REASON (drug_warning) + mechanism — best-effort, cached.
+    evidence = _chembl_evidence(kd.get("chembl_id"))
+    if evidence:
+        kd = {**kd, **{k: v for k, v in evidence.items() if v is not None}}
+        # Promote the curated warning_class into the veto liability so the verdict
+        # says *why* (e.g. "Known liability — Cardiotoxicity"), and refine the
+        # human-readable withdrawal reason from ChEMBL's description.
+        wc = evidence.get("warning_class")
+        desc = evidence.get("warning_description")
+        for L in kd.get("liabilities", []):
+            if L.get("severity") == "veto":
+                if wc:
+                    L["endpoint"] = wc.title()
+                if desc:
+                    yr = evidence.get("warning_year")
+                    L["valueText"] = desc + (f" (withdrawn {yr})" if yr else "")
+        if desc and kd.get("status") == "withdrawn":
+            kd["withdrawal_reason"] = desc
+
     veto_liabilities = [
         L for L in kd.get("liabilities", []) if L.get("severity") == "veto"
     ]

@@ -1018,4 +1018,81 @@ router.get("/pdb/by-uniprot", async (req, res) => {
   }
 });
 
+// ─── Similar known compounds (read-across for NOVEL chemistry) ─────────────
+// For a novel molecule, find the nearest KNOWN ChEMBL compounds and report each
+// one's development STATE (approved / withdrawn / clinical / research) and what
+// it implies. This is the strongest direction we can give a fresh molecule:
+// "you're 82% similar to a drug withdrawn for cardiotoxicity" is actionable.
+// Resilient: small `only=` payload + retry-on-5xx (EBI similarity 500s under load).
+router.get("/chembl/similar-compounds", async (req, res) => {
+  const smiles = req.query.smiles as string | undefined;
+  const threshold = Math.max(40, Math.min(100, parseInt((req.query.threshold as string) ?? "70")));
+  const limit = Math.max(5, Math.min(50, parseInt((req.query.limit as string) ?? "25")));
+  if (!smiles) { res.status(400).json({ error: "Provide ?smiles=<SMILES>" }); return; }
+
+  const url = `${CHEMBL_BASE}/similarity/${encodeURIComponent(smiles)}/${threshold}.json`
+    + `?only=molecule_chembl_id,pref_name,similarity,max_phase,withdrawn_flag&limit=${limit}`;
+  try {
+    let molecules: any[] | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await cachedFetch(url, { headers: HEADERS }, 15000);
+      if (r.ok) { molecules = (await r.json())?.molecules ?? []; break; }
+      if (r.status >= 500) _chemblCache.delete(url); // don't let the cached 5xx stick
+    }
+    if (molecules === null) { res.json({ compounds: [], status: "chembl_unavailable", threshold }); return; }
+
+    const seen = new Set<string>();
+    const compounds = molecules
+      .map((m) => {
+        const mp = m.max_phase == null ? null : Number(m.max_phase);
+        const withdrawn = !!m.withdrawn_flag;
+        const status =
+          withdrawn ? "withdrawn"
+          : mp != null && mp >= 4 ? "approved"
+          : mp != null && mp >= 1 ? `clinical (phase ${mp})`
+          : "research";
+        const implication =
+          withdrawn ? "Structural neighbour was WITHDRAWN — inspect this liability in your scaffold."
+          : status === "approved" ? "Approved drug in this chemical space — developability precedent."
+          : status.startsWith("clinical") ? "In clinical development — active chemotype."
+          : "Research compound — measured data may exist for read-across.";
+        return {
+          chemblId: m.molecule_chembl_id as string,
+          name: (m.pref_name as string) ?? null,
+          similarity: Math.round(Number(m.similarity ?? 0) * 10) / 10,
+          maxPhase: mp,
+          withdrawn,
+          status,
+          implication,
+          chemblUrl: `https://www.ebi.ac.uk/chembl/compound_report_card/${m.molecule_chembl_id}/`,
+        };
+      })
+      .filter((c) => c.chemblId && !seen.has(c.chemblId) && seen.add(c.chemblId))
+      // Most useful first: named drugs with a known clinical state, then by similarity.
+      .sort((a, b) => {
+        const rank = (c: typeof a) => (c.withdrawn ? 3 : c.status === "approved" ? 2 : c.status.startsWith("clinical") ? 1 : 0);
+        return rank(b) - rank(a) || b.similarity - a.similarity;
+      });
+
+    const withdrawnHits = compounds.filter((c) => c.withdrawn).length;
+    const approvedHits = compounds.filter((c) => c.status === "approved").length;
+    res.json({
+      compounds,
+      count: compounds.length,
+      withdrawnHits,
+      approvedHits,
+      threshold,
+      status: compounds.length > 0 ? "found" : "no_similar",
+      summary:
+        compounds.length === 0
+          ? `No ChEMBL compounds within ${threshold}% similarity — genuinely novel chemical space.`
+          : `${compounds.length} known neighbours ≥ ${threshold}% similar`
+            + (withdrawnHits ? ` · ${withdrawnHits} WITHDRAWN (liability signal)` : "")
+            + (approvedHits ? ` · ${approvedHits} approved (developability precedent)` : "") + ".",
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: err?.message ?? "ChEMBL similar-compounds proxy error", compounds: [] });
+  }
+});
+
 export default router;
