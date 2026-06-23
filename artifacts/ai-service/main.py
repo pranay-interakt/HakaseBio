@@ -1,4 +1,15 @@
 import os
+import sys
+
+# Ensure the service directory is at the front of sys.path to prioritize local modules
+# (e.g. data/known_drugs.py) and prevent conflicts with root-level directories.
+_service_dir = os.path.dirname(os.path.abspath(__file__))
+if _service_dir not in sys.path:
+    sys.path.insert(0, _service_dir)
+elif sys.path[0] != _service_dir:
+    sys.path.remove(_service_dir)
+    sys.path.insert(0, _service_dir)
+
 import numpy as np
 # Eagerly import sklearn submodules on the main thread BEFORE any prewarm
 # background thread can race on them. sklearn's submodules import each other

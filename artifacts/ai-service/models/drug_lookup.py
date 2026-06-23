@@ -34,6 +34,18 @@ Data sources are vendored at build time in `data/known_drugs.py`; running
 """
 from __future__ import annotations
 
+import os
+import sys
+
+# Ensure parent directory of this model (artifacts/ai-service) is at the front of sys.path
+# to prevent namespace package conflicts with the root-level 'data' directory.
+_parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+elif sys.path[0] != _parent_dir:
+    sys.path.remove(_parent_dir)
+    sys.path.insert(0, _parent_dir)
+
 import logging
 import threading
 from typing import Any, Optional
