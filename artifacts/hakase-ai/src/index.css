@@ -82,7 +82,7 @@
   /* Border */
   --border: 228 20% 14%;
   --input: 228 18% 16%;
-  --ring: 186 82% 54%;
+  --ring: 262 83% 65%;
 
   /* Card — slightly lighter than background */
   --card: 228 25% 6%;
@@ -95,7 +95,7 @@
   --popover-border: 228 20% 14%;
 
   /* Primary — violet */
-  --primary: 186 78% 46%;
+  --primary: 262 83% 62%;
   --primary-foreground: 0 0% 100%;
 
   /* Secondary */
@@ -115,7 +115,7 @@
   --destructive-foreground: 0 0% 100%;
 
   /* Charts */
-  --chart-1: 186 78% 46%;
+  --chart-1: 262 83% 62%;
   --chart-2: 217 91% 60%;
   --chart-3: 158 64% 52%;
   --chart-4: 45 93% 58%;
@@ -125,11 +125,11 @@
   --sidebar: 228 28% 5%;
   --sidebar-foreground: 210 40% 88%;
   --sidebar-border: 228 20% 10%;
-  --sidebar-primary: 186 78% 46%;
+  --sidebar-primary: 262 83% 62%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 228 25% 10%;
   --sidebar-accent-foreground: 210 30% 75%;
-  --sidebar-ring: 186 82% 54%;
+  --sidebar-ring: 262 83% 65%;
 
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
@@ -288,7 +288,7 @@ html.hk-light {
 
   --border: 220 14% 88%;
   --input: 220 14% 88%;
-  --ring: 184 72% 42%;
+  --ring: 262 83% 58%;
 
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
@@ -298,7 +298,7 @@ html.hk-light {
   --popover-foreground: 222 47% 11%;
   --popover-border: 220 14% 90%;
 
-  --primary: 184 72% 42%;
+  --primary: 262 83% 58%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 30 20% 96%;             /* Slightly warm tint to match background */
@@ -308,7 +308,7 @@ html.hk-light {
   --muted-foreground: 215 16% 47%;     /* Slate-500/600 readable on white */
 
   --accent: 220 14% 93%;
-  --accent-foreground: 184 72% 40%;
+  --accent-foreground: 262 83% 50%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
@@ -316,11 +316,11 @@ html.hk-light {
   --sidebar: 0 0% 100%;                /* Pure white sidebar */
   --sidebar-foreground: 222 30% 25%;
   --sidebar-border: 220 14% 90%;
-  --sidebar-primary: 184 72% 42%;
+  --sidebar-primary: 262 83% 58%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 220 14% 95%;
   --sidebar-accent-foreground: 222 30% 20%;
-  --sidebar-ring: 184 72% 42%;
+  --sidebar-ring: 262 83% 58%;
 
   --button-outline: rgba(15, 23, 42, 0.10);
   --badge-outline: rgba(15, 23, 42, 0.06);
@@ -466,20 +466,6 @@ html.hk-light body,
 .hk-light [class*="bg-white/10"] {
   background-color: var(--hk-surface3) !important;
 }
-/* Arbitrary-value white overlays (bg-white/[0.02], [0.03], [0.04], [0.015]…)
-   are NOT caught by the fractional rules above — Tailwind emits them as a
-   literal class. Without this they stay near-invisible (white-on-warm) in light
-   mode. Map the low-alpha arbitrary overlays to the warm surface tone so every
-   subtle panel/tile reads correctly in light theme app-wide. */
-.hk-light [class*="bg-white/[0.0"],
-.hk-light [class*="bg-white/[.0"] {
-  background-color: var(--hk-surface2) !important;
-}
-.hk-light [class*="bg-white/[0.1"],
-.hk-light [class*="bg-white/[0.12"],
-.hk-light [class*="bg-white/[0.15"] {
-  background-color: var(--hk-surface3) !important;
-}
 .hk-light [class*="bg-white/15"],
 .hk-light [class*="bg-white/20"],
 .hk-light [class*="bg-white/25"],
@@ -516,8 +502,8 @@ html.hk-light body,
 }
 .hk-light [class*="from-violet-950"][class*="to-violet-900"],
 .hk-light [class*="from-purple-950"][class*="to-purple-900"] {
-  background-image: linear-gradient(to right, rgba(20, 184, 166, 0.10), rgba(20, 184, 166, 0.04)) !important;
-  border-color: rgba(20, 184, 166, 0.35) !important;
+  background-image: linear-gradient(to right, rgba(139, 92, 246, 0.10), rgba(139, 92, 246, 0.04)) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
 }
 .hk-light [class*="from-blue-950"][class*="to-blue-900"],
 .hk-light [class*="from-indigo-950"][class*="to-indigo-900"] {
@@ -558,7 +544,7 @@ html.hk-light body,
 .hk-light [class*="bg-violet-500/15"],
 .hk-light [class*="bg-violet-400/8"],
 .hk-light [class*="bg-violet-400/10"] {
-  background-color: rgba(20, 184, 166, 0.05) !important;
+  background-color: rgba(139, 92, 246, 0.05) !important;
 }
 .hk-light [class*="bg-cyan-600/8"],
 .hk-light [class*="bg-cyan-600/10"],
@@ -1011,7 +997,7 @@ html.hk-light body,
 .hk-light textarea:focus,
 .hk-light select:focus {
   border-color: hsl(var(--ring)) !important;
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
 }
 
 /* ── Focus ring color for buttons ─────────────────────────────────── */
@@ -1032,7 +1018,7 @@ html.hk-light body,
   stroke: #d6d3cb !important;
 }
 .hk-light .hk-animated-grid .hk-glow-violet {
-  background-color: rgba(20, 184, 166, 0.10) !important;
+  background-color: rgba(139, 92, 246, 0.10) !important;
 }
 .hk-light .hk-animated-grid .hk-glow-blue {
   background-color: rgba(59, 130, 246, 0.08) !important;
@@ -1043,7 +1029,7 @@ html.hk-light body,
 
 /* ── Logo "v1.0" version chip in NavBar ───────────────────────────── */
 .hk-light nav button img + span {
-  background-color: rgba(20, 184, 166, 0.10) !important;
+  background-color: rgba(139, 92, 246, 0.10) !important;
   color: #6d28d9 !important;
 }
 
@@ -1162,7 +1148,7 @@ html.hk-light body,
 .wet-lab-report ul, .wet-lab-report ol { padding-left: 22px; margin: 8px 0 14px; }
 .wet-lab-report li { margin: 3px 0; }
 .wet-lab-report .katex { font-size: 1.05em; }
-.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #0e7490; padding-left: 14px; border-radius: 3px; }
+.wet-lab-report .katex-display { margin: 14px 0; padding: 10px 0; background: #f8fafc; border-left: 3px solid #8b5cf6; padding-left: 14px; border-radius: 3px; }
 
 /* Note: print/PDF for the wet-lab report is handled by an off-screen
    iframe in WetLabReportView (handlePrint). That route gives a clean,
@@ -1198,8 +1184,8 @@ html.hk-light body,
 /* ═══════════════════════════════════════════════════════════════════════
    HAKASE BRAND SYSTEM — reusable, opt-in design tokens
    ───────────────────────────────────────────────────────────────────────
-   Anchored to the logo: cyan (#22d3ee, the cap + "AI") → teal (#14b8a6),
-   the Hakase palette. These classes give the app a single, deliberate
+   Anchored to the logo: cyan (#22d3ee, the cap + "AI") → violet (#8b5cf6,
+   the platform primary). These classes give the app a single, deliberate
    visual language — panels, eyebrow labels, chips, rails and KPIs — so the
    UI reads as designed rather than assembled from ad-hoc translucent boxes.
 
@@ -1213,11 +1199,10 @@ html.hk-light body,
   --hk-cyan:        #22d3ee;
   --hk-cyan-soft:   #67e8f9;
   --hk-cyan-deep:   #0e7490;
-  /* Hakase brand is cyan→teal (the logo cap + "AI"). The former "violet"
-     slot is repurposed to teal so the whole design system reads on-brand. */
-  --hk-violet:      #14b8a6;
-  --hk-violet-soft: #5eead4;
-  --hk-violet-deep: #0f766e;
+  /* Anchored to the logo: cyan (#22d3ee, the cap + "AI") → violet (#8b5cf6, the platform primary). */
+  --hk-violet:      #8b5cf6;
+  --hk-violet-soft: #c4b5fd;
+  --hk-violet-deep: #6d28d9;
   --hk-brand-grad:  linear-gradient(120deg, var(--hk-cyan), var(--hk-violet));
 
   /* Direction A — editorial display face for headings (Fraunces serif). */
@@ -1302,29 +1287,7 @@ html.hk-light body,
   box-shadow: 0 1px 2px rgba(20,30,25,0.04), 0 14px 40px -24px rgba(20,30,25,0.16);
 }
 
-/* ── De-purple → Hakase cyan/teal across the whole dashboard ──────────────
-   The app shipped with a violet primary; Hakase's identity is the cyan/teal
-   of the logo. These override the SOLID violet utilities (the `~=` selector
-   matches the exact class token, so opacity variants like `bg-violet-600/20`
-   used by the per-stage stepper are left untouched) and the common violet
-   text/border accents. Result: buttons, links and accents read teal/cyan. */
-[class~="bg-violet-600"]      { background-color: #0d9488 !important; }
-[class~="bg-violet-500"]      { background-color: #14b8a6 !important; }
-[class~="bg-violet-700"]      { background-color: #0f766e !important; }
-[class~="hover:bg-violet-500"]:hover { background-color: #14b8a6 !important; }
-[class~="hover:bg-violet-600"]:hover { background-color: #0d9488 !important; }
-[class~="text-violet-200"],
-[class~="text-violet-300"],
-[class~="text-violet-400"]    { color: #2dd4bf !important; }
-.hk-light [class~="text-violet-200"],
-.hk-light [class~="text-violet-300"],
-.hk-light [class~="text-violet-400"] { color: #0f766e !important; }
-[class~="border-violet-500/40"],
-[class~="border-violet-500/30"],
-[class~="border-violet-500/20"] { border-color: rgba(20,184,166,0.4) !important; }
-[class~="bg-violet-500/10"],
-[class~="bg-violet-500/15"],
-[class~="bg-violet-600/10"]   { background-color: rgba(20,184,166,0.12) !important; }
+/* De-purple overrides removed to restore the violet theme. */
 
 /* Brand top-accent — a thin cyan→violet hairline along the panel's top edge.
    Implemented as a layered background (NOT a pseudo-element) so it can coexist
