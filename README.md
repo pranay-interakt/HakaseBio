@@ -129,13 +129,21 @@ The orchestrator will automatically boot and manage:
 - **FastAPI AI/ML Service:** listening on `http://localhost:8090` (and managing local Ersilia Docker instances if enabled).
 - **Model Warm-Up & Hot-Reloads:** Automatically pre-warms the DILI, hERG, Ames, and Binding-ML models, and watches file changes.
 
-#### 🎨 Terminal 2: Vite React Frontend
+#### 🎨 Terminal 2: Vite React Frontend (Development Mode Only)
 From the repository root, start the frontend developer server on the permitted origin port (`4000`):
 ```bash
 PORT=4000 pnpm run frontend:dev
 ```
 *   **Vite Dev Server URL:** `http://localhost:4000`
 *   Vite config automatically proxies all requests targeting `/api/*` to the gateway on port `3000` to prevent CORS issues.
+
+#### 🚀 Production Hosting & Deployment (Single-Port Mode)
+For hosting the app in production or deploying on cloud instances (e.g. AWS, Render, VM sandboxes, or Docker):
+1. **Build and Start:** Run the single workspace start command. This automatically typechecks, compiles the React assets, builds the server bundles, and launches the backend services:
+   ```bash
+   PATH=".venv/bin:$PATH" pnpm start
+   ```
+2. **Access App:** The Express API server on port `3000` detects the frontend build and serves the React UI statically. You can access the entire application at **`http://localhost:3000`** (meaning you only need to expose a single port `3000` to the internet).
 
 ---
 
