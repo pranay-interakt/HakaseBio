@@ -24,6 +24,8 @@ import type { SimResults } from "@/lib/admet";
 import type { InVitroResults } from "@/lib/inVitroSim";
 import type { MolecularProperties } from "@/lib/chemistry";
 import type { TargetSuggestion } from "@/lib/targetSuggestion";
+import { ADMET_META, formatAdmetValue } from "@/lib/admetMeta";
+import type { MlAdmetResult } from "@/lib/aiService";
 
 import {
   type ConfirmationEvidenceBlock, type EvidencePointer, type ExVivoEntryMode,
@@ -291,6 +293,159 @@ function AdmetPreviewCard({ preview, loading }: { preview: AdmetPreview | null; 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Full ADMET-AI 5-axis endpoint panel
+// ─────────────────────────────────────────────────────────────────────────────
+const AXES: Array<{ key: keyof MlAdmetResult["structured"]; label: string }> = [
+  { key: "absorption", label: "Absorption" }, { key: "distribution", label: "Distribution" },
+  { key: "metabolism", label: "Metabolism" }, { key: "excretion", label: "Excretion" },
+  { key: "toxicity", label: "Toxicity" },
+];
+function AdmetFullPanel({ admet }: { admet: MlAdmetResult }) {
+  if (!admet.ml_available) return null;
+  return (
+    <Card title="ADMET-AI · full endpoint panel" icon={<Activity size={16} style={{ color: "var(--teal)" }} />}
+      note={`${admet.model_info.engine ?? "ADMET-AI v2"} · ${admet.model_info.endpoint_count ?? ""} endpoints · benchmark reliability shown per row.`}>
+      <div className="lab-grid lab-grid-2">
+        {AXES.map(({ key, label }) => {
+          const entries = Object.entries(admet.structured[key] ?? {});
+          if (!entries.length) return null;
+          return (
+            <div className="lab-subcard" key={key as string}>
+              <div className="lab-subcard-h"><span className="lab-dot" style={{ background: "var(--teal)" }} /> {label}</div>
+              <div className="lab-rows">
+                {entries.map(([id, ev]) => {
+                  const meta = ADMET_META[id];
+                  const rel = meta?.reliability;
+                  const tone = rel === "high" ? "var(--go)" : rel === "moderate" ? "var(--watch)" : rel === "low" ? "var(--nogo)" : "var(--faint)";
+                  return (
+                    <Row key={id} label={(ev as any).label ?? meta?.name ?? id}
+                      sub={meta?.unit || undefined}
+                      value={<>{formatAdmetValue(id, (ev as any).value)} {rel && <span className="lab-dot" title={rel} style={{ background: tone, display: "inline-block" }} />}</>} />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function SolubilityCard({ s }: { s: SmallMoleculeL1Result["solubility"] }) {
+  if (s.ruleLogS == null && s.mlLogS == null) return null;
+  const cls = (logS: number) => logS > -2 ? "Highly soluble" : logS > -4 ? "Soluble" : logS > -6 ? "Slightly soluble" : "Insoluble";
+  return (
+    <Card title="Aqueous solubility" icon={<Droplets size={16} style={{ color: "var(--teal)" }} />}
+      note="Rule-based ESOL (Delaney 2004) cross-checked against the ML random-forest model.">
+      <div className="lab-grid lab-grid-2">
+        <div className="lab-subcard">
+          <div className="lab-subcard-h">Rule-based · ESOL <span className="lab-hint">Delaney 2004</span></div>
+          <div className="lab-tile-v" style={{ fontSize: 26 }}>{s.ruleLogS != null ? s.ruleLogS.toFixed(2) : "—"}</div>
+          <div className="lab-tile-sub">logS (mol/L) · {s.ruleLogS != null ? cls(s.ruleLogS) : "—"}</div>
+        </div>
+        <div className="lab-subcard">
+          <div className="lab-subcard-h">ML · random forest <span className="lab-hint">{s.divergent ? "divergent" : "concordant"}</span></div>
+          <div className="lab-tile-v" style={{ fontSize: 26, color: s.divergent ? "var(--watch)" : "var(--ink)" }}>{s.mlLogS != null ? s.mlLogS.toFixed(2) : "—"}</div>
+          <div className="lab-tile-sub">logS (mol/L) · {s.mlClass ?? "—"}</div>
+        </div>
+      </div>
+      {s.divergent && <div className="lab-note-soft" style={{ marginTop: 12 }}>Rule-based and ML estimates diverge by ≥ 1 log unit — measure kinetic solubility before committing to a formulation strategy.</div>}
+    </Card>
+  );
+}
+
+function ExternalDbCard({ ext, target }: { ext: SmallMoleculeL1Result["external"]; target: SmallMoleculeL1Result["target"] }) {
+  const { bindingDB, chembl, string, kegg, reactome, openTargets } = ext;
+  const any = bindingDB || chembl || string || kegg || reactome || openTargets;
+  if (!any) return null;
+  const live = (s?: { status?: string }) => s?.status === "live";
+  return (
+    <Card title="Target intelligence · external databases" icon={<Database size={16} style={{ color: "var(--teal)" }} />}
+      note={`Live evidence for ${target?.geneName || target?.uniprotId || "the resolved target"} — BindingDB, ChEMBL, STRING, KEGG, Reactome, Open Targets.`}>
+      <div className="lab-grid lab-grid-2">
+        {chembl && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><Beaker size={13} style={{ color: "var(--teal)" }} /> ChEMBL bioactivity <span className="lab-hint">{chembl.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Targets with activity" value={String(chembl.targetCount)} />
+              {chembl.activities.slice(0, 4).map((a, i) => <Row key={i} label={a.targetName || a.targetChemblId} sub={a.activityType} value={fmt(a.value_nM, 1, "nM")} />)}
+            </div>
+          </div>
+        )}
+        {bindingDB && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><Atom size={13} style={{ color: "var(--teal)" }} /> BindingDB <span className="lab-hint">{bindingDB.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Ligands on target" value={String(bindingDB.ligandCount)} />
+              <Row label="Median Ki" value={fmt(bindingDB.medianKi_nM, 1, "nM")} />
+              <Row label="Median IC50" value={fmt(bindingDB.medianIC50_nM, 1, "nM")} />
+            </div>
+          </div>
+        )}
+        {openTargets && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><TargetIcon size={13} style={{ color: "var(--teal)" }} /> Open Targets <span className="lab-hint">{openTargets.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Approved drugs" value={String(openTargets.approvedDrugs)} />
+              <Row label="SM tractability" value={fmt(openTargets.tractability?.smallMolecule, 0)} />
+              {openTargets.topDiseases.slice(0, 3).map((d, i) => <Row key={i} label={d.diseaseName} sub={`${d.knownDrugs} drugs · ${d.clinicalTrials} trials`} value={`${(d.score * 100).toFixed(0)}%`} />)}
+            </div>
+          </div>
+        )}
+        {string && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><Workflow size={13} style={{ color: "var(--teal)" }} /> STRING interactome <span className="lab-hint">{string.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Functional partners" value={String(string.functionalPartners)} />
+              <Row label="Hub score" value={String(string.hubScore)} />
+              {string.topPartners.slice(0, 3).map((p, i) => <Row key={i} label={p.gene} sub={p.type} value={String(p.score)} />)}
+            </div>
+          </div>
+        )}
+        {kegg && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><ScrollText size={13} style={{ color: "var(--teal)" }} /> KEGG <span className="lab-hint">{kegg.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Pathways" value={String(kegg.pathways.length)} />
+              <Row label="Linked diseases" value={String(kegg.diseases.length)} />
+              <Row label="Linked drugs" value={String(kegg.drugs.length)} />
+              {kegg.pathways.slice(0, 2).map((p, i) => <Row key={i} label={p.name} value="" />)}
+            </div>
+          </div>
+        )}
+        {reactome && (
+          <div className="lab-subcard"><div className="lab-subcard-h"><Boxes size={13} style={{ color: "var(--teal)" }} /> Reactome <span className="lab-hint">{reactome.status}</span></div>
+            <div className="lab-rows">
+              <Row label="Pathways" value={String(reactome.totalPathways)} />
+              <Row label="Complexes" value={String(reactome.complexCount)} />
+              <Row label="Reactions" value={String(reactome.reactionCount)} />
+            </div>
+          </div>
+        )}
+      </div>
+      {!live(bindingDB ?? undefined) && !live(string ?? undefined) && !live(kegg ?? undefined) && (
+        <div className="lab-note-soft" style={{ marginTop: 12 }}>Some live databases were unreachable — only sources that returned within the time budget are shown.</div>
+      )}
+    </Card>
+  );
+}
+
+function NoveltyCard({ n }: { n: NonNullable<SmallMoleculeL1Result["novelty"]> }) {
+  const tone = n.isKnownDrug ? "var(--known)" : n.noveltyScore > 0.7 ? "var(--teal)" : "var(--watch)";
+  return (
+    <Card title="Novelty & evidence footprint" icon={<Sparkles size={16} style={{ color: "var(--teal)" }} />} dot={tone}
+      note="Public-record consensus across PubChem, UniChem, SureChEMBL patents and the literature.">
+      <div className="lab-verdict" style={{ marginBottom: 12 }}>
+        <span className="lab-verdict-badge" style={{ background: "var(--surface-2)", color: tone, fontSize: 17 }}>{n.verdict}</span>
+        <div className="lab-verdict-meta"><span className="lab-verdict-headline">{n.summary}</span></div>
+        <div className="lab-score-ring"><span className="lab-score-num" style={{ color: tone }}>{Math.round(n.noveltyScore * 100)}</span><span className="lab-score-cap">novelty</span></div>
+      </div>
+      <div className="lab-chip-row">
+        <span className="lab-chip">{n.isKnownDrug ? "Known drug" : "Not a known drug"}</span>
+        <span className="lab-chip">{n.inPatents ? "In patents (SureChEMBL)" : "No patent hit"}</span>
+        <span className="lab-chip">{n.hits.length} public reference{n.hits.length === 1 ? "" : "s"}</span>
+      </div>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Small-molecule output (full)
 // ─────────────────────────────────────────────────────────────────────────────
 function SmallMoleculeResults({ r, showSafety }: { r: SmallMoleculeL1Result; showSafety: boolean }) {
@@ -391,6 +546,11 @@ function SmallMoleculeResults({ r, showSafety }: { r: SmallMoleculeL1Result; sho
           </Card>
         </div>
       )}
+      {r.rawAdmet?.ml_available && <AdmetFullPanel admet={r.rawAdmet} />}
+      <SolubilityCard s={r.solubility} />
+      <ExternalDbCard ext={r.external} target={target} />
+      {r.novelty && <NoveltyCard n={r.novelty} />}
+
       {known?.matched && (
         <Card title="Known-drug match" dot="var(--known)" note="Lookup-first identity / analogue match — measured liabilities bypass ML thresholds.">
           <div className="lab-rows">
@@ -649,6 +809,7 @@ export function Lab() {
   const [modality, setModality] = useState<Modality>("small_molecule");
   const [smiles, setSmiles] = useState("");
   const [molName, setMolName] = useState("");
+  const [indication, setIndication] = useState("");
   const [uniprotOverride, setUniprotOverride] = useState("");
   const [areaOverride, setAreaOverride] = useState("");
   const [sequence, setSequence] = useState("");
@@ -737,7 +898,7 @@ export function Lab() {
           <div style={{ padding: "0 4px", display: "flex", flexDirection: "column", gap: 6 }}>
             {sm ? SM_TEMPLATES.map((t) => (
               <div className="lab-aside-card" key={t.molName} style={{ margin: 0, cursor: "pointer" }}
-                onClick={() => { setSmiles(t.smiles); setMolName(t.molName); setUniprotOverride(t.uniprotId); setAreaOverride(""); }}>
+                onClick={() => { setSmiles(t.smiles); setMolName(t.molName); setUniprotOverride(t.uniprotId); setAreaOverride(""); setIndication(t.indicationCode); }}>
                 <div className="v" style={{ fontSize: 12.5 }}>{t.name}</div>
                 <div className="k" style={{ marginTop: 2 }}>{t.indication} · {t.uniprotId}</div>
               </div>
@@ -794,8 +955,11 @@ export function Lab() {
                   <div className="lab-grid">
                     <div className="lab-field"><label className="lab-label">SMILES</label><textarea className="lab-textarea" value={smiles} onChange={(e) => setSmiles(e.target.value)} placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" /></div>
                     <div className="lab-samples">{SM_SAMPLES.map((s) => <button className="lab-sample" key={s.name} onClick={() => { setSmiles(s.smiles); setMolName(s.name); }}>{s.name}</button>)}</div>
-                    <div className="lab-grid lab-grid-3">
+                    <div className="lab-grid lab-grid-2">
                       <div className="lab-field"><label className="lab-label">Molecule name <span className="lab-hint">optional</span></label><input className="lab-input" value={molName} onChange={(e) => setMolName(e.target.value)} placeholder="Unnamed" /></div>
+                      <div className="lab-field"><label className="lab-label">Indication & disease <span className="lab-hint">optional</span></label><input className="lab-input" value={indication} onChange={(e) => setIndication(e.target.value)} placeholder="e.g. Breast Cancer (HR+/HER2-)" /></div>
+                    </div>
+                    <div className="lab-grid lab-grid-2">
                       <div className="lab-field"><label className="lab-label">UniProt <span className="lab-hint">auto/override</span></label><input className="lab-input lab-mono" value={uniprotOverride} onChange={(e) => setUniprotOverride(e.target.value)} placeholder="auto" /></div>
                       <div className="lab-field"><label className="lab-label">Therapeutic area <span className="lab-hint">optional</span></label><select className="lab-select" value={areaOverride} onChange={(e) => setAreaOverride(e.target.value)}><option value="">Auto</option>{["Oncology","CNS","Cardiovascular","Metabolic","Rare Disease","Infectious Disease","Immunology"].map((a) => <option key={a} value={a}>{a}</option>)}</select></div>
                     </div>

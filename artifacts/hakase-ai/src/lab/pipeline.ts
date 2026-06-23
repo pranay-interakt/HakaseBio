@@ -39,6 +39,13 @@ import {
 } from "@/lib/targetSuggestion";
 import { fetchPeptideMlSignal } from "@/lib/peptideL1Plus";
 import { computePeptideL1Scorecard, type PeptideScorecard } from "@/lib/peptideL1Scorecard";
+import { fetchBindingDB, type BindingDBResult } from "@/lib/bindingDB";
+import { fetchChEMBLMultiTarget, type ChEMBLMultiTargetResult } from "@/lib/chemblActivity";
+import { fetchStringInteractions, type StringResult } from "@/lib/stringApi";
+import { fetchKEGGPathways, type KEGGResult } from "@/lib/kegg";
+import { fetchReactomePathways, type ReactomeResult } from "@/lib/reactome";
+import { fetchOpenTargets, type OTTargetResult } from "@/lib/openTargets";
+import { resolveNovelty, type NoveltyReport } from "@/lib/noveltyResolver";
 
 // ── Curated example compounds (real, well-characterised chemistry) ────────────
 export const SM_SAMPLES: Array<{ name: string; smiles: string }> = [
@@ -121,6 +128,22 @@ export interface ResolvedTarget {
   measured: boolean;
 }
 
+export interface ExternalDbBundle {
+  bindingDB: BindingDBResult | null;
+  chembl: ChEMBLMultiTargetResult | null;
+  string: StringResult | null;
+  kegg: KEGGResult | null;
+  reactome: ReactomeResult | null;
+  openTargets: OTTargetResult | null;
+}
+/** Delaney 2004 ESOL rule-based aqueous solubility (logS). */
+export interface SolubilityCompare {
+  ruleLogS: number | null;       // ESOL Delaney
+  mlLogS: number | null;         // ML random-forest
+  mlClass: string | null;
+  divergent: boolean;            // |rule − ml| ≥ 1 log unit
+}
+
 export interface SmallMoleculeL1Result {
   molProps: MolecularProperties;
   simResults: SimResults;
@@ -134,6 +157,29 @@ export interface SmallMoleculeL1Result {
   applicabilityDomain: ApplicabilityDomainResult | null;
   reactiveMets: ReactiveMetsResult | null;
   bsep: BsepResult | null;
+  rawAdmet: MlAdmetResult | null;
+  solubility: SolubilityCompare;
+  external: ExternalDbBundle;
+  novelty: NoveltyReport | null;
+}
+
+/** ESOL (Delaney 2004): logS = 0.16 − 0.63·cLogP − 0.0062·MW + 0.066·RB − 0.74·AP.
+ *  AP = aromatic-atom proportion, counted from RDKit. Pure published math. */
+function esolLogS(molProps: MolecularProperties, smiles: string): number | null {
+  let aromaticAtoms = 0;
+  try {
+    const rdk = getRDKitInstance();
+    const mol = rdk?.get_mol(smiles);
+    if (mol && mol.is_valid()) {
+      const q = rdk.get_qmol("[a]");
+      const matches = JSON.parse(mol.get_substruct_matches(q) || "[]");
+      aromaticAtoms = Array.isArray(matches) ? matches.length : 0;
+      q.delete(); mol.delete();
+    } else { mol?.delete?.(); }
+  } catch { return null; }
+  const heavy = molProps.heavyAtoms || 1;
+  const ap = Math.max(0, Math.min(1, aromaticAtoms / heavy));
+  return 0.16 - 0.63 * molProps.logP - 0.0062 * molProps.mw + 0.066 * molProps.rotBonds - 0.74 * ap;
 }
 
 export interface RunSmallMoleculeOpts {
@@ -265,11 +311,39 @@ export async function runSmallMoleculeL1(opts: RunSmallMoleculeOpts): Promise<Sm
       ? { critical_count: reactiveMets.critical_count, high_count: reactiveMets.high_count }
       : null,
   });
+  prog(0.95);
+
+  // ── External database intelligence + novelty (bounded, parallel) ───────────
+  const gene = target?.geneName ?? "";
+  const uni = finalUniprot;
+  const [bdbR, chemActR, strR, keggR, reactR, otR, novR] = await Promise.allSettled([
+    uni ? withTimeout(fetchBindingDB(uni), CHEMBL_TIMEOUT) : Promise.resolve(null),
+    withTimeout(fetchChEMBLMultiTarget(smiles), CHEMBL_TIMEOUT),
+    gene ? withTimeout(fetchStringInteractions(gene), CHEMBL_TIMEOUT) : Promise.resolve(null),
+    gene ? withTimeout(fetchKEGGPathways(gene), CHEMBL_TIMEOUT) : Promise.resolve(null),
+    uni ? withTimeout(fetchReactomePathways(uni), CHEMBL_TIMEOUT) : Promise.resolve(null),
+    (gene || uni) ? withTimeout(fetchOpenTargets(gene || uni, !!gene), CHEMBL_TIMEOUT) : Promise.resolve(null),
+    withTimeout(resolveNovelty(smiles), ML_TIMEOUT),
+  ]);
+  const external: ExternalDbBundle = {
+    bindingDB: settled(bdbR), chembl: settled(chemActR), string: settled(strR),
+    kegg: settled(keggR), reactome: settled(reactR), openTargets: settled(otR),
+  };
+  const novelty = settled(novR);
+
+  // ── Rule-based vs ML solubility ────────────────────────────────────────────
+  const ruleLogS = esolLogS(molProps, smiles);
+  const mlLogS = solubility?.prediction?.logS_predicted ?? null;
+  const solubilityCompare: SolubilityCompare = {
+    ruleLogS, mlLogS, mlClass: solubility?.prediction?.solubility_class ?? null,
+    divergent: ruleLogS != null && mlLogS != null ? Math.abs(ruleLogS - mlLogS) >= 1 : false,
+  };
   prog(1);
 
   return {
     molProps, simResults, inVitroResults, scorecard, overlay, mlAvailable, target,
     binding, known, applicabilityDomain: ad, reactiveMets, bsep,
+    rawAdmet: admetMl, solubility: solubilityCompare, external, novelty,
   };
 }
 

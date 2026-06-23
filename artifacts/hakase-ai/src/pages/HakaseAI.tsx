@@ -10616,7 +10616,7 @@ function Layer1Results({
                 : isKnownLiability ? "known"
                 : "red";
   const goBg    = goColor === "emerald" ? "from-emerald-950/60 to-emerald-900/30 border-emerald-500/25"
-                : goColor === "yellow"  ? "from-yellow-950/60 to-yellow-900/30 border-yellow-500/25"
+                : goColor === "yellow"  ? "from-yellow-500/12 via-yellow-500/5 to-yellow-950/20 border-yellow-500/35 shadow-[0_20px_50px_-32px_rgba(234,179,8,0.15)]"
                 : goColor === "known"   ? "from-amber-950/50 via-rose-950/30 to-rose-900/20 border-amber-500/30"
                 :                        "from-red-950/60 to-red-900/30 border-red-500/25";
   const goText  = goColor === "emerald" ? "text-emerald-400" : goColor === "yellow" ? "text-yellow-400" : goColor === "known" ? "text-amber-300" : "text-red-400";
