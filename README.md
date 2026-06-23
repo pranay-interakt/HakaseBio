@@ -118,14 +118,16 @@ This will automatically verify connection credentials and synchronize the table 
 You must run **two processes** concurrently. We recommend running them in separate terminal windows.
 
 #### 🖲️ Terminal 1: Backend Orchestrator
-From the repository root, start the single-command backend supervisor:
+From the repository root, start the single-command backend supervisor. 
+> [!IMPORTANT]
+> If you are running **Ersilia (local mode)**, prepend your virtual environment's bin directory to the `PATH` so the Python CLI can utilize the custom conda mock executable. This allows Ersilia to initialize correctly on any environment (such as macOS, Linux, or sandboxed environments) without needing a full Anaconda/Miniconda installation:
 ```bash
-pnpm run backend:dev
+PATH=".venv/bin:$PATH" pnpm run backend:dev
 ```
 The orchestrator will automatically boot and manage:
 - **Express API Gateway:** listening on `http://localhost:3000`
-- **FastAPI AI/ML Service:** listening on `http://localhost:8090`
-- **Model Warm-Up & Hot-Reloads:** Automatically pre-warms the DILI, hERG, Ames, and Binding-ML models, and watches file changes while ignoring cache changes.
+- **FastAPI AI/ML Service:** listening on `http://localhost:8090` (and managing local Ersilia Docker instances if enabled).
+- **Model Warm-Up & Hot-Reloads:** Automatically pre-warms the DILI, hERG, Ames, and Binding-ML models, and watches file changes.
 
 #### 🎨 Terminal 2: Vite React Frontend
 From the repository root, start the frontend developer server on the permitted origin port (`4000`):
@@ -134,6 +136,35 @@ PORT=4000 pnpm run frontend:dev
 ```
 *   **Vite Dev Server URL:** `http://localhost:4000`
 *   Vite config automatically proxies all requests targeting `/api/*` to the gateway on port `3000` to prevent CORS issues.
+
+---
+
+### 6. **Using the Ersilia Cell-Viability/Cytotoxicity Model (Optional)**
+
+The platform integrates the **Ersilia cell-viability model (`eos9ei3`)** to predict live cytotoxicity ($CC_{50}$) and Therapeutic Index (TI) values in the `/lab` dashboard.
+
+#### Prerequisites for Ersilia:
+1. **Docker Desktop:** Must be running locally.
+2. **Ersilia Python CLI:** Installed in your virtual environment (automatically handled via `uv sync` or `pip install -r pyproject.toml`).
+
+#### Setup Steps:
+1. **Configure Environment Variables:** Add the following lines to your root `.env` file to enable the local Ersilia Docker daemon:
+   ```env
+   HAKASE_ERSILIA_MODE=local
+   HAKASE_ERSILIA_MODELS='{"cytotoxicity":"eos9ei3"}'
+   HAKASE_ERSILIA_OUTPUT='{"cytotoxicity":{"kind":"cc50_uM","key":"cc50"}}'
+   ```
+   *(To disable or fall back to mock predictions, set `HAKASE_ERSILIA_MODE=off` or omit these lines).*
+
+2. **Fetch the Model Weights:** Pull the container weights from the Ersilia Model Hub:
+   ```bash
+   .venv/bin/ersilia -v fetch eos9ei3
+   ```
+
+3. **Start the Backend:** Start with the path-prefix workaround so that Ersilia is tricked into bypassing its Conda dependency check:
+   ```bash
+   PATH=".venv/bin:$PATH" pnpm run backend:dev
+   ```
 
 ---
 
@@ -157,4 +188,4 @@ Once both services are running, verify communication via these health check endp
     # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
     ```
 
-If all three verify successfully, open your browser to **`http://localhost:4000/dashboard`** to begin simulating digital twins!
+If all three verify successfully, open your browser to **`http://localhost:4000/`** (and log in or click "Access demo workspace" to navigate to **`/lab`**) to begin simulating digital twins!

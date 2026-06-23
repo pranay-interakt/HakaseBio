@@ -202,6 +202,46 @@ router.post("/ai/bsep", async (req, res) => {
   }
 });
 
+// Cytotoxicity (cell viability / CC50) — real Ersilia model or honest unavailable
+router.post("/ai/cytotoxicity", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/cytotoxicity`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+// Generic Ersilia Model Hub passthrough (configured endpoints only)
+router.post("/ai/ersilia", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/ersilia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
+router.get("/ai/ersilia/status", async (_req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/ersilia/status`);
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 // Applicability domain (AD) confidence scorer
 router.post("/ai/applicability-domain", async (req, res) => {
   try {

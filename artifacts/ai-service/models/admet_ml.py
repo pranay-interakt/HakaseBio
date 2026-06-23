@@ -163,6 +163,18 @@ KEY_ENDPOINTS: dict[str, dict[str, str]] = {
         "Carcinogens_Lagunin": "Carcinogenicity (probability)",
         "ClinTox": "Clinical toxicity (probability)",
         "Skin_Reaction": "Skin sensitization (probability)",
+        "SR-MMP": "Mitochondrial Membrane Potential disruption (probability)",
+        "SR-ATAD5": "ATPase Family AAA Domain-Containing Protein 5 (Genotoxicity) (probability)",
+        "SR-p53": "Tumor Protein p53 activation (probability)",
+        "SR-ARE": "Antioxidant Response Element activation (probability)",
+        "SR-HSE": "Heat Shock Factor Response Element activation (probability)",
+        "NR-AR": "Androgen Receptor binding (Full Length) (probability)",
+        "NR-AR-LBD": "Androgen Receptor binding (Ligand Binding Domain) (probability)",
+        "NR-AhR": "Aryl Hydrocarbon Receptor binding (probability)",
+        "NR-Aromatase": "Aromatase inhibition (probability)",
+        "NR-ER": "Estrogen Receptor binding (Full Length) (probability)",
+        "NR-ER-LBD": "Estrogen Receptor binding (Ligand Binding Domain) (probability)",
+        "NR-PPAR-gamma": "Peroxisome Proliferator-Activated Receptor Gamma binding (probability)",
     },
 }
 

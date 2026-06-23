@@ -91,6 +91,12 @@ from models.bsep import predict_bsep
 from models.applicability_domain import predict_applicability_domain
 from models.drug_lookup import lookup_drug, lookup_status
 from models.binding_dta_adapter import predict_affinity as predict_dta_affinity, status as dta_status
+from models.ersilia_hub import (
+    predict_ersilia,
+    predict_cytotoxicity,
+    is_ready as ersilia_status,
+    warmup as ersilia_warmup,
+)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -157,6 +163,8 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=celltype_aggregation_warmup, name="celltype-aggregation-prewarm", daemon=True).start()
     threading.Thread(target=patient_line_warmup, name="patient-line-prewarm", daemon=True).start()
     threading.Thread(target=peptide_esm_ml_warmup, name="peptide-esm-ml-prewarm", daemon=True).start()
+    # Ersilia hub: no-op unless HAKASE_ERSILIA_MODE=local; pre-serves configured models.
+    threading.Thread(target=ersilia_warmup, name="ersilia-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -648,6 +656,50 @@ def api_predict_applicability_domain(req: SmilesRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Applicability domain scoring failed: {str(e)}")
+
+
+class ErsiliaRequest(BaseModel):
+    endpoint: str
+    smiles: str
+
+
+@app.post("/predict/cytotoxicity")
+def api_predict_cytotoxicity(req: SmilesRequest):
+    """Cytotoxicity (cell viability / CC50) via a configured Ersilia Model Hub model.
+
+    Returns a real model prediction when HAKASE_ERSILIA_MODE + a cytotoxicity
+    eos model id are configured; otherwise returns source="unavailable" with
+    value=None. It NEVER fabricates a CC50 — the L1 engine treats an unavailable
+    result as missing data, not as a heuristic number.
+    """
+    try:
+        return sanitize(predict_cytotoxicity(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cytotoxicity prediction failed: {str(e)}")
+
+
+@app.post("/predict/ersilia")
+def api_predict_ersilia(req: ErsiliaRequest):
+    """Generic Ersilia Model Hub passthrough for a configured L1 endpoint.
+
+    endpoint ∈ {cytotoxicity, hepatotoxicity, ames, herg, solubility, …}. Real
+    model output when configured; honest source="unavailable" otherwise. Never
+    fabricates.
+    """
+    try:
+        return sanitize(predict_ersilia(req.endpoint, req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ersilia prediction failed: {str(e)}")
+
+
+@app.get("/predict/ersilia/status")
+def api_ersilia_status():
+    """Report Ersilia integration mode, install state, and configured endpoints."""
+    return sanitize(ersilia_status())
 
 
 @app.post("/api/ai/antibody-ml")
