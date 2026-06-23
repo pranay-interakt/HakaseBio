@@ -105,7 +105,6 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return super().default(obj)
 
-
 def sanitize(obj):
     if isinstance(obj, dict):
         return {k: sanitize(v) for k, v in obj.items()}
