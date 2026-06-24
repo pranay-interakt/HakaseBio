@@ -50,6 +50,12 @@ Ensure you have the following software installed on your machine:
 *   **PostgreSQL** (Local or remote running instance accepting connections)
 *   **Git & Git LFS** (Required for storing model weights and large datasets)
 
+Make sure to initialize Git LFS and pull model weights after cloning:
+```bash
+git lfs install
+git lfs pull
+```
+
 ---
 
 ### 2. **Environment & Security Configuration (.env)**
@@ -62,10 +68,10 @@ Ensure you have the following software installed on your machine:
    ```bash
    cp .env.example .env
    ```
-2. Open the newly created `.env` file and set the required database URL:
+2. Open the newly created `.env` file and set the required database URL (include your password if configured):
    ```env
    # PostgreSQL database connection URL (e.g. local DB named 'hakase_bio')
-   DATABASE_URL=postgresql://<username>@localhost:5432/hakase_bio
+   DATABASE_URL=postgresql://<username>:<password>@localhost:5432/hakase_bio
    ```
 3. Set Anthropic and RunPod bypass variables for local development (defaults to `DUMMY` to bypass API keys):
    ```env
@@ -105,11 +111,16 @@ uv sync
 
 ### 4. **Database Migration**
 
-Initialize the PostgreSQL database schema using Drizzle Kit. Run this command from the repository root:
-```bash
-DATABASE_URL="postgresql://<username>@localhost:5432/hakase_bio" pnpm --filter @workspace/db run push
-```
-This will automatically verify connection credentials and synchronize the table schemas.
+1. Create the PostgreSQL database `hakase_bio` if it does not already exist:
+   ```bash
+   createdb hakase_bio
+   # Or via psql: psql -c "CREATE DATABASE hakase_bio;"
+   ```
+2. Initialize the PostgreSQL database schema using Drizzle Kit. Run this command from the repository root:
+   ```bash
+   DATABASE_URL="postgresql://<username>:<password>@localhost:5432/hakase_bio" pnpm --filter @workspace/db run push
+   ```
+   This will automatically verify connection credentials and synchronize the table schemas.
 
 ---
 
@@ -120,10 +131,21 @@ You must run **two processes** concurrently. We recommend running them in separa
 #### 🖲️ Terminal 1: Backend Orchestrator
 From the repository root, start the single-command backend supervisor. 
 > [!IMPORTANT]
-> If you are running **Ersilia (local mode)**, prepend your virtual environment's bin directory to the `PATH` so the Python CLI can utilize the custom conda mock executable. This allows Ersilia to initialize correctly on any environment (such as macOS, Linux, or sandboxed environments) without needing a full Anaconda/Miniconda installation:
-```bash
-PATH=".venv/bin:$PATH" pnpm run backend:dev
-```
+> If you are running **Ersilia (local mode)**, prepend your virtual environment's binary directory to the `PATH` so the Python CLI can utilize the custom conda mock executable. This allows Ersilia to initialize correctly on any environment (such as macOS, Linux, or Windows) without needing a full Anaconda/Miniconda installation:
+
+- **Linux / macOS (bash/zsh)**:
+  ```bash
+  PATH=".venv/bin:$PATH" pnpm run backend:dev
+  ```
+- **Windows (Command Prompt)**:
+  ```cmd
+  set PATH=.venv\Scripts;%PATH% && pnpm run backend:dev
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  $env:PATH=".venv\Scripts;$env:PATH"; pnpm run backend:dev
+  ```
+
 The orchestrator will automatically boot and manage:
 - **Express API Gateway:** listening on `http://localhost:3000`
 - **FastAPI AI/ML Service:** listening on `http://localhost:8090` (and managing local Ersilia Docker instances if enabled).
