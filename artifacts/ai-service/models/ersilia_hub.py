@@ -162,6 +162,8 @@ def _extract_value(raw: Any, endpoint: str) -> tuple[float | None, str]:
 
 
 def _run_local(model_id: str, smiles: str) -> Any:
+    import tempfile
+    import csv
     mdl = _served.get(model_id)
     if mdl is None:
         with _serve_lock:
@@ -171,7 +173,29 @@ def _run_local(model_id: str, smiles: str) -> Any:
                 mdl = ErsiliaModel(model_id)
                 mdl.serve()
                 _served[model_id] = mdl
-    return mdl.run(input=[smiles], output="dict")
+
+    # Use file-based I/O to bypass PyPI Ersilia packaging bugs
+    fd_in, temp_input = tempfile.mkstemp(suffix=".csv")
+    os.close(fd_in)
+    try:
+        with open(temp_input, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["smiles"])
+            writer.writerow([smiles])
+
+        fd_out, temp_output = tempfile.mkstemp(suffix=".json")
+        os.close(fd_out)
+        try:
+            os.remove(temp_output)
+            mdl.run(input=temp_input, output=temp_output)
+            with open(temp_output, "r") as f:
+                return json.load(f)
+        finally:
+            if os.path.exists(temp_output):
+                os.remove(temp_output)
+    finally:
+        if os.path.exists(temp_input):
+            os.remove(temp_input)
 
 
 def _run_client(url: str, smiles: str) -> Any:
