@@ -86,6 +86,21 @@ cp backend/.env.example backend/.env
 ```
 Ensure the `DATABASE_URL` matches the connection string configured in the root `.env`.
 
+#### Step C: Enforce strict ML loading for Production (`STRICT_ML`)
+By default, the Python machine learning service degrades gracefully—if ADMET-AI or other ML models cannot load (e.g. weights missing, import errors), they fall back to heuristic estimates and set `ml_available=false`. 
+
+In **production deployments**, this silent fallback should be disabled to prevent serving heuristic results under an "ML-Enhanced" badge. Set the `STRICT_ML` flag in the root `.env` to enforce strict startup checks:
+```env
+STRICT_ML=1
+```
+When `STRICT_ML=1` is active:
+* The FastAPI process will immediately **fail and crash at startup/warmup** if the ADMET-AI, CardioTox, or DILI-ML weights fail to load.
+* Model weights for ADMET-AI are automatically downloaded on-demand from the official repositories on the first inference or when triggering the warmup endpoint:
+  ```bash
+  # Trigger model warmup and force pre-downloading/caching of weights
+  curl -X POST http://localhost:8090/models/warmup
+  ```
+
 ---
 
 ### 3. **Installation & Virtual Environment Setup**

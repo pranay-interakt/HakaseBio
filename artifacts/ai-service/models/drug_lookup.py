@@ -64,9 +64,15 @@ _SESSION = requests.Session()
 # Live ChEMBL URL configuration
 _CHEMBL_BASE = "https://www.ebi.ac.uk/chembl/api/data"
 _CHEMBL_HEADERS = {"Accept": "application/json", "User-Agent": "HakaseAI-DrugLookup/1.0"}
-_CHEMBL_TIMEOUT = 2.0  # Tight timeout to prevent blocking during EBI/ChEMBL downtime
-_CHEMBL_RETRIES = 2
+_CHEMBL_TIMEOUT = 2.5  # Tight timeout to prevent blocking during EBI/ChEMBL downtime
+_CHEMBL_RETRIES = 1    # one shot at load time — speed over exhaustiveness
 _CHEMBL_FIELDS = "molecule_chembl_id,pref_name,max_phase,withdrawn_flag,withdrawn_reason,withdrawn_year,withdrawn_country"
+
+# openFDA — live US-regulatory confirmation (independent of EBI/ChEMBL). Used to
+# (a) confirm a structurally-identified compound is an FDA-approved drug even
+# when ChEMBL is degraded, and (b) surface a boxed-warning monitor signal.
+_OPENFDA_BASE = "https://api.fda.gov/drug"
+_OPENFDA_TIMEOUT = 1.8
 
 _LOOKUP_CACHE: dict[str, dict[str, Any]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -269,6 +275,68 @@ def _rdkit_similarity(query_smiles: str, target_smiles: str) -> float:
         return 0.0
 
 
+# ── openFDA live confirmation ────────────────────────────────────────────────
+
+def _openfda_label(name: str) -> Optional[dict[str, Any]]:
+    """LIVE FDA drug-label lookup by name. Returns {'fda_approved': True,
+    'boxed_warning': bool, 'generic_name': str} when an FDA label exists for the
+    name, else None. A present label means the compound is an FDA-marketed drug;
+    `boxed_warning` is a real curated monitor-level signal. Independent of EBI,
+    so it keeps known-drug identification working when ChEMBL is degraded.
+    Never fabricates — any miss/error/timeout returns None."""
+    if not name or len(name.strip()) < 3:
+        return None
+    nm = name.strip().lower()
+    # Match either generic or brand name; openFDA uses Lucene-style quoting.
+    search = f'openfda.generic_name:"{nm}"+OR+openfda.brand_name:"{nm}"'
+    _SAFE = ':+"'
+    quoted = urllib.parse.quote(search, safe=_SAFE)
+    url = f"{_OPENFDA_BASE}/label.json?search={quoted}&limit=1"
+    try:
+        resp = _SESSION.get(url, headers=_CHEMBL_HEADERS, timeout=_OPENFDA_TIMEOUT)
+        if not resp.ok:
+            return None
+        results = resp.json().get("results") or []
+        if not results:
+            return None
+        rec = results[0]
+        of = rec.get("openfda") or {}
+        generic = (of.get("generic_name") or [None])[0]
+        return {
+            "fda_approved": True,
+            "boxed_warning": bool(rec.get("boxed_warning")),
+            "generic_name": generic,
+        }
+    except Exception:
+        return None
+
+
+def _apply_openfda(kd: dict[str, Any]) -> dict[str, Any]:
+    """Enrich a resolved drug record with a LIVE openFDA confirmation:
+      • adds a boxed-warning MONITOR liability when the FDA label carries one;
+      • upgrades a weak/unknown status to 'approved' when an FDA label exists
+        (resilience when ChEMBL did not answer) — never downgrades 'withdrawn'.
+    Pure enrichment; on any openFDA miss the record is returned unchanged."""
+    name = kd.get("name") or ""
+    of = _openfda_label(name)
+    if not of:
+        return kd
+    if kd.get("status") not in ("withdrawn", "approved"):
+        kd["status"] = "approved"
+        kd["fda_confirmed"] = True
+    if of.get("boxed_warning"):
+        existing = {(L.get("endpoint"), L.get("severity")) for L in kd.get("liabilities", [])}
+        if ("Boxed warning", "monitor") not in existing:
+            kd.setdefault("liabilities", []).append({
+                "endpoint": "Boxed warning",
+                "measured": 0,
+                "valueText": "FDA black-box (boxed) warning on the approved label",
+                "source": "openFDA drug label",
+                "severity": "monitor",
+            })
+    return kd
+
+
 # ── ChEMBL query mapping ────────────────────────────────────────────────────
 
 def _chembl_to_kd(mol: dict[str, Any]) -> Optional[KnownDrug]:
@@ -405,35 +473,50 @@ def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
         return env
 
     # ── 1. Live Exact Checks (Parallel ChEMBL + PubChem Exact Search) ──
-    # Runs the ChEMBL query, prefix variant, and PubChem CID lookup in parallel
-    # to avoid sequential bottlenecks and survive EBI service outages.
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # All three live queries fire concurrently. We return on the AUTHORITATIVE
+    # ChEMBL exact hit the instant it resolves and do NOT block on the prefix /
+    # PubChem stragglers (they only matter on a miss) — this is the main speed
+    # win at load time. openFDA enriches the hit with a boxed-warning signal.
+    executor = ThreadPoolExecutor(max_workers=3)
+    pubchem_cid = None
+    try:
         future_chembl_exact = executor.submit(
             _chembl_query, f"molecule_structures__standard_inchi_key__exact={ikey}"
         )
         future_chembl_prefix = executor.submit(
             _chembl_query, f"molecule_structures__standard_inchi_key__istartswith={fb}-"
         )
-        future_pubchem_cid = executor.submit(
-            _pubchem_cid_by_inchikey, ikey
-        )
+        future_pubchem_cid = executor.submit(_pubchem_cid_by_inchikey, ikey)
 
-        kd_chembl = future_chembl_exact.result()
-        kd_chembl_prefix = future_chembl_prefix.result()
-        pubchem_cid = future_pubchem_cid.result()
+        def _safe(fut, timeout):
+            try:
+                return fut.result(timeout=timeout)
+            except Exception:
+                return None
 
-    if kd_chembl is not None:
-        return _hit(_envelope(kd_chembl, "exact", 1.0, 1.0))
+        kd_chembl = _safe(future_chembl_exact, _CHEMBL_TIMEOUT * _CHEMBL_RETRIES + 1.0)
+        if kd_chembl is not None:
+            return _hit(_envelope(_apply_openfda(kd_chembl), "exact", 1.0, 1.0))
 
-    if kd_chembl_prefix is not None:
-        return _hit(_envelope(kd_chembl_prefix, "stereo-variant", 0.95, None))
+        kd_chembl_prefix = _safe(future_chembl_prefix, 2.5)
+        if kd_chembl_prefix is not None:
+            return _hit(_envelope(_apply_openfda(kd_chembl_prefix), "stereo-variant", 0.95, None))
+
+        pubchem_cid = _safe(future_pubchem_cid, 3.0)
+    finally:
+        # Don't wait for any still-running straggler queries — fast path out.
+        executor.shutdown(wait=False)
 
     if pubchem_cid is not None:
         properties = _pubchem_smiles_and_title_batch([pubchem_cid])
         sm, title = (properties[0].get("SMILES"), properties[0].get("Title")) if properties else (None, None)
         name = title or f"PubChem CID {pubchem_cid}"
         is_drug, max_phase, status, withdrawal_reason = _pubchem_safety_profile(pubchem_cid, name)
-        if is_drug:
+        # LIVE FDA confirmation — independent of ChEMBL. This is the resilience
+        # path: a real drug that PubChem didn't flag still resolves if the FDA
+        # has a label for it.
+        of = _openfda_label(name)
+        if is_drug or of:
             liabilities = []
             if status == "withdrawn" or withdrawal_reason:
                 liabilities.append({
@@ -443,13 +526,25 @@ def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
                     "source": f"PubChem CID {pubchem_cid}",
                     "severity": "veto",
                 })
+            if of and of.get("boxed_warning"):
+                liabilities.append({
+                    "endpoint": "Boxed warning",
+                    "measured": 0,
+                    "valueText": "FDA black-box (boxed) warning on the approved label",
+                    "source": "openFDA drug label",
+                    "severity": "monitor",
+                })
+            # Status precedence: a real withdrawal stands; otherwise an FDA label
+            # confirms 'approved' even when PubChem was non-committal.
+            resolved_status = status if (is_drug and status in ("withdrawn", "approved", "investigational")) else ("approved" if of else status)
             kd_record = {
-                "name": name,
-                "status": status,
-                "max_phase": max_phase,
+                "name": of.get("generic_name") or name if of else name,
+                "status": resolved_status,
+                "max_phase": max_phase if (is_drug and max_phase) else (4.0 if of else max_phase),
                 "chembl_id": f"PubChem CID {pubchem_cid}",
                 "withdrawal_reason": withdrawal_reason,
                 "liabilities": liabilities,
+                "fda_confirmed": bool(of),
             }
             return _hit(_envelope(kd_record, "exact", 1.0, 1.0))
 
@@ -527,10 +622,8 @@ def lookup_drug(smiles: str) -> Optional[dict[str, Any]]:
 def lookup_status() -> dict[str, Any]:
     return {
         "ready": True,
-        "indexed_drugs": 0,
-        "approved": 0,
-        "withdrawn": 0,
-        "reference": 0,
+        "engine": "live multi-source resolver (ChEMBL + PubChem + openFDA), no offline cache",
+        "sources": ["ChEMBL", "PubChem", "openFDA"],
         "match_thresholds": {
             "exact": _EXACT_THR,
             "close_analog_tanimoto": _CLOSE_THR,

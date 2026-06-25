@@ -396,6 +396,23 @@ router.post("/ai/patient-line", async (req, res) => {
   }
 });
 
+// Layer 1 — quantitative human PK by IVIVE. Forwards the AI-service status
+// verbatim (including 422 "insufficient-input" and 400 "input-error") so the
+// no-fallback contract reaches the client unaltered.
+router.post("/ai/pk/ivive", async (req, res) => {
+  try {
+    const resp = await fetch(`${AI_SERVICE_URL}/predict/pk/ivive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body),
+    });
+    const data = await resp.json();
+    res.status(resp.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 router.get("/ai/models/status", async (_req, res) => {
   try {
     const resp = await fetch(`${AI_SERVICE_URL}/models/status`);

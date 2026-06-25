@@ -97,6 +97,7 @@ from models.ersilia_hub import (
     is_ready as ersilia_status,
     warmup as ersilia_warmup,
 )
+from models.pk_ivive import predict_pk_ivive, is_ready as pk_ivive_status
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -445,6 +446,52 @@ def api_predict_patient_line(req: PatientLineRequest):
     return sanitized
 
 
+class PkIviveRequest(BaseModel):
+    """Layer 1 — quantitative human PK by IVIVE.
+
+    `overrides` lets a caller substitute a MEASURED value for any ADMET-AI input
+    (keys: clint_hep_ul_min_1e6, fu_plasma, vdss_l_per_kg, half_life_obach_h,
+    blood_plasma_ratio); measured wins over ML. `dose_mg` (optional) adds an
+    assumption-free IV-bolus exposure block (AUC, C-t curve).
+    """
+    smiles: str
+    overrides: dict[str, float] | None = None
+    ml_inputs: dict[str, float] | None = None
+    body_weight_kg: float = 70.0
+    blood_plasma_ratio: float | None = None
+    dose_mg: float | None = None
+
+
+@app.post("/predict/pk/ivive")
+def api_predict_pk_ivive(req: PkIviveRequest):
+    """Quantitative human PK (CL, t½, hepatic first-pass, exposure) by IVIVE.
+
+    Sources CLint / fu / VDss from the REAL ADMET-AI predictor (or measured
+    overrides). NO heuristic fallback: when a required real input is missing the
+    response is `source = "insufficient-input"` (HTTP 422) with the `missing`
+    list — never a value computed from a guess. Invalid SMILES → HTTP 400.
+    """
+    try:
+        result = predict_pk_ivive(
+            req.smiles,
+            overrides=req.overrides,
+            ml_inputs=req.ml_inputs,
+            body_weight_kg=req.body_weight_kg,
+            blood_plasma_ratio=req.blood_plasma_ratio,
+            dose_mg=req.dose_mg,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IVIVE PK projection failed: {type(e).__name__}: {e}")
+
+    sanitized = sanitize(result)
+    if sanitized.get("source") == "input-error":
+        raise HTTPException(status_code=400, detail=sanitized)
+    if sanitized.get("source") == "insufficient-input":
+        # Honest "cannot compute on real data" — surfaced, not silently faked.
+        raise HTTPException(status_code=422, detail=sanitized)
+    return sanitized
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -457,6 +504,7 @@ def api_models_status():
         "binding_ml": binding_ml_status(),
         "celltype_aggregation": celltype_aggregation_status(),
         "patient_line": patient_line_status(),
+        "pk_ivive": pk_ivive_status(),
     }
 
 
