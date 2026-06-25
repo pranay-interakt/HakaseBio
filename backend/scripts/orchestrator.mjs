@@ -259,7 +259,7 @@ function setupWatchers() {
     try {
       fsWatch(d, { recursive: true }, (_evt, file) => {
         if (!file) return;
-        if (/(^|\/)(__pycache__|cache|node_modules)(\/|$)/.test(file) || /\.(pyc|log|tmp)$/.test(file)) return;
+        if (/(^|\/)(__pycache__|cache|node_modules|validation)(\/|$)/.test(file) || /\.(pyc|log|tmp)$/.test(file)) return;
         log(`file change detected: ${relative(REPO_ROOT, resolve(d, file))} — scheduling reload`);
         clearTimeout(reloadTimer);
         reloadTimer = setTimeout(() => orchestrator.rebuildAndReload("watch"), RELOAD_DEBOUNCE);

@@ -168,26 +168,44 @@ def write_report(triage: dict, endpoints: dict) -> str:
                      "ai-service. AUROC carries a 95% bootstrap CI; the conformal veto threshold is fit on half the "
                      "negative (safe) class and FPR is the realised rate on the held-out half — a measured, "
                      "distribution-free ≤α guarantee, not a hand-set cutoff.\n")
-        lines.append("| Endpoint | n (scored) | AUROC (95% CI) | AUPRC | Brier | ECE | Conformal veto thr @α | held-out FPR |")
+        eps = endpoints["endpoints"]
+        bin = {k: v for k, v in eps.items() if v.get("kind") == "binary"}
+        reg = {k: v for k, v in eps.items() if v.get("kind") == "reg"}
+        # ── Binary endpoints ──
+        lines.append("### 2a. Binary endpoints — AUROC vs measured labels + conformal veto FPR\n")
+        lines.append("| Endpoint | n | AUROC (95% CI) | AUPRC | Brier | ECE | veto thr @α | mean FPR |")
         lines.append("|---|---|---|---|---|---|---|---|")
-        for ep, v in endpoints["endpoints"].items():
+        for ep, v in bin.items():
             if v.get("status") != "SCORED":
-                lines.append(f"| {ep} | — | {v.get('status')} — {v.get('reason','')} | | | | | |")
-                continue
+                lines.append(f"| {ep} | — | {v.get('status')} {v.get('reason','')} | | | | | |"); continue
             ci0, ci1 = v["auroc_ci95"]
-            cv = v["conformal_veto"]
+            cv = v.get("conformal_veto") or {}
             t = cv.get("threshold_all_negatives")
-            thr = f"{t:.3f}" if isinstance(t, (int, float)) and t == t else "∞"
+            thr = (f"{t:.3f}" if isinstance(t, (int, float)) and t == t else "∞") + ("†" if cv.get("small_n_caveat") else "")
             fpr = f"{cv['mean_realised_fpr']*100:.1f}%" if "mean_realised_fpr" in cv else "n/a"
-            caveat = "†" if cv.get("small_n_caveat") else ""
             lines.append(f"| {ep} | {v['n_scored']} | **{v['auroc']:.3f}** ({ci0:.3f}–{ci1:.3f}) | "
-                         f"{v['auprc']:.3f} | {v['brier']:.3f} | {v['ece']:.3f} | {thr}{caveat} (α={cv.get('alpha','?')}) | {fpr} |")
+                         f"{v['auprc']:.3f} | {v['brier']:.3f} | {v['ece']:.3f} | {thr} | {fpr} |")
         lines.append("")
-        lines.append("> The conformal veto thresholds above are the measured replacements for the hand-set cutoffs in "
-                     "`l1Thresholds.json`; the FPR column is the mean realised false-positive rate over 200 leakage-free "
-                     "splits (the guarantee is marginal, so it is verified by averaging, not a single split). "
-                     "`†` marks endpoints with <100 negatives where the threshold is noisy — for production, fit the "
-                     "threshold on the larger §1 approved hold-out (845 negatives) instead.\n")
+        # ── Regression endpoints ──
+        lines.append("### 2b. Regression endpoints — accuracy vs measured values\n")
+        lines.append("| Endpoint | n | R² (95% CI) | Spearman ρ | MAE | GMFE | within 2-fold | within 3-fold |")
+        lines.append("|---|---|---|---|---|---|---|---|")
+        for ep, v in reg.items():
+            if v.get("status") != "SCORED":
+                lines.append(f"| {ep} | — | {v.get('status')} | | | | | |"); continue
+            r0, r1 = v["r2_ci95"]
+            fe = v.get("fold_error")
+            gmfe = f"{fe['gmfe']:.2f}×" if fe else "—"
+            w2 = f"{fe['pct_within_2fold']*100:.0f}%" if fe else "—"
+            w3 = f"{fe['pct_within_3fold']*100:.0f}%" if fe else "—"
+            lines.append(f"| {ep} | {v['n_scored']} | **{v['r2']:.2f}** ({r0:.2f}–{r1:.2f}) | "
+                         f"{v['spearman']:.2f} | {v['mae']:.2f} | {gmfe} | {w2} | {w3} |")
+        lines.append("")
+        lines.append("> Binary veto thresholds are the measured replacements for the hand-set cutoffs in "
+                     "`l1Thresholds.json`; FPR is the mean over 200 leakage-free splits (`†` = <100 negatives → fit on "
+                     "the larger §1 approved set in production). Regression R² < 0 means the model is worse than "
+                     "predicting the mean for that endpoint — surface those as 'directional only' (matches the app's "
+                     "existing 'unreliable' tags for VDss / half-life).\n")
     lines.append("Reproduce: start the ai-service with `STRICT_ML=1`, then re-run this script (TEST splits are already "
                  "frozen in `validation/datasets/`; PyTDC is only a fallback). "
                  "Each endpoint emits AUROC, AUPRC, Brier, and an ECE calibration figure against the TDC TEST split "
@@ -235,12 +253,15 @@ def main() -> int:
         print(f"  PENDING — {endpoints.get('reason')}")
     else:
         for ep, v in endpoints["endpoints"].items():
-            if v.get("status") == "SCORED":
+            if v.get("status") != "SCORED":
+                print(f"  {ep:16s} {v.get('status')} — {v.get('reason','')}")
+            elif v.get("kind") == "binary":
                 ci0, ci1 = v["auroc_ci95"]
-                print(f"  {ep:5s} n={v['n_scored']:4d}  AUROC={v['auroc']:.3f} (95% CI {ci0:.3f}–{ci1:.3f})  "
-                      f"AUPRC={v['auprc']:.3f}  Brier={v['brier']:.3f}  ECE={v['ece']:.3f}")
+                print(f"  {ep:16s} [bin] n={v['n_scored']:4d}  AUROC={v['auroc']:.3f} (CI {ci0:.3f}–{ci1:.3f})  ECE={v['ece']:.3f}")
             else:
-                print(f"  {ep:5s} {v.get('status')} — {v.get('reason','')}")
+                fe = v.get("fold_error")
+                fold = f"  GMFE={fe['gmfe']:.2f}× within2={fe['pct_within_2fold']*100:.0f}%" if fe else ""
+                print(f"  {ep:16s} [reg] n={v['n_scored']:4d}  R²={v['r2']:.2f}  ρ={v['spearman']:.2f}{fold}")
     print(f"\nReport card → {path}")
     return 0
 

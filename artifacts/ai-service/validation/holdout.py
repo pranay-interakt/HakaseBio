@@ -29,11 +29,13 @@ SNAPSHOT_DIR = os.path.join(_HERE, "snapshots")
 
 
 def _fetch(url: str, retries: int = 4, timeout: float = 25.0) -> dict:
+    import ssl
+    context = ssl._create_unverified_context()
     last = None
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout, context=context) as r:
                 return json.loads(r.read().decode("utf-8"))
         except Exception as e:  # noqa: BLE001
             last = e
