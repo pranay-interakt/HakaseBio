@@ -57,6 +57,7 @@ data/
 !artifacts/hakase-ai/data/drugcentral/
 !artifacts/hakase-ai/data/drugcentral/README.md
 !artifacts/hakase-ai/data/drugcentral/.gitignore
+!artifacts/ai-service/data/
 
 # Environment configurations
 .env
