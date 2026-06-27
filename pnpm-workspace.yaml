@@ -33,6 +33,7 @@ minimumReleaseAge: 1440
 
 onlyBuiltDependencies:
   - '@swc/core'
+  - argon2
   - esbuild
   - msw
   - unrs-resolver

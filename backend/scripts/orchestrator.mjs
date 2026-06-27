@@ -182,8 +182,8 @@ const ai = new Child({
 const api = new Child({
   name: "api-server",
   tag:  TAGS.api,
-  cmd:  TSX,
-  args: ["artifacts/api-server/src/index.ts"],
+  cmd:  "node",
+  args: ["--import", "tsx", "artifacts/api-server/src/index.ts"],
   cwd:  REPO_ROOT,
   env:  { PORT, NODE_ENV },
 });

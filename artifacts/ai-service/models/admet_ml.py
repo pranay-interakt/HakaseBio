@@ -74,8 +74,15 @@ def _load_model() -> Any:
 
 def is_ready() -> dict[str, Any]:
     """Report load status without forcing a load."""
+    try:
+        import admet_ai  # type: ignore  # noqa: F401
+        installed = True
+    except Exception:
+        installed = False
     return {
         "loaded": _MODEL is not None,
+        "installed": installed,        # is the admet_ai package importable?
+        "strict_ml": STRICT_ML,        # will the service refuse heuristic fallback?
         "load_time_s": _LOAD_TIME_S,
         "error": _LOAD_ERROR,
         "engine": "ADMET-AI v2 (Chemprop-RDKit ensemble)",

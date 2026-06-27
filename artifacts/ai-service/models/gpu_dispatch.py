@@ -39,113 +39,9 @@ def has_local_gpu() -> bool:
 GPU_PROVIDER: str = os.environ.get("GPU_PROVIDER", "local" if has_local_gpu() else "runpod").lower()
 HTTP_TIMEOUT: int = 30  # seconds per individual HTTP call
 
-# ── DUMMY / bypass mode ──────────────────────────────────────────────────────
-# When the active provider's required env vars are missing or set to the
-# literal string "DUMMY", AND RUNPOD_BYPASS (or *_BYPASS for the active
-# provider) is "auto" (default) or "force", we short-circuit submit/poll to
-# return deterministic, schema-compatible payloads. This keeps the
-# Layer-1 → IVIVE flow alive end-to-end for all modalities without burning
-# real GPU minutes during dev. Set <PROVIDER>_BYPASS=off to fail loud.
-#
-# This bypass is intentionally provider-agnostic — it sits ABOVE
-# is_configured(), so the same dummy payload is returned regardless of
-# which cloud you've selected.
-
-_BYPASS_TOKENS = {"", "DUMMY", "your_runpod_api_key_here",
-                  "your_fep_endpoint_id_here", "your_boltz_endpoint_id_here",
-                  "your_aws_access_key_id", "your_azure_ml_api_key"}
-
-
-def _is_dummy_value(v: Optional[str]) -> bool:
-    if v is None:
-        return True
-    s = v.strip()
-    return s in _BYPASS_TOKENS or s.startswith("DUMMY")
-
-
-def _bypass_mode_for(provider: str) -> str:
-    # e.g. RUNPOD_BYPASS, AWS_BYPASS, AZURE_BYPASS. Default "auto".
-    return (os.environ.get(f"{provider.upper()}_BYPASS")
-            or os.environ.get("GPU_BYPASS")
-            or "auto").lower()
-
-
-def _should_bypass(provider_key: str) -> bool:
-    mode = _bypass_mode_for(GPU_PROVIDER)
-    if mode == "off":
-        return False
-    if mode == "force":
-        return True
-    # auto: bypass when any required credential is a dummy/placeholder
-    if GPU_PROVIDER == "local":
-        return False  # local never bypasses; it either has a GPU or it doesn't
-    if GPU_PROVIDER not in _CRED_ENV:
-        return True
-    creds = [_env(v) for v in _CRED_ENV[GPU_PROVIDER]]
-    endpoint = _env(_ENDPOINT_ENV.get(GPU_PROVIDER, {}).get(provider_key, ""))
-    if any(_is_dummy_value(c) for c in creds):
-        return True
-    if _is_dummy_value(endpoint):
-        return True
-    return False
-
-
-def _dummy_fep_output() -> dict:
-    return {
-        "ddg_kcal_mol": -0.42,
-        "ddg_uncertainty_kcalmol": 0.35,
-        "ddg_kT": -0.71,
-        "windows": [
-            {"lambda": round(i / 11, 3), "dG_kcal_mol": round(-0.04 * i, 4),
-             "stderr_kcal_mol": 0.02}
-            for i in range(12)
-        ],
-        "wallclock_minutes": 0.0,
-        "gpu_minutes": 0.0,
-        "engine_version": "DUMMY-BYPASS (no real FEP simulation ran)",
-        "force_field": "openff-2.2.0 (bypass)",
-        "warnings": [
-            "DUMMY/bypass mode active — ΔΔG is a deterministic placeholder. "
-            "Set RUNPOD_API_KEY + RUNPOD_FEP_ENDPOINT_ID (or RUNPOD_BYPASS=off) "
-            "to dispatch a real TIES/FEP run."
-        ],
-        "bypass": True,
-    }
-
-
-def _dummy_boltz_output() -> dict:
-    return {
-        "ranked_structures": [
-            {
-                "rank": 1,
-                "plddt": 78.4,
-                "ptm": 0.71,
-                "iptm": 0.68,
-                "confidence": "medium",
-                "pdb_block": "",   # downstream code tolerates empty when bypass=True
-            }
-        ],
-        "n_models": 1,
-        "wallclock_minutes": 0.0,
-        "gpu_minutes": 0.0,
-        "engine_version": "DUMMY-BYPASS (no real Boltz-2 co-folding ran)",
-        "warnings": [
-            "DUMMY/bypass mode active — Boltz-2 output is a deterministic placeholder. "
-            "Set RUNPOD_API_KEY + RUNPOD_BOLTZ_ENDPOINT_ID (or RUNPOD_BYPASS=off) "
-            "to dispatch a real co-folding job."
-        ],
-        "bypass": True,
-    }
-
-
-def _bypass_submit(provider_key: str) -> str:
-    import uuid as _uuid
-    return f"bypass-{provider_key}-{_uuid.uuid4().hex[:12]}"
-
-
-def _bypass_poll(provider_job_id: str, provider_key: str) -> tuple[str, Optional[dict], str]:
-    out = _dummy_fep_output() if provider_key == "fep" else _dummy_boltz_output()
-    return "done", out, "BYPASS: returning deterministic placeholder"
+# NOTE: dummy / bypass mode has been intentionally removed.
+# Per project policy: NO silent fallbacks. If the active GPU provider isn't
+# configured, every L2 endpoint MUST fail loud with a 503 + actionable message.
 
 # Map provider_key ("fep" | "boltz") → the env var that holds the endpoint
 _ENDPOINT_ENV: dict[str, dict[str, str]] = {
@@ -200,10 +96,6 @@ def is_configured(provider_key: str) -> tuple[bool, str]:
     Returns:
         (True, "") if ready, or (False, human-readable reason) if not.
     """
-    # DUMMY/bypass short-circuit — always "ready" so the L1→IVIVE flow continues.
-    if _should_bypass(provider_key):
-        return True, ""
-
     # local: no credentials needed — just needs GPU on the machine
     if GPU_PROVIDER == "local":
         if not has_local_gpu():
@@ -253,9 +145,6 @@ def submit(payload: dict, provider_key: str) -> str:
     if not ok:
         raise ProviderNotConfigured(reason)
 
-    if _should_bypass(provider_key):
-        return _bypass_submit(provider_key)
-
     if GPU_PROVIDER == "runpod":
         return _runpod_submit(payload, provider_key)
     if GPU_PROVIDER == "aws":
@@ -283,12 +172,6 @@ def poll(provider_job_id: str, provider_key: str) -> tuple[str, Optional[dict], 
     Raises:
         RuntimeError: unrecoverable provider error (job failed/cancelled, bad HTTP).
     """
-    # BYPASS poll: any provider_job_id starting with "bypass-" is dummy.
-    if isinstance(provider_job_id, str) and provider_job_id.startswith("bypass-"):
-        return _bypass_poll(provider_job_id, provider_key)
-    if _should_bypass(provider_key):
-        return _bypass_poll(provider_job_id, provider_key)
-
     if GPU_PROVIDER == "runpod":
         return _runpod_poll(provider_job_id, provider_key)
     if GPU_PROVIDER == "aws":

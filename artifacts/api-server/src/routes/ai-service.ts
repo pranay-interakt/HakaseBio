@@ -1,489 +1,117 @@
-import { Router } from "express";
+/**
+ * AI service proxy.
+ * All routes forward verbatim to the FastAPI service. We do NOT swallow errors:
+ *   - upstream non-2xx → forwarded as-is (status + body)
+ *   - upstream non-JSON → returned as text in an error envelope
+ *   - network failure → 502 UPSTREAM_ERROR with the real cause
+ */
+import { Router, type IRouter, type Request, type Response } from "express";
+import { asyncHandler, UpstreamError } from "../lib/errors.js";
 
-const router = Router();
-// AI_SERVICE_URL: override via env var when API server and AI service
-// run on different machines (e.g. DigitalOcean droplet vs RunPod pod).
-// Defaults to localhost for single-machine / docker-compose setups.
+const router: IRouter = Router();
+
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://localhost:8090";
+const UPSTREAM_TIMEOUT_MS = Number(process.env.AI_SERVICE_TIMEOUT_MS ?? 60_000);
 
-router.post("/ai/admet", async (req, res) => {
+async function proxy(
+  method: "GET" | "POST",
+  upstreamPath: string,
+  req: Request,
+  res: Response,
+  pathParams?: string[],
+) {
+  let url = `${AI_SERVICE_URL}${upstreamPath}`;
+  for (const p of pathParams ?? []) {
+    url += `/${encodeURIComponent(String(req.params[p] ?? ""))}`;
+  }
+
+  const init: RequestInit = {
+    method,
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  };
+  if (method === "POST") {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(req.body ?? {});
+  }
+
+  let resp: globalThis.Response;
   try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/admet`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
+    resp = await fetch(url, init);
+  } catch (e) {
+    throw UpstreamError(`AI service unreachable at ${AI_SERVICE_URL}: ${(e as Error).message}`);
+  }
+
+  const ct = resp.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    const data = await resp.json().catch(() => ({ error: "Malformed JSON from AI service" }));
     res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
+    return;
   }
-});
+  const text = await resp.text();
+  res.status(resp.status).type(ct || "text/plain").send(text);
+}
 
-router.post("/ai/properties", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/properties`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
+// ─── route table ────────────────────────────────────────────────────────────
+const POSTS: Record<string, string> = {
+  "/ai/admet": "/predict/admet",
+  "/ai/properties": "/predict/properties",
+  "/ai/binding": "/predict/binding",
+  "/ai/protein": "/predict/protein",
+  "/ai/full-pipeline": "/predict/full-pipeline",
+  "/ai/admet-ml": "/predict/admet-ml",
+  "/ai/cardiotox": "/predict/cardiotox",
+  "/ai/dili-ml": "/predict/dili-ml",
+  "/ai/protein-ml": "/predict/protein-ml",
+  "/ai/solubility-ml": "/predict/solubility-ml",
+  "/ai/binding-ml": "/predict/binding-ml",
+  "/ai/reactive-metabolites": "/predict/reactive-metabolites",
+  "/ai/bsep": "/predict/bsep",
+  "/ai/cytotoxicity": "/predict/cytotoxicity",
+  "/ai/ersilia": "/predict/ersilia",
+  "/ai/applicability-domain": "/predict/applicability-domain",
+  "/ai/known-drug": "/predict/known-drug",
+  "/ai/peptide": "/predict/peptide",
+  "/ai/antibody": "/predict/antibody",
+  "/ai/dock": "/predict/dock",
+  "/ai/fep": "/predict/fep",
+  "/ai/celltype-aggregation": "/predict/celltype-aggregation",
+  "/ai/patient-line": "/predict/patient-line",
+  "/ai/pk/ivive": "/predict/pk/ivive",
+  "/ai/cofold/validate": "/predict/cofold/validate",
+  "/ai/cofold": "/predict/cofold",
+};
 
-router.post("/ai/binding", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/binding`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
+const GETS: Record<string, string> = {
+  "/ai/health": "/health",
+  "/ai/ersilia/status": "/predict/ersilia/status",
+  "/ai/fep/config": "/predict/fep/config",
+  "/ai/models/status": "/models/status",
+  "/ai/cofold/config": "/predict/cofold/config",
+};
 
-router.post("/ai/protein", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/protein`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
+for (const [from, to] of Object.entries(POSTS)) {
+  router.post(from, asyncHandler((req, res) => proxy("POST", to, req, res)));
+}
+for (const [from, to] of Object.entries(GETS)) {
+  router.get(from, asyncHandler((req, res) => proxy("GET", to, req, res)));
+}
 
-router.post("/ai/full-pipeline", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/full-pipeline`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/health", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/health`);
-    const data = await resp.json();
-    res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/admet-ml", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/admet-ml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/cardiotox", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/cardiotox`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/dili-ml", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/dili-ml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/protein-ml", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/protein-ml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/solubility-ml", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/solubility-ml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/binding-ml", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/binding-ml`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// ── New mechanistic safety endpoints ─────────────────────────────────────
-
-// Reactive metabolite structural alert scanner (26 SMARTS patterns, literature-curated)
-router.post("/ai/reactive-metabolites", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/reactive-metabolites`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// BSEP inhibition + phospholipidosis predictor
-router.post("/ai/bsep", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/bsep`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// Cytotoxicity (cell viability / CC50) — real Ersilia model or honest unavailable
-router.post("/ai/cytotoxicity", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/cytotoxicity`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// Generic Ersilia Model Hub passthrough (configured endpoints only)
-router.post("/ai/ersilia", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/ersilia`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/ersilia/status", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/ersilia/status`);
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// Applicability domain (AD) confidence scorer
-router.post("/ai/applicability-domain", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/applicability-domain`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// L1 — Lookup-first known-drug resolver (live ChEMBL InChIKey). Returns the
-// measured published profile so approved/withdrawn drugs bypass the ML veto stack.
-router.post("/ai/known-drug", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/known-drug`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// L1 — Peptide-native property engine (physicochemical, stability, permeability, AMP, developability)
-router.post("/ai/peptide", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/peptide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// L1 — Antibody-native developability engine
-router.post("/ai/antibody", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/antibody`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-
-// L2 Stage 2 — AutoDock Vina docking (async job submission + polling)
-router.post("/ai/dock", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/dock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/dock/status/:jobId", async (req, res) => {
-  try {
-    const resp = await fetch(
-      `${AI_SERVICE_URL}/predict/dock/status/${encodeURIComponent(req.params.jobId)}`,
-    );
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// L2 Stage 5 — TIES relative-binding FEP via RunPod Serverless (async, ~24 GPU-h)
-router.get("/ai/fep/config", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/fep/config`);
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/fep", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/fep`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/fep/status/:jobId", async (req, res) => {
-  try {
-    const resp = await fetch(
-      `${AI_SERVICE_URL}/predict/fep/status/${encodeURIComponent(req.params.jobId)}`,
-    );
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/celltype-aggregation", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/celltype-aggregation`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/patient-line", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/patient-line`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// Layer 1 — quantitative human PK by IVIVE. Forwards the AI-service status
-// verbatim (including 422 "insufficient-input" and 400 "input-error") so the
-// no-fallback contract reaches the client unaltered.
-router.post("/ai/pk/ivive", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/pk/ivive`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/models/status", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/models/status`);
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/models/warmup", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/models/warmup`, {
-      method: "POST",
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-// L2 Stage 2b — Biologics Co-Folding (Boltz-2, AlphaFold3-class structure + affinity)
-router.get("/ai/cofold/config", async (_req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold/config`);
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/cofold/validate", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold/validate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.post("/ai/cofold", async (req, res) => {
-  try {
-    const resp = await fetch(`${AI_SERVICE_URL}/predict/cofold`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
-
-router.get("/ai/cofold/status/:jobId", async (req, res) => {
-  try {
-    const resp = await fetch(
-      `${AI_SERVICE_URL}/predict/cofold/status/${encodeURIComponent(req.params.jobId)}`,
-    );
-    const data = await resp.json();
-    res.status(resp.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: "AI service unavailable" });
-  }
-});
+// Routes with path params
+router.get(
+  "/ai/dock/status/:jobId",
+  asyncHandler((req, res) => proxy("GET", "/predict/dock/status", req, res, ["jobId"])),
+);
+router.get(
+  "/ai/fep/status/:jobId",
+  asyncHandler((req, res) => proxy("GET", "/predict/fep/status", req, res, ["jobId"])),
+);
+router.get(
+  "/ai/cofold/status/:jobId",
+  asyncHandler((req, res) => proxy("GET", "/predict/cofold/status", req, res, ["jobId"])),
+);
+router.post(
+  "/ai/models/warmup",
+  asyncHandler((req, res) => proxy("POST", "/models/warmup", req, res)),
+);
 
 export default router;
