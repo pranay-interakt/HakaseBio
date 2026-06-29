@@ -1,0 +1,16 @@
+process.env.NODE_ENV='test';
+const c = await import('./artifacts/api-server/src/lib/crypto.ts');
+const ipnet = await import('./artifacts/api-server/src/lib/ipnet.ts');
+const h = await c.hashPassword('LongEnoughP@ssword123!');
+console.log('argon2 ok, hash len', h.length);
+console.log('verify ok:', await c.verifyPassword(h, 'LongEnoughP@ssword123!'));
+console.log('verify wrong:', await c.verifyPassword(h, 'wrong'));
+console.log('sha256:', c.sha256('abc').slice(0,12));
+console.log('opaque base64url len:', c.generateOpaqueToken(16).length);
+const { challenge, verifier } = c.pkcePair();
+console.log('pkce verifier:', verifier.length, 'challenge:', challenge.length);
+const enc = c.encryptAtRest('hello world', 'a'.repeat(48));
+console.log('aes-gcm round-trip:', c.decryptAtRest(enc, 'a'.repeat(48)));
+console.log('cidr 10.0.0.5/24:', ipnet.ipInCidr('10.0.0.5','10.0.0.0/24'));
+console.log('cidr 192.168.1.1/24:', ipnet.ipInCidr('192.168.1.1','10.0.0.0/24'));
+console.log('cidr v4-mapped:', ipnet.ipInCidr('::ffff:10.0.0.5','10.0.0.0/24'));

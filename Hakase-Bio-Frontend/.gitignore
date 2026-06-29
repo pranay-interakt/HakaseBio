@@ -1,0 +1,80 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
+tdc_data/
+data/
+# Re-include the DrugCentral local-data directory so its README + .gitignore
+# (which document the CC BY-SA handling policy and exclude only the raw TSV)
+# stay tracked. Per gitignore semantics we must not ignore the parent dir
+# itself before re-including children.
+!artifacts/hakase-ai/data/
+!artifacts/hakase-ai/data/drugcentral/
+!artifacts/hakase-ai/data/drugcentral/README.md
+!artifacts/hakase-ai/data/drugcentral/.gitignore
+!artifacts/ai-service/data/
+
+# Environment configurations
+.env
+.env.*
+!.env.example
+
+# Python compiled output and runtime cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+artifacts/ai-service/cache/*.pkl
+artifacts/ai-service/cache/*.npz
+
+# Personal validation outputs
+validation_chembl_holdout_results.xlsx
+
+

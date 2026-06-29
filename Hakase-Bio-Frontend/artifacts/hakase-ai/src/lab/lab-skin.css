@@ -1,0 +1,365 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   lab-skin — cosy refinement layer applied ONLY on /lab.
+   It rides on top of the existing `html.hk-light` theme (which already remaps
+   every dark utility class to light) and simply warms the palette to the
+   Hakase teal/cream look, switches display headings to Fraunces, and softens
+   surfaces. Scoped to `html.hk-light.lab-skin` so the main dashboard — dark by
+   default — is never affected.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+
+/* Two-class selector → higher specificity than html.hk-light, so these win
+   regardless of stylesheet order. */
+html.hk-light.lab-skin {
+  /* Hakase teal accent (replaces the stock purple) */
+  --primary: 184 72% 40%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 184 72% 42%;
+  --accent: 184 40% 92%;
+  --accent-foreground: 184 70% 34%;
+  --sidebar-primary: 184 72% 40%;
+  --sidebar-ring: 184 72% 42%;
+
+  /* Cosy warm surfaces */
+  --background: 36 40% 95%;
+  --foreground: 28 18% 18%;
+  --card: 40 56% 99%;
+  --card-foreground: 28 18% 18%;
+  --secondary: 36 34% 95%;
+  --muted: 36 34% 95%;
+  --muted-foreground: 30 10% 42%;
+  --border: 36 26% 85%;
+  --input: 36 26% 85%;
+
+  --hk-bg: #f6efe4;
+  --hk-bg-deep: #efe7d8;
+  --hk-surface: #fffdf8;
+  --hk-surface2: #f7f1e8;
+  --hk-surface3: #efe7d8;
+  --hk-border: #e8dcc8;
+  --hk-border2: #ddd0bb;
+  --hk-text: #2f2a22;
+  --hk-text2: #3a342b;
+  --hk-text3: #544d40;
+  --hk-text4: #837a6a;
+  --hk-text5: #a89e8c;
+
+  --hk-shadow-sm: 0 1px 2px 0 rgba(74,60,40,.05);
+  --hk-shadow-md: 0 1px 3px 0 rgba(74,60,40,.06), 0 1px 2px -1px rgba(74,60,40,.05);
+  --hk-shadow-lg: 0 10px 26px -10px rgba(74,60,40,.16), 0 2px 6px -2px rgba(74,60,40,.06);
+
+  background-color: var(--hk-bg) !important;
+  color: var(--hk-text) !important;
+}
+
+html.hk-light.lab-skin body { background-color: var(--hk-bg) !important; }
+
+/* Display headings → cosy serif */
+html.hk-light.lab-skin h1,
+html.hk-light.lab-skin h2,
+html.hk-light.lab-skin h3,
+html.hk-light.lab-skin .text-2xl,
+html.hk-light.lab-skin .text-3xl,
+html.hk-light.lab-skin .text-4xl,
+html.hk-light.lab-skin .text-5xl {
+  font-family: "Fraunces", Georgia, "Times New Roman", serif !important;
+  letter-spacing: -0.015em;
+  font-weight: 600 !important;
+}
+
+/* Soften the big rounded cards/panels a touch */
+html.hk-light.lab-skin .rounded-2xl { border-radius: 18px !important; }
+html.hk-light.lab-skin .rounded-xl  { border-radius: 15px !important; }
+
+/* Gentle teal text selection */
+html.hk-light.lab-skin ::selection { background: rgba(22,166,179,.18); }
+
+/* Tame any leftover harsh accent rings to the warm teal */
+html.hk-light.lab-skin .ring-purple-500\/40,
+html.hk-light.lab-skin .border-purple-500\/40,
+html.hk-light.lab-skin .text-purple-400,
+html.hk-light.lab-skin .text-purple-300 { color: #16a6b3 !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Polish: kill gradients, retire the off-brand violet, soften boxes/shadows.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* 1 — No gradients anywhere. Flat, calm fills only. */
+html.hk-light.lab-skin [class*="bg-gradient-to-"] { background-image: none !important; }
+
+/* small gradient chips/icons would go transparent → give them a soft teal wash */
+html.hk-light.lab-skin [class*="bg-gradient"][class*="rounded-full"],
+html.hk-light.lab-skin [class*="bg-gradient"][class*="rounded-md"],
+html.hk-light.lab-skin [class*="bg-gradient"][class*="rounded-lg"] { background-color: rgba(22,166,179,.12) !important; }
+
+/* gradient buttons/links lose their fill → solid teal */
+html.hk-light.lab-skin button[class*="bg-gradient"],
+html.hk-light.lab-skin a[class*="bg-gradient"] { background-color: #16a6b3 !important; color: #fff !important; box-shadow: var(--hk-shadow-sm) !important; }
+html.hk-light.lab-skin button[class*="bg-gradient"]:hover,
+html.hk-light.lab-skin a[class*="bg-gradient"]:hover { background-color: #0f8c97 !important; }
+
+/* 2 — Verdict "aura" card → flat warm surface, gentle shadow (no heavy glow) */
+html.hk-light.lab-skin .hk-aura {
+  background-image: none !important;
+  background-color: var(--hk-surface) !important;
+  box-shadow: var(--hk-shadow-md) !important;
+}
+
+/* 3 — Violet → Hakase teal (brand stays cyan/teal, only purple retires) */
+html.hk-light.lab-skin .bg-violet-600,
+html.hk-light.lab-skin .bg-violet-500,
+html.hk-light.lab-skin .hover\:bg-violet-500:hover,
+html.hk-light.lab-skin .hover\:bg-violet-400:hover { background-color: #16a6b3 !important; color: #fff !important; }
+html.hk-light.lab-skin [class*="text-violet"] { color: #0f8c97 !important; }
+html.hk-light.lab-skin [class*="border-violet"] { border-color: rgba(22,166,179,.32) !important; }
+html.hk-light.lab-skin [class*="bg-violet-500\/"],
+html.hk-light.lab-skin [class*="bg-violet-600\/"],
+html.hk-light.lab-skin [class*="bg-violet-900\/"] { background-color: rgba(22,166,179,.10) !important; }
+html.hk-light.lab-skin [class*="shadow-violet"] { box-shadow: var(--hk-shadow-md) !important; }
+
+/* 4 — Warm the "simulation complete" status banner (was harsh green) */
+html.hk-light.lab-skin .bg-emerald-900\/20 { background-color: #edf6f1 !important; }
+
+/* 5 — Soften boxes: warm hairline borders, calmer custom shadows */
+html.hk-light.lab-skin [class*="border-white"] { border-color: var(--hk-border) !important; }
+html.hk-light.lab-skin [class*="shadow-[0_"] { box-shadow: var(--hk-shadow-md) !important; }
+
+/* 6 — Slightly more breathing room / rounder key panels for a cosy feel */
+html.hk-light.lab-skin .rounded-\[20px\] { border-radius: 20px !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Legibility pass — fix invisible text & low-contrast verdict colours.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* A — Native selects / inputs kept white text → force dark, legible field text */
+html.hk-light.lab-skin select,
+html.hk-light.lab-skin select.text-white,
+html.hk-light.lab-skin input.text-white,
+html.hk-light.lab-skin textarea.text-white { color: var(--hk-text) !important; }
+html.hk-light.lab-skin select {
+  background-color: var(--hk-surface) !important;
+  border-color: var(--hk-border) !important;
+}
+html.hk-light.lab-skin select option { color: #1e293b; background: #ffffff; }
+
+/* B — Verdict + signal text: darken the pale pastels so they read on cream */
+html.hk-light.lab-skin .text-emerald-400,
+html.hk-light.lab-skin .text-emerald-300,
+html.hk-light.lab-skin .text-green-400,
+html.hk-light.lab-skin .text-green-300 { color: #15803d !important; }
+html.hk-light.lab-skin .text-yellow-400,
+html.hk-light.lab-skin .text-yellow-300,
+html.hk-light.lab-skin .text-amber-400,
+html.hk-light.lab-skin .text-amber-300,
+html.hk-light.lab-skin .text-amber-200 { color: #a86a13 !important; }
+html.hk-light.lab-skin .text-red-400,
+html.hk-light.lab-skin .text-red-300,
+html.hk-light.lab-skin .text-rose-400,
+html.hk-light.lab-skin .text-rose-300 { color: #c0392b !important; }
+html.hk-light.lab-skin .text-cyan-400,
+html.hk-light.lab-skin .text-cyan-300 { color: #0f8c97 !important; }
+html.hk-light.lab-skin .text-blue-400,
+html.hk-light.lab-skin .text-blue-300 { color: #2563eb !important; }
+html.hk-light.lab-skin .text-slate-400,
+html.hk-light.lab-skin .text-slate-500,
+html.hk-light.lab-skin .text-slate-600 { color: #6b6155 !important; }
+
+/* C — Primary / gradient action buttons → solid teal, white label */
+html.hk-light.lab-skin button[class*="bg-gradient"],
+html.hk-light.lab-skin a[class*="bg-gradient"],
+html.hk-light.lab-skin button[class*="from-violet"],
+html.hk-light.lab-skin button[class*="from-cyan"] { background: #16a6b3 !important; color: #fff !important; }
+html.hk-light.lab-skin button[class*="bg-gradient"] *,
+html.hk-light.lab-skin button[class*="from-violet"] *,
+html.hk-light.lab-skin button[class*="from-cyan"] * { color: #fff !important; }
+
+/* D — Soften saturated tint boxes to gentle warm washes (literal "/" — no escape) */
+html.hk-light.lab-skin [class*="bg-red-500/1"],
+html.hk-light.lab-skin [class*="bg-rose-500/1"],
+html.hk-light.lab-skin [class*="bg-red-500/8"] { background-color: #fbecea !important; }
+html.hk-light.lab-skin [class*="bg-amber-500/1"],
+html.hk-light.lab-skin [class*="bg-yellow-500/1"],
+html.hk-light.lab-skin [class*="bg-amber-500/8"],
+html.hk-light.lab-skin [class*="bg-yellow-500/8"] { background-color: #f7efda !important; }
+html.hk-light.lab-skin [class*="bg-emerald-500/1"],
+html.hk-light.lab-skin [class*="bg-green-500/1"],
+html.hk-light.lab-skin [class*="bg-emerald-500/8"] { background-color: #e9f4ec !important; }
+html.hk-light.lab-skin [class*="bg-cyan-500/1"],
+html.hk-light.lab-skin [class*="bg-blue-500/1"],
+html.hk-light.lab-skin [class*="bg-cyan-500/8"] { background-color: #e6f2f3 !important; }
+html.hk-light.lab-skin [class*="bg-violet-500/1"],
+html.hk-light.lab-skin [class*="bg-violet-600/1"],
+html.hk-light.lab-skin [class*="bg-violet-900/"] { background-color: #eaf6f6 !important; }
+
+/* E — Tinted boxes: warm, soft borders instead of saturated ones */
+html.hk-light.lab-skin [class*="border-red-500/"],
+html.hk-light.lab-skin [class*="border-rose-500/"] { border-color: #ecc9c2 !important; }
+html.hk-light.lab-skin [class*="border-amber-500/"],
+html.hk-light.lab-skin [class*="border-yellow-500/"] { border-color: #e6d3a4 !important; }
+html.hk-light.lab-skin [class*="border-emerald-500/"],
+html.hk-light.lab-skin [class*="border-green-500/"] { border-color: #c4e1cd !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DARK /lab (sun toggled off) — same calming so the boxes/colours don't shout.
+   Targets html.lab-skin WITHOUT hk-light.
+   ───────────────────────────────────────────────────────────────────────── */
+html.lab-skin:not(.hk-light) [class*="bg-gradient-to-"] { background-image: none !important; }
+
+/* retire violet → teal */
+html.lab-skin:not(.hk-light) .bg-violet-600,
+html.lab-skin:not(.hk-light) .bg-violet-500,
+html.lab-skin:not(.hk-light) button[class*="bg-gradient"],
+html.lab-skin:not(.hk-light) a[class*="bg-gradient"] { background-color: #0e7d88 !important; color: #fff !important; }
+html.lab-skin:not(.hk-light) [class*="text-violet"] { color: #5fd3dd !important; }
+html.lab-skin:not(.hk-light) [class*="border-violet"] { border-color: rgba(22,166,179,.40) !important; }
+
+/* dial saturated tile fills WAY down so they sit quietly on the dark canvas */
+html.lab-skin:not(.hk-light) [class*="bg-amber-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-yellow-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-amber-500/8"] { background-color: rgba(202,138,4,.09) !important; }
+html.lab-skin:not(.hk-light) [class*="bg-red-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-rose-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-red-500/8"] { background-color: rgba(220,72,59,.09) !important; }
+html.lab-skin:not(.hk-light) [class*="bg-emerald-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-green-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-emerald-500/8"] { background-color: rgba(21,170,120,.09) !important; }
+html.lab-skin:not(.hk-light) [class*="bg-cyan-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-blue-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-violet-500/1"],
+html.lab-skin:not(.hk-light) [class*="bg-violet-900/"] { background-color: rgba(22,166,179,.09) !important; }
+
+/* soften their borders */
+html.lab-skin:not(.hk-light) [class*="border-amber-500/"],
+html.lab-skin:not(.hk-light) [class*="border-yellow-500/"] { border-color: rgba(202,138,4,.30) !important; }
+html.lab-skin:not(.hk-light) [class*="border-red-500/"],
+html.lab-skin:not(.hk-light) [class*="border-rose-500/"] { border-color: rgba(220,72,59,.30) !important; }
+html.lab-skin:not(.hk-light) [class*="border-emerald-500/"],
+html.lab-skin:not(.hk-light) [class*="border-green-500/"] { border-color: rgba(21,170,120,.30) !important; }
+html.lab-skin:not(.hk-light) [class*="border-cyan-500/"] { border-color: rgba(22,166,179,.30) !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   NEATEN THE OUTCOME SECTION (both themes) — no layout change, just calmer.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* kill leftover heavy glows / coloured shadows everywhere on /lab */
+html.lab-skin [class*="shadow-[0_"],
+html.lab-skin [class*="shadow-violet"],
+html.lab-skin [class*="shadow-emerald"],
+html.lab-skin [class*="shadow-amber"],
+html.lab-skin [class*="shadow-cyan"],
+html.lab-skin [class*="shadow-red"],
+html.lab-skin [class*="shadow-yellow"] { box-shadow: none !important; }
+html.lab-skin .shadow-lg, html.lab-skin .shadow-xl, html.lab-skin .shadow-2xl { box-shadow: var(--hk-shadow-md, 0 1px 3px rgba(0,0,0,.18)) !important; }
+
+/* even, generous breathing room between stacked output cards */
+html.lab-skin .space-y-5 > * + * { margin-top: 1.4rem !important; }
+html.lab-skin .space-y-4 > * + * { margin-top: 1.1rem !important; }
+html.lab-skin .space-y-6 > * + * { margin-top: 1.6rem !important; }
+
+/* quieter badges/pills — smaller visual weight so the data leads */
+html.lab-skin .rounded-full[class*="border"] { font-weight: 600; }
+
+/* tame the pulsing/animated attention-grabbers in the outcome area */
+html.lab-skin .animate-pulse { animation: none !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DE-DUPLICATE the outcome section (both themes) — hide panels the richer
+   cards already cover, so there's one clear source per topic.
+   ───────────────────────────────────────────────────────────────────────── */
+/* "Directional ADMET Indicators" (heuristic radar) — superseded by the
+   ML-Enhanced ADMET consensus card above it. */
+html.lab-skin [data-lab="directional-admet"] { display: none !important; }
+
+/* Lower-value detail tabs → keep the lead with ADMET · Permeability · Clearance
+   · Safety · Similar · Validation; hide the deep-dive extras on /lab. */
+html.lab-skin [data-lab-tab="dose-response"],
+html.lab-skin [data-lab-tab="mechanism"],
+html.lab-skin [data-lab-tab="bioactivation"] { display: none !important; }
+
+/* verbose HAIOps explainer banner — keep the outcome lean */
+html.lab-skin [data-lab="haiops-note"] { display: none !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   COHESION PASS (both themes) — flat, consistent, cosy building blocks.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* kill the decorative aura glow behind the verdict card → flat & calm */
+html.lab-skin .hk-aura::before { display: none !important; opacity: 0 !important; }
+
+/* serif display headings everywhere they're used */
+html.lab-skin .hk-display { font-family: "Fraunces", Georgia, serif !important; letter-spacing: -0.012em; font-weight: 600; }
+
+/* section eyebrows → quiet, teal tick */
+html.lab-skin .hk-eyebrow::before { background: #16a6b3 !important; }
+html.hk-light.lab-skin .hk-eyebrow { color: var(--hk-text4) !important; }
+
+/* unified card geometry — same soft radius + comfortable rhythm */
+html.lab-skin .hk-card,
+html.lab-skin .hk-glass,
+html.lab-skin .hk-glass-strong,
+html.lab-skin .hk-aura { border-radius: 16px !important; }
+
+/* light theme: every panel shares one warm surface + hairline */
+html.hk-light.lab-skin .hk-card,
+html.hk-light.lab-skin .hk-glass,
+html.hk-light.lab-skin .hk-glass-strong {
+  background-color: var(--hk-surface) !important;
+  border-color: var(--hk-border) !important;
+}
+
+/* quieter chips/badges so the numbers lead, not the labels */
+html.lab-skin .hk-chip { font-weight: 600; }
+html.hk-light.lab-skin .hk-chip { background: var(--hk-surface2) !important; border-color: var(--hk-border) !important; }
+
+/* dark theme: settle the panel surfaces onto one calm tone */
+html.lab-skin:not(.hk-light) [class*="bg-[#0d0f17]"],
+html.lab-skin:not(.hk-light) [class*="bg-[#0a0d14]"],
+html.lab-skin:not(.hk-light) [class*="bg-[#0b0f17]"] {
+  background-color: #11161d !important;
+  border-color: rgba(255,255,255,.07) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Permanent Highlights for Action Buttons & Legibility for Hover States
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Force permanent coloring/highlighting of report and run buttons (high specificity to win specificity battle) */
+html.hk-light.lab-skin button[class*="bg-gradient"][class*="rounded-md"].hk-btn-generate-report,
+html.hk-light.lab-skin button[class*="from-violet"][class*="rounded-md"].hk-btn-generate-report,
+html.hk-light.lab-skin button[class*="bg-gradient"][class*="rounded-lg"].hk-btn-run-smiles,
+html.hk-light.lab-skin button[class*="from-violet"][class*="rounded-lg"].hk-btn-run-smiles {
+  background: #16a6b3 !important;
+  background-color: #16a6b3 !important;
+  color: #ffffff !important;
+  border-color: #16a6b3 !important;
+  opacity: 1 !important;
+}
+
+/* Force all text/icon children inside these buttons to be white */
+html.hk-light.lab-skin button.hk-btn-generate-report *,
+html.hk-light.lab-skin button.hk-btn-run-smiles * {
+  color: #ffffff !important;
+}
+
+/* Hover state styling */
+html.hk-light.lab-skin button[class*="bg-gradient"][class*="rounded-md"].hk-btn-generate-report:hover,
+html.hk-light.lab-skin button[class*="from-violet"][class*="rounded-md"].hk-btn-generate-report:hover,
+html.hk-light.lab-skin button[class*="bg-gradient"][class*="rounded-lg"].hk-btn-run-smiles:hover,
+html.hk-light.lab-skin button[class*="from-violet"][class*="rounded-lg"].hk-btn-run-smiles:hover {
+  background: #0f8c97 !important;
+  background-color: #0f8c97 !important;
+  color: #ffffff !important;
+  border-color: #0f8c97 !important;
+}
+
+/* Target & Starter template names legibility on hover: keep them black */
+html.hk-light.lab-skin .group:hover .group-hover\:text-white {
+  color: var(--hk-text) !important;
+}
+
+/* Molecule-Based Target Suggestions button text and icon color */
+html.hk-light.lab-skin .hk-btn-target-suggestions,
+html.hk-light.lab-skin .hk-btn-target-suggestions * {
+  color: #0f8c97 !important;
+}
