@@ -2,12 +2,12 @@
 correctly on the REAL frozen TDC test labels for the WHOLE ADMET panel
 (binary + regression).
 
-It uses a deterministic SUBSTITUTE predictor (a logP value). This is NOT ADMET-AI
+It uses a deterministic SUBSTITUTE predictor (a logP value). This is NOT Hakase ADMET
 and the AUROC / R² it produces are NOT product numbers — the only thing asserted
 is that the harness mechanics are correct (loads every split, scores without
 silent drops, returns the right metric shape per endpoint kind, and the conformal
 veto's marginal FPR ≤ α holds for the binary endpoints). Real product numbers
-come from validation/run_validation.py against the live ADMET-AI service.
+come from validation/run_validation.py against the live Hakase ADMET service.
 
 Run:  python3 validation/tests/test_endpoint_harness.py
 """

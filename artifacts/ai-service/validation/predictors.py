@@ -5,11 +5,11 @@ DeterministicChemistryPredictor
   fire a NO-GO even with the ML stack offline — reactive-metabolite SMARTS
   (models.reactive_metabolites, the real production module) + Lipinski Ro5
   (RDKit). This subset is what we can validate end-to-end right now without the
-  ADMET-AI weights. (The TS pipeline adds Brenk/BMS structural-alert rejects on
+  Hakase ADMET weights. (The TS pipeline adds Brenk/BMS structural-alert rejects on
   top; those are not in this Python floor and are noted as such in the report.)
 
 MlServiceEndpointPredictor
-  Calls the live ai-service ADMET-AI endpoint for a given endpoint's probability.
+  Calls the live ai-service Hakase ADMET endpoint for a given endpoint's probability.
   Returns None when the service / model is unavailable — the harness then marks
   that endpoint PENDING rather than inventing a number.
 """
@@ -57,13 +57,13 @@ class DeterministicChemistryPredictor:
 
 
 class MlServiceEndpointPredictor:
-    """Probability for one ADMET-AI endpoint via the live ai-service. Returns
+    """Probability for one Hakase ADMET endpoint via the live ai-service. Returns
     None on any unavailability — never a fabricated probability."""
 
     def __init__(self, endpoint_key: str, base_url: str = "http://localhost:8090"):
         self.endpoint_key = endpoint_key   # e.g. 'hERG', 'DILI', 'AMES'
         self.base_url = base_url.rstrip("/")
-        self.name = f"ai-service ADMET-AI[{endpoint_key}]"
+        self.name = f"ai-service Hakase ADMET[{endpoint_key}]"
 
     def predict_prob(self, smiles: str) -> Optional[float]:
         import json

@@ -152,7 +152,7 @@ def _prewarm_in_background() -> None:
       starts read everything from cache and are seconds. Either way, running on
       a background thread means /health and other endpoints stay responsive.
 
-    ADMET-AI is intentionally not prewarmed (~30s + heavy memory; existing UI
+    Hakase ADMET is intentionally not prewarmed (~30s + heavy memory; existing UI
     handles cold-load gracefully).
     """
     import threading
@@ -275,7 +275,7 @@ def api_dta_status():
 
 @app.post("/predict/admet-ml")
 def api_predict_admet_ml(req: SmilesRequest):
-    """ML-enhanced ADMET prediction via ADMET-AI (Chemprop GNN ensemble)."""
+    """ML-enhanced ADMET prediction via Hakase ADMET (Chemprop GNN ensemble)."""
     try:
         return sanitize(predict_admet_ml(req.smiles))
     except ValueError as e:
@@ -290,7 +290,7 @@ class BatchSmilesRequest(BaseModel):
 
 @app.post("/predict/admet-ml/batch")
 def api_predict_admet_ml_batch(req: BatchSmilesRequest):
-    """Library-scale ADMET-AI: one model call over a list of SMILES."""
+    """Library-scale Hakase ADMET: one model call over a list of SMILES."""
     try:
         return sanitize(predict_admet_ml_batch(req.smiles))
     except ValueError as e:
@@ -449,7 +449,7 @@ def api_predict_patient_line(req: PatientLineRequest):
 class PkIviveRequest(BaseModel):
     """Layer 1 — quantitative human PK by IVIVE.
 
-    `overrides` lets a caller substitute a MEASURED value for any ADMET-AI input
+    `overrides` lets a caller substitute a MEASURED value for any Hakase ADMET input
     (keys: clint_hep_ul_min_1e6, fu_plasma, vdss_l_per_kg, half_life_obach_h,
     blood_plasma_ratio); measured wins over ML. `dose_mg` (optional) adds an
     assumption-free IV-bolus exposure block (AUC, C-t curve).
@@ -466,7 +466,7 @@ class PkIviveRequest(BaseModel):
 def api_predict_pk_ivive(req: PkIviveRequest):
     """Quantitative human PK (CL, t½, hepatic first-pass, exposure) by IVIVE.
 
-    Sources CLint / fu / VDss from the REAL ADMET-AI predictor (or measured
+    Sources CLint / fu / VDss from the REAL Hakase ADMET predictor (or measured
     overrides). NO heuristic fallback: when a required real input is missing the
     response is `source = "insufficient-input"` (HTTP 422) with the `missing`
     list — never a value computed from a guess. Invalid SMILES → HTTP 400.

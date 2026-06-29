@@ -14,7 +14,7 @@ for a measured human PK study, and it does not claim to be.
 
 PROVENANCE / NO-FALLBACK CONTRACT (project-wide policy)
 ──────────────────────────────────────────────────────
-Every number that drives an output is a REAL input — either an ADMET-AI ML
+Every number that drives an output is a REAL input — either an Hakase ADMET ML
 prediction (provenance "ml") or a user-supplied measured value (provenance
 "measured"). There is NO heuristic substitution: if the inputs required for a
 block are missing, that block is returned with ``available = False`` and a
@@ -24,8 +24,8 @@ literature reference constants, not per-molecule guesses; they are named,
 cited, and overridable, and flagged with provenance "reference"/"assumed".
 
 The two inputs the hepatic-clearance block strictly requires are:
-  • hepatocyte intrinsic clearance CLint  (ADMET-AI ``Clearance_Hepatocyte_AZ``)
-  • fraction unbound in plasma fu          (from ADMET-AI ``PPBR_AZ``)
+  • hepatocyte intrinsic clearance CLint  (Hakase ADMET ``Clearance_Hepatocyte_AZ``)
+  • fraction unbound in plasma fu          (from Hakase ADMET ``PPBR_AZ``)
 Steady-state volume VDss (``VDss_Lombardo``) is required for the half-life and
 concentration-time blocks; when it is absent, clearance is still returned but
 the t½ / curve blocks are flagged unavailable — never faked.
@@ -167,7 +167,7 @@ def compute_ivive(
         out["vdss_l_per_kg"] = round(vdss_l_per_kg, 4)
         out["half_life_h"] = round(half_life_h, 3) if half_life_h is not None else None
         out["half_life_available"] = half_life_h is not None
-        # 6) Independent cross-check vs ADMET-AI Half_Life_Obach (both real signals).
+        # 6) Independent cross-check vs Hakase ADMET Half_Life_Obach (both real signals).
         obach = _num(half_life_obach_h)
         if obach is not None and obach > 0 and half_life_h is not None:
             ratio = half_life_h / obach
@@ -206,7 +206,7 @@ def compute_ivive(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# WRAPPER — sources REAL inputs from ADMET-AI (or measured overrides) and
+# WRAPPER — sources REAL inputs from Hakase ADMET (or measured overrides) and
 # enforces the no-fallback "insufficient-input" contract.
 # ─────────────────────────────────────────────────────────────────────────────
 def _mw_from_smiles(smiles: str) -> float | None:
@@ -233,11 +233,11 @@ def predict_pk_ivive(
     Input precedence per quantity (keys: clint_hep_ul_min_1e6, fu_plasma,
     vdss_l_per_kg, half_life_obach_h):
       1. ``overrides``  — a MEASURED value supplied by the caller → provenance "measured".
-      2. ``ml_inputs``  — an ADMET-AI value the caller ALREADY fetched (e.g. the L1
-         overlay) → provenance "ml". Lets the pipeline reuse its single ADMET-AI
+      2. ``ml_inputs``  — an Hakase ADMET value the caller ALREADY fetched (e.g. the L1
+         overlay) → provenance "ml". Lets the pipeline reuse its single Hakase ADMET
          inference instead of paying a second one here. These must be genuine ML
          outputs; they are tagged "ml", never "measured".
-      3. server ADMET-AI — fetched here via ``predict_admet_ml`` only for the
+      3. server Hakase ADMET — fetched here via ``predict_admet_ml`` only for the
          quantities not already supplied → provenance "ml".
     Anything still absent yields the no-fallback "insufficient-input" envelope.
 
@@ -285,12 +285,12 @@ def predict_pk_ivive(
     fu_from_ml = (max(0.0, min(1.0, 1.0 - ppb_bound_pct / 100.0)) if ppb_bound_pct is not None else None)
 
     inputs["clint_hep_ul_min_1e6"] = take("clint_hep_ul_min_1e6", _num(flat.get("Clearance_Hepatocyte_AZ")),
-                                          "µL/min/10⁶ cells", "ADMET-AI Clearance_Hepatocyte_AZ")
-    inputs["fu_plasma"] = take("fu_plasma", fu_from_ml, "fraction", "ADMET-AI PPBR_AZ → fu")
+                                          "µL/min/10⁶ cells", "Hakase ADMET Clearance_Hepatocyte_AZ")
+    inputs["fu_plasma"] = take("fu_plasma", fu_from_ml, "fraction", "Hakase ADMET PPBR_AZ → fu")
     inputs["vdss_l_per_kg"] = take("vdss_l_per_kg", _num(flat.get("VDss_Lombardo")),
-                                   "L/kg", "ADMET-AI VDss_Lombardo")
+                                   "L/kg", "Hakase ADMET VDss_Lombardo")
     inputs["half_life_obach_h"] = take("half_life_obach_h", _num(flat.get("Half_Life_Obach")),
-                                       "h", "ADMET-AI Half_Life_Obach")
+                                       "h", "Hakase ADMET Half_Life_Obach")
 
     r_bp = _num(blood_plasma_ratio) or _num(overrides.get("blood_plasma_ratio")) or DEFAULT_BLOOD_PLASMA_RATIO
     r_bp_prov = "measured" if (_num(blood_plasma_ratio) or _num(overrides.get("blood_plasma_ratio"))) else "assumed"
@@ -305,7 +305,7 @@ def predict_pk_ivive(
             "missing": missing,
             "inputs": {k: vars(v) for k, v in inputs.items()},
             "admet_ml": admet_meta,
-            "remediation": "Bring the ADMET-AI ML stack online (STRICT_ML=1) or supply measured CLint/fu via `overrides`.",
+            "remediation": "Bring the Hakase ADMET ML stack online (STRICT_ML=1) or supply measured CLint/fu via `overrides`.",
         }
 
     fu_val = inputs["fu_plasma"].value
@@ -348,7 +348,7 @@ def predict_pk_ivive(
         "admet_ml": admet_meta,
         "model_info": {
             "engine": "Hakase IVIVE (well-stirred liver, Rowland/Wilkinson; Houston scale-up)",
-            "method": "Deterministic IVIVE from real ADMET-AI inputs; no heuristic fallback",
+            "method": "Deterministic IVIVE from real Hakase ADMET inputs; no heuristic fallback",
             "references": [
                 "Wilkinson & Shand 1975 Clin Pharmacol Ther 18:377",
                 "Houston 1994 Biochem Pharmacol 47:1469",
@@ -361,5 +361,5 @@ def predict_pk_ivive(
 
 
 def is_ready() -> dict[str, Any]:
-    """IVIVE is pure arithmetic — always ready; its INPUTS depend on ADMET-AI."""
-    return {"loaded": True, "engine": "Hakase IVIVE", "depends_on": "ADMET-AI (Clearance_Hepatocyte_AZ, PPBR_AZ, VDss_Lombardo)"}
+    """IVIVE is pure arithmetic — always ready; its INPUTS depend on Hakase ADMET."""
+    return {"loaded": True, "engine": "Hakase IVIVE", "depends_on": "Hakase ADMET (Clearance_Hepatocyte_AZ, PPBR_AZ, VDss_Lombardo)"}

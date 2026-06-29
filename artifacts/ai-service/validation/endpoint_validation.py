@@ -1,8 +1,8 @@
 """§2 — validate EVERY displayed ADMET endpoint against measured TDC test data.
 
 Each endpoint the app shows is checked against its TDC scaffold-split TEST set
-(the standard ADMET-AI hold-out, frozen in validation/datasets/). Predictions
-come from the LIVE ai-service ADMET-AI head; molecules the model can't score are
+(the standard Hakase ADMET hold-out, frozen in validation/datasets/). Predictions
+come from the LIVE ai-service Hakase ADMET head; molecules the model can't score are
 skipped, never imputed.
 
   • Binary endpoints (hERG, AMES, DILI, BBB, P-gp, F, 5×CYP, ClinTox, Carcinogen)
@@ -32,7 +32,7 @@ DATASET_DIR = os.path.join(_HERE, "datasets")
 
 # Panel: display name → config.
 #   tdc      = TDC dataset name           cls = 'Tox' | 'ADME'
-#   admet_key= ADMET-AI output column     kind= 'binary' | 'reg'
+#   admet_key= Hakase ADMET output column     kind= 'binary' | 'reg'
 #   fold     = (reg only) value is strictly-positive linear → report fold-error
 PANEL: dict[str, dict] = {
     # ── Safety / toxicity (binary) ──

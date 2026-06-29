@@ -4,7 +4,7 @@ Produces the receipts:
   • Triage confusion matrix on a live ChEMBL approved/withdrawn hold-out, scored
     by the model-free deterministic-chemistry floor (runnable today).
   • ML safety-endpoint AUROC/calibration (hERG/AMES/DILI/…) against TDC test
-    splits — auto-run when PyTDC is installed AND the ai-service ADMET-AI stack
+    splits — auto-run when PyTDC is installed AND the ai-service Hakase ADMET stack
     is up; otherwise reported PENDING with the exact reproduce command. NEVER
     fabricated.
   • The conformal FPR-controlled veto-threshold recipe (the principled
@@ -79,15 +79,15 @@ def run_triage(approved_pages: int | None) -> dict:
 
 
 def run_endpoints(base_url: str, alpha: float = 0.05, endpoint_max_n: int | None = None) -> dict:
-    """§2 — score ADMET-AI hERG/AMES/DILI on the frozen TDC TEST splits via the
+    """§2 — score Hakase ADMET hERG/AMES/DILI on the frozen TDC TEST splits via the
     live ai-service. Real numbers when the service is up; honest PENDING otherwise
     (the TEST data is already frozen locally, so only the model is needed)."""
     from validation.endpoint_validation import validate_all, ENDPOINTS
-    # Reachability probe — if ADMET-AI isn't serving, do not fabricate.
+    # Reachability probe — if Hakase ADMET isn't serving, do not fabricate.
     probe = MlServiceEndpointPredictor("hERG", base_url=base_url)
     if probe.predict_prob("CCO") is None:
         return {"status": "PENDING",
-                "reason": "ai-service ADMET-AI not reachable / not STRICT-loaded (start it with STRICT_ML=1)",
+                "reason": "ai-service Hakase ADMET not reachable / not STRICT-loaded (start it with STRICT_ML=1)",
                 "endpoints": {ep: {"endpoint": ep, "status": "PENDING"} for ep in ENDPOINTS}}
     factory = lambda key: MlServiceEndpointPredictor(key, base_url=base_url).predict_prob  # noqa: E731
     results = validate_all(factory, alpha=alpha, max_n=endpoint_max_n)
@@ -157,14 +157,14 @@ def write_report(triage: dict, endpoints: dict) -> str:
                  "most market withdrawals are cardiac/hepatic (hERG/DILI) liabilities that model-free chemistry "
                  "cannot see. So a LOW false-halt rate on approved drugs here is the success signal, and the "
                  "(expected) low recall on withdrawn is exactly why the calibrated ML safety stack exists — "
-                 "to be quantified in §2 once the ADMET-AI stack is online.\n")
+                 "to be quantified in §2 once the Hakase ADMET stack is online.\n")
     lines.append("## 2. ML safety endpoints vs TDC test splits (AUROC + calibration + conformal veto)\n")
     if endpoints.get("status") == "PENDING":
         lines.append(f"**PENDING** — {endpoints.get('reason')}. The TEST data is frozen locally "
                      "(`validation/datasets/`), so the only missing piece is the model: start the ai-service with "
-                     "`STRICT_ML=1` (ADMET-AI installed) and re-run. No other dependency.\n")
+                     "`STRICT_ML=1` (Hakase ADMET installed) and re-run. No other dependency.\n")
     else:
-        lines.append("Scored on the FROZEN TDC scaffold-split TEST sets (the published ADMET-AI hold-out) via the live "
+        lines.append("Scored on the FROZEN TDC scaffold-split TEST sets (the published Hakase ADMET hold-out) via the live "
                      "ai-service. AUROC carries a 95% bootstrap CI; the conformal veto threshold is fit on half the "
                      "negative (safe) class and FPR is the realised rate on the held-out half — a measured, "
                      "distribution-free ≤α guarantee, not a hand-set cutoff.\n")
@@ -216,7 +216,7 @@ def write_report(triage: dict, endpoints: dict) -> str:
                  "on approved drugs is provably ≤ α (Vovk; Lei 2018) — the principled replacement for the hand-set "
                  "0.92/0.88 cutoffs. Coverage & FPR guarantees are unit-tested in `validation/tests/run_tests.py` "
                  "(empirical FPR 0.038 at α=0.05; interval coverage 90.9% at nominal 90% on real data).\n")
-    lines.append("To fit production thresholds: collect ADMET-AI scores over the approved hold-out (§1 set) and call "
+    lines.append("To fit production thresholds: collect Hakase ADMET scores over the approved hold-out (§1 set) and call "
                  "`ConformalVetoGate.calibrate(approved_scores, alpha=0.05)` per endpoint; write the thresholds into "
                  "`l1Thresholds.json`. This replaces the unrun defaults with measured, guaranteed numbers.\n")
     lines.append("## 4. Methods\n")
@@ -240,7 +240,7 @@ def main() -> int:
 
     print("Building live ChEMBL hold-out + scoring deterministic floor …", flush=True)
     triage = run_triage(args.approved_pages)
-    print("Scoring ADMET-AI safety endpoints on frozen TDC test splits …", flush=True)
+    print("Scoring Hakase ADMET safety endpoints on frozen TDC test splits …", flush=True)
     endpoints = run_endpoints(args.ai_service, alpha=args.alpha, endpoint_max_n=args.endpoint_max_n)
     path = write_report(triage, endpoints)
 

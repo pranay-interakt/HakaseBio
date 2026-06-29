@@ -17,15 +17,21 @@ httpx>=0.27.0
 # Required by: admet.py, molecular_properties.py, binding_ml.py, solubility_ml.py
 rdkit>=2023.9.1
 
-# ── ADMET-AI ML stack — REQUIRED for ML provenance ──────────────────────────
-# Without these the ai-service silently degrades to heuristics while
-# UPSTREAM thinks it's getting ML predictions. The recalibrated L1 scorecard
-# (l1Scorecard.ts thresholds.json) is tuned to the ML output distribution,
-# not the heuristic one — running mismatched is the root cause of
-# "every known drug → NO-GO". Pin them; STRICT_ML=1 in env makes the service
-# refuse to start when these are absent (see admet_ml.warmup).
-admet_ai>=1.4.0
-chemprop>=1.7.0
+# ── Hakase ADMET engine — REQUIRED for ML provenance ────────────────────────
+# The engine itself is vendored in-tree at hakase_admet/ (Chemprop-RDKit
+# ensemble + bundled weights); no pip package to install. These are its
+# runtime deps. Without them the ai-service silently degrades to heuristics
+# while UPSTREAM thinks it's getting ML predictions. The recalibrated L1
+# scorecard (l1Scorecard.ts thresholds.json) is tuned to the ML output
+# distribution, not the heuristic one — running mismatched is the root cause
+# of "every known drug → NO-GO". STRICT_ML=1 in env makes the service refuse
+# to start when the engine can't load (see admet_ml.warmup).
+chemprop>=2.2.2          # hakase_admet uses the Chemprop v2 model API
+torch>=2.8.0
+lightning>=2.4.0
+pandas>=2.0.0
+scipy>=1.11.0
+tqdm>=4.66.3
 
 # ── PyTDC for applicability domain + DTA training corpora ──────────────────
 # Provides DILI, hERG_Karim, BindingDB downloads used by applicability_domain.py

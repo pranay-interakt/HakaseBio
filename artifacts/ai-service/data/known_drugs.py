@@ -15,7 +15,7 @@ APIs only:
   - UniProt   (already wired) — target sequence & PDB cross-refs
 
 When no live source returns a hit, the lookup returns None and the L1
-pipeline falls through to the properly-trained ML stack (ADMET-AI Chemprop,
+pipeline falls through to the properly-trained ML stack (Hakase ADMET Chemprop,
 BindingDB-pretrained DTA). When the ML stack is also unavailable, the
 endpoint value is null + a "no model available" envelope. NEVER a fake
 number.
