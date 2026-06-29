@@ -359,7 +359,7 @@ router.get(
       throw BadRequest("Unsupported provider");
     }
     const redirectAfter =
-      typeof req.query.redirect === "string" ? req.query.redirect : "/dashboard";
+      typeof req.query.redirect === "string" ? req.query.redirect : "/lab";
     const { url } = await startOauthFlow({ provider, redirectAfter });
     res.redirect(url);
   }),

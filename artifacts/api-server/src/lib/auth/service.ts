@@ -687,7 +687,7 @@ export async function startOauthFlow(opts: {
     state,
     provider: opts.provider,
     codeVerifier: verifier,
-    redirectAfter: opts.redirectAfter ?? "/dashboard",
+    redirectAfter: opts.redirectAfter ?? "/lab",
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
@@ -911,7 +911,7 @@ export async function completeGoogleOauth(opts: {
     ip: opts.ip,
     userAgent: opts.userAgent,
   });
-  return { session, redirectAfter: st.redirectAfter ?? "/dashboard" };
+  return { session, redirectAfter: st.redirectAfter ?? "/lab" };
 }
 
 // Apple's id_token verification needs JWKS; we use jose.
@@ -1002,7 +1002,7 @@ export async function completeAppleOauth(opts: {
     ip: opts.ip,
     userAgent: opts.userAgent,
   });
-  return { session, redirectAfter: st.redirectAfter ?? "/dashboard" };
+  return { session, redirectAfter: st.redirectAfter ?? "/lab" };
 }
 
 // ─── /me ─────────────────────────────────────────────────────────────────────

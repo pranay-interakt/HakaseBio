@@ -1,199 +1,214 @@
-# Hakase BioTwin Preclinical Digital Twin Platform
+# Hakase BioTwin — Backend
 
-Hakase BioTwin is a state-of-the-art, full-stack preclinical digital twin simulation platform. It integrates advanced physical chemistry analysis, structural mutagenicity scans, 3D molecular visualization, ex vivo safety assays, and high-fidelity Machine Learning model predictions (Graph Neural Networks and Random Forests) to profile drug candidates and evaluate regulatory IND readiness.
+Backend deploy unit for the **Hakase BioTwin** preclinical digital-twin platform. This
+repository contains the API gateway and the AI/ML inference service. The web UI lives
+in a separate repository: **[hakase-bio-frontend](https://github.com/Hakase-ai/hakase-bio-frontend)**.
+
+> Process management is **PM2-based** (no Docker required). All configuration is read
+> from a local `.env` file — nothing environment-specific is hardcoded, and `.env` is
+> never committed.
 
 ---
 
-## 🏗️ Platform Architecture
-
-The system is organized as a multi-tier microservice architecture:
+## Architecture
 
 ```mermaid
 graph TD
-    A[React Client / Vite] -- API requests --> B[Express API Gateway]
-    B -- /api/ai/* --> C[Python AI/ML Service]
-    C -- Real ML Predictions --> D[(Morgan FP / Chemprop GNN)]
-    C -- RDKit Descriptors --> E[Physchem Engine]
+    A[React Client / Vite  ·  separate repo] -- /api/* --> B[Express API Gateway · :3000]
+    B -- /api/ai/* --> C[Python AI/ML Service · :8090]
+    C --> D[(Morgan FP / Chemprop GNN)]
+    C --> E[RDKit Physchem Engine]
+    B --> F[(PostgreSQL · users, sessions, audit)]
 ```
 
-### 1. **Frontend: React Application (`/artifacts/hakase-ai`)**
-*   Built with React, Vite, TypeScript, and TailwindCSS.
-*   Uses a dark-mode glassmorphic design system for a premium scientific look.
-*   Integrates `3Dmol.js` for real-time 3D structural protein-ligand viewer interaction.
-*   Communicates with the API gateway using relative endpoints (e.g. `/api/auth/*`, `/api/ai/*`), fully proxied in development mode.
+### Components in this repo
 
-### 2. **API Gateway & Auth: Express Server (`/artifacts/api-server`)**
-*   Built with Express, TypeScript, and Drizzle ORM (PostgreSQL).
-*   Implements a production-grade security suite:
-    *   **Double-Submit CSRF Protection:** Powered by `csrf-csrf` bound to the signed session identifier (refresh token / IP) to prevent cross-site request forgery without session state bloat.
-    *   **JWT Authentication Cycle:** Sliding-session token verification with access tokens in memory and signed HTTP-only refresh cookies.
-    *   **Lockout and Protection:** Account lockouts on successive failed attempts, security notification emails on new device logins, and CIDR-based IP allowlists.
+| Path | Service | Stack |
+| --- | --- | --- |
+| `artifacts/api-server` | **API Gateway & Auth** | Express 5, TypeScript, Drizzle ORM (PostgreSQL), JWT + CSRF + rate limiting |
+| `artifacts/ai-service` | **AI/ML Engine** | FastAPI, RDKit, SciPy, scikit-learn, Chemprop GNN (ADMET-AI), Random-Forest models (DILI, hERG) |
+| `backend/scripts/orchestrator.mjs` | **Orchestrator** | Single-command supervisor that boots, health-checks, warms, and reloads both services |
+| `backend/config/ecosystem.config.cjs` | **PM2 config** | App definitions; loads `.env` |
+| `ecosystem.config.js` | **PM2 entry** | Root canonical entry — re-exports the config above |
+| `workers/`, `runpod_worker*/` | **GPU workers** | Boltz-2 co-folding & TIES/FEP dispatch (RunPod) |
 
-### 3. **AI/ML Engine: Python Service (`/artifacts/ai-service`)**
-*   Powered by FastAPI, RDKit, SciPy, and Scikit-Learn.
-*   Performs structural pharmacophore scans (Ames mutagens, DILI risks, hERG block indicators).
-*   Consists of three primary production-ready machine learning engines:
-    *   **DILI-ML:** A Random Forest classifier trained on the FDA DILIrank dataset ($n=475$ compounds) utilizing Morgan fingerprints and RDKit descriptors.
-    *   **CardioTox ML (DeepHIT):** A Random Forest model trained on ChEMBL ($n=655$ assays) to predict hERG channel blocking probabilities.
-    *   **ADMET-AI:** A pre-trained deep Graph Neural Network (**Chemprop GNN ensemble**) predicting 41 endpoints directly from molecular structure.
+The API gateway implements a production-grade security suite: double-submit CSRF
+(`csrf-csrf`), sliding-session JWTs (in-memory access token + signed HTTP-only refresh
+cookie), account lockout on repeated failures, new-device notification emails, and
+CIDR-based IP allow/block lists.
 
 ---
 
-## 🛠️ Developer Guide & Startup Instructions
+## Prerequisites
 
-Follow these instructions to clone, configure, migrate, and run the Hakase BioTwin platform locally.
+- **Node.js** ≥ 20
+- **pnpm** ≥ 10 (workspace package manager — do **not** use `npm`/`yarn`)
+- **Python** ≥ 3.11 with **uv**
+- **PostgreSQL** (local or remote)
+- **PM2** (`pnpm add -g pm2`) — for production process management
+- **Git & Git LFS** — model weights / large datasets are stored via LFS
 
-### 1. **Prerequisites**
-Ensure you have the following software installed on your machine:
-*   **Node.js** (v20 or higher)
-*   **pnpm** (v10+; Workspace package manager; do not use `npm` or `yarn`)
-*   **Python** (v3.11 or higher)
-*   **uv** (Fast Python package installer and resolver)
-*   **PostgreSQL** (Local or remote running instance)
-*   **Git & Git LFS** (Required for storing model weights and large datasets)
-
-Initialize Git LFS and pull model weights after cloning:
 ```bash
-git lfs install
-git lfs pull
+git lfs install && git lfs pull
 ```
 
 ---
 
-### 2. **Environment & Security Configuration**
+## 1 · Configure environment
 
-#### Step A: Configure the Repository Root `.env`
-1. Copy the reference configuration template:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open the `.env` file and configure your Postgres database credentials:
-   ```env
-   DATABASE_URL=postgresql://username:password@localhost:5432/hakase_bio
-   ```
-3. Generate secure secrets using `openssl rand -base64 48` and populate:
-   *   `JWT_ACCESS_SECRET`
-   *   `JWT_REFRESH_SECRET`
-   *   `COOKIE_SECRET`
-   *   `CSRF_SECRET`
+All settings come from `.env` at the repo root. Copy the template and fill it in:
 
-#### Step B: Dev Mode vs. Production Security Policies
-*   **Rate Limits:**
-    *   **Production:** Strict limits are enforced per IP (10 auth requests/min, 120 API requests/min).
-    *   **Development:** Automatically relaxed (1000 auth requests/min, 2000 API requests/min) to prevent developer blocks during hot-reloads and UI iterations.
-*   **Email Deliverability:**
-    *   **Production:** Expects a valid `RESEND_API_KEY` to send verification links.
-    *   **Development:** Bypasses email-sending failures gracefully. It prints the verification URLs directly to the terminal console (`>>> DEVELOPMENT LINK: ... <<<`), allowing you to complete verification without an active email gateway.
-
----
-
-### 3. **Installation & Virtual Environment Setup**
-
-#### Step A: Install Node.js Workspace Dependencies
-From the repository root, install all monorepo dependencies:
 ```bash
-pnpm install
+cp .env.example .env
 ```
 
-#### Step B: Initialize the Python Virtual Environment
-Sync dependencies using `uv` to align Python packages cleanly:
+Minimum required values (see `.env.example` for the full, documented list):
+
+```env
+PORT=3000                  # Express API gateway
+AI_SERVICE_PORT=8090       # FastAPI AI service
+AI_SERVICE_URL=http://localhost:8090
+APP_URL=http://localhost:3000
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/hakase_bio
+
+# Generate each with: openssl rand -base64 48
+JWT_ACCESS_SECRET=...
+JWT_REFRESH_SECRET=...
+COOKIE_SECRET=...
+CSRF_SECRET=...
+
+RESEND_API_KEY=re_...       # email verify + password reset
+```
+
+> **Never commit `.env`.** It is git-ignored. The server fails loudly if a required
+> variable is missing. In development, rate limits are auto-relaxed and verification
+> links are printed to the console instead of emailed.
+
+---
+
+## 2 · Install dependencies
+
 ```bash
-# Create the virtual environment
-uv venv .venv
-
-# Sync dependencies based on requirements
-uv sync
+pnpm install                # Node workspace
+uv venv .venv && uv sync    # Python virtual env (.venv)
 ```
-*(If you do not use `uv`, run `.venv/bin/pip install -r pyproject.toml`)*
 
 ---
 
-### 4. **Database Setup & Schema Sync**
+## 3 · Database setup
 
-1. Create the PostgreSQL database:
-   ```bash
-   createdb hakase_bio
-   # Or via psql: psql -c "CREATE DATABASE hakase_bio;"
-   ```
-2. Apply the Drizzle migrations to push schemas:
-   ```bash
-   pnpm --filter @workspace/db run push
-   ```
-3. Compile the TS declarations for the database package:
-   ```bash
-   pnpm typecheck:libs
-   ```
-
-#### 💡 Bypass Email Verification & Force Admin (Optional Dev Shortcut)
-If you register a user locally and want to make them verified and an administrator instantly without using verification links:
 ```bash
-psql postgresql://username:password@localhost:5432/hakase_bio -c "UPDATE users SET status = 'active', role = 'admin', email_verified_at = NOW() WHERE email = 'your-email@domain.com';"
+createdb hakase_bio                       # or: psql -c "CREATE DATABASE hakase_bio;"
+pnpm --filter @workspace/db run push      # apply Drizzle schema
+pnpm typecheck:libs                       # compile TS declarations for lib packages
 ```
 
----
+Optional dev shortcut to verify + promote a user to admin:
 
-### 5. **Starting the Services (Local Dev)**
-
-Run **two processes** concurrently. We recommend using separate terminal windows.
-
-#### 🖲️ Terminal 1: Backend Orchestrator
-From the repository root, start the single-command backend supervisor. If you are running **Ersilia (local mode)**, prepend your virtual environment's binary directory to the `PATH`:
-
-*   **Linux / macOS**:
-    ```bash
-    PATH=".venv/bin:$PATH" pnpm run backend:dev
-    ```
-*   **Windows (Command Prompt)**:
-    ```cmd
-    set PATH=.venv\Scripts;%PATH% && pnpm run backend:dev
-    ```
-*   **Windows (PowerShell)**:
-    ```powershell
-    $env:PATH=".venv\Scripts;$env:PATH"; pnpm run backend:dev
-    ```
-
-The orchestrator manages:
-*   **Express API Gateway:** listening on `http://localhost:3000`
-*   **FastAPI AI/ML Service:** listening on `http://localhost:8090`
-*   **Model Warm-Up & Hot-Reloads:** Automatically pre-warms DILI, hERG, Ames, and Binding-ML models.
-
-#### 🎨 Terminal 2: Vite React Frontend
-From the repository root, start the frontend developer server:
 ```bash
-pnpm run frontend:dev
+psql "$DATABASE_URL" -c "UPDATE users SET status='active', role='admin', email_verified_at=NOW() WHERE email='you@example.com';"
 ```
-*   **Vite Dev Server URL:** `http://localhost:5173`
-*   Vite config automatically proxies all requests targeting `/api/*` to the gateway on port `3000`.
 
 ---
 
-### 6. **Running in Production Mode (Single-Port Hosting)**
+## 4 · Run in development
 
-For hosting the app in production (e.g. Docker, VM, AWS, or Render):
-1.  **Build and Start:** Run the build/start command to compile frontend and backend assets:
-    ```bash
-    PATH=".venv/bin:$PATH" pnpm start
-    ```
-2.  **Access App:** The Express API server on port `3000` serves the React UI statically. Access the application directly at **`http://localhost:3000`** (only expose port `3000` to the internet).
+The orchestrator boots **both** the API gateway and the AI service with model warm-up
+and hot-reload:
+
+```bash
+PATH=".venv/bin:$PATH" pnpm run backend:dev
+```
+
+- Express API gateway → `http://localhost:3000`
+- FastAPI AI/ML service → `http://localhost:8090`
+
+Run the **frontend** from its own repository
+([hakase-bio-frontend](https://github.com/Hakase-ai/hakase-bio-frontend)); its Vite dev
+server proxies `/api/*` to this gateway.
 
 ---
 
-## 🧪 Health Checks & Troubleshooting
+## 5 · Run in production (PM2)
 
-Verify service connectivity using these health endpoints:
+Process management is handled entirely by PM2 using the root `ecosystem.config.js`:
 
-1.  **AI/ML Service Health check:**
-    ```bash
-    curl -s http://localhost:8090/health
-    # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
-    ```
-2.  **API Server Gateway Health check:**
-    ```bash
-    curl -s http://localhost:3000/api/health
-    # Expect: {"status":"ok"}
-    ```
-3.  **Vite Dev Proxy Health check:**
-    ```bash
-    curl -s http://localhost:5173/api/ai/health
-    # Expect: {"status":"ok","service":"HakaseAI AI Service","version":"1.0.0"}
-    ```
+```bash
+pnpm install && pnpm run build                    # verify the build first
+PATH=".venv/bin:$PATH" pm2 start ecosystem.config.js --env production
+pm2 save                                           # persist across reboots
+pm2 startup                                         # (once) generate boot script
+```
+
+Common operations:
+
+```bash
+pm2 reload ecosystem.config.js --update-env   # zero-downtime reload
+pm2 stop   ecosystem.config.js
+pm2 logs                                       # tail logs
+pm2 status                                     # process table
+```
+
+PM2 manages three apps (defined in `backend/config/ecosystem.config.cjs`):
+
+- `hakase-backend` — the orchestrator (**recommended**; supervises both children)
+- `hakase-api-server` — Express gateway, for granular control
+- `hakase-ai-service` — FastAPI service, for granular control
+
+To run the children directly instead of the orchestrator:
+
+```bash
+pm2 start ecosystem.config.js --only hakase-api-server,hakase-ai-service --env production
+```
+
+All PM2 env values are loaded from `.env` at start time — no secrets live in the config.
+
+---
+
+## 6 · Build & verify
+
+Always confirm a clean build before pushing:
+
+```bash
+pnpm run build      # runs typecheck across the workspace, then per-package builds
+```
+
+Health checks:
+
+```bash
+curl -s http://localhost:8090/health      # AI service  → {"status":"ok",...}
+curl -s http://localhost:3000/api/health  # API gateway → {"status":"ok"}
+```
+
+---
+
+## Deployment workflow
+
+- Push application changes to the **`staging`** branch only — never directly to
+  `main`/`master` or any production branch.
+- Verify `pnpm run build` succeeds before pushing.
+- `.env`, secrets, API keys, and compiled artifacts (`__pycache__`, `*.pyc`, `dist/`)
+  are git-ignored and must never be committed.
+- The test/staging server pulls `staging`; the orchestrator (or `pm2 reload`) performs a
+  zero-downtime reload via the post-merge hook in `backend/ops/`.
+
+---
+
+## Repository layout
+
+```
+.
+├── ecosystem.config.js              # root PM2 entry (re-exports backend/config)
+├── artifacts/
+│   ├── api-server/                  # Express API gateway + auth
+│   └── ai-service/                  # FastAPI ML service
+├── backend/
+│   ├── scripts/orchestrator.mjs     # single-command supervisor
+│   ├── config/ecosystem.config.cjs  # PM2 app definitions
+│   ├── ops/                         # deploy.sh, reload.sh, post-merge hook
+│   └── nginx/ · systemd/            # sample host configs
+├── lib/                             # shared workspace packages (db, api-zod, integrations)
+├── workers/ · runpod_worker*/       # GPU dispatch workers
+├── .env.example                     # documented env reference (copy to .env)
+└── pnpm-workspace.yaml
+```
