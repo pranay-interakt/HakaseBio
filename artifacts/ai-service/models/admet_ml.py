@@ -1,12 +1,12 @@
-"""ADMET-AI ML predictor wrapper.
+"""Hakase ADMET ML predictor wrapper.
 
-Wraps the open-source ADMET-AI Chemprop model (41 ADMET endpoints + 60 physchem
+Wraps the open-source Hakase ADMET Chemprop model (41 ADMET endpoints + 60 physchem
 descriptors). Uses lazy singleton loading so the FastAPI service starts fast
 and only pays the ~30s model-load cost on first prediction.
 
 Operating modes
 ───────────────
-By default the wrapper degrades gracefully — if ADMET-AI isn't installed, the
+By default the wrapper degrades gracefully — if Hakase ADMET isn't installed, the
 loader raises and `predict_admet_ml` returns a `_fallback_envelope`. Upstream
 consumers must check `ml_available` and re-route to the heuristic path.
 
@@ -30,7 +30,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Set STRICT_ML=1 to refuse to start when ADMET-AI isn't available.
+# Set STRICT_ML=1 to refuse to start when Hakase ADMET isn't available.
 STRICT_ML = os.environ.get("STRICT_ML", "0") == "1"
 
 _MODEL: Any = None
@@ -40,7 +40,7 @@ _LOAD_TIME_S: float | None = None
 
 
 def _load_model() -> Any:
-    """Lazy-load the ADMET-AI model (singleton, thread-safe)."""
+    """Lazy-load the Hakase ADMET model (singleton, thread-safe)."""
     global _MODEL, _LOAD_ERROR, _LOAD_TIME_S
     if _MODEL is not None:
         return _MODEL
@@ -58,27 +58,34 @@ def _load_model() -> Any:
             except Exception as patch_err:
                 logger.warning("Could not patch lightning.pytorch.Trainer: %s", patch_err)
 
-            from admet_ai import ADMETModel  # type: ignore[import-not-found]
+            from hakase_admet import HakaseADMETModel  # vendored in-house engine (hakase_admet/)
 
             t0 = time.time()
-            logger.info("Loading ADMET-AI model (first call only)...")
-            _MODEL = ADMETModel()
+            logger.info("Loading Hakase ADMET model (first call only)...")
+            _MODEL = HakaseADMETModel()
             _LOAD_TIME_S = time.time() - t0
-            logger.info("ADMET-AI model loaded in %.2fs", _LOAD_TIME_S)
+            logger.info("Hakase ADMET model loaded in %.2fs", _LOAD_TIME_S)
             return _MODEL
         except Exception as exc:  # noqa: BLE001 - we want any failure here
             _LOAD_ERROR = f"{type(exc).__name__}: {exc}"
-            logger.exception("Failed to load ADMET-AI model")
+            logger.exception("Failed to load Hakase ADMET model")
             raise
 
 
 def is_ready() -> dict[str, Any]:
     """Report load status without forcing a load."""
+    try:
+        import hakase_admet  # type: ignore  # noqa: F401
+        installed = True
+    except Exception:
+        installed = False
     return {
         "loaded": _MODEL is not None,
+        "installed": installed,        # is the hakase_admet engine importable?
+        "strict_ml": STRICT_ML,        # will the service refuse heuristic fallback?
         "load_time_s": _LOAD_TIME_S,
         "error": _LOAD_ERROR,
-        "engine": "ADMET-AI v2 (Chemprop-RDKit ensemble)",
+        "engine": "Hakase ADMET v2 (Chemprop-RDKit ensemble)",
     }
 
 
@@ -95,9 +102,9 @@ def warmup() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         if STRICT_ML:
             logger.critical(
-                "STRICT_ML=1 and ADMET-AI failed to load: %s. "
+                "STRICT_ML=1 and Hakase ADMET failed to load: %s. "
                 "Refusing to serve to avoid silent heuristic fallback under an "
-                "'ML-Enhanced' badge. Pin admet_ai>=1.4 in requirements.txt or "
+                "'ML-Enhanced' badge. Ensure the hakase_admet engine + weights are importable or "
                 "unset STRICT_ML to allow degraded mode.", exc,
             )
             raise
@@ -105,7 +112,7 @@ def warmup() -> dict[str, Any]:
 
 
 def _normalize_result(raw: Any, smiles: str) -> dict[str, float | str | None]:
-    """ADMET-AI returns a pandas DataFrame; normalize to a flat dict."""
+    """Hakase ADMET returns a pandas DataFrame; normalize to a flat dict."""
     if hasattr(raw, "iloc") and hasattr(raw, "columns"):
         try:
             row = raw.iloc[0].to_dict()
@@ -128,7 +135,7 @@ def _normalize_result(raw: Any, smiles: str) -> dict[str, float | str | None]:
 
 
 # Endpoints we surface as the primary safety/ADMET signal in the UI.
-# Names match ADMET-AI's column conventions; values are probabilities (0-1)
+# Names match Hakase ADMET's column conventions; values are probabilities (0-1)
 # unless otherwise noted.
 KEY_ENDPOINTS: dict[str, dict[str, str]] = {
     "absorption": {
@@ -163,6 +170,18 @@ KEY_ENDPOINTS: dict[str, dict[str, str]] = {
         "Carcinogens_Lagunin": "Carcinogenicity (probability)",
         "ClinTox": "Clinical toxicity (probability)",
         "Skin_Reaction": "Skin sensitization (probability)",
+        "SR-MMP": "Mitochondrial Membrane Potential disruption (probability)",
+        "SR-ATAD5": "ATPase Family AAA Domain-Containing Protein 5 (Genotoxicity) (probability)",
+        "SR-p53": "Tumor Protein p53 activation (probability)",
+        "SR-ARE": "Antioxidant Response Element activation (probability)",
+        "SR-HSE": "Heat Shock Factor Response Element activation (probability)",
+        "NR-AR": "Androgen Receptor binding (Full Length) (probability)",
+        "NR-AR-LBD": "Androgen Receptor binding (Ligand Binding Domain) (probability)",
+        "NR-AhR": "Aryl Hydrocarbon Receptor binding (probability)",
+        "NR-Aromatase": "Aromatase inhibition (probability)",
+        "NR-ER": "Estrogen Receptor binding (Full Length) (probability)",
+        "NR-ER-LBD": "Estrogen Receptor binding (Ligand Binding Domain) (probability)",
+        "NR-PPAR-gamma": "Peroxisome Proliferator-Activated Receptor Gamma binding (probability)",
     },
 }
 
@@ -200,7 +219,7 @@ def _fallback_envelope(smiles: str, error: str) -> dict[str, Any]:
         "endpoints": {},
         "structured": _empty_structured(),
         "model_info": {
-            "engine": "ADMET-AI (unavailable)",
+            "engine": "Hakase ADMET (unavailable)",
             "method": "ML model failed; consumer should use heuristic source",
             "load_status": is_ready(),
         },
@@ -208,7 +227,7 @@ def _fallback_envelope(smiles: str, error: str) -> dict[str, Any]:
 
 
 def predict_admet_ml(smiles: str) -> dict[str, Any]:
-    """Run ADMET-AI on a SMILES string.
+    """Run Hakase ADMET on a SMILES string.
 
     Returns a dict with both the full 100+ endpoint flat map and a curated
     structured view grouped by ADMET bucket. The structured view always
@@ -251,7 +270,7 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
         inference_time_ms = round((time.time() - t0) * 1000, 1)
         flat = _normalize_result(raw, smiles)
     except Exception as exc:  # noqa: BLE001 - runtime inference error → fallback
-        logger.exception("ADMET-AI inference failed for SMILES=%r", smiles)
+        logger.exception("Hakase ADMET inference failed for SMILES=%r", smiles)
         return _fallback_envelope(smiles, f"inference_failed: {exc}")
 
     structured = _structured_view(flat)
@@ -263,20 +282,19 @@ def predict_admet_ml(smiles: str) -> dict[str, Any]:
         "endpoints": flat,
         "structured": structured,
         "model_info": {
-            "engine": "ADMET-AI v2 (Chemprop-RDKit GNN ensemble)",
+            "engine": "Hakase ADMET v2 (Chemprop-RDKit GNN ensemble)",
             "method": "Pretrained on TDC ADMET benchmark (41 endpoints)",
             "endpoint_count": len(flat),
             "inference_time_ms": inference_time_ms,
-            "license": "MIT",
-            "reference": "https://github.com/swansonk14/admet_ai",
+            "provenance": "Hakase in-house ADMET ensemble (Chemprop-RDKit, TDC-trained)",
         },
     }
 
 
 def predict_admet_ml_batch(smiles_list: list[str], limit: int = 500) -> dict[str, Any]:
-    """Run ADMET-AI over a LIBRARY of SMILES in a single model call.
+    """Run Hakase ADMET over a LIBRARY of SMILES in a single model call.
 
-    ADMET-AI's `model.predict()` natively accepts a list and returns one
+    Hakase ADMET's `model.predict()` natively accepts a list and returns one
     DataFrame row per molecule, so we run inference ONCE for the whole batch
     (the single-molecule path's [s, s] duplication hack is unnecessary and
     wasteful at scale). Each SMILES is RDKit-validated/canonicalised first;
@@ -357,7 +375,7 @@ def predict_admet_ml_batch(smiles_list: list[str], limit: int = 500) -> dict[str
         "count": len(valid),
         "ml_available": True,
         "model_info": {
-            "engine": "ADMET-AI v2 (Chemprop-RDKit GNN ensemble)",
+            "engine": "Hakase ADMET v2 (Chemprop-RDKit GNN ensemble)",
             "inference_time_ms": inference_time_ms,
             "batch_size": len(valid),
         },

@@ -1,6 +1,6 @@
 """Peptide-native property engine — Layer 1 expansion for biologics.
 
-Small-molecule ADMET tools (Lipinski rules, ADMET-AI Chemprop, ECFP fingerprints)
+Small-molecule ADMET tools (Lipinski rules, Hakase ADMET Chemprop, ECFP fingerprints)
 are meaningless for peptides: a 15-mer has MW ≈ 1 800 Da, violates every oral
 drug rule, and is not represented in the ChEMBL/BindingDB training sets. This
 module provides peptide-specific analytics that are actually predictive:

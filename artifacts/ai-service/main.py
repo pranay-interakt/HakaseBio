@@ -1,4 +1,15 @@
 import os
+import sys
+
+# Ensure the service directory is at the front of sys.path to prioritize local modules
+# (e.g. data/known_drugs.py) and prevent conflicts with root-level directories.
+_service_dir = os.path.dirname(os.path.abspath(__file__))
+if _service_dir not in sys.path:
+    sys.path.insert(0, _service_dir)
+elif sys.path[0] != _service_dir:
+    sys.path.remove(_service_dir)
+    sys.path.insert(0, _service_dir)
+
 import numpy as np
 # Eagerly import sklearn submodules on the main thread BEFORE any prewarm
 # background thread can race on them. sklearn's submodules import each other
@@ -80,6 +91,13 @@ from models.bsep import predict_bsep
 from models.applicability_domain import predict_applicability_domain
 from models.drug_lookup import lookup_drug, lookup_status
 from models.binding_dta_adapter import predict_affinity as predict_dta_affinity, status as dta_status
+from models.ersilia_hub import (
+    predict_ersilia,
+    predict_cytotoxicity,
+    is_ready as ersilia_status,
+    warmup as ersilia_warmup,
+)
+from models.pk_ivive import predict_pk_ivive, is_ready as pk_ivive_status
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -93,7 +111,6 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super().default(obj)
-
 
 def sanitize(obj):
     if isinstance(obj, dict):
@@ -135,7 +152,7 @@ def _prewarm_in_background() -> None:
       starts read everything from cache and are seconds. Either way, running on
       a background thread means /health and other endpoints stay responsive.
 
-    ADMET-AI is intentionally not prewarmed (~30s + heavy memory; existing UI
+    Hakase ADMET is intentionally not prewarmed (~30s + heavy memory; existing UI
     handles cold-load gracefully).
     """
     import threading
@@ -147,6 +164,8 @@ def _prewarm_in_background() -> None:
     threading.Thread(target=celltype_aggregation_warmup, name="celltype-aggregation-prewarm", daemon=True).start()
     threading.Thread(target=patient_line_warmup, name="patient-line-prewarm", daemon=True).start()
     threading.Thread(target=peptide_esm_ml_warmup, name="peptide-esm-ml-prewarm", daemon=True).start()
+    # Ersilia hub: no-op unless HAKASE_ERSILIA_MODE=local; pre-serves configured models.
+    threading.Thread(target=ersilia_warmup, name="ersilia-prewarm", daemon=True).start()
 
 
 class SmilesRequest(BaseModel):
@@ -256,7 +275,7 @@ def api_dta_status():
 
 @app.post("/predict/admet-ml")
 def api_predict_admet_ml(req: SmilesRequest):
-    """ML-enhanced ADMET prediction via ADMET-AI (Chemprop GNN ensemble)."""
+    """ML-enhanced ADMET prediction via Hakase ADMET (Chemprop GNN ensemble)."""
     try:
         return sanitize(predict_admet_ml(req.smiles))
     except ValueError as e:
@@ -271,7 +290,7 @@ class BatchSmilesRequest(BaseModel):
 
 @app.post("/predict/admet-ml/batch")
 def api_predict_admet_ml_batch(req: BatchSmilesRequest):
-    """Library-scale ADMET-AI: one model call over a list of SMILES."""
+    """Library-scale Hakase ADMET: one model call over a list of SMILES."""
     try:
         return sanitize(predict_admet_ml_batch(req.smiles))
     except ValueError as e:
@@ -427,6 +446,52 @@ def api_predict_patient_line(req: PatientLineRequest):
     return sanitized
 
 
+class PkIviveRequest(BaseModel):
+    """Layer 1 — quantitative human PK by IVIVE.
+
+    `overrides` lets a caller substitute a MEASURED value for any Hakase ADMET input
+    (keys: clint_hep_ul_min_1e6, fu_plasma, vdss_l_per_kg, half_life_obach_h,
+    blood_plasma_ratio); measured wins over ML. `dose_mg` (optional) adds an
+    assumption-free IV-bolus exposure block (AUC, C-t curve).
+    """
+    smiles: str
+    overrides: dict[str, float] | None = None
+    ml_inputs: dict[str, float] | None = None
+    body_weight_kg: float = 70.0
+    blood_plasma_ratio: float | None = None
+    dose_mg: float | None = None
+
+
+@app.post("/predict/pk/ivive")
+def api_predict_pk_ivive(req: PkIviveRequest):
+    """Quantitative human PK (CL, t½, hepatic first-pass, exposure) by IVIVE.
+
+    Sources CLint / fu / VDss from the REAL Hakase ADMET predictor (or measured
+    overrides). NO heuristic fallback: when a required real input is missing the
+    response is `source = "insufficient-input"` (HTTP 422) with the `missing`
+    list — never a value computed from a guess. Invalid SMILES → HTTP 400.
+    """
+    try:
+        result = predict_pk_ivive(
+            req.smiles,
+            overrides=req.overrides,
+            ml_inputs=req.ml_inputs,
+            body_weight_kg=req.body_weight_kg,
+            blood_plasma_ratio=req.blood_plasma_ratio,
+            dose_mg=req.dose_mg,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IVIVE PK projection failed: {type(e).__name__}: {e}")
+
+    sanitized = sanitize(result)
+    if sanitized.get("source") == "input-error":
+        raise HTTPException(status_code=400, detail=sanitized)
+    if sanitized.get("source") == "insufficient-input":
+        # Honest "cannot compute on real data" — surfaced, not silently faked.
+        raise HTTPException(status_code=422, detail=sanitized)
+    return sanitized
+
+
 @app.get("/models/status")
 def api_models_status():
     """Report which ML models are loaded and ready."""
@@ -439,6 +504,7 @@ def api_models_status():
         "binding_ml": binding_ml_status(),
         "celltype_aggregation": celltype_aggregation_status(),
         "patient_line": patient_line_status(),
+        "pk_ivive": pk_ivive_status(),
     }
 
 
@@ -638,6 +704,50 @@ def api_predict_applicability_domain(req: SmilesRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Applicability domain scoring failed: {str(e)}")
+
+
+class ErsiliaRequest(BaseModel):
+    endpoint: str
+    smiles: str
+
+
+@app.post("/predict/cytotoxicity")
+def api_predict_cytotoxicity(req: SmilesRequest):
+    """Cytotoxicity (cell viability / CC50) via a configured Ersilia Model Hub model.
+
+    Returns a real model prediction when HAKASE_ERSILIA_MODE + a cytotoxicity
+    eos model id are configured; otherwise returns source="unavailable" with
+    value=None. It NEVER fabricates a CC50 — the L1 engine treats an unavailable
+    result as missing data, not as a heuristic number.
+    """
+    try:
+        return sanitize(predict_cytotoxicity(req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cytotoxicity prediction failed: {str(e)}")
+
+
+@app.post("/predict/ersilia")
+def api_predict_ersilia(req: ErsiliaRequest):
+    """Generic Ersilia Model Hub passthrough for a configured L1 endpoint.
+
+    endpoint ∈ {cytotoxicity, hepatotoxicity, ames, herg, solubility, …}. Real
+    model output when configured; honest source="unavailable" otherwise. Never
+    fabricates.
+    """
+    try:
+        return sanitize(predict_ersilia(req.endpoint, req.smiles))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ersilia prediction failed: {str(e)}")
+
+
+@app.get("/predict/ersilia/status")
+def api_ersilia_status():
+    """Report Ersilia integration mode, install state, and configured endpoints."""
+    return sanitize(ersilia_status())
 
 
 @app.post("/api/ai/antibody-ml")

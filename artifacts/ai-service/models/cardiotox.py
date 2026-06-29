@@ -1,10 +1,10 @@
 """CardioTox — dedicated hERG cardiotoxicity predictor.
 
-Independent second-opinion model that augments ADMET-AI's hERG prediction.
+Independent second-opinion model that augments Hakase ADMET's hERG prediction.
 Methodologically distinct in three ways:
 
   1. Different training data: TDC `hERG` (Wang et al., 655 compounds, binary
-     IC50<10uM threshold) — distinct from ADMET-AI's `hERG_Karim` (~13k
+     IC50<10uM threshold) — distinct from Hakase ADMET's `hERG_Karim` (~13k
      compounds, different curation).
   2. Different feature representation: Morgan circular fingerprint (1024-bit,
      radius 2) + 6 key RDKit descriptors — not learned graph embeddings.
@@ -341,7 +341,7 @@ def _fallback_envelope(smiles: str, error: str) -> dict[str, Any]:
         },
         "model_info": {
             "engine": "CardioTox (unavailable)",
-            "method": "Model failed to load or featurize; consumer should rely on ADMET-AI hERG only",
+            "method": "Model failed to load or featurize; consumer should rely on Hakase ADMET hERG only",
             "load_status": is_ready(),
         },
     }

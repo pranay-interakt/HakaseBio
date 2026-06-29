@@ -1,6 +1,6 @@
 """Antibody-native developability engine — Layer 1 expansion for biologics.
 
-Small-molecule ADMET tooling (Lipinski, ADMET-AI, ECFP fingerprints) and even
+Small-molecule ADMET tooling (Lipinski, Hakase ADMET, ECFP fingerprints) and even
 the peptide engine are meaningless for antibodies: a VH domain is ~120 residues,
 a full IgG ~1 320 residues, and the questions that decide whether an antibody is
 developable are not "is it drug-like" but "will it express, fold, stay monomeric,

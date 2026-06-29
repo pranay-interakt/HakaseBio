@@ -30,7 +30,11 @@ _PANEL_RAW: list[tuple[str, str, str, str, str, str, str, str]] = [
     (
         "RM001", "Primary aromatic amine (aniline)",
         "[NH2;!$(NC=O);!$(NS=O);!$(NC=N);!$(N=*)]c",
-        "critical",
+        # Recalibrated critical→high (2026-06): validation on a 1,183-drug ChEMBL
+        # hold-out showed this motif fires on 8.8% of APPROVED vs 7.7% of withdrawn
+        # drugs — non-discriminating, so it must flag-to-monitor, not auto-veto. It
+        # is present in hundreds of approved drugs (sulfonamides, procainamide, …).
+        "high",
         "N-Hydroxylation by CYP1A2/3A4 → hydroxylamine → nitroso → protein adducts; quinone imine metabolites cause idiosyncratic hepatotoxicity",
         "Acetaminophen (via NAPQI), sulfanilamide, amodiaquine",
         "N-Acylation; switch to tetrazole/sulfonamide bioisostere; introduce steric block at N",
@@ -122,7 +126,12 @@ _PANEL_RAW: list[tuple[str, str, str, str, str, str, str, str]] = [
     (
         "RM010", "α,β-Unsaturated carbonyl (Michael acceptor)",
         "[CX3]=[CX3][CX3]=[OX1]",
-        "critical",
+        # Recalibrated critical→high (2026-06): fires on 6.4% of APPROVED vs 5.9%
+        # of withdrawn on the validation hold-out — non-discriminating. Michael
+        # acceptors are the INTENTIONAL warhead of approved covalent drugs
+        # (afatinib, neratinib, …), so this is a confirm-selectivity flag, not an
+        # auto-veto. The scorecard's covalent-intent logic handles it downstream.
+        "high",
         "1,4-Conjugate addition of biological nucleophiles (GSH, protein Cys, Lys, His); depletes cellular glutathione; NAPQI mechanism; parthenolide class",
         "Acrolein, methyl vinyl ketone, NAPQI, parthenolide, α-methylene lactones",
         "Reduce C=C bond; add α-methyl group; use saturated analog",
