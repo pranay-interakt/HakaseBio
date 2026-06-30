@@ -32,6 +32,8 @@ lightning>=2.4.0
 pandas>=2.0.0
 scipy>=1.11.0
 tqdm>=4.66.3
+typed-argument-parser>=1.9.0
+docstring-parser>=0.15
 
 # ── PyTDC for applicability domain + DTA training corpora ──────────────────
 # Provides DILI, hERG_Karim, BindingDB downloads used by applicability_domain.py
