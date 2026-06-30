@@ -66,8 +66,15 @@ export function installSecurity(app: Express) {
     }),
   );
 
-  // 4. Global IP blocklist gate (cheap on every request)
+  // 4. Global IP blocklist gate (only for API routes, excluding health checks)
   const ipGate: RequestHandler = async (req, _res, next) => {
+    const isApiRoute = req.path.startsWith("/api/");
+    const isHealthCheck = req.path === "/api/health" || req.path === "/api/healthz";
+
+    if (!isApiRoute || isHealthCheck) {
+      return next();
+    }
+
     try {
       const ip = clientIp(req);
       if (ip && (await ipBlockedGlobally(ip))) {

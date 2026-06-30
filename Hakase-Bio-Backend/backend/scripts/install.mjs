@@ -4,7 +4,7 @@
  * Idempotent. Safe to run on every deploy / post-merge.
  */
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,11 +24,23 @@ const PYTHON = IS_WIN
 
 function sh(cmd, cwd = REPO_ROOT) {
   console.log(`$ ${cmd}`);
-  execSync(cmd, { stdio: "inherit", cwd, env: { ...process.env } });
+  execSync(cmd, { stdio: "inherit", cwd, env: { ...process.env, PIP_USER: "false" } });
 }
 
 console.log("→ Backend install starting");
 console.log("  REPO_ROOT =", REPO_ROOT);
+
+// Copy .env.example to .env if missing to satisfy required variables on startup
+const envPath = resolve(REPO_ROOT, ".env");
+const examplePath = resolve(REPO_ROOT, ".env.example");
+if (!existsSync(envPath) && existsSync(examplePath)) {
+  console.log("→ Copying .env.example to .env");
+  try {
+    copyFileSync(examplePath, envPath);
+  } catch (e) {
+    console.warn("  failed to copy .env.example to .env:", e.message);
+  }
+}
 
 // pnpm
 try {
@@ -40,6 +52,7 @@ try {
 
 // JS deps (workspace)
 sh("pnpm install --frozen-lockfile=false --prefer-offline", REPO_ROOT);
+sh("pnpm run typecheck:libs", REPO_ROOT);
 
 // Python venv
 if (!existsSync(PYTHON)) {

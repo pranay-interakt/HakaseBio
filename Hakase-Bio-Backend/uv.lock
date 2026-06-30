@@ -38,27 +38,6 @@ wheels = [
 ]
 
 [[package]]
-name = "admet-ai"
-version = "2.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "chemprop" },
-    { name = "lightning" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "rdkit" },
-    { name = "seaborn" },
-    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "tqdm" },
-    { name = "typed-argument-parser" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/61/30/70a4a426391b8d8a028907a693cb024d98adcd827e7fbd41a2e388fb3061/admet_ai-2.0.1.tar.gz", hash = "sha256:d796e2d5f63be563c3a879857eb4c67eca7ee0b6a9a7490990d165147c96f6c8", size = 14222048, upload-time = "2026-02-22T01:29:18.714Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/19/5d83e84207636e6dd655b7cefab95c04eb5a48e7eaa1151424370b1a6ff1/admet_ai-2.0.1-py3-none-any.whl", hash = "sha256:fef3527f637abb00d272cf824e8eef0136fe31ebde6c56881f1a8c02c0417806", size = 14311533, upload-time = "2026-02-22T01:29:16.374Z" },
-]
-
-[[package]]
 name = "aimsim-core"
 version = "2.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2874,11 +2853,11 @@ name = "repl-nix-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "admet-ai" },
     { name = "anarci" },
     { name = "biomcp" },
     { name = "chemprop" },
     { name = "deeppurpose" },
+    { name = "docstring-parser" },
     { name = "ersilia" },
     { name = "fastapi" },
     { name = "numpy" },
@@ -2891,16 +2870,17 @@ dependencies = [
     { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
+    { name = "typed-argument-parser" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "admet-ai", specifier = ">=2.0.1" },
     { name = "anarci" },
     { name = "biomcp", specifier = ">=0.0.1" },
     { name = "chemprop", specifier = ">=1.7.0" },
     { name = "deeppurpose", specifier = ">=0.1.5" },
+    { name = "docstring-parser", specifier = ">=0.15" },
     { name = "ersilia", specifier = "==0.1.59" },
     { name = "fastapi", specifier = ">=0.135.3" },
     { name = "numpy", specifier = ">=1.24.0,<2.0.0" },
@@ -2913,6 +2893,7 @@ requires-dist = [
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.11.0" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.11.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "transformers" },
+    { name = "typed-argument-parser", specifier = ">=1.9.0" },
     { name = "uvicorn", specifier = ">=0.44.0" },
 ]
 
