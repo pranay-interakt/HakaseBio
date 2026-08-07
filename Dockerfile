@@ -9,11 +9,10 @@ COPY hakase-invitro-workspace/src/ ./src/
 RUN npx vite build
 
 FROM node:20-alpine
-RUN adduser -D -u 1000 appuser
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 
-USER appuser
+USER node
 EXPOSE 7860
 
 CMD ["node", "-e", "const h=require('http'),f=require('fs'),p=require('path'),u=require('url');const D='./dist',M={'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.woff2':'font/woff2'};h.createServer((q,r)=>{let fp=p.join(D,u.parse(q.url).pathname==='/'?'index.html':u.parse(q.url).pathname);if(!f.existsSync(fp))fp=p.join(D,'index.html');try{r.writeHead(200,{'Content-Type':M[p.extname(fp)]||'application/octet-stream'});r.end(f.readFileSync(fp))}catch(e){r.writeHead(404);r.end('Not found')}}).listen(7860,'0.0.0.0',()=>console.log('HakaseBio on :7860'))"]
