@@ -42,7 +42,7 @@ RUN pip install --upgrade pip setuptools wheel
 
 RUN pip install fastapi uvicorn numpy pandas pyarrow scikit-learn requests \
                docstring-parser typed-argument-parser pydantic xgboost lightgbm \
-               rdkit-pypi matplotlib
+               rdkit-pypi matplotlib scipy httpx tqdm seaborn
 
 # Install workspace Python packages
 RUN pip install -e /app/platform/kernel 2>&1 || true && \
@@ -56,7 +56,7 @@ RUN pip install -e /app/platform/kernel 2>&1 || true && \
 
 # PyTorch CPU — large but fits in Pro tier build
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu 2>&1 || true
-RUN pip install transformers chemprop 2>&1 || true
+RUN pip install lightning transformers chemprop 2>&1 || true
 
 # ── Data & assets ──────────────────────────────────────────────────────────
 COPY hakase-bio-backend/data/ /app/data/
@@ -77,7 +77,9 @@ ENV NODE_ENV=production \
     PYTHONUNBUFFERED=1 \
     HAKASE_SKIP_PREWARM=1 \
     STRICT_ML=0 \
-    HAKASE_ERSILIA_MODE=off
+    HAKASE_ERSILIA_MODE=off \
+    TRUST_PROXY=true \
+    FRONTEND_DIST_PATH=/app/frontend-dist
 
 EXPOSE 7860
 
