@@ -16,6 +16,8 @@ FROM python:3.11-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates build-essential pkg-config \
+      libxrender1 libxext6 libx11-6 libsm6 libice6 \
+      libfreetype6 libpng16-16 libglib2.0-0 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g pnpm \
@@ -39,7 +41,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 RUN pip install --upgrade pip setuptools wheel
 
 RUN pip install fastapi uvicorn numpy pandas pyarrow scikit-learn requests \
-               docstring-parser typed-argument-parser pydantic xgboost lightgbm
+               docstring-parser typed-argument-parser pydantic xgboost lightgbm \
+               rdkit-pypi matplotlib
 
 # Install workspace Python packages
 RUN pip install -e /app/platform/kernel 2>&1 || true && \
