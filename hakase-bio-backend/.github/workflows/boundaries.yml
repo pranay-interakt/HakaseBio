@@ -1,0 +1,43 @@
+# Architectural boundary enforcement.
+#
+# The platform/modality split is only real if the dependency arrows point one
+# way. This runs on every push and PR so a violation cannot land silently — see
+# ARCHITECTURE.md for the rules and RESTRUCTURE.md for why.
+name: boundaries
+
+on:
+  push:
+    branches: [main, staging, dev]
+  pull_request:
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # No dependencies needed: the checker is stdlib-only (ast + pathlib).
+      - name: Check dependency direction
+        run: python scripts/check_boundaries.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Ruff (lint)
+        run: uvx ruff check .
+
+      - name: Black (format check)
+        run: uvx black --check .

@@ -1,0 +1,17 @@
+Drug,Primary Metabolic/Clearance Pathway in Rat,Rat in vivo Extraction Ratio (EH​),Unbound Fraction in Rat Plasma (fp​),Representative Scaled Rat CLint​ (mL/min/kg)
+FK1052,CYP450 Oxidation,0.93 (High),Highly Bound,~941
+FK480,CYP450 Oxidation,0.62 (Intermediate),Highly Bound,~255
+Diazepam,CYP450 Oxidation (CYP2C/3A),0.64 (Intermediate),Mod. Bound,~230
+Diltiazem,CYP450 Oxidation,High,Low/Mod. Bound,~698
+Propranolol,CYP450 Oxidation,High,Low/Mod. Bound,~516
+Midazolam,CYP3A Oxidation,High,Low/Mod. Bound,~455
+Phenacetin,CYP1A2 Dealkylation,Moderate,Mod. Bound,~151
+7-Ethoxycoumarin,Broad Phase I Oxidation,Moderate / High,Mod. Bound,~364
+Quinotolast,UGT Glucuronidation / Esterase,Moderate,Mod. Bound,~194
+FK079,CYP450 Oxidation,0.05 (Very Low),Highly Bound,~25
+Zidovudine,UGT Glucuronidation,Moderate,0.786 (Low Binding),~109
+Acetaminophen,UGT Glucuronidation / SULT,Low,0.820 (Low Binding),~48
+Troglitazone,UGT Glucuronidation / SULT,Low / Intermediate,0.00092 (Extremely High),~72
+Tolbutamide,CYP2C9 (Low Turnover),Very Low,Highly Bound,< 5
+Bosentan,OATP Uptake / CYP Metabolism,Low / Moderate,Highly Bound,~151 (Attached Cells)
+Rosuvastatin,OATP Uptake / Biliary Excretion,Low,Mod. Bound,~273 (Attached Cells)

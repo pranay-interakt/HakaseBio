@@ -1,0 +1,39 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../db"
+    },
+    {
+      "path": "../contract"
+    },
+    {
+      "path": "../integrations"
+    },
+    {
+      "path": "../datasources"
+    },
+    {
+      "path": "../narrative"
+    },
+    {
+      "path": "../../modalities/small-molecule/gateway"
+    },
+    {
+      "path": "../../modalities/peptide/gateway"
+    },
+    {
+      "path": "../../modalities/antibody/gateway"
+    }
+  ]
+}

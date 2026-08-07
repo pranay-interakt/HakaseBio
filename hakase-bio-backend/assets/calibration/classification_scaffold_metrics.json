@@ -1,0 +1,54 @@
+{
+  "generated": "2026-07-17T03:01:32Z",
+  "method": "Bemis-Murcko scaffold split; same RF family as serving endpoints",
+  "endpoints": {
+    "ames": {
+      "status": "EVALUATED",
+      "split": "Bemis-Murcko scaffold, disjoint train/cal/test (no shared scaffold)",
+      "model": "RandomForest(300, min_samples_leaf=2, class_weight=balanced) on Morgan1024+6 RDKit desc",
+      "n_total": 7278,
+      "n_positives_total": 3974,
+      "n_train_scaffold": 5092,
+      "n_cal_scaffold": 1092,
+      "n_test_scaffold": 1094,
+      "n_positives_test": 580,
+      "auroc": 0.8828,
+      "auprc": 0.8968,
+      "brier_raw": 0.1492,
+      "brier_isotonic": 0.1385,
+      "note": "Realistic novel-chemistry generalization. This is the honest number for a triage tool; the leaked tdc_*_test.csv metrics are optimistic. The deployed model trains on all data, so production discrimination is typically >= these scaffold numbers."
+    },
+    "dili": {
+      "status": "EVALUATED",
+      "split": "Bemis-Murcko scaffold, disjoint train/cal/test (no shared scaffold)",
+      "model": "RandomForest(300, min_samples_leaf=2, class_weight=balanced) on Morgan1024+6 RDKit desc",
+      "n_total": 475,
+      "n_positives_total": 236,
+      "n_train_scaffold": 328,
+      "n_cal_scaffold": 75,
+      "n_test_scaffold": 72,
+      "n_positives_test": 48,
+      "auroc": 0.8941,
+      "auprc": 0.9191,
+      "brier_raw": 0.1491,
+      "brier_isotonic": 0.1277,
+      "note": "Realistic novel-chemistry generalization. This is the honest number for a triage tool; the leaked tdc_*_test.csv metrics are optimistic. The deployed model trains on all data, so production discrimination is typically >= these scaffold numbers."
+    },
+    "herg": {
+      "status": "EVALUATED",
+      "split": "Bemis-Murcko scaffold, disjoint train/cal/test (no shared scaffold)",
+      "model": "RandomForest(300, min_samples_leaf=2, class_weight=balanced) on Morgan1024+6 RDKit desc",
+      "n_total": 13445,
+      "n_positives_total": 6718,
+      "n_train_scaffold": 9411,
+      "n_cal_scaffold": 2017,
+      "n_test_scaffold": 2017,
+      "n_positives_test": 921,
+      "auroc": 0.8642,
+      "auprc": 0.8529,
+      "brier_raw": 0.1575,
+      "brier_isotonic": 0.1509,
+      "note": "Realistic novel-chemistry generalization. This is the honest number for a triage tool; the leaked tdc_*_test.csv metrics are optimistic. The deployed model trains on all data, so production discrimination is typically >= these scaffold numbers."
+    }
+  }
+}

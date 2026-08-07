@@ -1,0 +1,6 @@
+compound_name,smiles,route,dose_mg_kg,cmax_ng_ml,auc_ng_h_ml,cl_ml_min_kg,t_half_h,vss_l_kg
+Acetaminophen,CC(=O)Nc1ccc(O)cc1,iv,10,8000,10000,15,1.2,0.8
+Ibuprofen,CC(C)Cc1ccc(cc1)C(C)C(=O)O,iv,10,25000,30000,5,2.0,0.2
+Propranolol,CC(C)NCC(O)COc1cccc2ccccc12,iv,10,1000,2000,70,1.5,4.0
+Diazepam,CN1C(=O)CN=C(c2ccccc2)c3cc(Cl)ccc13,iv,10,2000,5000,10,3.0,1.5
+Caffeine,Cn1cnc2c1c(=O)n(C)c(=O)n2C,iv,10,15000,40000,4,4.0,0.6

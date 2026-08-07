@@ -1,0 +1,15 @@
+[project]
+# Rename to hakase-<modality>, and update the wheel packages path below.
+name = "hakase-MODALITY"
+version = "0.1.0"
+description = "<Modality> engine."
+requires-python = ">=3.11,<3.14"
+# Add only the substrates this modality actually uses.
+dependencies = ["hakase-kernel"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hakase_MODALITY"]

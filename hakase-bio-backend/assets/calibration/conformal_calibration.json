@@ -1,0 +1,55 @@
+{
+  "generated": "2026-07-17T02:53:25Z",
+  "method": "models.conformal.ConformalVetoGate \u2014 split-conformal (1-alpha) quantile of in-domain approved-drug liability scores (Vovk, Gammerman, Shafer 2005)",
+  "alpha": 0.05,
+  "holdout_snapshot": "verdict_holdout_20260712.json",
+  "n_approved_total": 845,
+  "n_withdrawn_total": 338,
+  "endpoints": {
+    "herg": {
+      "status": "CALIBRATED",
+      "label": "hERG blocker",
+      "threshold": 0.8607321921781708,
+      "alpha": 0.05,
+      "n_calibration_in_domain_approved": 845,
+      "n_approved_scored_total": 845,
+      "n_approved_unscored": 0,
+      "n_approved_out_of_domain": 0,
+      "realised_fpr_on_approved_holdout_resplit": 0.04829787234042554,
+      "empirical_fpr_full_calibration_set": 0.0485207100591716,
+      "recall_on_withdrawn_in_domain": 0.04437869822485207,
+      "n_withdrawn_in_domain": 338,
+      "n_withdrawn_scored_total": 338
+    },
+    "dili": {
+      "status": "CALIBRATED",
+      "label": "DILI",
+      "threshold": 0.8593211060933577,
+      "alpha": 0.05,
+      "n_calibration_in_domain_approved": 845,
+      "n_approved_scored_total": 845,
+      "n_approved_unscored": 0,
+      "n_approved_out_of_domain": 0,
+      "realised_fpr_on_approved_holdout_resplit": 0.049858156028368794,
+      "empirical_fpr_full_calibration_set": 0.0485207100591716,
+      "recall_on_withdrawn_in_domain": 0.0621301775147929,
+      "n_withdrawn_in_domain": 338,
+      "n_withdrawn_scored_total": 338
+    },
+    "ames": {
+      "status": "CALIBRATED",
+      "label": "Ames mutagenicity",
+      "threshold": 0.7738375378412017,
+      "alpha": 0.05,
+      "n_calibration_in_domain_approved": 505,
+      "n_approved_scored_total": 845,
+      "n_approved_unscored": 0,
+      "n_approved_out_of_domain": 340,
+      "realised_fpr_on_approved_holdout_resplit": 0.0483399209486166,
+      "empirical_fpr_full_calibration_set": 0.047524752475247525,
+      "recall_on_withdrawn_in_domain": 0.037914691943127965,
+      "n_withdrawn_in_domain": 211,
+      "n_withdrawn_scored_total": 338
+    }
+  }
+}

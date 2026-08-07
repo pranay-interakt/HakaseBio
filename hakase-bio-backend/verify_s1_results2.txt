@@ -1,0 +1,83 @@
+======================================
+Verifying branch: feat/pbpk-disposition-contract
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 202 files would be left unchanged.
+--- pytest ---
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 82 items
+
+platform/kernel/tests/test_pbpk_contract.py ............                 [ 14%]
+platform/kernel/tests/test_scientific_verdict.py ..........              [ 26%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_api_registration.py . [ 28%]
+.                                                                        [ 29%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_domain_and_decision.py . [ 30%]
+........                                                                 [ 40%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_esmatlas_bounded_failure.py . [ 41%]
+....                                                                     [ 46%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_live_pipeline.py s [ 47%]
+s                                                                        [ 48%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_peptide_properties_descriptors.py . [ 50%]
+........                                                                 [ 59%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical.py . [ 60%]
+......                                                                   [ 68%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_embeddings.py . [ 69%]
+.....                                                                    [ 75%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_evidence.py . [ 76%]
+......                                                                   [ 84%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_modifications.py . [ 85%]
+...........                                                              [ 98%]
+modalities/small-molecule/validation/tests/test_endpoint_harness.py .    [100%]
+
+======================== 80 passed, 2 skipped in 53.72s ========================
+======================================
+======================================
+Verifying branch: feat/pbpk-physiology-store
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 203 files would be left unchanged.
+--- pytest ---
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 86 items
+
+platform/kernel/tests/test_pbpk_physiology.py ................           [ 18%]
+platform/kernel/tests/test_scientific_verdict.py ..........              [ 30%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_api_registration.py . [ 31%]
+.                                                                        [ 32%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_domain_and_decision.py . [ 33%]
+........                                                                 [ 43%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_esmatlas_bounded_failure.py . [ 44%]
+....                                                                     [ 48%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_live_pipeline.py s [ 50%]
+s                                                                        [ 51%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_peptide_properties_descriptors.py . [ 52%]
+........                                                                 [ 61%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical.py . [ 62%]
+......                                                                   [ 69%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_embeddings.py . [ 70%]
+.....                                                                    [ 76%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_evidence.py . [ 77%]
+......                                                                   [ 84%]
+modalities/peptide/engine/src/hakase_peptide/tests/test_physicochemical_modifications.py . [ 86%]
+...........                                                              [ 98%]
+modalities/small-molecule/validation/tests/test_endpoint_harness.py 

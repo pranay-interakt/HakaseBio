@@ -1,0 +1,7 @@
+# Per-run generated artifacts — not source. The curated gate report
+# (S2-T5_GATE_REPORT.md) and headline plot (S2-T5_gate_FINAL_indomain.png)
+# are committed; everything else here is reproducible from run_pbpk_validation.py.
+pbpk_validation_*.json
+S2-T5_gate_measured_clint.png
+S2-T5_gate_measured_clint_FIXED.png
+S2-T5_gate_rat_clearance.png

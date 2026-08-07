@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "_comment": "Extra calibrated species for the PBPK physiology store. Add an object to the 'species' array to register a new species with NO code change (see loader.py for the field schema). Unknown species with no entry here are handled by allometric extrapolation in store.get_physiology.",
+  "species": []
+}

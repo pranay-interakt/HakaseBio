@@ -1,0 +1,133 @@
+[project]
+name = "hakase-bio-backend"
+version = "0.1.0"
+description = "Hakase BioTwin backend — platform substrates + modality verticals."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    # ── workspace members ────────────────────────────────────────────────
+    "hakase-kernel",
+    "hakase-chemistry",
+    "hakase-sequence",
+    "hakase-structure",
+    "hakase-smallmol",
+    "hakase-peptide",
+    "hakase-antibody",
+    "hakase-service",
+    # ── third-party ──────────────────────────────────────────────────────
+    "biomcp>=0.0.1",
+    "fastapi>=0.135.3",
+    "numpy>=1.24.0,<2.0.0",
+    "pandas>=2.2.0,<3.0.0",
+    "pyarrow>=16.0.0",
+    "pytdc>=0.4.1",
+    "rdkit>=2026.3.1",
+    "typed-argument-parser>=1.9.0",
+    "docstring-parser>=0.15",
+    "requests>=2.33.1",
+    "scikit-learn>=1.8.0",
+    "torch>=2.11.0",
+    "transformers",
+    "uvicorn>=0.44.0",
+    "chemprop>=1.7.0",
+    "deeppurpose>=0.1.5",
+    "anarci",
+    "ersilia==0.1.59",
+    "xgboost>=3.2.0",
+    "lightgbm>=4.7.0",
+]
+
+# Dev-only tooling (not installed in production).
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "black>=24.0",
+    "pre-commit>=3.7",
+    "pytest>=8.0.0",
+]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+explicit = true
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+
+[tool.uv.workspace]
+members = [
+    "platform/kernel",
+    "platform/chemistry",
+    "platform/sequence",
+    "platform/structure",
+    "modalities/small-molecule/engine",
+    "modalities/peptide/engine",
+    "modalities/antibody/engine",
+    "service",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+hakase-kernel = { workspace = true }
+hakase-chemistry = { workspace = true }
+hakase-sequence = { workspace = true }
+hakase-structure = { workspace = true }
+hakase-smallmol = { workspace = true }
+hakase-peptide = { workspace = true }
+hakase-antibody = { workspace = true }
+hakase-service = { workspace = true }
+
+[tool.uv]
+override-dependencies = [
+    "rdkit-pypi ; sys_platform == 'never'",
+]
+
+# Black formatter config.
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+# See [tool.ruff] extend-exclude. force-exclude also applies the rule when
+# pre-commit passes the files explicitly, not just on directory discovery.
+force-exclude = '/docs/'
+
+# Ruff linter config.
+[tool.ruff]
+line-length = 100          # MUST equal [tool.black] line-length
+target-version = "py311"
+src = ["platform", "modalities", "service", "scripts"]
+# Specs under docs/ are reference material, not shipped code — some are written
+# as illustrative Python (the peptide evidence object schemas). Linting them
+# fails CI over the formatting of a document, so exclude the whole tree.
+extend-exclude = ["**/docs/**"]
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]   # pycodestyle, pyflakes, isort, pyupgrade, bugbear
+ignore = [
+    "E501",   # line length — black's job
+    "E203",   # whitespace before ':' — conflicts with black
+    "E702",   # multiple statements (semicolons) — used deliberately
+    "E741",   # ambiguous var name 'l'
+    "B904",   # raise ... from — defer to a later cleanup
+    "F841",   # unused locals — a few real ones; revisit later
+    "B008",   # FastAPI Body()/Depends() in defaults is idiomatic
+    "E402",   # entry points import after sys.path shims — intentional
+    "E721",   # type-equality check — minor, defer
+    "B007",   # unused loop variable — minor, defer
+    "E731",   # lambda assignment — minor, defer
+    "UP042",  # inherit from str and Enum
+    "B905",   # zip without strict
+    "B017",   # blind exception in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+# workers guard heavy optional deps behind try/except — the "unused"
+# imports are the availability probe, not dead code.
+"**/workers/**" = ["F401"]
+# validation scripts import after a path/header shim on purpose.
+"modalities/*/validation/**" = ["E402"]
+
+[tool.pytest.ini_options]
+# No pythonpath needed: every package is an installed workspace member.
+testpaths = ["platform", "modalities"]

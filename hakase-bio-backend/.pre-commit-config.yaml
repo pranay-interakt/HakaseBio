@@ -1,0 +1,35 @@
+# .pre-commit-config.yaml — runs on every git commit
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(pdb|tab|sdf|mol2?|fasta|csv)$'
+      - id: end-of-file-fixer
+        exclude: '\.(pdb|tab|sdf|mol2?|fasta|csv)$'
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key          # blocks committing secrets/keys
+      - id: check-added-large-files     # blocks new big blobs (-> use DVC)
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22
+    hooks:
+      - id: ruff                        # lint (auto-fix)
+        args: ["--fix"]
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black                       # format
+
+  - repo: local
+    hooks:
+      - id: check-boundaries
+        name: architectural boundaries (platform must not import modalities)
+        entry: python scripts/check_boundaries.py
+        language: system
+        pass_filenames: false
+        files: '^(platform|modalities|service)/.*\.py$'

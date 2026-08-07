@@ -1,0 +1,84 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+.cache/
+.local/
+tdc_data/
+
+# Environment configurations
+.env
+.env.*
+!.env.example
+
+# Python compiled output
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Runtime artifacts — regenerable trained models, embeddings, downloads.
+# Resolved by hakase_kernel.runtime.paths.cache_dir(). Never commit these; the
+# tracked counterparts live in assets/calibration/ (versioned build artifacts)
+# and platform/structure/fixtures/ (reference structures).
+/var/
+
+# Personal validation outputs
+validation_chembl_holdout_results.xlsx
+
+# Python virtual environment
+.venv/
+.venv-*/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Primary-source paper PDFs — kept locally for provenance, cited by PMID in the
+# validation datasets; not committed (copyright + size).
+data/*.pdf

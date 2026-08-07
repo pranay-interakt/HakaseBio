@@ -1,0 +1,31 @@
+{
+  "name": "hakase-bio-backend",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "preinstall": "node deploy/scripts/enforce-pnpm.mjs",
+    "setup": "node deploy/scripts/install.mjs",
+    "preflight": "node deploy/scripts/preflight.mjs",
+    "db:push": "pnpm --filter @platform/db run push",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "start": "node deploy/scripts/orchestrator.mjs",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"@platform/*\" --if-present run typecheck",
+    "backend": "node deploy/scripts/orchestrator.mjs",
+    "backend:dev": "cross-env NODE_ENV=development WATCH_SOURCE=true node deploy/scripts/orchestrator.mjs",
+    "backend:reload": "bash deploy/ops/reload.sh",
+    "backend:legacy": "tsx scripts/start-backend.mts",
+    "backend:stop": "pm2 stop hakase-ai-service hakase-api-server",
+    "backend:logs": "pm2 logs",
+    "backend:status": "pm2 status",
+    "api-server": "pnpm --filter @platform/gateway run dev",
+    "ai-service": "node deploy/scripts/run-ai-service.mjs"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "prettier": "^3.8.1",
+    "tsx": "catalog:",
+    "typescript": "~5.9.2"
+  }
+}

@@ -1,0 +1,10 @@
+compound_name,smiles,route,dose_mg_kg,fu_plasma,clint_hep_ul_min_1e6,blood_plasma_ratio,vdss_l_per_kg,cmax_ng_ml,auc_ng_h_ml,cl_ml_min_kg,source,reference_doi,notes
+Diazepam,CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21,iv,1.0,0.140,50,1.04,5.30,,,,"Vss/fu/BP: Sawada 1985 Table II (rat)",PMID:3938813,"Vss endpoint only; clint_hep is a nominal placeholder (Vss derives from Kp, independent of CLint); CL not scored"
+Hexobarbital,CC1(C2=CCCCC2)C(=O)NC(=O)N(C)C1=O,iv,1.0,0.619,50,1.00,0.701,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Pentobarbital,CCCC(C)C1(CC)C(=O)NC(=O)NC1=O,iv,1.0,0.504,50,1.56,1.64,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Phenylbutazone,CCCCC1C(=O)N(c2ccccc2)N(c2ccccc2)C1=O,iv,1.0,0.0420,50,0.58,0.236,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Valproate,CCCC(CCC)C(=O)O,iv,1.0,0.366,50,0.740,0.657,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Phenobarbital,CCC1(c2ccccc2)C(=O)NC(=O)NC1=O,iv,1.0,0.639,50,1.59,1.02,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Amobarbital,CCC1(CCC(C)C)C(=O)NC(=O)NC1=O,iv,1.0,0.481,50,1.48,1.46,,,,"Vss/fu/BP: Sawada 1985 Table I (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Chlorpromazine,CN(C)CCCN1c2ccccc2Sc2ccc(Cl)cc21,iv,1.0,0.106,50,1.56,29.1,,,,"Vss/fu/BP: Sawada 1985 Table II (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"
+Pentazocine,CC(C)=CCN1CC[C@]2(C)c3cc(O)ccc3C[C@@H]1[C@@H]2C,iv,1.0,0.540,50,1.55,7.66,,,,"Vss/fu/BP: Sawada 1985 Table II (rat)",PMID:3938813,"Vss endpoint only; clint_hep nominal placeholder"

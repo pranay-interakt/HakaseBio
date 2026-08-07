@@ -1,0 +1,74 @@
+{
+  "generated": "2026-07-17T02:53:33Z",
+  "snapshot": "verdict_holdout_20260712.json",
+  "method": "Youden-J and recall-target thresholds on ChEMBL approved/withdrawn hold-out scores",
+  "recall_target": 0.5,
+  "endpoints": {
+    "herg": {
+      "status": "CALIBRATED",
+      "label": "hERG blocker",
+      "prob_key": "blocker_probability",
+      "n_approved_scored": 845,
+      "n_withdrawn_scored": 338,
+      "screen_youden": {
+        "threshold": 0.236,
+        "recall_withdrawn": 0.6864,
+        "fpr_approved": 0.5574,
+        "youden_j": 0.129,
+        "basis": "argmax_t (TPR_withdrawn - FPR_approved), Youden 1950"
+      },
+      "screen_recall_target": {
+        "recall_target": 0.5,
+        "threshold": 0.2995,
+        "recall_withdrawn": 0.5,
+        "fpr_approved": 0.4201,
+        "basis": "lowest threshold with recall_withdrawn >= 0.5"
+      },
+      "note": "Sensitivity-oriented operating points on the SAME served-model score scale as the FPR-controlled veto. Use the screen to CATCH candidate liabilities (more false positives); use the veto for high-specificity hard alerts. Both measured on the ChEMBL approved/withdrawn hold-out."
+    },
+    "dili": {
+      "status": "CALIBRATED",
+      "label": "DILI",
+      "prob_key": "dili_probability",
+      "n_approved_scored": 845,
+      "n_withdrawn_scored": 338,
+      "screen_youden": {
+        "threshold": 0.3744,
+        "recall_withdrawn": 0.6982,
+        "fpr_approved": 0.6237,
+        "youden_j": 0.0746,
+        "basis": "argmax_t (TPR_withdrawn - FPR_approved), Youden 1950"
+      },
+      "screen_recall_target": {
+        "recall_target": 0.5,
+        "threshold": 0.5074,
+        "recall_withdrawn": 0.5,
+        "fpr_approved": 0.471,
+        "basis": "lowest threshold with recall_withdrawn >= 0.5"
+      },
+      "note": "Sensitivity-oriented operating points on the SAME served-model score scale as the FPR-controlled veto. Use the screen to CATCH candidate liabilities (more false positives); use the veto for high-specificity hard alerts. Both measured on the ChEMBL approved/withdrawn hold-out."
+    },
+    "ames": {
+      "status": "CALIBRATED",
+      "label": "Ames mutagenicity",
+      "prob_key": "mutagenic_probability",
+      "n_approved_scored": 845,
+      "n_withdrawn_scored": 338,
+      "screen_youden": {
+        "threshold": 0.4222,
+        "recall_withdrawn": 0.2574,
+        "fpr_approved": 0.2189,
+        "youden_j": 0.0385,
+        "basis": "argmax_t (TPR_withdrawn - FPR_approved), Youden 1950"
+      },
+      "screen_recall_target": {
+        "recall_target": 0.5,
+        "threshold": 0.3165,
+        "recall_withdrawn": 0.5,
+        "fpr_approved": 0.4994,
+        "basis": "lowest threshold with recall_withdrawn >= 0.5"
+      },
+      "note": "Sensitivity-oriented operating points on the SAME served-model score scale as the FPR-controlled veto. Use the screen to CATCH candidate liabilities (more false positives); use the veto for high-specificity hard alerts. Both measured on the ChEMBL approved/withdrawn hold-out."
+    }
+  }
+}

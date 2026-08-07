@@ -1,0 +1,184 @@
+======================================
+Verifying branch: feat/pbpk-disposition-contract
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 202 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-physiology-store
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 203 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-species-extrapolation
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 206 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-pka-predictor
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 202 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-rr-kp
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 208 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-uncertainty-helpers
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 202 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-ivive-uncertainty
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 207 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================
+======================================
+Verifying branch: feat/pbpk-disposition-assembler
+--- check_boundaries ---
+Boundary check passed — dependency direction is clean.
+--- ruff ---
+All checks passed!
+--- black ---
+would reformat /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend/modalities/peptide/validation/build_golden.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 217 files would be left unchanged.
+--- pytest ---
+ERROR: file or directory not found: tests/
+
+============================= test session starts ==============================
+platform darwin -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/apple/Developer/Hakase-AI(Work)/hakase-bio-backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 0 items
+
+============================ no tests ran in 0.01s =============================
+======================================

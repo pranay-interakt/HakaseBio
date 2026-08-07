@@ -1,0 +1,43 @@
+,,,,,,,
+,,,,,,,
+,ID,Drug Name,Compound Class / Primary Pathway,Fraction Unbound in Plasma (fup),"Scaled In Vivo Intrinsic Clearance (CLint, mL/min/kg)","Observed In Vivo Hepatic Clearance (CLH, mL/min/kg)",Source Reference
+,1,Propranolol,Basic / CYP,0.15,840,45,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,2,Midazolam,Basic / CYP3A,0.05,3500,50,"Da Silva et al., 2018"
+,3,Diazepam,Neutral / CYP,0.15,60.2,8,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,4,Tolbutamide,Acidic / CYP2C9,0.05,30.6,1.5,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,5,Warfarin,Acidic / CYP2C9,0.01,50.3,0.5,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,6,Phenytoin,Acidic / CYP,0.15,24.5,3.5,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,7,Diltiazem,Basic / CYP,0.2,466.7,40,"Utility of Hepatocytes in Predicting Drug Metabolism, 2003"
+,8,Acetaminophen,Neutral / UGT/SULT,0.8,23.8,15,"Utility of Hepatocytes in Predicting Drug Metabolism, 2003"
+,9,Quinidine,Basic / CYP,0.2,72.4,12,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,10,Verapamil,Basic / CYP,0.1,1260,45,PharmRes 2023
+,11,Zidovudine,Neutral / UGT,0.8,87.5,35,"Utility of Hepatocytes in Predicting Drug Metabolism, 2003"
+,12,Diclofenac,Acidic / CYP,0.01,656.2,6,"Ito and Houston, 2005"
+,13,Dextromethorphan,Basic / CYP2D6,0.3,350,42,"Ito and Houston, 2005"
+,14,Terfenadine,Basic / CYP,0.02,4156.2,38,"Da Silva et al., 2018"
+,15,Testosterone,Neutral / CYP,0.05,1400,35,"Da Silva et al., 2018"
+,16,Antipyrine,Neutral / CYP,0.75,5.6,4,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,17,Chlorpromazine,Basic / CYP,0.03,1750,30,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,18,Hexobarbital,Acidic / CYP,0.45,53.8,18,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,19,Pentobarbital,Acidic / CYP,0.5,13.1,6,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,20,Phenylbutazone,Acidic / CYP,0.05,24.4,1.2,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,21,Valproic Acid,Acidic / UGT/CYP,0.2,10.3,2,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,22,Phenobarbital,Acidic / CYP,0.5,2,1,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,23,Amobarbital,Acidic / CYP,0.45,9.4,4,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,24,Pentazocine,Basic / CYP,0.2,350,35,"Sawada et al., J Pharmacokinet Biopharm 1985"
+,25,Nifedipine,Neutral / CYP3A,0.05,777.8,25,"Evaluation of Cryopreserved Human Hepatocytes, 2007"
+,26,Bufuralol,Basic / CYP2D6,0.25,186.7,28,"Evaluation of Cryopreserved Human Hepatocytes, 2007"
+,27,Fexofenadine,Zwitterion / Transporter,0.25,81.8,15,"Naritomi et al., 2008"
+,28,Napsagatran,Zwitterion / Transporter,0.8,35,20,"Naritomi et al., 2008"
+,29,Troglitazone,Acidic / CYP/UGT,0.01,656.2,6,"Utility of Hepatocytes in Predicting Drug Metabolism, 2003"
+,30,Quinotolast,Acidic / CYP,0.02,102.9,2,"Utility of Hepatocytes in Predicting Drug Metabolism, 2003"
+,31,Theophylline,Neutral / CYP,0.5,5.2,2.5,Biopharmaceutics and Pharmacokinetics
+,32,Alprazolam,Neutral / CYP3A,0.3,58.3,14,"Evaluation of Cryopreserved Human Hepatocytes, 2007"
+,33,Labetalol,Basic / UGT,0.25,610.9,48,"PhD Final, UQ"
+,34,Lorazepam,Neutral / UGT,0.15,77.8,10,"Da Silva et al., 2018"
+,35,Oxazepam,Neutral / UGT,0.15,64.5,8.5,"Da Silva et al., 2018"
+,36,Alpha-amanitin,Renal/Hepatic,0.95,18.4,14,"Lee et al., Molecules 2022"
+,37,Moxifloxacin,Antibiotic / UGT/SULT,0.6,31.8,15,PBPK model in intra-abdominal infected rats
+,38,Bupropion,Basic / CYP2B6,0.15,466.7,35,MDPI Pharmaceutics 2018
+,39,S-mephenytoin,Neutral / CYP2C19,0.2,72.4,12,"Evaluation of Cryopreserved Human Hepatocytes, 2007"
+,40,Flunitrazepam,Neutral / CYP3A,0.15,87,11,"Evaluation of Cryopreserved Human Hepatocytes, 2007"

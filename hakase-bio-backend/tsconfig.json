@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./platform/db"
+    },
+    {
+      "path": "./platform/contract"
+    },
+    {
+      "path": "./platform/integrations"
+    },
+    {
+      "path": "./platform/datasources"
+    },
+    {
+      "path": "./platform/narrative"
+    },
+    {
+      "path": "./modalities/small-molecule/gateway"
+    },
+    {
+      "path": "./modalities/peptide/gateway"
+    },
+    {
+      "path": "./modalities/antibody/gateway"
+    }
+  ]
+}

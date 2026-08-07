@@ -1,0 +1,1 @@
+{"_removed":"Offline known-drug index removed by design. Known drugs are resolved LIVE (ChEMBL + PubChem + openFDA) at simulation-load time in models/drug_lookup.py. No offline cache, no fallback.","drugs":{}}

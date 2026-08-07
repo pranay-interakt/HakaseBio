@@ -1,0 +1,55 @@
+# .github/workflows/backend-deploy.yml
+# Reference CI/CD pipeline for the backend deploy unit.
+# Triggers on push to main; runs preflight + tests, then SSH-deploys.
+name: backend-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "platform/**"
+      - "modalities/**"
+      - "service/**"
+      - "deploy/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pyproject.toml"
+      - "uv.lock"
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: latest }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: astral-sh/setup-uv@v4
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm --filter @platform/gateway run typecheck
+      # requirements.txt is gone — the Python half is a uv workspace now.
+      - run: uv sync --frozen
+      - run: node deploy/scripts/preflight.mjs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BACKEND_HOST }}
+          username: ${{ secrets.BACKEND_USER }}
+          key: ${{ secrets.BACKEND_SSH_KEY }}
+          script: |
+            cd /opt/hakase/Hakase-BioTwin-dev
+            bash deploy/ops/deploy.sh

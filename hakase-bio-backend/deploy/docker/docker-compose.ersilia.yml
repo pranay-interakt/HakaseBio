@@ -1,0 +1,4 @@
+# DEPRECATED — Ersilia integration was scrapped in favour of ADMETlab 3.0.
+# See models/admetlab.py + main.py for the current wiring.
+# Safe to delete this file:
+#   rm docker-compose.ersilia.yml .env.ersilia.example ERSILIA_SETUP.md

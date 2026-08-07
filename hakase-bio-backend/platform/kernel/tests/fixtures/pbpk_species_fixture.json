@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "_comment": "Test fixture: proves a new calibrated species can be added via the data file with no code change.",
+  "species": [
+    {
+      "species": "hakase_test_critter",
+      "strain": "reference",
+      "reference_body_weight_kg": 0.5,
+      "cardiac_output_ml_min_kg": 320.0,
+      "hepatic_blood_flow_ml_min_kg": 80.0,
+      "gfr_ml_min_kg": 4.2,
+      "plasma_albumin_g_l": 33.0,
+      "blood_volume_fraction": 0.072,
+      "hematocrit": 0.43,
+      "organ_volume_fraction": {"liver": 0.040, "kidney": 0.008, "heart": 0.004},
+      "organ_blood_flow_fraction": {"liver": 0.22, "kidney": 0.14, "heart": 0.05},
+      "hepatocellularity_1e6_per_g": null,
+      "source": "synthetic fixture, not a real animal"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# /etc/systemd/system/hakase-backend.service
+#
+# Install:
+#   sudo cp deploy/systemd/hakase-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hakase-backend
+#   sudo systemctl status hakase-backend
+#   sudo systemctl reload hakase-backend   # zero-downtime, after git pull
+#
+# `reload` sends SIGHUP → start.mjs catches it and respawns the children.
+[Unit]
+Description=Hakase BioTwin — Backend (API + AI service)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hakase
+Group=hakase
+WorkingDirectory=/opt/hakase/Hakase-BioTwin-dev
+Environment=NODE_ENV=production
+EnvironmentFile=-/opt/hakase/Hakase-BioTwin-dev/backend/.env
+ExecStartPre=/usr/bin/node /opt/hakase/Hakase-BioTwin-dev/deploy/scripts/preflight.mjs
+# Orchestrator boots BOTH services (Express API + FastAPI AI) under one PID
+# and handles SIGHUP reload + git-pull watcher + ML warmup internally.
+ExecStart=/usr/bin/node /opt/hakase/Hakase-BioTwin-dev/deploy/scripts/orchestrator.mjs
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hakase-backend
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
