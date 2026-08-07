@@ -79,7 +79,9 @@ ENV NODE_ENV=production \
     STRICT_ML=0 \
     HAKASE_ERSILIA_MODE=off \
     TRUST_PROXY=true \
-    FRONTEND_DIST_PATH=/app/frontend-dist
+    FRONTEND_DIST_PATH=/app/frontend-dist \
+    AI_SERVICE_TIMEOUT_MS=300000 \
+    HAKASE_SKIP_PREWARM=0
 
 EXPOSE 7860
 
