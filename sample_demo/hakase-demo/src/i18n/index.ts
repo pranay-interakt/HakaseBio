@@ -34,6 +34,11 @@ function initial(): Locale {
 let current: Locale = initial();
 const listeners = new Set<() => void>();
 
+/* A stored preference is applied before React mounts. Without this, text can
+   render in Japanese while the document remains marked as English until the
+   user toggles the switch again. */
+if (typeof document !== "undefined") document.documentElement.lang = current;
+
 export function getLocale(): Locale { return current; }
 
 export function setLocale(next: Locale) {

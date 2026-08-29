@@ -203,6 +203,16 @@ function localizeAttribute(element: Element, name: string) {
   if (localized !== current) element.setAttribute(name, localized);
 }
 
+function restoreText(node: Text) {
+  const previous = textOriginal.get(node);
+  if (previous && node.data === previous.localized) node.data = previous.source;
+}
+
+function restoreAttribute(element: Element, name: string) {
+  const previous = attributeOriginal.get(element)?.get(name);
+  if (previous && element.getAttribute(name) === previous.localized) element.setAttribute(name, previous.source);
+}
+
 function localizeSubtree(root: Node) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
@@ -218,11 +228,29 @@ function localizeSubtree(root: Node) {
   }
 }
 
+function restoreSubtree(root: Node) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    restoreText(node as Text);
+    node = walker.nextNode();
+  }
+  if (root instanceof Element) {
+    for (const element of [root, ...root.querySelectorAll("[aria-label], [placeholder], [title]")]) {
+      for (const name of attributeNames) restoreAttribute(element, name);
+    }
+  }
+}
+
 /** Keeps legacy JSX and asynchronously added result blocks in the active locale. */
 export function useRenderedLocale(locale: Locale) {
   useEffect(() => {
     const root = document.getElementById("root");
-    if (!root || locale !== "ja") return;
+    if (!root) return;
+    if (locale !== "ja") {
+      restoreSubtree(root);
+      return;
+    }
     localizeSubtree(root);
     const observer = new MutationObserver((records) => {
       for (const record of records) {
