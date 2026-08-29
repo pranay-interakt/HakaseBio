@@ -37,11 +37,11 @@ const BOUNDARIES = [
 export function Landing({ onEnter }: { onEnter: () => void }) {
   return <div className="landing platform-brief">
     <nav className="bp-nav">
-      <a className="bp-brand" href="#top" aria-label="HakaseAI platform brief"><img src={logo} alt="HakaseAI" /><span>Platform brief</span></a>
+      <a className="bp-brand" href="#top" aria-label={t("HakaseAI platform brief")}><img src={logo} alt="HakaseAI" /><span>{t("Platform brief")}</span></a>
       <div className="bp-nav-links">
-        <a href="#workflow">Workflow</a>
-        <a href="#evidence">Evidence & tools</a>
-        <a href="#governance">Governance</a>
+        <a href="#workflow">{t("Workflow")}</a>
+        <a href="#evidence">{t("Evidence & tools")}</a>
+        <a href="#governance">{t("Governance")}</a>
       </div>
       <div className="bp-nav-actions"><LanguageSwitch /><button className="btn primary" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={15} /></button></div>
     </nav>
@@ -49,66 +49,66 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
     <main id="top">
       <section className="bp-hero">
         <div className="bp-hero-copy">
-          <p className="bp-eyebrow">Preclinical decision infrastructure</p>
-          <h1>One evidence record,<br />from structure to <em>first-in-human planning.</em></h1>
-          <p className="bp-intro">HakaseAI is a structured preclinical workspace for bringing chemistry, biology, exposure, safety and study-design context into a reviewable decision record. It makes model limits, evidence gaps and source provenance visible alongside every result.</p>
+          <p className="bp-eyebrow">{t("Preclinical decision infrastructure")}</p>
+          <h1>{t("One evidence record,")}<br />{t("from structure to ")}<em>{t("first-in-human planning.")}</em></h1>
+          <p className="bp-intro">{t("HakaseAI is a structured preclinical workspace for bringing chemistry, biology, exposure, safety and study-design context into a reviewable decision record. It makes model limits, evidence gaps and source provenance visible alongside every result.")}</p>
           <div className="bp-actions">
             <button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button>
-            <a className="bp-text-link" href="#workflow">Review the workflow <ArrowRight size={14} /></a>
+            <a className="bp-text-link" href="#workflow">{t("Review the workflow")} <ArrowRight size={14} /></a>
           </div>
         </div>
-        <aside className="bp-record" aria-label="Hakase evidence record summary">
-          <div className="bp-record-head"><span>Current record model</span><code>hakase.smallmol.v2</code></div>
-          <div className="bp-record-title"><GitBranch size={18} /><div><b>Controlled cascade</b><small>Each layer inherits the signed source record.</small></div></div>
+        <aside className="bp-record" aria-label={t("Hakase evidence record summary")}>
+          <div className="bp-record-head"><span>{t("Current record model")}</span><code>hakase.smallmol.v2</code></div>
+          <div className="bp-record-title"><GitBranch size={18} /><div><b>{t("Controlled cascade")}</b><small>{t("Each layer inherits the signed source record.")}</small></div></div>
           <ol>
-            <li><span>01</span><div><b>Input identity</b><small>SMILES, parent species, target and intended route</small></div><i>Captured</i></li>
-            <li><span>02</span><div><b>Evidence & models</b><small>Descriptor, assay, source and applicability context</small></div><i>Attributed</i></li>
-            <li><span>03</span><div><b>Decision gates</b><small>Gate-driving checks, gaps and required follow-up</small></div><i>Constrained</i></li>
-            <li><span>04</span><div><b>Review handoff</b><small>Complete record carried forward without re-derivation</small></div><i>Traceable</i></li>
+            <li><span>01</span><div><b>{t("Input identity")}</b><small>{t("SMILES, parent species, target and intended route")}</small></div><i>{t("Captured")}</i></li>
+            <li><span>02</span><div><b>{t("Evidence & models")}</b><small>{t("Descriptor, assay, source and applicability context")}</small></div><i>{t("Attributed")}</i></li>
+            <li><span>03</span><div><b>{t("Decision gates")}</b><small>{t("Gate-driving checks, gaps and required follow-up")}</small></div><i>{t("Constrained")}</i></li>
+            <li><span>04</span><div><b>{t("Review handoff")}</b><small>{t("Complete record carried forward without re-derivation")}</small></div><i>{t("Traceable")}</i></li>
           </ol>
-          <div className="bp-record-foot"><BadgeCheck size={15} /> Provenance, units and limitations are part of the record—not a separate report.</div>
+          <div className="bp-record-foot"><BadgeCheck size={15} /> {t("Provenance, units and limitations are part of the record—not a separate report.")}</div>
         </aside>
       </section>
 
       <section className="bp-band">
-        <div><b>45</b><span>ADMET endpoints with bands, units and applicability context</span></div>
-        <div><b>13</b><span>PBPK compartments per virtual subject</span></div>
-        <div><b>15</b><span>Mechanistic toxicology domains joined to organ exposure</span></div>
-        <div><b>4</b><span>Connected layers with an inherited review record</span></div>
+        <div><b>45</b><span>{t("ADMET endpoints with bands, units and applicability context")}</span></div>
+        <div><b>13</b><span>{t("PBPK compartments per virtual subject")}</span></div>
+        <div><b>15</b><span>{t("Mechanistic toxicology domains joined to organ exposure")}</span></div>
+        <div><b>4</b><span>{t("Connected layers with an inherited review record")}</span></div>
       </section>
 
       <section className="bp-section bp-purpose" id="purpose">
-        <div className="bp-section-intro"><p className="bp-eyebrow">Purpose</p><h2>Make preclinical reasoning inspectable.</h2></div>
-        <div className="bp-purpose-copy"><p>Drug-development teams do not need another unqualified score. They need a coherent record of what was calculated, what was measured, what a source returned, what a model can reasonably say, and what must be resolved before the next commitment.</p><div className="bp-purpose-grid"><div><small>For teams</small><b>Medicinal chemistry, DMPK, toxicology, translational pharmacology and programme leadership.</b></div><div><small>For decisions</small><b>Portfolio triage, experiment selection, virtual-study planning and first-in-human preparation.</b></div><div><small>For review</small><b>Named inputs, source state, evidence grade, assumption, limitation and downstream consequence.</b></div></div></div>
+        <div className="bp-section-intro"><p className="bp-eyebrow">{t("Purpose")}</p><h2>{t("Make preclinical reasoning inspectable.")}</h2></div>
+        <div className="bp-purpose-copy"><p>{t("Drug-development teams do not need another unqualified score. They need a coherent record of what was calculated, what was measured, what a source returned, what a model can reasonably say, and what must be resolved before the next commitment.")}</p><div className="bp-purpose-grid"><div><small>{t("For teams")}</small><b>{t("Medicinal chemistry, DMPK, toxicology, translational pharmacology and programme leadership.")}</b></div><div><small>{t("For decisions")}</small><b>{t("Portfolio triage, experiment selection, virtual-study planning and first-in-human preparation.")}</b></div><div><small>{t("For review")}</small><b>{t("Named inputs, source state, evidence grade, assumption, limitation and downstream consequence.")}</b></div></div></div>
       </section>
 
       <section className="bp-section" id="workflow">
-        <div className="bp-section-intro"><p className="bp-eyebrow">Operating workflow</p><h2>A record that becomes more specific—not less accountable—as it moves forward.</h2><p>The next layer receives the actual result from the prior layer, including its uncertainty and provenance. Measured replacements travel forward; downstream layers do not silently recreate their own version.</p></div>
+        <div className="bp-section-intro"><p className="bp-eyebrow">{t("Operating workflow")}</p><h2>{t("A record that becomes more specific—not less accountable—as it moves forward.")}</h2><p>{t("The next layer receives the actual result from the prior layer, including its uncertainty and provenance. Measured replacements travel forward; downstream layers do not silently recreate their own version.")}</p></div>
         <div className="bp-workflow">
-          {WORKFLOW.map((item) => <article className="bp-flow-card" key={item.step}><div className="bp-flow-head"><span>{item.step}</span>{item.icon}<small>{item.tag}</small></div><h3>{item.title}</h3><p>{item.body}</p><footer><small>Primary output</small><b>{item.output}</b></footer></article>)}
+          {WORKFLOW.map((item) => <article className="bp-flow-card" key={item.step}><div className="bp-flow-head"><span>{item.step}</span>{item.icon}<small>{t(item.tag)}</small></div><h3>{t(item.title)}</h3><p>{t(item.body)}</p><footer><small>{t("Primary output")}</small><b>{t(item.output)}</b></footer></article>)}
         </div>
       </section>
 
       <section className="bp-section bp-methods" id="methods">
-        <div className="bp-section-intro"><p className="bp-eyebrow">Method architecture</p><h2>Computation is useful only when its operating conditions are visible.</h2></div>
-        <div className="bp-method-grid">{METHODS.map((method) => <article key={method.title}><span>{method.icon}</span><h3>{method.title}</h3><p>{method.body}</p></article>)}</div>
+        <div className="bp-section-intro"><p className="bp-eyebrow">{t("Method architecture")}</p><h2>{t("Computation is useful only when its operating conditions are visible.")}</h2></div>
+        <div className="bp-method-grid">{METHODS.map((method) => <article key={method.title}><span>{method.icon}</span><h3>{t(method.title)}</h3><p>{t(method.body)}</p></article>)}</div>
       </section>
 
       <section className="bp-section" id="evidence">
-        <div className="bp-section-intro"><p className="bp-eyebrow">Evidence & tools</p><h2>Connected to the sources a preclinical review actually needs.</h2><p>Source blocks distinguish live, no-data, skipped and unavailable states. A source that returned no record is never presented as a statement of safety or efficacy.</p></div>
-        <div className="bp-source-table" role="table" aria-label="Data sources and purpose">
-          <div className="bp-source-row bp-source-header" role="row"><span role="columnheader">Evidence domain</span><span role="columnheader">Sources and tools</span><span role="columnheader">How the workspace uses them</span></div>
-          {SOURCE_GROUPS.map((group) => <div className="bp-source-row" role="row" key={group.category}><b role="cell">{group.category}</b><div role="cell" className="bp-source-tags">{group.sources.map((source) => <span key={source}>{source}</span>)}</div><p role="cell">{group.use}</p></div>)}
+        <div className="bp-section-intro"><p className="bp-eyebrow">{t("Evidence & tools")}</p><h2>{t("Connected to the sources a preclinical review actually needs.")}</h2><p>{t("Source blocks distinguish live, no-data, skipped and unavailable states. A source that returned no record is never presented as a statement of safety or efficacy.")}</p></div>
+        <div className="bp-source-table" role="table" aria-label={t("Data sources and purpose")}>
+          <div className="bp-source-row bp-source-header" role="row"><span role="columnheader">{t("Evidence domain")}</span><span role="columnheader">{t("Sources and tools")}</span><span role="columnheader">{t("How the workspace uses them")}</span></div>
+          {SOURCE_GROUPS.map((group) => <div className="bp-source-row" role="row" key={group.category}><b role="cell">{t(group.category)}</b><div role="cell" className="bp-source-tags">{group.sources.map((source) => <span key={source}>{source}</span>)}</div><p role="cell">{t(group.use)}</p></div>)}
         </div>
       </section>
 
       <section className="bp-section bp-governance" id="governance">
-        <div className="bp-section-intro"><p className="bp-eyebrow">Product, IP & governance</p><h2>Clear ownership. Clear boundaries. Clear records.</h2><p>The platform separates Hakase’s workflow and evidence-management layer from external source data and from the experimental evidence a real programme must still generate.</p></div>
-        <div className="bp-boundaries">{BOUNDARIES.map((boundary) => <article key={boundary.title}><BookOpenCheck size={17} /><h3>{boundary.title}</h3><p>{boundary.body}</p></article>)}</div>
+        <div className="bp-section-intro"><p className="bp-eyebrow">{t("Product, IP & governance")}</p><h2>{t("Clear ownership. Clear boundaries. Clear records.")}</h2><p>{t("The platform separates Hakase’s workflow and evidence-management layer from external source data and from the experimental evidence a real programme must still generate.")}</p></div>
+        <div className="bp-boundaries">{BOUNDARIES.map((boundary) => <article key={boundary.title}><BookOpenCheck size={17} /><h3>{t(boundary.title)}</h3><p>{t(boundary.body)}</p></article>)}</div>
       </section>
 
-      <section className="bp-cta"><div><p className="bp-eyebrow">Demonstration workspace</p><h2>Review the full cascade with a live, computed example.</h2><p>Use the workspace to inspect the record model, run a structure through the stages, edit a working structure and download the complete Layer 1 and Animal Cohort dossiers.</p></div><button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button></section>
+      <section className="bp-cta"><div><p className="bp-eyebrow">{t("Demonstration workspace")}</p><h2>{t("Review the full cascade with a live, computed example.")}</h2><p>{t("Use the workspace to inspect the record model, run a structure through the stages, edit a working structure and download the complete Layer 1 and Animal Cohort dossiers.")}</p></div><button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button></section>
     </main>
-    <footer className="bp-footer"><span>HakaseAI · standalone demonstration workspace</span><span>Structure-derived values are calculated locally with RDKit. Pharmacology, ADMET and study outputs are illustrative local heuristics—not production models or decision-grade evidence.</span></footer>
+    <footer className="bp-footer"><span>{t("HakaseAI · standalone demonstration workspace")}</span><span>{t("Structure-derived values are calculated locally with RDKit. Pharmacology, ADMET and study outputs are illustrative local heuristics—not production models or decision-grade evidence.")}</span></footer>
   </div>;
 }

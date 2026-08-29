@@ -598,14 +598,14 @@ export function L1InVitro({ state, setState, railHost, onRun, running, onContinu
       title={t("Running the Layer 1 in-vitro screen")}
       typicalSeconds={9}
       steps={[
-        "Standardising the structure and selecting the parent species",
-        "RDKit descriptors and conformer embedding",
-        "Structure-directed ADMET demo screen (45 endpoint views)",
-        "Local cardiac, liver and mutagenicity screening heuristics",
-        "PAINS / Brenk / NIH structural alert screen",
-        "Applicability domain against the training chemistry",
-        "PubChem structural precedent and OpenFDA regulatory lookup",
-        "Stage-gate evaluation and dossier assembly",
+        t("Standardising the structure and selecting the parent species"),
+        t("RDKit descriptors and conformer embedding"),
+        t("Structure-directed ADMET demo screen (45 endpoint views)"),
+        t("Local cardiac, liver and mutagenicity screening heuristics"),
+        t("PAINS / Brenk / NIH structural alert screen"),
+        t("Applicability domain against the training chemistry"),
+        t("PubChem structural precedent and OpenFDA regulatory lookup"),
+        t("Stage-gate evaluation and dossier assembly"),
       ]}
     /></>;
   }
@@ -792,8 +792,8 @@ export function L1InVitro({ state, setState, railHost, onRun, running, onContinu
           ["Behavioural fingerprinting", record.simulation_configuration.behavioral_fingerprinting ? "Requested — Drug2cell / Tabula Sapiens" : "Not requested"],
           ["Reviewer confidence annotation", `${record.simulation_configuration.confidence_threshold.toFixed(2)} — ${record.simulation_configuration.confidence_threshold_note}`],
         ] as Array<[string, unknown]>).map(([label, value], index) => {
-          const rendered = text(value);
-          return <div key={index} className={rendered.length > 88 ? "narrative" : undefined}><dt>{label}</dt><dd>{rendered}</dd></div>;
+          const rendered = text(typeof value === "string" ? t(value) : value);
+          return <div key={index} className={rendered.length > 88 ? "narrative" : undefined}><dt>{t(label)}</dt><dd>{rendered}</dd></div>;
         })}
       </div>
       {(() => {
@@ -1021,8 +1021,8 @@ export function L1InVitro({ state, setState, railHost, onRun, running, onContinu
         description={t("A separate computational run against a validated receptor structure. It is not part of the standard screen and is never included in a batch.")} />
       <div className="row" style={{ alignItems: "flex-end", marginBottom: 14 }}>
         <div style={{ width: 190 }}>
-          <Field label="Receptor PDB ID">
-            <input value={dockPdb} maxLength={4} onChange={(event) => setDockPdb(event.target.value.toUpperCase())} placeholder="Validated structure" />
+          <Field label={t("Receptor PDB ID")}>
+            <input value={dockPdb} maxLength={4} onChange={(event) => setDockPdb(event.target.value.toUpperCase())} placeholder={t("Validated structure")} />
           </Field>
         </div>
         <button className="btn" disabled={!dockPdb.trim() || dockBusy || record.target_resolution.status !== "resolved"}
@@ -1030,11 +1030,11 @@ export function L1InVitro({ state, setState, railHost, onRun, running, onContinu
             setDockBusy(true);
             window.setTimeout(() => { setDockJob(dockingResult(profile, dockPdb.trim())); setDockBusy(false); }, 1400);
           }}>
-          {dockBusy ? <LoaderCircle size={15} className="spin" /> : <Play size={15} />} {dockBusy ? "Docking…" : "Run docking"}
+          {dockBusy ? <LoaderCircle size={15} className="spin" /> : <Play size={15} />} {dockBusy ? t("Docking…") : t("Run docking")}
         </button>
         {record.target_resolution.status === "resolved" && (state.targets.find((target) => target.targetChemblId === state.selectedTargetId)?.pdbIds ?? []).length > 0 && (
           <div className="row" style={{ gap: 5 }}>
-            <span className="tiny muted">Linked structures:</span>
+            <span className="tiny muted">{t("Linked structures:")}</span>
             {(state.targets.find((target) => target.targetChemblId === state.selectedTargetId)?.pdbIds ?? []).map((pdb) => (
               <button key={pdb} className="pill" style={{ cursor: "pointer" }} onClick={() => setDockPdb(pdb)}>{pdb}</button>
             ))}
@@ -1042,21 +1042,21 @@ export function L1InVitro({ state, setState, railHost, onRun, running, onContinu
         )}
       </div>
       {record.target_resolution.status !== "resolved" && (
-        <Notice kind="plain" icon={<CircleHelp size={15} />}>Resolve and validate a protein target before submitting a receptor-specific docking job.</Notice>
+        <Notice kind="plain" icon={<CircleHelp size={15} />}>{t("Resolve and validate a protein target before submitting a receptor-specific docking job.")}</Notice>
       )}
       {dockJob && <>
         <Anchors entries={[
-          ["Best binding score", `${num(dockJob.result.poses[0].affinity_kcal_mol)} kcal/mol`],
-          ["Receptor", dockJob.result.pdb_id],
-          ["Engine", dockJob.result.vina_version],
-          ["Runtime", `${num(dockJob.result.runtime_seconds)} s`],
+          [t("Best binding score"), `${num(dockJob.result.poses[0].affinity_kcal_mol)} kcal/mol`],
+          [t("Receptor"), dockJob.result.pdb_id],
+          [t("Engine"), dockJob.result.vina_version],
+          [t("Runtime"), `${num(dockJob.result.runtime_seconds)} s`],
         ]} />
         <DataTable
           columns={[
-            { key: "m", header: "Mode", render: (row: any) => row.mode },
-            { key: "a", header: "Affinity (kcal/mol)", align: "right", render: (row: any) => num(row.affinity_kcal_mol) },
-            { key: "l", header: "RMSD lower bound", align: "right", render: (row: any) => num(row.rmsd_lb) },
-            { key: "u", header: "RMSD upper bound", align: "right", render: (row: any) => num(row.rmsd_ub) },
+            { key: "m", header: t("Mode"), render: (row: any) => row.mode },
+            { key: "a", header: t("Affinity (kcal/mol)"), align: "right", render: (row: any) => num(row.affinity_kcal_mol) },
+            { key: "l", header: t("RMSD lower bound"), align: "right", render: (row: any) => num(row.rmsd_lb) },
+            { key: "u", header: t("RMSD upper bound"), align: "right", render: (row: any) => num(row.rmsd_ub) },
           ]}
           rows={dockJob.result.poses}
         />

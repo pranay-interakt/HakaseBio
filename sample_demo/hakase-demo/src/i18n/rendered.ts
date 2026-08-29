@@ -10,6 +10,11 @@ import { getLocale, type Locale } from "./index";
 import { JA } from "./ja";
 
 const UI_JA: Record<string, string> = {
+  "DEMO": "デモ",
+  "Demo": "デモ",
+  "Back to projects": "プロジェクトに戻る",
+  "Structure-directed demo screen — 45 endpoint views": "構造指向デモスクリーニング — 45 エンドポイント表示",
+  "Local affinity read-across, requires a resolved UniProt target": "ローカル親和性リードアクロス。解決済み UniProt 標的が必要です",
   "Setup": "設定",
   "Layer 1 screening": "レイヤー 1 スクリーニング",
   "L1 → L2 handoff": "L1 → L2 引き継ぎ",
