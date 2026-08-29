@@ -14,19 +14,12 @@
  * the stage says so — the numbers around it are the only part taken from the
  * record.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
-/* Imported rather than served from public/ so the bundler content-hashes it;
-   a public/ file keeps its name and a stale copy survives in cache. */
-import restingStill from "../assets/biotwin-rat-final.jpg";
 
 /** Source-frame dimensions; every coordinate below is in these units. */
 const W = 1280;
 const H = 720;
-
-/* This still is only the media poster: it is visible while the video buffer is
-   loading or if the asset cannot be read. It is not used as the completed-study
-   surface, so the supplied simulation clip remains the thing users see. */
 
 export type StageCallout = {
   /** Where on the specimen this reading refers to, in source pixels. */
@@ -55,6 +48,7 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
   footnote: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
   /* A public Vite asset must respect the deployment base. A root-relative URL
      works locally but asks GitHub Pages for /biotwin-rat.mp4 instead of
      /HakaseBio/biotwin-rat.mp4. */
@@ -69,7 +63,7 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
        the same source from its beginning rather than replacing it with an image. */
     const start = () => {
       if (running) element.currentTime = 0;
-      void element.play().catch(() => { /* autoplay refused — the still stands in */ });
+      void element.play().then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true));
     };
     if (element.readyState >= 2) { start(); return; }
     element.addEventListener("loadeddata", start, { once: true });
@@ -81,7 +75,16 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
   return <section className={`biotwin ${complete ? "is-complete" : ""} ${running ? "is-running" : ""}`}>
     <div className="biotwin-stage">
       <video ref={video} className="biotwin-video" src={videoSrc}
-        poster={restingStill} muted playsInline loop preload="auto" aria-hidden="true" />
+        autoPlay muted playsInline loop preload="auto" aria-hidden="true"
+        onCanPlay={(event) => { void event.currentTarget.play().then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true)); }}
+        onError={() => setPlaybackBlocked(true)} />
+
+      {playbackBlocked && <button type="button" className="biotwin-play" onClick={() => {
+        const element = video.current;
+        if (element) void element.play().then(() => setPlaybackBlocked(false));
+      }}>
+        {t("Play original animation")}
+      </button>}
 
       <div className="biotwin-badge">
         <span className={`biotwin-dot ${running ? "live" : "done"}`} />

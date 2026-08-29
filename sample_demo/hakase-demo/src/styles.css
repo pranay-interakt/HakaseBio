@@ -1468,6 +1468,12 @@ details.disclosure > summary svg { transition: transform .2s; }
   -webkit-mask-image: radial-gradient(115% 110% at 50% 48%, #000 62%, transparent 97%);
   mask-image: radial-gradient(115% 110% at 50% 48%, #000 62%, transparent 97%);
 }
+.biotwin-play {
+  position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); z-index: 2;
+  padding: 9px 14px; border-radius: 999px; border: 1px solid rgba(14, 43, 56, .18);
+  background: rgba(255, 255, 255, .9); color: #0e2b38; box-shadow: var(--sh-sm);
+  font-size: 12px; font-weight: 680;
+}
 
 /* Overlay chrome. Sized in px against a stage that tops out at 1000px, so it
    stays legible instead of scaling with the artwork. */
