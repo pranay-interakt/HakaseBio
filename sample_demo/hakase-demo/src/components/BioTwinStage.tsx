@@ -14,7 +14,7 @@
  * the stage says so — the numbers around it are the only part taken from the
  * record.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { t } from "../i18n";
 
 /** Source-frame dimensions; every coordinate below is in these units. */
@@ -48,7 +48,6 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
   footnote: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
-  const [playbackBlocked, setPlaybackBlocked] = useState(false);
   /* A public Vite asset must respect the deployment base. A root-relative URL
      works locally but asks GitHub Pages for /biotwin-rat.mp4 instead of
      /HakaseBio/biotwin-rat.mp4. */
@@ -63,7 +62,7 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
        the same source from its beginning rather than replacing it with an image. */
     const start = () => {
       if (running) element.currentTime = 0;
-      void element.play().then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true));
+      void element.play().catch(() => { /* Muted autoplay is also declared on the media element. */ });
     };
     if (element.readyState >= 2) { start(); return; }
     element.addEventListener("loadeddata", start, { once: true });
@@ -75,16 +74,7 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
   return <section className={`biotwin ${complete ? "is-complete" : ""} ${running ? "is-running" : ""}`}>
     <div className="biotwin-stage">
       <video ref={video} className="biotwin-video" src={videoSrc}
-        autoPlay muted playsInline loop preload="auto" aria-hidden="true"
-        onCanPlay={(event) => { void event.currentTarget.play().then(() => setPlaybackBlocked(false)).catch(() => setPlaybackBlocked(true)); }}
-        onError={() => setPlaybackBlocked(true)} />
-
-      {playbackBlocked && <button type="button" className="biotwin-play" onClick={() => {
-        const element = video.current;
-        if (element) void element.play().then(() => setPlaybackBlocked(false));
-      }}>
-        {t("Play original animation")}
-      </button>}
+        autoPlay muted playsInline loop preload="auto" aria-hidden="true" />
 
       <div className="biotwin-badge">
         <span className={`biotwin-dot ${running ? "live" : "done"}`} />

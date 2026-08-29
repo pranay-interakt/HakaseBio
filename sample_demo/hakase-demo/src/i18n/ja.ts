@@ -611,7 +611,6 @@ export const JA: Record<string, string> = {
   /* ── Animal cohort: BioTwin stage ──────────────────────────────────────── */
   "Simulation running": "シミュレーション実行中",
   "Simulation complete": "シミュレーション完了",
-  "Play original animation": "元のアニメーションを再生",
   "{species} · virtual subject 01": "{species} · 仮想個体 01",
   "Rat": "ラット",
   "Mouse": "マウス",
