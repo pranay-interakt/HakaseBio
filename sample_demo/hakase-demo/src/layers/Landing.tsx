@@ -1,142 +1,114 @@
-/**
- * Landing page.
- *
- * Presentation only. Every claim below mirrors what the layers actually
- * compute; nothing here is a live calculation.
- */
+/** Platform brief / landing page for the standalone demonstration. */
 import {
-  ArrowRight, Atom, BadgeCheck, Beaker, Boxes, CircleCheck, Database, FlaskConical, Gauge,
-  Layers, Microscope, Rabbit, ScanSearch, ShieldCheck, Sparkles, Syringe, Target,
+  ArrowRight, Atom, BadgeCheck, BookOpenCheck, Boxes, FileCheck2, FlaskConical,
+  GitBranch, Microscope, Network, ShieldCheck,
 } from "lucide-react";
 import logo from "../assets/hakase-logo.png";
 import { t } from "../i18n";
 import { LanguageSwitch } from "../i18n/LanguageSwitch";
 
-const STATS = [
-  { value: "45", label: "ADMET endpoints per screen, each with unit provenance, a screening band and an applicability domain" },
-  { value: "13", label: "perfusion-limited PBPK compartments integrated per virtual subject" },
-  { value: "15", label: "mechanistic toxicology domains joined onto simulated organ exposure" },
-  { value: "4", label: "layers from structure to a defensible first-in-human starting dose" },
+const WORKFLOW = [
+  { step: "01", title: "Structure & evidence triage", tag: "Layer 1", icon: <Atom size={17} />, body: "Standardise the submitted chemical entity; calculate structure-derived descriptors; assess ADMET, safety, structural alerts, target evidence and public regulatory precedent.", output: "Evidence-graded stage-gate record" },
+  { step: "02", title: "Orthogonal confirmation", tag: "Layer 2", icon: <Microscope size={17} />, body: "Make physical and computational jobs explicit. Docking, free-energy refinement and contextual evidence retain readiness, inputs, limitations and run status.", output: "Confirmation plan and executed-job roll-up" },
+  { step: "03", title: "Exposure & virtual study design", tag: "Layer 3", icon: <Boxes size={17} />, body: "Connect disposition inputs to a whole-body PBPK projection and a virtual animal study, with protocol conformance, welfare accounting and organ-level exposure context.", output: "Study record, TK and target-organ assessment" },
+  { step: "04", title: "Human translation", tag: "Layer 4", icon: <FileCheck2 size={17} />, body: "Bring points of departure, exposure margins, MABEL and HED into one constrained first-in-human planning record without treating a simulation as a completed study.", output: "Starting-dose rationale and filing-readiness view" },
 ];
 
-const LAYERS = [
-  {
-    layer: 1, colour: "var(--l1)", name: "In Vitro", icon: <Beaker size={18} />,
-    summary: "A structure enters, and a stage-gate verdict with evidence-graded checks comes out. Every endpoint carries the band it was judged against and the applicability domain that decides whether the model may speak about this chemistry at all.",
-    points: ["45 ADMET endpoints across six property families", "20-assay extended bench with focused predictors", "PAINS, Brenk and NIH structural alert screen", "Read-across target and selectivity evidence", "Regulatory precedent from OpenFDA and PubChem"],
-  },
-  {
-    layer: 2, colour: "var(--l2)", name: "Confirmation", icon: <Microscope size={18} />,
-    summary: "Ten stages of orthogonal cross-checking. Docking and free-energy refinement are dispatched explicitly because each needs its own inputs and carries a real compute cost — they are never silently batched.",
-    points: ["Target druggability and pocket descriptors", "Binding, ADME and disposition cross-check", "Safety triage and the Tox21 panel", "IVIVE clearance, target engagement, therapeutic index", "A rollup over only the stages that actually ran"],
-  },
-  {
-    layer: 3, colour: "var(--l3)", name: "IVIVE & Animal Cohort", icon: <Rabbit size={18} />,
-    summary: "A whole-body PBPK exposure projection, then a complete virtual preclinical study: toxicokinetics to ICH S3A, biodistribution, a mechanistic hazard panel joined onto organ exposure, the ICH S7A/S7B battery, and the welfare accounting an ethics committee asks for.",
-    points: ["Poulin & Theil tissue partitioning across 13 compartments", "Guideline conformance before the run is paid for", "Target-organ map — hazard and exposure must coincide", "EU 2010/63 prospective severity and 3Rs reduction", "Points of departure with their strength and provenance"],
-  },
-  {
-    layer: 4, colour: "var(--l4)", name: "First in Human", icon: <Syringe size={18} />,
-    summary: "The NOAEL/HED route and MABEL derived independently, with the lower governing — and the fold difference between them shown, because a wide divergence is a finding rather than a rounding detail.",
-    points: ["FDA (2005) body-surface-area translation with itemised safety factors", "Escalation ladder and 3+3 operating characteristics", "Exposure margins at every planned dose level", "SAD/MAD design, sampling schedule and stopping rules", "IND/CTA checklist and FDA (2023) benefit-risk framing"],
-  },
+const SOURCE_GROUPS = [
+  { category: "Chemical identity & structure", sources: ["RDKit.js", "PubChem", "ChEMBL", "UniProt", "RCSB PDB", "AlphaFold DB"], use: "Identity, structure normalisation, descriptors, biological activity, protein and pocket context." },
+  { category: "Mechanistic & biological evidence", sources: ["STRING", "KEGG", "Reactome", "ToxCast / Tox21", "PharmGKB", "DisGeNET", "gnomAD"], use: "Networks, pathways, assay context, pharmacogenomics, gene–disease and population constraint." },
+  { category: "Nonclinical & exposure evidence", sources: ["EPA ToxRefDB", "EPA ToxValDB", "ECOTOX", "PK-DB", "ICH", "OECD", "ARRIVE 2.0"], use: "Hazard anchors, observed PK context, study design, reporting and welfare standards." },
+  { category: "Regulatory & clinical landscape", sources: ["openFDA / Drugs@FDA", "ClinicalTrials.gov", "FDA guidance", "EMA guidance", "EU Directive 2010/63"], use: "Approval precedent, labels, registered studies, human-translation and animal-welfare context." },
 ];
 
-const PRINCIPLES = [
-  { title: "No composite score", body: "Averaging a permeability against a genotoxicity flag has no scientific meaning, so it is never done. One flagged gate-driving check can set a verdict on its own." },
-  { title: "Absence is not evidence", body: "An organ with no hazard signal is the absence of a flagged model output, not a demonstration of organ safety. A registry that returned nothing says something about the public record, not about the compound." },
-  { title: "Provenance on every number", body: "Each value carries whether it was measured, predicted, derived or assumed — and a measured value supplied by the user outranks the prediction through the whole cascade." },
-  { title: "Applicability decides admissibility", body: "The nearest-neighbour similarity to the training chemistry decides whether a model may speak at all. Outside the domain, a value is an extrapolation and is labelled as one." },
-  { title: "Stated limitations, not footnotes", body: "Every block reports what it does not model. Transporter uptake, metabolite exposure, saturable metabolism and formulation effects are named as absent rather than quietly omitted." },
-  { title: "A signature never changes a number", body: "A reviewer can accept residual risk on the record. A block records an evidence gap that no signature can close." },
+const METHODS = [
+  { icon: <Atom size={18} />, title: "Structure-derived chemistry", body: "Browser-side RDKit parsing, canonicalisation, depictions and core physicochemical descriptors. No molecular structure is sent to a third party by this demonstration." },
+  { icon: <Network size={18} />, title: "Evidence graph", body: "Identifiers, source status, provenance and limitations remain attached to their originating block. No blank panel is interpreted as a negative finding." },
+  { icon: <FlaskConical size={18} />, title: "Model-informed exposure", body: "A 13-compartment, perfusion-limited PBPK workflow connects disposition assumptions to cohort and tissue exposure rather than showing isolated hazard scores." },
+  { icon: <ShieldCheck size={18} />, title: "Decision controls", body: "Applicability domains, gate roles, measured overrides and stated limitations are visible at the point of use. A manual sign-off does not rewrite a result." },
+];
+
+const BOUNDARIES = [
+  { title: "Hakase product layer", body: "The cascading record architecture, workflow orchestration, decision presentation, evidence handoffs and review controls are the proprietary product layer being demonstrated." },
+  { title: "Public and licensed sources", body: "Public-source records retain their own terms, update cadence and limitations. Hakase reports source state and provenance; it does not claim ownership of source data." },
+  { title: "Scientific boundary", body: "This demonstration calculates structure-derived properties locally and uses illustrative local heuristics for pharmacology, ADMET and study outputs. It is not a validated model suite or a substitute for GLP studies." },
 ];
 
 export function Landing({ onEnter }: { onEnter: () => void }) {
-  return <div className="landing">
-    <nav className="lp-nav">
-      <img src={logo} alt="HakaseAI" />
-      <span className="pill">{t("Demonstration workspace")}</span>
-      <div className="links">
-        <a href="#layers">{t("Layers")}</a>
-        <a href="#principles">{t("Principles")}</a>
-        <LanguageSwitch />
-        <button className="btn primary" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={15} /></button>
+  return <div className="landing platform-brief">
+    <nav className="bp-nav">
+      <a className="bp-brand" href="#top" aria-label="HakaseAI platform brief"><img src={logo} alt="HakaseAI" /><span>Platform brief</span></a>
+      <div className="bp-nav-links">
+        <a href="#workflow">Workflow</a>
+        <a href="#evidence">Evidence & tools</a>
+        <a href="#governance">Governance</a>
       </div>
+      <div className="bp-nav-actions"><LanguageSwitch /><button className="btn primary" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={15} /></button></div>
     </nav>
 
-    <header className="lp-hero">
-      <div className="lp-badge"><Sparkles size={14} /> {t("Preclinical BioDigital Twin")}</div>
-      <h1>{t("From a SMILES string to a defensible")}<br /><em>{t("first-in-human starting dose")}</em></h1>
-      <p>
-        {t("Four connected layers of preclinical evidence — in-vitro screening, orthogonal confirmation, a whole-body exposure projection and a virtual animal study, then the human translation. Every number carries its unit, its provenance, the band it was judged against and the limits of what it can support.")}
-      </p>
-      <div className="lp-cta">
-        <button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button>
-        <a className="btn lg" href="#layers">{t("See what each layer computes")}</a>
-      </div>
-      <div className="lp-stats">
-        {STATS.map((stat) => <div className="lp-stat" key={stat.label}><b>{stat.value}</b><span>{t(stat.label)}</span></div>)}
-      </div>
-    </header>
+    <main id="top">
+      <section className="bp-hero">
+        <div className="bp-hero-copy">
+          <p className="bp-eyebrow">Preclinical decision infrastructure</p>
+          <h1>One evidence record,<br />from structure to <em>first-in-human planning.</em></h1>
+          <p className="bp-intro">HakaseAI is a structured preclinical workspace for bringing chemistry, biology, exposure, safety and study-design context into a reviewable decision record. It makes model limits, evidence gaps and source provenance visible alongside every result.</p>
+          <div className="bp-actions">
+            <button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button>
+            <a className="bp-text-link" href="#workflow">Review the workflow <ArrowRight size={14} /></a>
+          </div>
+        </div>
+        <aside className="bp-record" aria-label="Hakase evidence record summary">
+          <div className="bp-record-head"><span>Current record model</span><code>hakase.smallmol.v2</code></div>
+          <div className="bp-record-title"><GitBranch size={18} /><div><b>Controlled cascade</b><small>Each layer inherits the signed source record.</small></div></div>
+          <ol>
+            <li><span>01</span><div><b>Input identity</b><small>SMILES, parent species, target and intended route</small></div><i>Captured</i></li>
+            <li><span>02</span><div><b>Evidence & models</b><small>Descriptor, assay, source and applicability context</small></div><i>Attributed</i></li>
+            <li><span>03</span><div><b>Decision gates</b><small>Gate-driving checks, gaps and required follow-up</small></div><i>Constrained</i></li>
+            <li><span>04</span><div><b>Review handoff</b><small>Complete record carried forward without re-derivation</small></div><i>Traceable</i></li>
+          </ol>
+          <div className="bp-record-foot"><BadgeCheck size={15} /> Provenance, units and limitations are part of the record—not a separate report.</div>
+        </aside>
+      </section>
 
-    <section className="lp-section" id="layers">
-      <h2>{t("The cascade")}</h2>
-      <p>{t("Each layer consumes the record the previous one produced, unchanged. Nothing is re-derived downstream, and a value corrected by measurement travels the whole chain.")}</p>
-      <div className="lp-layers">
-        {LAYERS.map((layer) => (
-          <article className="lp-layer" key={layer.layer} style={{ ["--lc" as string]: layer.colour }}>
-            <span className="lnum">{layer.icon} {t("Layer {n}", { n: layer.layer })}</span>
-            <h3>{t(layer.name)}</h3>
-            <p>{t(layer.summary)}</p>
-            <ul>{layer.points.map((point) => <li key={point}><CircleCheck size={13} />{t(point)}</li>)}</ul>
-          </article>
-        ))}
-      </div>
-    </section>
+      <section className="bp-band">
+        <div><b>45</b><span>ADMET endpoints with bands, units and applicability context</span></div>
+        <div><b>13</b><span>PBPK compartments per virtual subject</span></div>
+        <div><b>15</b><span>Mechanistic toxicology domains joined to organ exposure</span></div>
+        <div><b>4</b><span>Connected layers with an inherited review record</span></div>
+      </section>
 
-    <section className="lp-section" id="principles">
-      <h2>{t("What the interface refuses to do")}</h2>
-      <p>{t("The scientific discipline of this platform is mostly visible in what it declines to show you.")}</p>
-      <div className="lp-layers" style={{ marginTop: 36 }}>
-        {PRINCIPLES.map((principle) => (
-          <article className="lp-layer" key={principle.title} style={{ ["--lc" as string]: "var(--brand)" }}>
-            <span className="lnum"><ShieldCheck size={15} /> {t("Principle")}</span>
-            <h3>{t(principle.title)}</h3>
-            <p>{t(principle.body)}</p>
-          </article>
-        ))}
-      </div>
-    </section>
+      <section className="bp-section bp-purpose" id="purpose">
+        <div className="bp-section-intro"><p className="bp-eyebrow">Purpose</p><h2>Make preclinical reasoning inspectable.</h2></div>
+        <div className="bp-purpose-copy"><p>Drug-development teams do not need another unqualified score. They need a coherent record of what was calculated, what was measured, what a source returned, what a model can reasonably say, and what must be resolved before the next commitment.</p><div className="bp-purpose-grid"><div><small>For teams</small><b>Medicinal chemistry, DMPK, toxicology, translational pharmacology and programme leadership.</b></div><div><small>For decisions</small><b>Portfolio triage, experiment selection, virtual-study planning and first-in-human preparation.</b></div><div><small>For review</small><b>Named inputs, source state, evidence grade, assumption, limitation and downstream consequence.</b></div></div></div>
+      </section>
 
-    <section className="lp-section">
-      <h2>{t("Everything the workspace computes")}</h2>
-      <p>{t("A single run touches every one of these surfaces.")}</p>
-      <div className="lp-layers" style={{ marginTop: 36, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
-        {[
-          { icon: <Atom size={16} />, title: "Structure & descriptors", body: "RDKit-powered SMILES parsing, 2D depiction and core descriptors, plus five rule-based filters." },
-          { icon: <Layers size={16} />, title: "ADMET profile", body: "45 endpoints with bands, conformal intervals, approved-drug percentiles and per-endpoint applicability." },
-          { icon: <ScanSearch size={16} />, title: "Structural screening", body: "PAINS, Brenk and NIH substructure detection with recommended orthogonal controls." },
-          { icon: <Target size={16} />, title: "Target evidence", body: "Candidate ranking, resolution provenance, read-across potency grouped by activity type." },
-          { icon: <FlaskConical size={16} />, title: "Physical jobs", body: "Docking poses and box definition; TIES free-energy refinement with per-λ convergence." },
-          { icon: <Beaker size={16} />, title: "Exposure projection", body: "13-compartment PBPK with a sampled virtual cohort and a 90% population band." },
-          { icon: <Boxes size={16} />, title: "Biodistribution", body: "Per-organ Cmax, Tmax, AUC, Kp and tissue:plasma ratio across every dose group." },
-          { icon: <Microscope size={16} />, title: "Toxicology", body: "15 mechanistic domains, each joined onto simulated organ exposure before an organ is called." },
-          { icon: <Rabbit size={16} />, title: "Welfare & 3Rs", body: "Animals an equivalent wet study would consume, EU 2010/63 severity, humane endpoints." },
-          { icon: <Gauge size={16} />, title: "Human translation", body: "HED, MRSD, MABEL, escalation ladder, exposure margins and 3+3 operating characteristics." },
-          { icon: <Database size={16} />, title: "External evidence", body: "STRING, KEGG, Reactome, ToxRef, ECOTOX, ToxCast, ClinicalTrials.gov, PharmGKB, DisGeNET, gnomAD." },
-          { icon: <BadgeCheck size={16} />, title: "Validation & provenance", body: "Held-out fold error, endpoint qualification map, and which model produced which number." },
-        ].map((item) => (
-          <article className="lp-layer" key={item.title} style={{ ["--lc" as string]: "var(--brand)" }}>
-            <span className="lnum">{item.icon}</span>
-            <h3 style={{ fontSize: 15 }}>{t(item.title)}</h3>
-            <p style={{ fontSize: 12.5 }}>{t(item.body)}</p>
-          </article>
-        ))}
-      </div>
-    </section>
+      <section className="bp-section" id="workflow">
+        <div className="bp-section-intro"><p className="bp-eyebrow">Operating workflow</p><h2>A record that becomes more specific—not less accountable—as it moves forward.</h2><p>The next layer receives the actual result from the prior layer, including its uncertainty and provenance. Measured replacements travel forward; downstream layers do not silently recreate their own version.</p></div>
+        <div className="bp-workflow">
+          {WORKFLOW.map((item) => <article className="bp-flow-card" key={item.step}><div className="bp-flow-head"><span>{item.step}</span>{item.icon}<small>{item.tag}</small></div><h3>{item.title}</h3><p>{item.body}</p><footer><small>Primary output</small><b>{item.output}</b></footer></article>)}
+        </div>
+      </section>
 
-    <footer className="lp-footer">
-      {t("HakaseAI · demonstration workspace. Structure-derived values are calculated locally with RDKit. All pharmacology, ADMET and study outputs are illustrative local heuristics, not production models or decision-grade evidence.")}
-    </footer>
+      <section className="bp-section bp-methods" id="methods">
+        <div className="bp-section-intro"><p className="bp-eyebrow">Method architecture</p><h2>Computation is useful only when its operating conditions are visible.</h2></div>
+        <div className="bp-method-grid">{METHODS.map((method) => <article key={method.title}><span>{method.icon}</span><h3>{method.title}</h3><p>{method.body}</p></article>)}</div>
+      </section>
+
+      <section className="bp-section" id="evidence">
+        <div className="bp-section-intro"><p className="bp-eyebrow">Evidence & tools</p><h2>Connected to the sources a preclinical review actually needs.</h2><p>Source blocks distinguish live, no-data, skipped and unavailable states. A source that returned no record is never presented as a statement of safety or efficacy.</p></div>
+        <div className="bp-source-table" role="table" aria-label="Data sources and purpose">
+          <div className="bp-source-row bp-source-header" role="row"><span role="columnheader">Evidence domain</span><span role="columnheader">Sources and tools</span><span role="columnheader">How the workspace uses them</span></div>
+          {SOURCE_GROUPS.map((group) => <div className="bp-source-row" role="row" key={group.category}><b role="cell">{group.category}</b><div role="cell" className="bp-source-tags">{group.sources.map((source) => <span key={source}>{source}</span>)}</div><p role="cell">{group.use}</p></div>)}
+        </div>
+      </section>
+
+      <section className="bp-section bp-governance" id="governance">
+        <div className="bp-section-intro"><p className="bp-eyebrow">Product, IP & governance</p><h2>Clear ownership. Clear boundaries. Clear records.</h2><p>The platform separates Hakase’s workflow and evidence-management layer from external source data and from the experimental evidence a real programme must still generate.</p></div>
+        <div className="bp-boundaries">{BOUNDARIES.map((boundary) => <article key={boundary.title}><BookOpenCheck size={17} /><h3>{boundary.title}</h3><p>{boundary.body}</p></article>)}</div>
+      </section>
+
+      <section className="bp-cta"><div><p className="bp-eyebrow">Demonstration workspace</p><h2>Review the full cascade with a live, computed example.</h2><p>Use the workspace to inspect the record model, run a structure through the stages, edit a working structure and download the complete Layer 1 and Animal Cohort dossiers.</p></div><button className="btn primary lg" onClick={onEnter}>{t("Open the workspace")} <ArrowRight size={16} /></button></section>
+    </main>
+    <footer className="bp-footer"><span>HakaseAI · standalone demonstration workspace</span><span>Structure-derived values are calculated locally with RDKit. Pharmacology, ADMET and study outputs are illustrative local heuristics—not production models or decision-grade evidence.</span></footer>
   </div>;
 }
