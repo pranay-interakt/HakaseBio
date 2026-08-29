@@ -202,3 +202,106 @@ export function downloadExhaustivePdf({ filename, title, subtitle, sources, find
   const doc = buildExhaustivePdf({ title, subtitle, sources, findings });
   doc.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
+
+/**
+ * A concise, study-director report. Unlike the exhaustive export above this
+ * intentionally retains only interpretation-ready tables: raw subject and
+ * time-series arrays remain in the interactive record, rather than turning a
+ * PDF into an unreadable data dump.
+ */
+export type ScientificPdfTable = { title?: string; headers: string[]; rows: Array<Array<unknown>> };
+export type ScientificPdfSection = { title: string; summary?: string; tables?: ScientificPdfTable[]; notes?: string[] };
+
+export function buildScientificPdf({
+  title, subtitle, findings = [], sections,
+}: {
+  title: string;
+  subtitle: string;
+  findings?: PdfReportFinding[];
+  sections: ScientificPdfSection[];
+}) {
+  const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
+  let y = PAGE.top;
+  const newPage = () => { doc.addPage(); y = PAGE.top; };
+  const ensure = (height: number) => { if (y + height > BOTTOM_Y) newPage(); };
+  const rule = (colour: [number, number, number] = [219, 229, 238]) => {
+    doc.setDrawColor(...colour); doc.line(PAGE.left, y, PAGE.width - PAGE.right, y);
+  };
+  const heading = (content: string, level: 1 | 2 = 2) => {
+    const size = level === 1 ? 19 : 13;
+    ensure(size + 20);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(size); doc.setTextColor(16, 32, 47);
+    doc.text(printable(content), PAGE.left, y); y += size + 7;
+    rule(level === 1 ? [24, 180, 232] : [181, 229, 248]); y += 9;
+  };
+  const paragraph = (content: string, options: { bold?: boolean; colour?: [number, number, number]; gap?: number } = {}) => {
+    const size = 9.5;
+    doc.setFont("helvetica", options.bold ? "bold" : "normal"); doc.setFontSize(size); doc.setTextColor(...(options.colour ?? [48, 65, 82]));
+    const lines = doc.splitTextToSize(printable(content), CONTENT_WIDTH) as string[];
+    const height = Math.max(lines.length, 1) * 12.5;
+    ensure(height + (options.gap ?? 7)); doc.text(lines, PAGE.left, y); y += height + (options.gap ?? 7);
+  };
+  const table = (headers: string[], rawRows: Array<Array<unknown>>) => {
+    if (!rawRows.length) return;
+    const widths = headers.map((_, index) => index === 0 ? CONTENT_WIDTH * 0.27 : (CONTENT_WIDTH * 0.73) / Math.max(headers.length - 1, 1));
+    const headerHeight = 20;
+    const drawHeader = () => {
+      ensure(headerHeight); let x = PAGE.left;
+      doc.setFillColor(21, 80, 112); doc.rect(PAGE.left, y, CONTENT_WIDTH, headerHeight, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.8); doc.setTextColor(255, 255, 255);
+      headers.forEach((header, index) => { doc.text(doc.splitTextToSize(printable(header), widths[index] - 8) as string[], x + 4, y + 12); x += widths[index]; });
+      y += headerHeight;
+    };
+    drawHeader();
+    rawRows.forEach((row, rowIndex) => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.1);
+      const cells = row.map((cell, index) => doc.splitTextToSize(printable(cell), widths[index] - 8) as string[]);
+      const rowHeight = Math.max(18, ...cells.map((cell) => cell.length * 9.4 + 8));
+      if (y + rowHeight > BOTTOM_Y) { newPage(); drawHeader(); }
+      doc.setFillColor(rowIndex % 2 === 0 ? 248 : 252, rowIndex % 2 === 0 ? 251 : 254, 255);
+      doc.rect(PAGE.left, y, CONTENT_WIDTH, rowHeight, "F"); let x = PAGE.left;
+      cells.forEach((cell, index) => {
+        doc.setDrawColor(224, 233, 241); doc.rect(x, y, widths[index], rowHeight);
+        doc.setTextColor(index === 0 ? 25 : 51, index === 0 ? 92 : 67, index === 0 ? 124 : 85);
+        doc.text(cell, x + 4, y + 11); x += widths[index];
+      });
+      y += rowHeight;
+    });
+    y += 10;
+  };
+
+  doc.setProperties({ title, subject: "Curated virtual preclinical study dossier", author: "HakaseAI demonstration workspace" });
+  heading(title, 1);
+  paragraph(subtitle, { colour: [79, 101, 121], gap: 12 });
+  paragraph(`Generated ${timestamp()}`, { gap: 10 });
+  paragraph("This is a concise scientific review dossier. It reports decision-driving design, exposure, hazard, welfare and interpretation outputs. Individual virtual-subject series and raw integration steps are deliberately excluded; they are not a substitute for observed study data.", { bold: true, colour: [7, 90, 124], gap: 14 });
+  if (findings.length) {
+    heading("Decision summary");
+    table(["Item", "Recorded value"], findings.map((finding) => [finding.label, finding.value]));
+  }
+  sections.forEach((section) => {
+    heading(section.title);
+    if (section.summary) paragraph(section.summary, { gap: 10 });
+    section.tables?.forEach((entry) => { if (entry.title) paragraph(entry.title, { bold: true, colour: [7, 90, 124], gap: 5 }); table(entry.headers, entry.rows); });
+    section.notes?.forEach((note) => paragraph(note, { colour: [91, 111, 130], gap: 6 }));
+  });
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page += 1) {
+    doc.setPage(page); doc.setDrawColor(219, 229, 238); doc.line(PAGE.left, PAGE.height - 31, PAGE.width - PAGE.right, PAGE.height - 31);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(91, 111, 130);
+    doc.text("HakaseAI demonstration report - curated scientific decision dossier", PAGE.left, PAGE.height - 18);
+    doc.text(`Page ${page} of ${pages}`, PAGE.width - PAGE.right, PAGE.height - 18, { align: "right" });
+  }
+  return doc;
+}
+
+export function downloadScientificPdf({ filename, title, subtitle, findings, sections }: {
+  filename: string;
+  title: string;
+  subtitle: string;
+  findings?: PdfReportFinding[];
+  sections: ScientificPdfSection[];
+}) {
+  const doc = buildScientificPdf({ title, subtitle, findings, sections });
+  doc.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+}

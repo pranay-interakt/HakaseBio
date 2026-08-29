@@ -14,7 +14,7 @@ import {
 import { GUIDELINES, STUDY_TYPES } from "../lib/catalogs";
 import { SPECIES, TISSUE_LABEL } from "../lib/pk";
 import { num, pct, round, text, titleCase, tone } from "../lib/format";
-import { downloadExhaustivePdf } from "../lib/pdfReport";
+import { downloadScientificPdf } from "../lib/pdfReport";
 import type { CompoundProfile } from "../engine/profile";
 import type { L1Record } from "../engine/l1";
 import type { MeasuredOverrides } from "../engine/l3ivive";
@@ -502,10 +502,16 @@ function AnimalResult({ record, state, setState, onBack, onContinue, l1, design,
   };
 
   function report() {
-    const { record: _record, ...animalInputs } = state;
-    downloadExhaustivePdf({
+    const toxicology = record.toxicology as any;
+    const safetyPharmacology = record.safety_pharmacology as any;
+    const pointsOfDeparture = record.points_of_departure as any;
+    const studyProtocol = record.study_protocol as any;
+    const welfare = record.welfare as any;
+    const topDoseDistribution = record.biodistribution.per_arm[record.biodistribution.per_arm.length - 1];
+    const preferredPod = pointsOfDeparture.preferred_pod;
+    downloadScientificPdf({
       filename: `hakase-animal-cohort-${record.study_id}.pdf`,
-      title: "Hakase Animal Cohort - complete virtual preclinical study report",
+      title: "Hakase Animal Cohort - scientific decision dossier",
       subtitle: `${gate.recommendation} - ${gate.headline}`,
       findings: [
         { label: "Stage-gate recommendation", value: gate.recommendation },
@@ -517,17 +523,77 @@ function AnimalResult({ record, state, setState, onBack, onContinue, l1, design,
         { label: "Arms simulated", value: record.study_summary.arms_simulated },
         { label: "Design warnings", value: record.readiness_warnings.length ? record.readiness_warnings.join("; ") : "None recorded" },
       ],
-      sources: [
-        { title: "Animal study inputs and view state", value: animalInputs },
-        { title: "Animal design preflight calculations", value: {
-          design_conformance: designConformance(design, inheritedHalfLifeH),
-          dose_setting: doseSetting(design, inheritedHalfLifeH),
-          welfare_and_3rs_accounting: animalAccounting(design),
-        } },
-        { title: "Inherited Layer 1 record", value: l1 },
-        { title: "Structure-derived chemistry profile", value: profile },
-        { title: "Animal cohort execution context", value: { overrides, areaCode, components, signoff, inheritedHalfLifeH } },
-        { title: "Complete animal cohort simulation record", value: record },
+      sections: [
+        {
+          title: "Study design and protocol",
+          summary: "The declared study design, guideline context and planned arms. This is a virtual protocol review, not an executed animal study.",
+          tables: [
+            { headers: ["Design field", "Value"], rows: [
+              ["Species / strain", `${record.study_summary.species} / ${record.study_summary.strain}`],
+              ["Sex", record.study_summary.sex], ["Route / frequency", `${record.study_summary.route} / ${record.study_summary.frequency}`],
+              ["Duration", `${record.study_summary.duration_h} h`], ["Formulation", record.study_summary.formulation],
+              ["Guideline", studyProtocol.study_identity.guideline], ["Recovery period", `${record.study_summary.recovery_period_days} days`],
+            ] },
+            { title: "Dose groups and control", headers: ["Arm", "Dose (mg/kg)", "Animals / sex", "Study purpose"], rows: studyProtocol.arms.map((arm: any) => [arm.label, arm.dose_mg_per_kg, arm.n_per_sex, arm.purpose]) },
+            { title: "Protocol gaps that must be resolved before a real study", headers: ["Required item", "Why it is needed"], rows: studyProtocol.planning_gaps.map((gap: any) => [gap.item, gap.reason]) },
+          ],
+        },
+        {
+          title: "Toxicokinetics and exposure",
+          summary: record.toxicokinetics.limitations,
+          tables: [
+            { title: "ICH S3A toxicokinetics by dose group", headers: ["Arm", "Dose", "Cmax", "Tmax", "AUC", "AUC CV", "t1/2", "Accumulation"], rows: record.toxicokinetics.per_arm.map((row) => [row.arm, `${row.dose_mg_per_kg} mg/kg`, `${row.c_max_mg_per_l} mg/L`, `${row.t_max_h} h`, `${row.auc_mg_h_per_l} mg h/L`, `${row.auc_cv_percent}%`, `${row.t_half_h} h`, row.accumulation.available ? row.accumulation.accumulation_ratio : row.accumulation.reason]) },
+            { title: "Exposure interpretation", headers: ["Assessment", "Result"], rows: [
+              ["Dose proportionality", record.toxicokinetics.exposure_linearity.interpretation],
+              ["Relative spread in dose-normalised AUC", record.toxicokinetics.exposure_linearity.relative_spread],
+              ["Elimination context", topDoseDistribution.elimination_routes.interpretation],
+              ["CNS penetration", `${topDoseDistribution.cns_penetration.classification}; brain:plasma AUC ${topDoseDistribution.cns_penetration.brain_plasma_auc_ratio}`],
+            ] },
+          ],
+          notes: record.toxicokinetics.not_modelled.map((item) => `Not modelled - ${item.item}: ${item.reason}`),
+        },
+        {
+          title: "Biodistribution and target-organ assessment",
+          summary: `${record.organ_risk.summary.n_concern} target organ(s) of concern were identified by joining predicted mechanism with simulated tissue exposure.`,
+          tables: [
+            { title: "Top-dose tissue exposure", headers: ["Tissue", "AUC", "Cmax", "Tissue:plasma AUC", "Kp", "Partitioning"], rows: topDoseDistribution.tissues.map((tissue: any) => [tissue.label, `${tissue.auc_median} mg h/L`, `${tissue.c_max_median} mg/L`, tissue.tissue_plasma_auc_ratio, tissue.kp, tissue.partitioning]) },
+            { title: "Organ risk map", headers: ["Organ", "Call", "Hazard", "Tissue:plasma AUC", "Driving domain"], rows: record.organ_risk.organs.map((organ) => [organ.label, organ.call_label, organ.hazard_probability ?? "Not predicted", organ.exposure.available ? organ.exposure.tissue_plasma_auc_ratio : "No compartment", organ.driving_domain ?? "None"]) },
+          ],
+          notes: [record.biodistribution.limitations, record.organ_risk.limitations],
+        },
+        {
+          title: "Mechanistic toxicology and safety pharmacology",
+          summary: toxicology.limitations,
+          tables: [
+            { title: "Mechanistic hazard panel", headers: ["Domain", "Guideline", "Hazard call", "Driver", "Organ / exposure"], rows: toxicology.domains.map((domain: any) => [domain.name, domain.guideline, domain.hazard_call.level, domain.hazard_call.driving_endpoint ?? "Not predicted", domain.organ ? `${domain.organ} / ${domain.exposure_context.available ? `${domain.exposure_context.tissue_plasma_auc_ratio}x plasma` : "unresolved"}` : "Systemic"]) },
+            { title: "ICH S7A/S7B safety pharmacology", headers: ["System", "Assessment", "Study equivalent", "Next measurement"], rows: safetyPharmacology.systems.map((system: any) => [system.system, system.assessment, system.study_equivalent, system.next_measurement]) },
+            { title: "Safety margins", headers: ["Arm", "Dose", "Margin to model NOAEL", "Margin to LD50", "Margin to public NOAEL"], rows: record.safety.per_arm_margins.map((margin) => [margin.arm, `${margin.dose_mg_per_kg} mg/kg`, margin.margin_to_allometric_noael, margin.margin_to_ld50, margin.margin_to_evidence_noael ?? "No public anchor"]) },
+          ],
+          notes: [safetyPharmacology.limitations, record.safety.limitation],
+        },
+        {
+          title: "Study observations and welfare",
+          summary: "The observation schedule identifies procedures and endpoints that a real study must perform. It does not predict clinical findings or pathology incidence.",
+          tables: [
+            { title: "Outcome schedule", headers: ["Procedure", "Timing", "Priority", "Focused parameters"], rows: record.study_outcomes.sections.map((section) => [section.name, section.schedule, section.status, section.focus_parameters.length ? section.focus_parameters.join(", ") : "Standard endpoint set"]) },
+            { title: "Welfare and 3Rs", headers: ["Item", "Result"], rows: [
+              ["Prospective severity", welfare.severity.study_prospective_severity], ["Monitoring frequency", welfare.humane_endpoints.monitoring_frequency],
+              ["Animals in equivalent wet study", welfare.reduction_3rs.animals_in_equivalent_wet_study], ["Animals avoided by simulation", welfare.reduction_3rs.animals_avoided],
+              ["Dosing administrations / animal", welfare.procedure_burden.dosing_administrations_per_animal], ["Humane endpoint principle", welfare.humane_endpoints.note],
+            ] },
+          ],
+          notes: [welfare.severity.limitations, welfare.reduction_3rs.note],
+        },
+        {
+          title: "Points of departure, model context and limitations",
+          summary: "These are planning anchors for the next decision. They do not establish a NOAEL or replace measured evidence.",
+          tables: [
+            { title: "Points of departure", headers: ["Anchor", "Dose", "Strength", "Basis"], rows: pointsOfDeparture.candidates.map((candidate: any) => [candidate.name, `${candidate.dose_mg_per_kg} mg/kg`, candidate.strength, candidate.basis]) },
+            { title: "Preferred planning anchor", headers: ["Item", "Value"], rows: preferredPod ? [["Selected anchor", preferredPod.name], ["Dose", `${preferredPod.dose_mg_per_kg} mg/kg`], ["Strength", preferredPod.strength], ["Provenance", preferredPod.provenance]] : [["Selected anchor", "None"]] },
+            { title: "Models used", headers: ["Block", "Model", "Provenance"], rows: record.selected_scientific_models.map((model) => [model.block, model.model, model.provenance]) },
+          ],
+          notes: [pointsOfDeparture.noael_determination.reason, record.validation_evidence.headline, record.validation_evidence.limitations],
+        },
       ],
     });
   }
@@ -1813,7 +1879,7 @@ function AnimalResult({ record, state, setState, onBack, onContinue, l1, design,
 
     <div className="actions-row">
       <button className="btn" onClick={onBack}><ArrowLeft size={15} /> Return to IVIVE</button>
-      <button className="btn" onClick={report}><FileText size={15} /> Download complete study PDF</button>
+      <button className="btn" onClick={report}><FileText size={15} /> {t("Download scientific report (PDF)")}</button>
       <button className="btn primary" onClick={() => onContinue(record.study_id)}>Continue to first in human <ArrowRight size={15} /></button>
     </div>
   </>;

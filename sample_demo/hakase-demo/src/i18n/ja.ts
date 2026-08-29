@@ -834,6 +834,7 @@ export const JA: Record<string, string> = {
   "Affinity (kcal/mol)": "親和性 (kcal/mol)",
   "RMSD lower bound": "RMSD 下限",
   "RMSD upper bound": "RMSD 上限",
+  "Download scientific report (PDF)": "科学的レビュー報告書（PDF）をダウンロード",
   "Turn a NO-GO into the next best evidence": "NO-GO を次に得るべきエビデンスへ変える",
   "Turn a WATCH into the next best evidence": "WATCH を次に得るべきエビデンスへ変える",
   "Automated hERG patch-clamp concentration–response": "自動 hERG パッチクランプ濃度反応試験",
