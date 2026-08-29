@@ -1510,19 +1510,22 @@ details.disclosure > summary svg { transition: transform .2s; }
 .biotwin-line.bad circle { fill: var(--bad); }
 
 .biotwin-callout, .biotwin-stats, .biotwin-dial { animation: biotwin-in .45s ease both .15s; }
-@keyframes biotwin-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+/* Do not animate transform here. Callouts use transform to pin their left or
+   right edge to a source-coordinate anchor; setting it to `none` after the
+   entrance animation made right-side labels spill out of the stage. */
+@keyframes biotwin-in { from { opacity: 0; } to { opacity: 1; } }
 
 .biotwin-callout {
   position: absolute; transform: translateY(-50%);
   display: flex; flex-direction: column; gap: 2px; padding: 6px 11px; border-radius: 8px;
   background: rgba(255, 255, 255, .82); border: 1px solid rgba(14, 43, 56, .11);
-  backdrop-filter: blur(6px); white-space: nowrap; pointer-events: none;
+  backdrop-filter: blur(6px); width: max-content; max-width: 24%; pointer-events: none;
 }
 .biotwin-callout.left { transform: translate(-100%, -50%); text-align: right; }
 .biotwin-callout span {
   font-size: 9.5px; font-weight: 720; letter-spacing: .09em; text-transform: uppercase; color: #5b7280;
 }
-.biotwin-callout b { font-size: 13.5px; font-weight: 690; letter-spacing: -.015em; color: #10222c; }
+.biotwin-callout b { font-size: 13.5px; font-weight: 690; line-height: 1.25; letter-spacing: -.015em; color: #10222c; }
 .biotwin-callout.warn b { color: var(--warn-ink); }
 .biotwin-callout.bad b { color: var(--bad-ink); }
 
@@ -1563,11 +1566,8 @@ details.disclosure > summary svg { transition: transform .2s; }
   .biotwin-log { width: auto; left: 6%; right: 6%; max-width: none; }
 }
 
-/* Run clip and resting still are layered and crossfaded, so the transition from
-   simulating to annotated reads as one continuous image. */
-.biotwin-still { object-position: center; }
-.biotwin-video { transition: opacity .5s ease; }
-.biotwin-video.is-hidden { opacity: 0; }
+/* The supplied clip remains the visual surface after completion. Its poster is
+   retained only for initial buffering or a media-load failure. */
 
 /* ── Structure workbench ────────────────────────────────────────────────── */
 

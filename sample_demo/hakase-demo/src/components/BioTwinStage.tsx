@@ -3,9 +3,8 @@
  *
  * The clip is a 10-second arc — a wireframe specimen, then organs appearing as
  * the dose goes in, then full anatomy — so it is used as the layer's run state
- * rather than as decoration: it plays while the study computes and rests on its
- * final frame once the record exists, at which point the real readings from
- * that record are annotated onto it.
+ * rather than as decoration. It continues to play behind the completed study's
+ * annotations, which keeps the original simulation asset visible throughout.
  *
  * Everything is positioned in the clip's own 1280×720 coordinate space and the
  * stage is locked to 16:9, so the leader lines, their anchor points and the
@@ -25,10 +24,9 @@ import restingStill from "../assets/biotwin-rat-final.jpg";
 const W = 1280;
 const H = 720;
 
-/* The resting still (public/biotwin-rat-final.jpg) is cut from the clip at
-   8.7s: the anatomy is fully drawn there, and it is before the clip burns in
-   its own "SIMULATION COMPLETE" caption, which would otherwise sit under our
-   badge saying the same thing. */
+/* This still is only the media poster: it is visible while the video buffer is
+   loading or if the asset cannot be read. It is not used as the completed-study
+   surface, so the supplied simulation clip remains the thing users see. */
 
 export type StageCallout = {
   /** Where on the specimen this reading refers to, in source pixels. */
@@ -57,24 +55,20 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
   footnote: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  /* A public Vite asset must respect the deployment base. A root-relative URL
+     works locally but asks GitHub Pages for /biotwin-rat.mp4 instead of
+     /HakaseBio/biotwin-rat.mp4. */
+  const videoSrc = `${import.meta.env.BASE_URL}biotwin-rat.mp4`;
 
-  /* The clip plays for the run and the completed stage crossfades to a still
-     taken from it at REST_AT.
-     Seeking the video there instead looked right but was not reliable: the clip
-     is encoded with sparse keyframes, so a seek lands on the nearest one, which
-     can be late enough to include the caption the clip burns in over its final
-     second — the same words as our own badge. The still is exact, and crisper. */
   useEffect(() => {
     const element = video.current;
     if (!element) return;
-    if (!running) { element.pause(); return; }
 
-    /* On the first run the element is usually still loading, and seeking or
-       playing before it has data silently does nothing — which is what left the
-       clip frozen on frame 0 for a whole run. Wait for data when there is none
-       yet. */
+    /* On the first run the element is usually still loading, and playing before
+       it has data silently does nothing. When the result surface mounts, play
+       the same source from its beginning rather than replacing it with an image. */
     const start = () => {
-      element.currentTime = 0;
+      if (running) element.currentTime = 0;
       void element.play().catch(() => { /* autoplay refused — the still stands in */ });
     };
     if (element.readyState >= 2) { start(); return; }
@@ -86,10 +80,8 @@ export function BioTwinStage({ running, steps, durationMs, subject, stats, callo
 
   return <section className={`biotwin ${complete ? "is-complete" : ""} ${running ? "is-running" : ""}`}>
     <div className="biotwin-stage">
-      <video ref={video} className={`biotwin-video ${complete ? "is-hidden" : ""}`} src="/biotwin-rat.mp4"
-        poster={restingStill} muted playsInline preload="auto" aria-hidden="true" />
-      <img className={`biotwin-video biotwin-still ${complete ? "" : "is-hidden"}`}
-        src={restingStill} alt="" aria-hidden="true" />
+      <video ref={video} className="biotwin-video" src={videoSrc}
+        poster={restingStill} muted playsInline loop preload="auto" aria-hidden="true" />
 
       <div className="biotwin-badge">
         <span className={`biotwin-dot ${running ? "live" : "done"}`} />
