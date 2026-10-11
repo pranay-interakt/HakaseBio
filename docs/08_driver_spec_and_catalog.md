@@ -366,7 +366,11 @@ The kit checks:
 2. Declare every scientific design value as a required parameter. If a citable convention
    exists, put it in the documentation with its source, not in a default.
 3. Register methods and citations in the core registries (`methods.py`, `citations.py`), each
-   with a verified source.
+   with a verified source, then run `python scripts/lock_registries.py`. The registries are
+   append-only (`tests/core/test_registry_lock.py`). Provenance embeds each method and its
+   citations, so their content is part of every analysis hash, and editing an entry would make
+   signed studies fail re-verification. Correct a citation by adding a new key; change a method
+   by bumping its version.
 4. Pass `check_driver` and add known-value tests from the source.
 5. Ship it in-tree (add to `BUILTIN_DRIVERS`) or as a package exposing an entry point in the
    `hos.drivers` group.
