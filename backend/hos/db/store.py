@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any
 
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.engine import Engine
@@ -27,7 +28,7 @@ def default_data_dir() -> Path:
 class Database:
     """Owns the SQLAlchemy engine and session factory."""
 
-    def __init__(self, url: Optional[str] = None) -> None:
+    def __init__(self, url: str | None = None) -> None:
         self.url = url or os.environ.get(
             "HOS_DATABASE_URL", f"sqlite:///{default_data_dir() / 'hos.sqlite3'}"
         )
@@ -37,7 +38,7 @@ class Database:
         self.engine: Engine = create_engine(self.url, future=True, **kwargs)
         if self.url.startswith("sqlite"):
             @event.listens_for(self.engine, "connect")
-            def _pragmas(dbapi_conn, _):  # pragma: no cover - driver hook
+            def _pragmas(dbapi_conn: Any, _: Any) -> None:  # pragma: no cover - driver hook
                 cur = dbapi_conn.cursor()
                 cur.execute("PRAGMA foreign_keys=ON")
                 cur.execute("PRAGMA journal_mode=WAL")
@@ -68,7 +69,7 @@ class FileStore:
     in the ledger.
     """
 
-    def __init__(self, root: Optional[Path] = None) -> None:
+    def __init__(self, root: Path | None = None) -> None:
         self.root = (root or default_data_dir() / "objects")
         self.root.mkdir(parents=True, exist_ok=True)
 
@@ -89,7 +90,7 @@ class FileStore:
         p = self._path(sha)
         data = p.read_bytes()
         if hashlib.sha256(data).hexdigest() != sha:
-            raise IOError(f"stored object {sha} failed integrity check")
+            raise OSError(f"stored object {sha} failed integrity check")
         return data
 
     def exists(self, sha: str) -> bool:
@@ -121,7 +122,7 @@ class SqlLedgerBackend:
                 prev_hash=entry.prev_hash, entry_hash=entry.entry_hash, reason=entry.reason,
             ))
 
-    def last(self) -> Optional[LedgerEntry]:
+    def last(self) -> LedgerEntry | None:
         with self.db.session() as s:
             r = s.execute(select(LedgerRow).order_by(LedgerRow.seq.desc()).limit(1)).scalar_one_or_none()
             return self._to_entry(r) if r else None

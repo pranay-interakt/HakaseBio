@@ -5,7 +5,12 @@ import hashlib
 import pytest
 
 from hos.drivers.base import (
-    DataColumn, DataOrigin, DataTemplate, IngestError, Table, parse_return_file,
+    DataColumn,
+    DataOrigin,
+    DataTemplate,
+    IngestError,
+    Table,
+    parse_return_file,
 )
 from hos.kernel.errors import DriverError
 

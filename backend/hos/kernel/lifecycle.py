@@ -21,7 +21,7 @@ from typing import Final
 
 from hos.kernel.errors import IllegalTransition
 
-__all__ = ["StudyState", "TRANSITIONS", "assert_transition", "is_terminal"]
+__all__ = ["TRANSITIONS", "StudyState", "assert_transition", "is_terminal"]
 
 
 class StudyState(str, Enum):

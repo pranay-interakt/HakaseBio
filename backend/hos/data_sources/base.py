@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from hos.core.quantity import Quantity
 
-__all__ = ["SourceStatus", "SourceResult"]
+__all__ = ["SourceResult", "SourceStatus"]
 
 
 class SourceStatus(str, Enum):
@@ -25,13 +26,13 @@ class SourceResult:
     status: SourceStatus
     query: str
     url: str
-    retrieved_at: Optional[str]
+    retrieved_at: str | None
     records: tuple[Mapping[str, Any], ...] = ()
     quantities: Mapping[str, Quantity] = field(default_factory=dict)
     from_cache: bool = False
-    license: Optional[str] = None
-    attribution: Optional[str] = None
-    error: Optional[str] = None
+    license: str | None = None
+    attribution: str | None = None
+    error: str | None = None
 
     @property
     def ok(self) -> bool:

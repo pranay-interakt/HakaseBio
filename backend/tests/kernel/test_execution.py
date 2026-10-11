@@ -10,10 +10,14 @@ import pytest
 from hos.drivers.base import DataOrigin
 from hos.kernel.errors import KernelError
 from hos.kernel.execution import (
-    DispatchStatus, ExternalLabTarget, InHouseTarget, SimulationTarget, TargetKind,
+    DispatchStatus,
+    ExternalLabTarget,
+    InHouseTarget,
+    SimulationTarget,
+    TargetKind,
     target_from_spec,
 )
-from tests.drivers.test_metabolic_stability import COMPOUND, D, PARAMS, SIM
+from tests.drivers.test_metabolic_stability import COMPOUND, PARAMS, SIM, D
 
 
 def _pkg():

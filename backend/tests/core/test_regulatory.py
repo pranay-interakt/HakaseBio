@@ -3,10 +3,18 @@
 import pytest
 
 from hos.core.regulatory import (
-    ClinicalPopulation, Indication, Modality, ProgramContext, Route, Timing, derive_study_set,
+    ClinicalPopulation,
+    Indication,
+    Modality,
+    ProgramContext,
+    Route,
+    Timing,
+    derive_study_set,
 )
 from hos.core.regulatory.engine import (
-    RequirementStatus, m3r2_marketing_duration, m3r2_trial_support_duration,
+    RequirementStatus,
+    m3r2_marketing_duration,
+    m3r2_trial_support_duration,
 )
 
 

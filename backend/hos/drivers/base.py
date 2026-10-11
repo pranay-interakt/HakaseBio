@@ -34,9 +34,10 @@ import json
 import math
 import zipfile
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, ClassVar, Iterable, Mapping, Optional, Sequence, Union
+from typing import Any, ClassVar
 
 import numpy as np
 from pydantic import BaseModel
@@ -54,32 +55,32 @@ from hos.kernel.errors import DriverError
 
 __all__ = [
     "DRIVER_ABI",
-    "SIMULATION_MARKER",
     "SIMULATION_DISCLAIMER",
-    "DataOrigin",
-    "CompoundInfo",
-    "Support",
-    "ProtocolStep",
+    "SIMULATION_MARKER",
     "AcceptanceCriterion",
-    "ProtocolDocument",
-    "StudyPlan",
-    "DataColumn",
-    "MetadataField",
-    "DataTemplate",
-    "InstructionPackage",
-    "IngestedData",
-    "Table",
     "AnalysisResult",
-    "InterpretiveStatement",
-    "Interpretation",
+    "CompoundInfo",
+    "DataColumn",
+    "DataOrigin",
+    "DataTemplate",
     "ExpertDetermination",
+    "IngestError",
+    "IngestedData",
+    "InstructionPackage",
+    "Interpretation",
+    "InterpretiveStatement",
+    "MetadataField",
+    "ProtocolDocument",
+    "ProtocolStep",
     "ReportSection",
-    "StudyReport",
     "SimulatedDataset",
     "StudyDriver",
-    "IngestError",
-    "parse_return_file",
+    "StudyPlan",
+    "StudyReport",
+    "Support",
+    "Table",
     "canonical_hash",
+    "parse_return_file",
 ]
 
 #: Version of the driver ABI. The registry refuses drivers built for a different major.
@@ -144,9 +145,9 @@ class CompoundInfo:
     id: str
     name: str
     smiles: str
-    inchikey: Optional[str] = None
-    molecular_weight: Optional[Quantity] = None
-    clogp: Optional[Quantity] = None
+    inchikey: str | None = None
+    molecular_weight: Quantity | None = None
+    clogp: Quantity | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -206,7 +207,7 @@ class ProtocolDocument:
     driver_version: str
     title: str
     objective: str
-    hypothesis: Optional[str]
+    hypothesis: str | None
     test_article: Mapping[str, Any]
     test_system: Mapping[str, Any]
     design: Mapping[str, Any]
@@ -291,7 +292,7 @@ class StudyPlan:
     """Logistics derived from the protocol. Cost is deliberately absent: a price is a quote
     from a named laboratory, not a property of the science."""
 
-    execution_duration_days: Optional[float]
+    execution_duration_days: float | None
     duration_basis: str
     sample_count: int
     sample_count_basis: str
@@ -333,13 +334,13 @@ class DataColumn:
     name: str
     description: str
     kind: str = "number"
-    unit: Optional[str] = None
+    unit: str | None = None
     required: bool = True
-    choices: Optional[tuple[str, ...]] = None
-    minimum: Optional[float] = None
-    maximum: Optional[float] = None
+    choices: tuple[str, ...] | None = None
+    minimum: float | None = None
+    maximum: float | None = None
     exclusive_minimum: bool = False
-    unit_column: Optional[str] = None
+    unit_column: str | None = None
     """For numeric columns whose unit varies by row: the text column holding each row's unit."""
 
     def __post_init__(self) -> None:
@@ -441,7 +442,7 @@ class IngestedData:
     def is_simulated(self) -> bool:
         return self.origin is DataOrigin.SIMULATED
 
-    def provenance(self, *, record_id: Optional[str] = None) -> Provenance:
+    def provenance(self, *, record_id: str | None = None) -> Provenance:
         """Provenance for raw observations taken from this file."""
         rid = record_id or f"sha256:{self.file_sha256}"
         if self.is_simulated:
@@ -478,7 +479,7 @@ class IngestedData:
         }
 
     @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> "IngestedData":
+    def from_dict(cls, d: Mapping[str, Any]) -> IngestedData:
         return cls(
             template_id=d["template_id"], records=tuple(d["records"]), metadata=d["metadata"],
             origin=DataOrigin(d["origin"]), file_sha256=d["file_sha256"], filename=d["filename"],
@@ -486,7 +487,7 @@ class IngestedData:
         )
 
 
-def _parse_header_cell(cell: str) -> tuple[str, Optional[str]]:
+def _parse_header_cell(cell: str) -> tuple[str, str | None]:
     cell = cell.strip()
     if cell.endswith("]") and "[" in cell:
         name, _, unit = cell[:-1].partition("[")
@@ -569,7 +570,7 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
                       f"expected {template.header()}")
 
     conversions: list[str] = []
-    col_units: dict[str, Optional[str]] = {}
+    col_units: dict[str, str | None] = {}
     for n, unit in parsed_header:
         if n not in known:
             continue
@@ -601,7 +602,7 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
             errors.append(f"line {line_no}: expected {len(names)} fields, found {len(row)}")
             continue
         rec: dict[str, Any] = {}
-        for (n, _), cell in zip(parsed_header, row):
+        for (n, _), cell in zip(parsed_header, row, strict=True):
             if n not in known:
                 continue
             col = template.column(n)
@@ -683,7 +684,7 @@ class InstructionPackage:
     data_template: DataTemplate
     sample_manifest: tuple[Mapping[str, Any], ...]
     return_instructions: str
-    expert_determinations: tuple["ExpertDetermination", ...] = ()
+    expert_determinations: tuple[ExpertDetermination, ...] = ()
 
     def files(self) -> dict[str, bytes]:
         manifest_csv = io.StringIO()
@@ -732,7 +733,7 @@ class InstructionPackage:
 # Analysis, interpretation, determinations, report
 # ---------------------------------------------------------------------------
 
-Cell = Union[Quantity, str, int, None]
+Cell = Quantity | str | int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -743,19 +744,19 @@ class Table:
     title: str
     columns: tuple[str, ...]
     rows: tuple[tuple[Cell, ...], ...]
-    note: Optional[str] = None
+    note: str | None = None
 
     def __post_init__(self) -> None:
         for r in self.rows:
             if len(r) != len(self.columns):
                 raise DriverError(f"table {self.title!r}: row width {len(r)} != {len(self.columns)}")
             for c in r:
-                if isinstance(c, bool) or isinstance(c, float):
+                if isinstance(c, (bool, float)):
                     raise DriverError(
                         f"table {self.title!r} contains a bare float {c!r}; numeric results must "
                         "be Quantity objects carrying provenance")
 
-    def map_quantities(self, fn: Any) -> "Table":
+    def map_quantities(self, fn: Any) -> Table:
         return replace(self, rows=tuple(tuple(fn(c) if isinstance(c, Quantity) else c for c in r)
                                         for r in self.rows))
 
@@ -829,7 +830,7 @@ class ExpertDetermination:
 
     key: str
     label: str
-    unit: Optional[str]
+    unit: str | None
     role: Role
     required_for_approval: bool
     guidance: str
@@ -856,7 +857,7 @@ class StudyReport:
     ctd_section: str
     sections: tuple[ReportSection, ...]
     evidence_admissible: bool
-    disclaimer: Optional[str] = None
+    disclaimer: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = {"title": self.title, "ctd_section": self.ctd_section,
@@ -949,13 +950,14 @@ class StudyDriver(ABC):
             "description": cls.description,
             "references": [cite(k).to_dict() for k in cls.reference_keys],
             "parameters_schema": cls.parameters_model().model_json_schema(),
-            "simulation_parameters_schema": (cls.simulation_parameters_model().model_json_schema()
-                                             if cls.simulation_parameters_model() else None),
+            "simulation_parameters_schema": (sim_model.model_json_schema()
+                                             if (sim_model := cls.simulation_parameters_model())
+                                             else None),
             "can_simulate": cls.simulation_parameters_model() is not None,
         }
 
     def probe(self, requirement: StudyRequirement,
-              context: Optional[ProgramContext] = None) -> Support:
+              context: ProgramContext | None = None) -> Support:
         """Whether this driver can serve ``requirement``. Drivers refine this; the default
         checks the match table and modality."""
         if requirement.id not in self.requirement_ids and requirement.driver_id != self.id:
@@ -981,8 +983,8 @@ class StudyDriver(ABC):
 
     @abstractmethod
     def design(self, compound: CompoundInfo, params: BaseModel,
-               context: Optional[ProgramContext] = None,
-               hypothesis: Optional[str] = None) -> ProtocolDocument: ...
+               context: ProgramContext | None = None,
+               hypothesis: str | None = None) -> ProtocolDocument: ...
 
     @abstractmethod
     def plan(self, protocol: ProtocolDocument, params: BaseModel) -> StudyPlan: ...
@@ -1013,7 +1015,7 @@ class StudyDriver(ABC):
 
     def ingest(self, content: bytes, params: BaseModel, *, filename: str = "upload.csv",
                claimed_origin: DataOrigin = DataOrigin.MEASURED,
-               study_reference: Optional[str] = None) -> IngestedData:
+               study_reference: str | None = None) -> IngestedData:
         """Strict ingest: generic template validation, then driver semantic validation."""
         template = self.data_template(params)
         data = parse_return_file(content, template, filename=filename,
@@ -1045,7 +1047,7 @@ class StudyDriver(ABC):
         return {}
 
     def analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
-                inputs: Optional[Mapping[str, Quantity]] = None) -> AnalysisResult:
+                inputs: Mapping[str, Quantity] | None = None) -> AnalysisResult:
         result = self._analyze(data, params, compound, dict(inputs or {}))
         if not data.is_simulated:
             return result
@@ -1062,10 +1064,10 @@ class StudyDriver(ABC):
 
     @abstractmethod
     def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: Optional[ProgramContext]) -> Interpretation: ...
+                   context: ProgramContext | None) -> Interpretation: ...
 
     def interpret(self, analysis: AnalysisResult, params: BaseModel,
-                  context: Optional[ProgramContext] = None) -> Interpretation:
+                  context: ProgramContext | None = None) -> Interpretation:
         interp = self._interpret(analysis, params, context)
         for s in interp.statements:
             if not s.citation_keys:
@@ -1105,7 +1107,7 @@ class StudyDriver(ABC):
     # -- simulation (optional) -------------------------------------------------
 
     @classmethod
-    def simulation_parameters_model(cls) -> Optional[type[BaseModel]]:
+    def simulation_parameters_model(cls) -> type[BaseModel] | None:
         """Pydantic model of the generator's true parameters, or None if the driver cannot
         simulate. Scientific parameters have no defaults: the user states them."""
         return None
@@ -1231,5 +1233,5 @@ def _methods_section(analysis: AnalysisResult, protocol: ProtocolDocument) -> Re
 
 
 def tabulate(title: str, columns: Iterable[str], rows: Iterable[Iterable[Cell]],
-             note: Optional[str] = None) -> Table:
+             note: str | None = None) -> Table:
     return Table(title=title, columns=tuple(columns), rows=tuple(tuple(r) for r in rows), note=note)

@@ -87,8 +87,9 @@ cd backend && HOS_DATA_DIR=./data .venv/bin/uvicorn hos.api.app:app --port 8000
 
 OpenAPI docs are served at <http://127.0.0.1:8000/docs>. Storage defaults to SQLite under
 `HOS_DATA_DIR` (default `~/.hakase_os`); set `HOS_DATABASE_URL` for PostgreSQL. On first run,
-create the administrator from the UI, or seed demo accounts (development only; credentials are in
-`backend/scripts/dev_principals.example.json`):
+create the administrator from the UI, or seed demo accounts (development only). The seeder
+generates a random password per account, prints them once and saves them to
+`backend/scripts/dev_principals.local.json`, which is gitignored:
 
 ```bash
 cd backend && .venv/bin/python scripts/seed_dev.py http://127.0.0.1:8000

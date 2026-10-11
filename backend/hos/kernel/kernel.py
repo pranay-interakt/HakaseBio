@@ -23,7 +23,8 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -65,7 +66,7 @@ from hos.kernel.execution import TargetKind, target_from_spec
 from hos.kernel.ledger import Ledger
 from hos.kernel.lifecycle import TRANSITIONS, StudyState, assert_transition
 
-__all__ = ["Kernel", "WORK_ROLES"]
+__all__ = ["WORK_ROLES", "Kernel"]
 
 #: Roles allowed to create, design, dispatch and analyse studies.
 WORK_ROLES = frozenset({Role.SCIENTIST, Role.RESPONSIBLE_SCIENTIST, Role.STUDY_DIRECTOR,
@@ -74,6 +75,17 @@ WORK_ROLES = frozenset({Role.SCIENTIST, Role.RESPONSIBLE_SCIENTIST, Role.STUDY_D
 _MIN_PASSWORD = 12
 _SCRYPT = dict(n=2**14, r=8, p=1)
 
+
+
+def _require_record(value: dict[str, Any] | None, what: str, study_id: str) -> dict[str, Any]:
+    """Return a stored study record section, or fail with a kernel error if it is absent.
+
+    The lifecycle guarantees these sections exist in the states that read them; this makes
+    the guarantee explicit so a violated invariant surfaces as a clear error, not a crash.
+    """
+    if value is None:
+        raise KernelError(f"study {study_id} has no {what}; the lifecycle invariant was violated")
+    return value
 
 def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
@@ -96,8 +108,8 @@ def _new_id(prefix: str) -> str:
 
 
 class Kernel:
-    def __init__(self, db: Optional[Database] = None, files: Optional[FileStore] = None,
-                 registry: Optional[DriverRegistry] = None) -> None:
+    def __init__(self, db: Database | None = None, files: FileStore | None = None,
+                 registry: DriverRegistry | None = None) -> None:
         self.db = db or Database()
         self.db.create_all()
         self.files = files or FileStore()
@@ -115,10 +127,10 @@ class Kernel:
                          roles=frozenset(Role(r) for r in row.roles),
                          organisation=row.organisation)
 
-    def register_principal(self, actor: Optional[Principal], *, principal_id: str, name: str,
+    def register_principal(self, actor: Principal | None, *, principal_id: str, name: str,
                            kind: PrincipalKind, roles: Sequence[Role],
-                           password: Optional[str] = None,
-                           organisation: Optional[str] = None) -> Principal:
+                           password: str | None = None,
+                           organisation: str | None = None) -> Principal:
         """Create a user or agent. The first principal bootstraps the system and must be a
         human administrator; afterwards only administrators may add principals."""
         existing = self.repo.principals()
@@ -129,10 +141,9 @@ class Kernel:
             raise PermissionDenied("the first principal must be a human administrator")
         if any(p.id == principal_id for p in existing):
             raise KernelError(f"principal {principal_id!r} already exists")
-        if kind is PrincipalKind.HUMAN:
-            if not password or len(password) < _MIN_PASSWORD:
-                raise PermissionDenied(f"human principals need a password of at least "
-                                       f"{_MIN_PASSWORD} characters")
+        if kind is PrincipalKind.HUMAN and (not password or len(password) < _MIN_PASSWORD):
+            raise PermissionDenied(f"human principals need a password of at least "
+                                   f"{_MIN_PASSWORD} characters")
         if kind is not PrincipalKind.HUMAN and any(r.is_legal_attestor for r in roles):
             raise PermissionDenied("legal attestation roles can only be held by humans")
         row = PrincipalRow(id=principal_id, name=name, kind=kind.value,
@@ -168,7 +179,7 @@ class Kernel:
     # ======================================================================
 
     def create_program(self, actor: Principal, *, name: str, context: ProgramContext,
-                       sponsor: Optional[str] = None) -> dict[str, Any]:
+                       sponsor: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
         if not name.strip():
             raise KernelError("programme name is required")
@@ -249,8 +260,8 @@ class Kernel:
                        f"{program.name}")
 
     def create_study(self, actor: Principal, *, program_id: str, compound_id: str,
-                     requirement_id: Optional[str] = None, driver_id: Optional[str] = None,
-                     hypothesis: Optional[str] = None) -> dict[str, Any]:
+                     requirement_id: str | None = None, driver_id: str | None = None,
+                     hypothesis: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
         program = self.repo.program(program_id)
         compound = self.repo.compound(compound_id)
@@ -298,7 +309,7 @@ class Kernel:
         return self.study_view(sid)
 
     def design_study(self, actor: Principal, study_id: str, parameters: Mapping[str, Any],
-                     *, reason: Optional[str] = None) -> dict[str, Any]:
+                     *, reason: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
         row = self.repo.study(study_id)
         state = StudyState(row.state)
@@ -370,8 +381,8 @@ class Kernel:
             raise NotFound("study has not been dispatched")
         return self.files.get(row.execution["bundle_file"])
 
-    def receive_data(self, actor: Principal, study_id: str, content: Optional[bytes] = None, *,
-                     filename: str = "upload.csv", reason: Optional[str] = None) -> dict[str, Any]:
+    def receive_data(self, actor: Principal, study_id: str, content: bytes | None = None, *,
+                     filename: str = "upload.csv", reason: str | None = None) -> dict[str, Any]:
         """Ingest a returned data file (or, for a simulation target, the generated file)."""
         self._require_worker(actor)
         row = self.repo.study(study_id)
@@ -451,7 +462,7 @@ class Kernel:
         return self.study_view(study_id)
 
     def analyze_study(self, actor: Principal, study_id: str, *,
-                      reason: Optional[str] = None) -> dict[str, Any]:
+                      reason: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
         row = self.repo.study(study_id)
         state = StudyState(row.state)
@@ -477,8 +488,8 @@ class Kernel:
         return self.study_view(study_id)
 
     def record_determination(self, actor: Principal, study_id: str, *, key: str,
-                             value: Optional[float], unit: Optional[str], rationale: str,
-                             reason: Optional[str] = None) -> dict[str, Any]:
+                             value: float | None, unit: str | None, rationale: str,
+                             reason: str | None = None) -> dict[str, Any]:
         """Record an expert determination (e.g. a NOAEL) the driver declared. The actor must
         be a human holding the declared role; the record is signed and bound to the exact
         analysis it interprets. The API layer re-authenticates before calling this."""
@@ -494,7 +505,7 @@ class Kernel:
         if spec.unit and not U.compatible(unit, spec.unit):
             raise KernelError(f"{key}: unit {unit!r} incompatible with {spec.unit!r}")
         existing = [d for d in row.determinations or []
-                    if d["key"] == key and d["analysis_hash"] == row.results["analysis_hash"]]
+                    if d["key"] == key and d["analysis_hash"] == _require_record(row.results, "analysis results", row.id)["analysis_hash"]]
         if existing and not (reason and reason.strip()):
             raise KernelError(f"{key} is already determined; a revision requires a reason")
         if value is None:
@@ -509,14 +520,14 @@ class Kernel:
             claim = f"I determine {spec.label} = {value:g} {unit}"
         subject = {"study_id": study_id, "key": key,
                    "value": None if value is None else float(value), "unit": unit,
-                   "rationale": rationale, "analysis_hash": row.results["analysis_hash"]}
+                   "rationale": rationale, "analysis_hash": _require_record(row.results, "analysis results", row.id)["analysis_hash"]}
         sig = sign(actor, role=spec.role, meaning=SignatureMeaning.RESPONSIBILITY,
                    subject_id=f"{study_id}/determination/{key}",
                    subject_hash=content_hash(subject),
                    statement=f"{claim}. Rationale: {rationale}")
         det = {"key": key, "label": spec.label, "quantity": q.to_dict(), "rationale": rationale,
                "role": spec.role.value, "signer_id": actor.id, "signer_name": actor.name,
-               "signed_at": sig.signed_at, "analysis_hash": row.results["analysis_hash"],
+               "signed_at": sig.signed_at, "analysis_hash": _require_record(row.results, "analysis results", row.id)["analysis_hash"],
                "signature": sig.to_dict()}
         keep = [d for d in row.determinations or [] if d not in existing]
         self.repo.add_artifact(study_id, "determination", det, actor=actor.id, reason=reason)
@@ -533,7 +544,7 @@ class Kernel:
         driver = self._driver(row)
         params = self._validate(driver, row.parameters)
         current = [d for d in row.determinations or []
-                   if d["analysis_hash"] == row.results["analysis_hash"]]
+                   if d["analysis_hash"] == _require_record(row.results, "analysis results", row.id)["analysis_hash"]]
         missing = [s.label for s in driver.expert_determinations(params)
                    if s.required_for_approval and s.key not in {d["key"] for d in current}]
         if missing:
@@ -542,11 +553,11 @@ class Kernel:
         protocol = self._verified_protocol(row, driver, params)
         res, interp = self._run_analysis(row, driver, params)
         res_d = res.to_dict()
-        if content_hash(res_d) != row.results["analysis_hash"]:
+        if content_hash(res_d) != _require_record(row.results, "analysis results", row.id)["analysis_hash"]:
             raise KernelError("re-running the analysis no longer reproduces the recorded "
                               "result (driver or reference parameters changed); re-analyse "
                               "with a reason before reporting")
-        data = IngestedData.from_dict(row.data)
+        data = IngestedData.from_dict(_require_record(row.data, "ingested data", row.id))
         report = driver.report(protocol, data, res, interp, current)
         rd = report.to_dict()
         rd["markdown"] = report.to_markdown()
@@ -687,17 +698,17 @@ class Kernel:
                                                  driver.expert_determinations(params)]
         return view
 
-    def studies(self, program_id: Optional[str] = None) -> list[dict[str, Any]]:
+    def studies(self, program_id: str | None = None) -> list[dict[str, Any]]:
         return [self._study_summary(s) for s in self.repo.studies(program_id)]
 
-    def artifacts(self, study_id: str, kind: Optional[str] = None) -> list[dict[str, Any]]:
+    def artifacts(self, study_id: str, kind: str | None = None) -> list[dict[str, Any]]:
         return [{"id": a.id, "kind": a.kind, "version": a.version, "content_hash": a.content_hash,
                  "supersedes": a.supersedes, "reason": a.reason, "created_by": a.created_by,
                  "created_at": a.created_at.isoformat(), "content": a.content}
                 for a in self.repo.artifacts(study_id, kind)]
 
     def record_event(self, actor: Principal, action: str, subject_type: str, subject_id: str,
-                     payload: dict[str, Any], *, reason: Optional[str] = None) -> None:
+                     payload: dict[str, Any], *, reason: str | None = None) -> None:
         """Ledger an event raised by a kernel service (e.g. IND assembly)."""
         self._require_worker(actor)
         self._record(actor, action, subject_type, subject_id, payload, reason=reason)
@@ -713,7 +724,7 @@ class Kernel:
     # ======================================================================
 
     def _record(self, actor: Principal, action: str, subject_type: str, subject_id: str,
-                payload: dict[str, Any], reason: Optional[str] = None) -> None:
+                payload: dict[str, Any], reason: str | None = None) -> None:
         self.ledger.record(actor_id=actor.id, actor_kind=actor.kind.value, action=action,
                            subject_type=subject_type, subject_id=subject_id, payload=payload,
                            reason=reason)
@@ -763,7 +774,7 @@ class Kernel:
         return res, driver.interpret(res, params, ctx)
 
     def _input_quantity(self, name: str, spec: Mapping[str, Any],
-                        actor: Optional[Principal]) -> Quantity:
+                        actor: Principal | None) -> Quantity:
         try:
             value = float(spec["value"])
             unit = str(spec["unit"])

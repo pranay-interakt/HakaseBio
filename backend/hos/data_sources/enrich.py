@@ -4,18 +4,21 @@ lookup itself is on the ledger."""
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from hos.data_sources.chembl import ChEMBLClient
 from hos.data_sources.pubchem import PubChemClient
 from hos.kernel.attestation import Principal
 
+if TYPE_CHECKING:
+    from hos.kernel.kernel import Kernel
+
 __all__ = ["enrich_compound"]
 
 
-def enrich_compound(kernel: Any, actor: Principal, compound_id: str, *,
-                    pubchem: Optional[PubChemClient] = None,
-                    chembl: Optional[ChEMBLClient] = None,
+def enrich_compound(kernel: Kernel, actor: Principal, compound_id: str, *,
+                    pubchem: PubChemClient | None = None,
+                    chembl: ChEMBLClient | None = None,
                     include_herg: bool = True) -> dict[str, Any]:
     row = kernel.repo.compound(compound_id)
     if not row.inchikey:

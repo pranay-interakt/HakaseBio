@@ -17,8 +17,9 @@ implications for commercial redistribution must be reviewed; docs/05).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Iterable, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 from hos.core.provenance import Citation, Provenance
@@ -26,7 +27,7 @@ from hos.core.quantity import Quantity
 from hos.data_sources.base import SourceResult, SourceStatus
 from hos.data_sources.http import CachedHttp
 
-__all__ = ["ChEMBLClient", "CHEMBL_BASE", "HERG_TARGET"]
+__all__ = ["CHEMBL_BASE", "HERG_TARGET", "ChEMBLClient"]
 
 CHEMBL_BASE = "https://www.ebi.ac.uk/chembl/api/data"
 #: ChEMBL target for human hERG (KCNH2, UniProt Q12809), verified against the live API.
@@ -38,7 +39,7 @@ _MAX_PAGES = 20
 class ChEMBLClient:
     source = "ChEMBL"
 
-    def __init__(self, http: Optional[CachedHttp] = None) -> None:
+    def __init__(self, http: CachedHttp | None = None) -> None:
         self.http = http or CachedHttp()
 
     def molecule_by_inchikey(self, inchikey: str, *, refresh: bool = False) -> SourceResult:
@@ -68,7 +69,7 @@ class ChEMBLClient:
                             from_cache=cached, license=LICENSE,
                             attribution=f"ChEMBL {cid}, EMBL-EBI, CC BY-SA 3.0")
 
-    def activities(self, molecule_chembl_id: str, *, target_chembl_id: Optional[str] = None,
+    def activities(self, molecule_chembl_id: str, *, target_chembl_id: str | None = None,
                    standard_types: Iterable[str] = (), refresh: bool = False) -> SourceResult:
         params: dict[str, Any] = {"molecule_chembl_id": molecule_chembl_id, "limit": 100}
         if target_chembl_id:
@@ -80,8 +81,8 @@ class ChEMBLClient:
         query = f"{molecule_chembl_id}/{target_chembl_id or '*'}/{','.join(types) or '*'}"
         records: list[dict[str, Any]] = []
         q: dict[str, Quantity] = {}
-        next_url: Optional[str] = url
-        first_at: Optional[str] = None
+        next_url: str | None = url
+        first_at: str | None = None
         cached_all = True
         pages = 0
         while next_url and pages < _MAX_PAGES:
@@ -91,7 +92,8 @@ class ChEMBLClient:
             if status is not SourceStatus.OK:
                 return SourceResult(self.source, status, query, url, at, from_cache=cached,
                                     error=err, license=LICENSE)
-            acts = (payload or {}).get("activities")
+            body = payload or {}
+            acts = body.get("activities")
             if acts is None:
                 return SourceResult(self.source, SourceStatus.ERROR, query, url, at,
                                     error="unexpected response schema", license=LICENSE)
@@ -100,7 +102,7 @@ class ChEMBLClient:
                 records.append(rec)
                 if qty is not None:
                     q[f"activity:{a.get('activity_id')}"] = qty
-            nxt = (payload.get("page_meta") or {}).get("next")
+            nxt = (body.get("page_meta") or {}).get("next")
             next_url = f"https://www.ebi.ac.uk{nxt}" if nxt else None
             pages += 1
         truncated = next_url is not None
@@ -121,7 +123,7 @@ class ChEMBLClient:
 _UNIT_MAP = {"nM": "nM", "uM": "uM", "mM": "mM", "pM": "pM", "M": "M"}
 
 
-def _activity(a: dict[str, Any], at: Optional[str]) -> tuple[dict[str, Any], Optional[Quantity]]:
+def _activity(a: dict[str, Any], at: str | None) -> tuple[dict[str, Any], Quantity | None]:
     doc = a.get("document_chembl_id")
     rec = {k: a.get(k) for k in ("activity_id", "standard_type", "standard_relation",
                                  "standard_value", "standard_units", "pchembl_value",

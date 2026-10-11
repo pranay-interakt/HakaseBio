@@ -12,4 +12,4 @@ from hos.data_sources.chembl import ChEMBLClient
 from hos.data_sources.http import CachedHttp
 from hos.data_sources.pubchem import PubChemClient
 
-__all__ = ["SourceResult", "SourceStatus", "CachedHttp", "PubChemClient", "ChEMBLClient"]
+__all__ = ["CachedHttp", "ChEMBLClient", "PubChemClient", "SourceResult", "SourceStatus"]

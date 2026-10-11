@@ -1,6 +1,7 @@
 """Repeat-dose toxicity driver: TG design rules, Dunnett 1955 known values, NOAEL boundary."""
 
 import pytest
+from pydantic import ValidationError
 
 from hos.core.regulatory import Indication, Modality, ProgramContext, Route, derive_study_set
 from hos.drivers.base import CompoundInfo
@@ -54,7 +55,7 @@ def _dunnett_params():
 
 
 def test_conformance_kit_passes():
-    p = D.validate_parameters(PARAMS)
+    D.validate_parameters(PARAMS)
     rep = check_driver(D, compound=COMPOUND, parameters=PARAMS, simulation_parameters=SIM)
     assert rep.passed, rep.summary()
 
@@ -96,13 +97,13 @@ def test_system_never_decides_noael():
     ({"recovery_duration_days": 7}, "at least 14 days"),
 ])
 def test_tg407_design_minimums_enforced(change, needle):
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValidationError) as e:
         D.validate_parameters(dict(PARAMS, **change))
     assert needle in str(e.value)
 
 
 def test_tg408_and_409_minimums():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         D.validate_parameters(dict(PARAMS, guideline_basis="oecd_tg408", dosing_duration_days=90,
                                    animals_per_sex_per_group=5))
     D.validate_parameters(dict(PARAMS, guideline_basis="oecd_tg409", species="dog",
@@ -132,6 +133,6 @@ def test_requirement_prefill_from_m3r2_table1():
         modality=Modality.SMALL_MOLECULE, indication=Indication.CHRONIC_NON_ONCOLOGY,
         route=Route.ORAL, intended_clinical_duration_days=365, max_trial_duration_days=28))
     req = next(r for r in ss.requirements if r.id == "tox.repeat_dose_rodent")
-    (d, s), = default_registry().match(req, ss.context)
+    (_d, s), = default_registry().match(req, ss.context)
     assert s.prefill == {"glp": True, "species": "rat", "dosing_duration_days": 28,
                          "guideline_basis": "oecd_tg407"}

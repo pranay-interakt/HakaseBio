@@ -21,7 +21,9 @@ driver's statistics.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from itertools import pairwise
+from typing import Any, Literal
 
 import numpy as np
 import scipy
@@ -74,7 +76,7 @@ class EndpointSpec(BaseModel):
     name: str = Field(min_length=1, pattern=r"^[^|,]+$")
     unit: str = Field(min_length=1)
     category: Category
-    checklist_item: Optional[str] = Field(
+    checklist_item: str | None = Field(
         default=None, description="the guideline checklist item this endpoint satisfies")
 
     @field_validator("unit")
@@ -96,8 +98,8 @@ class RepeatDoseParams(BaseModel):
     animals_per_sex_per_group: int = Field(ge=2)
     dosing_duration_days: int = Field(ge=1)
     recovery: bool
-    recovery_animals_per_sex: Optional[int] = Field(default=None, ge=2)
-    recovery_duration_days: Optional[int] = Field(default=None, ge=1)
+    recovery_animals_per_sex: int | None = Field(default=None, ge=2)
+    recovery_duration_days: int | None = Field(default=None, ge=1)
     endpoints: list[EndpointSpec] = Field(min_length=1)
     timepoints: list[str] = Field(min_length=1)
     alpha: float = Field(gt=0, lt=0.5)
@@ -108,7 +110,7 @@ class RepeatDoseParams(BaseModel):
     def _doses(cls, v: list[float]) -> list[float]:
         if any(d <= 0 for d in v):
             raise ValueError("dose levels exclude the control (0) and must be positive")
-        if any(b <= a for a, b in zip(v, v[1:])):
+        if any(b <= a for a, b in pairwise(v)):
             raise ValueError("dose levels must be strictly increasing")
         return v
 
@@ -120,7 +122,7 @@ class RepeatDoseParams(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _guideline(self) -> "RepeatDoseParams":
+    def _guideline(self) -> RepeatDoseParams:
         if self.recovery and (self.recovery_animals_per_sex is None or
                               self.recovery_duration_days is None):
             raise ValueError("recovery groups need recovery_animals_per_sex and "
@@ -208,7 +210,7 @@ class RepeatDoseToxicityDriver(StudyDriver):
         if requirement.species:
             out["species"] = requirement.species[0]
         if requirement.duration_weeks:
-            days = int(round(requirement.duration_weeks * 7))
+            days = round(requirement.duration_weeks * 7)
             out["dosing_duration_days"] = days
             sp = out.get("species")
             if sp in RODENTS and days == 28:
@@ -222,7 +224,7 @@ class RepeatDoseToxicityDriver(StudyDriver):
         return out
 
     def probe(self, requirement: StudyRequirement,
-              context: Optional[ProgramContext] = None) -> Support:
+              context: ProgramContext | None = None) -> Support:
         s = super().probe(requirement, context)
         if not s.supported:
             return s
@@ -234,13 +236,13 @@ class RepeatDoseToxicityDriver(StudyDriver):
     # -- design ----------------------------------------------------------------
 
     def design(self, compound: CompoundInfo, params: BaseModel,
-               context: Optional[ProgramContext] = None,
-               hypothesis: Optional[str] = None) -> ProtocolDocument:
+               context: ProgramContext | None = None,
+               hypothesis: str | None = None) -> ProtocolDocument:
         p = _p(params)
         g = GUIDELINES.get(p.guideline_basis)
         cov = self.coverage(p)
         doses = p.groups()
-        spacing = [b / a for a, b in zip(p.dose_levels_mg_per_kg_day, p.dose_levels_mg_per_kg_day[1:])]
+        spacing = [b / a for a, b in pairwise(p.dose_levels_mg_per_kg_day)]
         design: dict[str, Any] = {
             "species": f"{p.species} ({p.strain})", "route": p.route, "vehicle": p.vehicle,
             "groups_mg_per_kg_day": [f"{d:g}" for d in doses],
@@ -458,12 +460,12 @@ class RepeatDoseToxicityDriver(StudyDriver):
             if len(ctrl) < 2 or not treated:
                 notes.append(f"{endpoint}/{sex}/{phase}/{tp}: control n < 2 or no testable "
                              "group; no comparison")
-                pvals: dict[float, Optional[float]] = {}
+                pvals: dict[float, float | None] = {}
             else:
                 res = stats.dunnett(*[np.asarray(groups[d]) for d in treated],
                                     control=np.asarray(ctrl), alternative="two-sided",
                                     rng=np.random.default_rng(DUNNETT_QMC_SEED))
-                pvals = {d: float(pv) for d, pv in zip(treated, res.pvalue)}
+                pvals = {d: float(pv) for d, pv in zip(treated, res.pvalue, strict=True)}
             cmean = float(np.mean(ctrl)) if ctrl else None
             label = f"{endpoint} ({sex}, {phase}, {tp})"
             for d in sorted(groups):
@@ -521,7 +523,7 @@ class RepeatDoseToxicityDriver(StudyDriver):
     # -- interpretation --------------------------------------------------------
 
     def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: Optional[ProgramContext]) -> Interpretation:
+                   context: ProgramContext | None) -> Interpretation:
         p = _p(params)
         g = GUIDELINES.get(p.guideline_basis)
         cites = ("dunnett1955",) + ((g.citation_key,) if g else ("ich_m3r2",))

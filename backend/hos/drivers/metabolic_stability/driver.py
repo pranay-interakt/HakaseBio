@@ -16,7 +16,9 @@ them; cited recommendations are offered separately (``recommendations.py``).
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from itertools import pairwise
+from typing import Any, Literal
 
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -62,13 +64,13 @@ TEST_ARTICLE_CODE = "TA"
 
 class PositiveControl(BaseModel):
     name: str = Field(min_length=1)
-    acceptance_clint_low_uL_min_mg: Optional[float] = Field(default=None, gt=0)
-    acceptance_clint_high_uL_min_mg: Optional[float] = Field(default=None, gt=0)
-    acceptance_basis: Optional[str] = Field(
+    acceptance_clint_low_uL_min_mg: float | None = Field(default=None, gt=0)
+    acceptance_clint_high_uL_min_mg: float | None = Field(default=None, gt=0)
+    acceptance_basis: str | None = Field(
         default=None, description="Source of the acceptance range, e.g. lab SOP and revision")
 
     @model_validator(mode="after")
-    def _range(self) -> "PositiveControl":
+    def _range(self) -> PositiveControl:
         lo, hi = self.acceptance_clint_low_uL_min_mg, self.acceptance_clint_high_uL_min_mg
         if (lo is None) != (hi is None):
             raise ValueError("give both ends of the acceptance range or neither")
@@ -97,7 +99,7 @@ class MetabolicStabilityParams(BaseModel):
     acceptance_min_depletion_percent: float = Field(ge=0, lt=100)
     acceptance_basis: str = Field(min_length=1,
                                   description="Where the acceptance criteria come from")
-    max_minus_nadph_loss_percent: Optional[float] = Field(default=None, ge=0, lt=100)
+    max_minus_nadph_loss_percent: float | None = Field(default=None, ge=0, lt=100)
     fu_mic_correction: Literal["none", "hallifax_houston"] = "none"
 
     @field_validator("timepoints_min")
@@ -105,7 +107,7 @@ class MetabolicStabilityParams(BaseModel):
     def _times(cls, v: list[float]) -> list[float]:
         if v[0] != 0:
             raise ValueError("the first timepoint must be 0 min (the reference sample)")
-        if any(b <= a for a, b in zip(v, v[1:])):
+        if any(b <= a for a, b in pairwise(v)):
             raise ValueError("timepoints must be strictly increasing")
         return v
 
@@ -129,7 +131,7 @@ class MetabolicStabilitySimulation(BaseModel):
     half_life_min: dict[str, float] = Field(description="true t1/2 per species (test article)")
     control_half_life_min: dict[str, dict[str, float]] = Field(
         default_factory=dict, description="code -> species -> t1/2")
-    minus_nadph_half_life_min: Optional[float] = Field(
+    minus_nadph_half_life_min: float | None = Field(
         default=None, gt=0, description="t1/2 without cofactor; omit for no loss")
     t0_response: float = Field(gt=0)
     analytical_cv: float = Field(ge=0, lt=1, description="multiplicative log-normal noise SD")
@@ -167,8 +169,8 @@ class MetabolicStabilityDriver(StudyDriver):
     # -- design ----------------------------------------------------------------
 
     def design(self, compound: CompoundInfo, params: BaseModel,
-               context: Optional[ProgramContext] = None,
-               hypothesis: Optional[str] = None) -> ProtocolDocument:
+               context: ProgramContext | None = None,
+               hypothesis: str | None = None) -> ProtocolDocument:
         p = _p(params)
         controls = [c.name for c in p.positive_controls]
         steps = (
@@ -367,7 +369,7 @@ class MetabolicStabilityDriver(StudyDriver):
         return out
 
     def _series(self, data: IngestedData, code: str, species: str,
-                cofactor: str) -> tuple[Optional[MeasurementSeries], list[str]]:
+                cofactor: str) -> tuple[MeasurementSeries | None, list[str]]:
         by_t: dict[float, list[float]] = defaultdict(list)
         blq_t: set[float] = set()
         for r in data.records:
@@ -420,7 +422,7 @@ class MetabolicStabilityDriver(StudyDriver):
                                 min_depletion_pct=p.acceptance_min_depletion_percent)
             findings += [QCFinding(f"{sp}.{f.code}", f.status, f.message, f.observed, f.threshold)
                          for f in fit.qc.findings]
-            for t, y in zip(s.x, s.y):
+            for t, y in zip(s.x, s.y, strict=True):
                 course_rows.append((sp, Quantity.user_supplied(t, "min", actor="study protocol",
                                                                label="nominal sampling time"),
                                     Quantity.computed(100.0 * y / s.y[0], "percent",
@@ -519,7 +521,7 @@ class MetabolicStabilityDriver(StudyDriver):
     # -- interpretation --------------------------------------------------------
 
     def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: Optional[ProgramContext]) -> Interpretation:
+                   context: ProgramContext | None) -> Interpretation:
         p = _p(params)
         out: list[InterpretiveStatement] = []
         judgement: list[str] = []

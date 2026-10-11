@@ -9,7 +9,7 @@ import pytest
 
 from hos.kernel.attestation import Role, SignatureMeaning
 from hos.kernel.errors import AttestationRequired, PermissionDenied
-from tests.drivers.test_repeat_dose_tox import COMPOUND, D, PARAMS, SIM
+from tests.drivers.test_repeat_dose_tox import COMPOUND, PARAMS, SIM, D
 from tests.kernel.test_kernel import CTX, k  # noqa: F401  (fixture)
 
 

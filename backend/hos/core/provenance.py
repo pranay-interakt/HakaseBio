@@ -22,18 +22,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 __all__ = [
-    "ProvenanceKind",
+    "ApplicabilityCheck",
     "Citation",
     "Method",
-    "Uncertainty",
-    "ApplicabilityCheck",
     "Provenance",
+    "ProvenanceKind",
+    "Uncertainty",
     "utc_now",
 ]
 
@@ -91,9 +92,9 @@ class Citation:
 
     key: str
     text: str
-    doi: Optional[str] = None
-    url: Optional[str] = None
-    year: Optional[int] = None
+    doi: str | None = None
+    url: str | None = None
+    year: int | None = None
 
     def __post_init__(self) -> None:
         if not self.key or not self.key.strip():
@@ -158,10 +159,10 @@ class Uncertainty:
     """
 
     kind: str
-    lower: Optional[float] = None
-    upper: Optional[float] = None
-    sd: Optional[float] = None
-    n: Optional[int] = None
+    lower: float | None = None
+    upper: float | None = None
+    sd: float | None = None
+    n: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -184,9 +185,9 @@ class ApplicabilityCheck:
 
     in_domain: bool
     descriptor_ranges_checked: tuple[str, ...] = ()
-    reason: Optional[str] = None
-    distance_metric: Optional[str] = None
-    distance_value: Optional[float] = None
+    reason: str | None = None
+    distance_metric: str | None = None
+    distance_value: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -207,19 +208,19 @@ class Provenance:
     """
 
     kind: ProvenanceKind
-    method: Optional[Method] = None
-    citation: Optional[Citation] = None
-    source_name: Optional[str] = None
-    source_url: Optional[str] = None
-    source_record_id: Optional[str] = None
-    retrieved_at: Optional[datetime] = None
-    actor: Optional[str] = None
+    method: Method | None = None
+    citation: Citation | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    source_record_id: str | None = None
+    retrieved_at: datetime | None = None
+    actor: str | None = None
     input_ids: tuple[str, ...] = ()
     software: Mapping[str, str] = field(default_factory=dict)
-    parameter_set_version: Optional[str] = None
-    applicability: Optional[ApplicabilityCheck] = None
-    reason: Optional[str] = None
-    notes: Optional[str] = None
+    parameter_set_version: str | None = None
+    applicability: ApplicabilityCheck | None = None
+    reason: str | None = None
+    notes: str | None = None
     recorded_at: datetime = field(default_factory=utc_now)
 
     def __post_init__(self) -> None:
@@ -251,10 +252,10 @@ class Provenance:
         cls,
         *,
         source_name: str,
-        actor: Optional[str] = None,
-        source_record_id: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Provenance":
+        actor: str | None = None,
+        source_record_id: str | None = None,
+        notes: str | None = None,
+    ) -> Provenance:
         return cls(
             kind=ProvenanceKind.MEASURED,
             source_name=source_name,
@@ -268,12 +269,12 @@ class Provenance:
         cls,
         *,
         source_name: str,
-        citation: Optional[Citation] = None,
-        source_url: Optional[str] = None,
-        source_record_id: Optional[str] = None,
-        retrieved_at: Optional[datetime] = None,
-        notes: Optional[str] = None,
-    ) -> "Provenance":
+        citation: Citation | None = None,
+        source_url: str | None = None,
+        source_record_id: str | None = None,
+        retrieved_at: datetime | None = None,
+        notes: str | None = None,
+    ) -> Provenance:
         if citation is None:
             citation = Citation(
                 key=f"db:{source_name}",
@@ -296,10 +297,10 @@ class Provenance:
         *,
         method: Method,
         input_ids: Sequence[str] = (),
-        software: Optional[Mapping[str, str]] = None,
-        parameter_set_version: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Provenance":
+        software: Mapping[str, str] | None = None,
+        parameter_set_version: str | None = None,
+        notes: str | None = None,
+    ) -> Provenance:
         return cls(
             kind=ProvenanceKind.COMPUTED,
             method=method,
@@ -316,9 +317,9 @@ class Provenance:
         method: Method,
         applicability: ApplicabilityCheck,
         input_ids: Sequence[str] = (),
-        software: Optional[Mapping[str, str]] = None,
-        notes: Optional[str] = None,
-    ) -> "Provenance":
+        software: Mapping[str, str] | None = None,
+        notes: str | None = None,
+    ) -> Provenance:
         return cls(
             kind=ProvenanceKind.PREDICTED,
             method=method,
@@ -333,10 +334,10 @@ class Provenance:
         cls,
         *,
         citation: Citation,
-        source_record_id: Optional[str] = None,
-        parameter_set_version: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Provenance":
+        source_record_id: str | None = None,
+        parameter_set_version: str | None = None,
+        notes: str | None = None,
+    ) -> Provenance:
         return cls(
             kind=ProvenanceKind.GUIDELINE,
             citation=citation,
@@ -351,9 +352,9 @@ class Provenance:
         *,
         method: Method,
         parameters: str,
-        seed: Optional[int] = None,
-        software: Optional[Mapping[str, str]] = None,
-    ) -> "Provenance":
+        seed: int | None = None,
+        software: Mapping[str, str] | None = None,
+    ) -> Provenance:
         note = f"SIMULATED - not a measurement. generator parameters: {parameters}"
         if seed is not None:
             note += f"; seed={seed}"
@@ -366,16 +367,16 @@ class Provenance:
         )
 
     @classmethod
-    def user_supplied(cls, *, actor: str, notes: Optional[str] = None) -> "Provenance":
+    def user_supplied(cls, *, actor: str, notes: str | None = None) -> Provenance:
         return cls(kind=ProvenanceKind.USER_SUPPLIED, actor=actor, notes=notes)
 
     @classmethod
-    def unavailable(cls, *, reason: str, source_name: Optional[str] = None) -> "Provenance":
+    def unavailable(cls, *, reason: str, source_name: str | None = None) -> Provenance:
         return cls(kind=ProvenanceKind.UNAVAILABLE, reason=reason, source_name=source_name)
 
     # -- helpers ------------------------------------------------------------
 
-    def with_note(self, note: str) -> "Provenance":
+    def with_note(self, note: str) -> Provenance:
         merged = f"{self.notes}; {note}" if self.notes else note
         return replace(self, notes=merged)
 

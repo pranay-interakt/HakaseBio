@@ -88,6 +88,7 @@ def test_cache_keeps_original_retrieval_time(tmp_path):
 
 def test_fixtures_carry_capture_metadata():
     import json
+
     from tests.fixtures.transport import FIXTURE_DIR
     for f in FIXTURE_DIR.glob("*.json"):
         d = json.loads(f.read_text())

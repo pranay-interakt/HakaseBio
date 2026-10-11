@@ -16,10 +16,10 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hos.core.provenance import utc_now  # noqa: E402
-from hos.data_sources import CachedHttp, ChEMBLClient, PubChemClient  # noqa: E402
-from hos.data_sources.http import USER_AGENT  # noqa: E402
-from tests.fixtures.transport import fixture_path  # noqa: E402
+from hos.core.provenance import utc_now
+from hos.data_sources import CachedHttp, ChEMBLClient, PubChemClient
+from hos.data_sources.http import USER_AGENT
+from tests.fixtures.transport import fixture_path
 
 
 class Recording(httpx.BaseTransport):

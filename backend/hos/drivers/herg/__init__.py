@@ -2,4 +2,4 @@
 
 from hos.drivers.herg.driver import HergParams, HergPatchClampDriver
 
-__all__ = ["HergPatchClampDriver", "HergParams"]
+__all__ = ["HergParams", "HergPatchClampDriver"]

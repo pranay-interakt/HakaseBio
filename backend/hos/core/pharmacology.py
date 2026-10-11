@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import scipy
@@ -27,7 +27,7 @@ from hos.core.provenance import Uncertainty
 from hos.core.qc import QCFinding, QCStatus, QCVerdict
 from hos.core.quantity import MeasurementSeries, Quantity, QuantityError
 
-__all__ = ["HillFit", "four_parameter_logistic", "fit_hill", "herg_safety_margin"]
+__all__ = ["HillFit", "fit_hill", "four_parameter_logistic", "herg_safety_margin"]
 
 _SOFTWARE = {"numpy": np.__version__, "scipy": scipy.__version__}
 
@@ -86,9 +86,9 @@ def fit_hill(
     *,
     min_r2: float,
     potency_label: str = "IC50",
-    fix_bottom: Optional[float] = None,
-    fix_top: Optional[float] = None,
-    hill_slope_warn_range: Optional[tuple[float, float]] = None,
+    fix_bottom: float | None = None,
+    fix_top: float | None = None,
+    hill_slope_warn_range: tuple[float, float] | None = None,
 ) -> HillFit:
     """Fit a 4PL curve to concentration-response data.
 
@@ -134,7 +134,7 @@ def fit_hill(
         [y_hi + 5 * y_range, y_hi + 5 * y_range, hi_c * span * 100.0, 10.0],
     )
     p0 = [p_bottom, p_top, p_ic50, p_hill]
-    p0 = [min(max(v, lo), hi) for v, lo, hi in zip(p0, bounds[0], bounds[1])]
+    p0 = [min(max(v, lo), hi) for v, lo, hi in zip(p0, bounds[0], bounds[1], strict=True)]
 
     findings: list[QCFinding] = []
     try:

@@ -9,7 +9,7 @@ fact recorded, not as measurements.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 from hos.core.provenance import Citation, Provenance
@@ -17,7 +17,7 @@ from hos.core.quantity import Quantity
 from hos.data_sources.base import SourceResult, SourceStatus
 from hos.data_sources.http import CachedHttp
 
-__all__ = ["PubChemClient", "PUBCHEM_BASE"]
+__all__ = ["PUBCHEM_BASE", "PubChemClient"]
 
 PUBCHEM_BASE = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
 _PROPS = ("MolecularFormula,MolecularWeight,ExactMass,XLogP,TPSA,HBondDonorCount,"
@@ -36,7 +36,7 @@ LICENSE = "Public domain (NCBI PubChem)"
 class PubChemClient:
     source = "PubChem"
 
-    def __init__(self, http: Optional[CachedHttp] = None) -> None:
+    def __init__(self, http: CachedHttp | None = None) -> None:
         self.http = http or CachedHttp()
 
     def compound_by_inchikey(self, inchikey: str, *, refresh: bool = False) -> SourceResult:
@@ -45,6 +45,9 @@ class PubChemClient:
         if status is not SourceStatus.OK:
             return SourceResult(self.source, status, inchikey, url, at, from_cache=cached,
                                 error=err, license=LICENSE)
+        if payload is None:
+            return SourceResult(self.source, SourceStatus.ERROR, inchikey, url, at,
+                                error="empty response body", license=LICENSE)
         try:
             props = payload["PropertyTable"]["Properties"]
         except (KeyError, TypeError):
@@ -80,8 +83,8 @@ class PubChemClient:
                             attribution=f"PubChem CID {cid}")
 
 
-def _lit(value: float, unit: str, label: str, cid: Any, record_url: str, at: Optional[str],
-         note: Optional[str]) -> Quantity:
+def _lit(value: float, unit: str, label: str, cid: Any, record_url: str, at: str | None,
+         note: str | None) -> Quantity:
     from datetime import datetime
     prov = Provenance.literature(
         source_name="PubChem",

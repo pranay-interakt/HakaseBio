@@ -14,15 +14,15 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Iterator
 from importlib.metadata import entry_points
-from typing import Iterator, Optional
 
 from hos.core.regulatory.context import ProgramContext
 from hos.core.regulatory.engine import StudyRequirement
 from hos.drivers.base import DRIVER_ABI, StudyDriver, Support
 from hos.kernel.errors import DriverError, NotFound
 
-__all__ = ["DriverRegistry", "default_registry", "BUILTIN_DRIVERS"]
+__all__ = ["BUILTIN_DRIVERS", "DriverRegistry", "default_registry"]
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class DriverRegistry:
         for ep in entry_points(group="hos.drivers"):
             try:
                 loaded.append(self.register(ep.load()).id)
-            except Exception as exc:  # a broken plug-in must not take the kernel down
+            except Exception as exc:  # noqa: BLE001 - a broken plug-in must not take the kernel down
                 log.error("failed to load driver entry point %s: %s", ep.name, exc)
         return loaded
 
@@ -92,7 +92,7 @@ class DriverRegistry:
         return sorted(self._drivers)
 
     def match(self, requirement: StudyRequirement,
-              context: Optional[ProgramContext] = None) -> list[tuple[StudyDriver, Support]]:
+              context: ProgramContext | None = None) -> list[tuple[StudyDriver, Support]]:
         """Every registered driver that supports ``requirement``, with its probe result."""
         out = []
         for d in self:
@@ -102,7 +102,7 @@ class DriverRegistry:
         return out
 
 
-_DEFAULT: Optional[DriverRegistry] = None
+_DEFAULT: DriverRegistry | None = None
 
 
 def default_registry() -> DriverRegistry:

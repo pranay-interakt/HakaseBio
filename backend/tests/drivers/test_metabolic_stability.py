@@ -3,6 +3,7 @@
 import math
 
 import pytest
+from pydantic import ValidationError
 
 from hos.core.quantity import Quantity
 from hos.core.regulatory import Indication, Modality, ProgramContext, Route, derive_study_set
@@ -124,17 +125,17 @@ def test_wrong_study_reference_rejected():
 
 
 def test_parameters_have_no_scientific_defaults():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         D.validate_parameters({"species": ["human"]})
 
 
 def test_timepoints_must_start_at_zero():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         D.validate_parameters(dict(PARAMS, timepoints_min=[5, 15, 30]))
 
 
 def test_acceptance_range_requires_basis():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         D.validate_parameters(dict(PARAMS, positive_controls=[
             {"name": "x", "acceptance_clint_low_uL_min_mg": 1, "acceptance_clint_high_uL_min_mg": 2}]))
 

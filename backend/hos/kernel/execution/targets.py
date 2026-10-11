@@ -4,24 +4,31 @@ from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
 from hos.core.provenance import utc_now
-from hos.drivers.base import CompoundInfo, DataOrigin, InstructionPackage, SimulatedDataset, StudyDriver
+from hos.drivers.base import (
+    CompoundInfo,
+    DataOrigin,
+    InstructionPackage,
+    SimulatedDataset,
+    StudyDriver,
+)
 from hos.kernel.errors import KernelError
 
 __all__ = [
-    "TargetKind",
-    "DispatchStatus",
     "DispatchRecord",
+    "DispatchStatus",
     "ExecutionTarget",
     "ExternalLabTarget",
     "InHouseTarget",
     "SimulationTarget",
+    "TargetKind",
     "target_from_spec",
 ]
 
@@ -49,7 +56,7 @@ class DispatchRecord:
     protocol_hash: str
     status: DispatchStatus
     expected_origin: DataOrigin
-    simulated: Optional[SimulatedDataset] = None
+    simulated: SimulatedDataset | None = None
     notes: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,9 +100,9 @@ class ExternalLabTarget(ExecutionTarget):
     HOS records it but never estimates a price."""
 
     laboratory: str
-    contact: Optional[str] = None
-    quote_reference: Optional[str] = None
-    glp_certified: Optional[bool] = None
+    contact: str | None = None
+    quote_reference: str | None = None
+    glp_certified: bool | None = None
     kind: TargetKind = TargetKind.EXTERNAL_LAB
 
     def __post_init__(self) -> None:

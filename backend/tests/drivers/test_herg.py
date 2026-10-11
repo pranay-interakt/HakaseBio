@@ -1,8 +1,8 @@
 """hERG driver: conformance, exact IC50 recovery, Q&A 1.2 margin, Q&A 2.1 controls."""
 
-import math
 
 import pytest
+from pydantic import ValidationError
 
 from hos.core.descriptors import compute_profile
 from hos.core.quantity import Quantity
@@ -102,7 +102,7 @@ def test_no_threshold_means_expert_judgement_not_a_verdict():
 
 
 def test_threshold_requires_basis_and_is_applied():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         D.validate_parameters(dict(PARAMS, margin_threshold=51))
     p = D.validate_parameters(dict(PARAMS, margin_threshold=1000,
                                    margin_threshold_basis="lab reference set, pooled upper bound"))

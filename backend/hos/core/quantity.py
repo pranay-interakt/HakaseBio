@@ -19,8 +19,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any
 
 from hos.core import units as U
 from hos.core.provenance import (
@@ -31,7 +32,7 @@ from hos.core.provenance import (
     ProvenanceKind,
 )
 
-__all__ = ["Quantity", "MeasurementSeries", "QuantityError", "SIMULATION_TAINT"]
+__all__ = ["SIMULATION_TAINT", "MeasurementSeries", "Quantity", "QuantityError"]
 
 #: QC flag carried by every value derived, at any distance, from simulated data. A COMPUTED
 #: value is only as admissible as its inputs; this flag is how that is preserved once the
@@ -47,11 +48,11 @@ class QuantityError(ValueError):
 class Quantity:
     """A scientific value that knows where it came from."""
 
-    value: Optional[float]
+    value: float | None
     unit: str
     provenance: Provenance
-    uncertainty: Optional[Any] = None
-    label: Optional[str] = None
+    uncertainty: Any | None = None
+    label: str | None = None
     qc_flags: tuple[str, ...] = field(default_factory=tuple)
 
     # -- invariants ---------------------------------------------------------
@@ -81,12 +82,12 @@ class Quantity:
         unit: str,
         *,
         source_name: str,
-        actor: Optional[str] = None,
-        source_record_id: Optional[str] = None,
-        uncertainty: Optional[Any] = None,
-        label: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        actor: str | None = None,
+        source_record_id: str | None = None,
+        uncertainty: Any | None = None,
+        label: str | None = None,
+        notes: str | None = None,
+    ) -> Quantity:
         return cls(
             value=float(value),
             unit=unit,
@@ -107,13 +108,13 @@ class Quantity:
         unit: str,
         *,
         source_name: str,
-        citation: Optional[Citation] = None,
-        source_url: Optional[str] = None,
-        source_record_id: Optional[str] = None,
-        uncertainty: Optional[Any] = None,
-        label: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        citation: Citation | None = None,
+        source_url: str | None = None,
+        source_record_id: str | None = None,
+        uncertainty: Any | None = None,
+        label: str | None = None,
+        notes: str | None = None,
+    ) -> Quantity:
         return cls(
             value=float(value),
             unit=unit,
@@ -135,14 +136,14 @@ class Quantity:
         unit: str,
         *,
         method: Method,
-        inputs: Sequence["Quantity"] = (),
-        software: Optional[dict[str, str]] = None,
-        parameter_set_version: Optional[str] = None,
-        uncertainty: Optional[Any] = None,
-        label: Optional[str] = None,
+        inputs: Sequence[Quantity] = (),
+        software: dict[str, str] | None = None,
+        parameter_set_version: str | None = None,
+        uncertainty: Any | None = None,
+        label: str | None = None,
         qc_flags: Iterable[str] = (),
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        notes: str | None = None,
+    ) -> Quantity:
         return cls(
             value=float(value),
             unit=unit,
@@ -166,13 +167,13 @@ class Quantity:
         *,
         method: Method,
         applicability: ApplicabilityCheck,
-        inputs: Sequence["Quantity"] = (),
-        software: Optional[dict[str, str]] = None,
-        uncertainty: Optional[Any] = None,
-        label: Optional[str] = None,
+        inputs: Sequence[Quantity] = (),
+        software: dict[str, str] | None = None,
+        uncertainty: Any | None = None,
+        label: str | None = None,
         qc_flags: Iterable[str] = (),
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        notes: str | None = None,
+    ) -> Quantity:
         flags = list(qc_flags)
         if not applicability.in_domain:
             flags.append("out_of_applicability_domain")
@@ -198,11 +199,11 @@ class Quantity:
         unit: str,
         *,
         citation: Citation,
-        source_record_id: Optional[str] = None,
-        parameter_set_version: Optional[str] = None,
-        label: Optional[str] = None,
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        source_record_id: str | None = None,
+        parameter_set_version: str | None = None,
+        label: str | None = None,
+        notes: str | None = None,
+    ) -> Quantity:
         return cls(
             value=float(value),
             unit=unit,
@@ -222,10 +223,10 @@ class Quantity:
         unit: str,
         *,
         actor: str,
-        label: Optional[str] = None,
-        uncertainty: Optional[Any] = None,
-        notes: Optional[str] = None,
-    ) -> "Quantity":
+        label: str | None = None,
+        uncertainty: Any | None = None,
+        notes: str | None = None,
+    ) -> Quantity:
         return cls(
             value=float(value),
             unit=unit,
@@ -240,9 +241,9 @@ class Quantity:
         unit: str,
         *,
         reason: str,
-        source_name: Optional[str] = None,
-        label: Optional[str] = None,
-    ) -> "Quantity":
+        source_name: str | None = None,
+        label: str | None = None,
+    ) -> Quantity:
         """Represent an honest gap. ``value`` is ``None`` and the reason is carried."""
         return cls(
             value=None,
@@ -275,7 +276,7 @@ class Quantity:
         """False for simulated or unavailable values and for anything derived from simulation."""
         return self.provenance.kind.admissible_as_evidence and SIMULATION_TAINT not in self.qc_flags
 
-    def tainted_by_simulation(self) -> "Quantity":
+    def tainted_by_simulation(self) -> Quantity:
         """Mark this value as derived from simulated data (idempotent)."""
         return self.with_flags(SIMULATION_TAINT)
 
@@ -308,7 +309,7 @@ class Quantity:
         """Magnitude converted to ``unit``; raises if unavailable or incompatible."""
         return U.convert(self.require(), self.unit, unit)
 
-    def to(self, unit: str) -> "Quantity":
+    def to(self, unit: str) -> Quantity:
         """Convert to another unit, preserving provenance and recording the conversion."""
         if self.value is None:
             return replace(self, unit=unit)
@@ -320,10 +321,10 @@ class Quantity:
             provenance=self.provenance.with_note(f"converted {self.unit} -> {unit}"),
         )
 
-    def with_flags(self, *flags: str) -> "Quantity":
+    def with_flags(self, *flags: str) -> Quantity:
         return replace(self, qc_flags=tuple(dict.fromkeys((*self.qc_flags, *flags))))
 
-    def relabel(self, label: str) -> "Quantity":
+    def relabel(self, label: str) -> Quantity:
         return replace(self, label=label)
 
     # -- presentation -------------------------------------------------------

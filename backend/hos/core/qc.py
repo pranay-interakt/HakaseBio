@@ -7,11 +7,12 @@ QC findings travel with the result rather than being logged and forgotten, and a
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
-__all__ = ["QCStatus", "QCFinding", "QCVerdict"]
+__all__ = ["QCFinding", "QCStatus", "QCVerdict"]
 
 
 class QCStatus(str, Enum):
@@ -47,7 +48,7 @@ class QCVerdict:
     findings: tuple[QCFinding, ...] = field(default_factory=tuple)
 
     @classmethod
-    def of(cls, findings: Iterable[QCFinding]) -> "QCVerdict":
+    def of(cls, findings: Iterable[QCFinding]) -> QCVerdict:
         return cls(tuple(findings))
 
     @property

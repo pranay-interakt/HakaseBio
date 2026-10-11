@@ -9,7 +9,9 @@ import pytest
 from hos.ind import assemble_module4, readiness_report
 from hos.kernel.attestation import Role, SignatureMeaning
 from hos.kernel.errors import EvidenceInadmissible
-from tests.drivers.test_metabolic_stability import HL, PARAMS as MS_PARAMS, SIM as MS_SIM, _measured_csv
+from tests.drivers.test_metabolic_stability import HL, _measured_csv
+from tests.drivers.test_metabolic_stability import PARAMS as MS_PARAMS
+from tests.drivers.test_metabolic_stability import SIM as MS_SIM
 from tests.drivers.test_repeat_dose_tox import PARAMS as RD_PARAMS
 from tests.kernel.test_glp_flow import _lab_file
 from tests.kernel.test_kernel import CTX, k  # noqa: F401
@@ -38,7 +40,7 @@ def _approved_metstab(k, sci, pid, cid):  # noqa: F811
 
 
 def test_readiness_on_a_new_programme(k):  # noqa: F811
-    sci, pid, _ = _program(k)
+    _sci, pid, _ = _program(k)
     r = readiness_report(k, pid)
     s = r["summary"]
     assert s["done"] == 0 and s["required_for_milestone"] > 0
@@ -52,7 +54,7 @@ def test_readiness_on_a_new_programme(k):  # noqa: F811
 def test_readiness_progress_and_simulation_never_counts(k):  # noqa: F811
     sci, pid, cid = _program(k)
     _approved_metstab(k, sci, pid, cid)
-    sim = k.create_study(sci, program_id=pid, compound_id=cid,
+    k.create_study(sci, program_id=pid, compound_id=cid,
                          requirement_id="safety.herg")["id"]
     r = readiness_report(k, pid)
     st = {i["requirement_id"]: i["status"] for i in r["items"]}

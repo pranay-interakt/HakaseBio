@@ -7,8 +7,17 @@ from datetime import datetime
 from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-__all__ = ["Base", "ProgramRow", "CompoundRow", "StudyRow", "FileRow", "LedgerRow", "PrincipalRow",
-           "ArtifactRow", "SimulatedFileRow"]
+__all__ = [
+    "ArtifactRow",
+    "Base",
+    "CompoundRow",
+    "FileRow",
+    "LedgerRow",
+    "PrincipalRow",
+    "ProgramRow",
+    "SimulatedFileRow",
+    "StudyRow",
+]
 
 
 class Base(DeclarativeBase):

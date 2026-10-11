@@ -9,9 +9,8 @@ third-party mirror; it is flagged for re-verification against the OECD original.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
-__all__ = ["GuidelineDesign", "GUIDELINES", "RODENTS", "NON_RODENTS"]
+__all__ = ["GUIDELINES", "NON_RODENTS", "RODENTS", "GuidelineDesign"]
 
 RODENTS = frozenset({"rat", "mouse"})
 NON_RODENTS = frozenset({"dog", "monkey", "minipig", "rabbit"})
@@ -31,7 +30,7 @@ class GuidelineDesign:
     duration_exact: bool
     duration_paragraph: str
     min_recovery_animals_per_sex: int
-    min_recovery_days: Optional[int]
+    min_recovery_days: int | None
     recovery_paragraph: str
     max_spacing_factor: float
     spacing_paragraph: str

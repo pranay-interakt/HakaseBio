@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
-__all__ = ["Modality", "Indication", "Route", "ClinicalPopulation", "ProgramContext"]
+__all__ = ["ClinicalPopulation", "Indication", "Modality", "ProgramContext", "Route"]
 
 
 class Modality(str, Enum):
@@ -87,13 +87,13 @@ class ProgramContext:
     populations: tuple[ClinicalPopulation, ...] = (ClinicalPopulation.HEALTHY_VOLUNTEERS,)
     supports_marketing: bool = False
     """True when the study set must also support a marketing application (M3(R2) Table 2)."""
-    molar_extinction_coefficient_ge_1000: Optional[bool] = None
+    molar_extinction_coefficient_ge_1000: bool | None = None
     """ICH S10 trigger: absorbs light 290-700 nm with MEC >= 1000 L mol^-1 cm^-1."""
     pharmacologically_relevant_species: tuple[str, ...] = ()
     """For biologics: species in which the product is pharmacologically active (S6(R1))."""
     is_immunomodulatory_agonist: bool = False
     """Immune agonists/T-cell engagers: cytokine release and MABEL requirements."""
-    is_integrating_vector: Optional[bool] = None
+    is_integrating_vector: bool | None = None
     """Gene therapy: integrating vectors require insertional-mutagenesis assessment."""
     intended_pediatric_use: bool = False
     notes: dict[str, Any] = field(default_factory=dict)
@@ -120,7 +120,7 @@ class ProgramContext:
         return ClinicalPopulation.PREGNANT_WOMEN in self.populations
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ProgramContext":
+    def from_dict(cls, d: dict[str, Any]) -> ProgramContext:
         return cls(
             modality=Modality(d["modality"]),
             indication=Indication(d["indication"]),

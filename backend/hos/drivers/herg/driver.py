@@ -20,7 +20,9 @@ call is listed as requiring expert judgement.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from itertools import pairwise
+from typing import Any, Literal
 
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -65,7 +67,7 @@ class ExpectedBlock(BaseModel):
     high_percent: float
 
     @model_validator(mode="after")
-    def _order(self) -> "ExpectedBlock":
+    def _order(self) -> ExpectedBlock:
         if self.low_percent >= self.high_percent:
             raise ValueError("low_percent must be below high_percent")
         return self
@@ -88,25 +90,25 @@ class HergParams(BaseModel):
                                   description="one of the reference drugs (Q&A 1.2 / 2.1)")
     positive_control_concentrations_uM: list[float] = Field(min_length=2)
     positive_control_expected_block: list[ExpectedBlock] = Field(default_factory=list)
-    positive_control_basis: Optional[str] = None
+    positive_control_basis: str | None = None
     constrain_asymptotes_0_100: bool
     acceptance_min_r2: float = Field(gt=0, le=1)
-    max_background_fraction: Optional[float] = Field(default=None, gt=0, lt=1)
+    max_background_fraction: float | None = Field(default=None, gt=0, lt=1)
     acceptance_basis: str = Field(min_length=1)
-    margin_threshold: Optional[float] = Field(default=None, gt=0)
-    margin_threshold_basis: Optional[str] = None
+    margin_threshold: float | None = Field(default=None, gt=0)
+    margin_threshold_basis: str | None = None
 
     @field_validator("test_concentrations_uM", "positive_control_concentrations_uM")
     @classmethod
     def _ascending(cls, v: list[float]) -> list[float]:
         if any(c <= 0 for c in v):
             raise ValueError("concentrations must be positive")
-        if any(b <= a for a, b in zip(v, v[1:])):
+        if any(b <= a for a, b in pairwise(v)):
             raise ValueError("concentrations must be strictly increasing")
         return v
 
     @model_validator(mode="after")
-    def _bases(self) -> "HergParams":
+    def _bases(self) -> HergParams:
         if self.margin_threshold is not None and not self.margin_threshold_basis:
             raise ValueError("a margin threshold requires its basis (reference drugs under the "
                              "same protocol, S7B Q&A 1.2)")
@@ -179,8 +181,8 @@ class HergPatchClampDriver(StudyDriver):
     # -- design ----------------------------------------------------------------
 
     def design(self, compound: CompoundInfo, params: BaseModel,
-               context: Optional[ProgramContext] = None,
-               hypothesis: Optional[str] = None) -> ProtocolDocument:
+               context: ProgramContext | None = None,
+               hypothesis: str | None = None) -> ProtocolDocument:
         p = _p(params)
         comp = p.compliance()
         steps = (
@@ -546,7 +548,7 @@ class HergPatchClampDriver(StudyDriver):
     # -- interpretation --------------------------------------------------------
 
     def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: Optional[ProgramContext]) -> Interpretation:
+                   context: ProgramContext | None) -> Interpretation:
         p = _p(params)
         out: list[InterpretiveStatement] = []
         judgement = ["Integrated S7B risk assessment: low TdP risk also requires no QTc "

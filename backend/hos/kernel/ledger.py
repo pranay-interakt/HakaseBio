@@ -15,15 +15,22 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Iterator, Optional, Protocol
+from typing import Any, Protocol
 
 from hos.core.provenance import utc_now
 from hos.kernel.errors import LedgerIntegrityError
 
-__all__ = ["LedgerEntry", "Ledger", "LedgerBackend", "MemoryLedgerBackend", "canonical_json",
-           "GENESIS_HASH"]
+__all__ = [
+    "GENESIS_HASH",
+    "Ledger",
+    "LedgerBackend",
+    "LedgerEntry",
+    "MemoryLedgerBackend",
+    "canonical_json",
+]
 
 GENESIS_HASH = "0" * 64
 
@@ -58,7 +65,7 @@ class LedgerEntry:
     payload_sha256: str
     prev_hash: str
     entry_hash: str
-    reason: Optional[str] = None
+    reason: str | None = None
 
     def body(self) -> dict[str, Any]:
         return {
@@ -87,7 +94,7 @@ class LedgerEntry:
 
 class LedgerBackend(Protocol):
     def append(self, entry: LedgerEntry) -> None: ...
-    def last(self) -> Optional[LedgerEntry]: ...
+    def last(self) -> LedgerEntry | None: ...
     def iter_all(self) -> Iterator[LedgerEntry]: ...
     def for_subject(self, subject_id: str) -> list[LedgerEntry]: ...
 
@@ -101,7 +108,7 @@ class MemoryLedgerBackend:
     def append(self, entry: LedgerEntry) -> None:
         self._entries.append(entry)
 
-    def last(self) -> Optional[LedgerEntry]:
+    def last(self) -> LedgerEntry | None:
         return self._entries[-1] if self._entries else None
 
     def iter_all(self) -> Iterator[LedgerEntry]:
@@ -114,7 +121,7 @@ class MemoryLedgerBackend:
 class Ledger:
     """Append-only hash-chained ledger over a pluggable backend."""
 
-    def __init__(self, backend: Optional[LedgerBackend] = None,
+    def __init__(self, backend: LedgerBackend | None = None,
                  clock: Callable[[], datetime] = utc_now) -> None:
         self._backend: LedgerBackend = backend or MemoryLedgerBackend()
         self._clock = clock
@@ -128,8 +135,8 @@ class Ledger:
         action: str,
         subject_type: str,
         subject_id: str,
-        payload: Optional[dict[str, Any]] = None,
-        reason: Optional[str] = None,
+        payload: dict[str, Any] | None = None,
+        reason: str | None = None,
     ) -> LedgerEntry:
         payload = payload or {}
         payload_json = canonical_json(payload)
@@ -138,7 +145,7 @@ class Ledger:
             last = self._backend.last()
             seq = (last.seq + 1) if last else 1
             prev = last.entry_hash if last else GENESIS_HASH
-            body = {
+            body: dict[str, Any] = {
                 "seq": seq,
                 "recorded_at": self._clock().isoformat(),
                 "actor_id": actor_id,

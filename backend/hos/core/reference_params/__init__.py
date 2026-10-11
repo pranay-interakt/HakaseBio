@@ -14,17 +14,18 @@ confirmed against the primary literature before supporting a regulatory claim.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Final, Iterator, Optional
+from typing import Final
 
 from hos.core.citations import cite
 from hos.core.quantity import Quantity
 
 __all__ = [
-    "ReferenceParameter",
-    "ReferenceParameterSet",
     "REFERENCE_PARAMETERS",
     "REGISTRY_VERSION",
+    "ReferenceParameter",
+    "ReferenceParameterSet",
     "get_parameter",
     "get_quantity",
 ]
@@ -41,9 +42,9 @@ class ReferenceParameter:
     unit: str
     description: str
     citation_key: str
-    species: Optional[str] = None
+    species: str | None = None
     requires_verification: bool = False
-    note: Optional[str] = None
+    note: str | None = None
 
     def as_quantity(self, registry_version: str = REGISTRY_VERSION) -> Quantity:
         flags: list[str] = []
@@ -67,9 +68,9 @@ def _p(
     unit: str,
     description: str,
     citation_key: str,
-    species: Optional[str] = None,
+    species: str | None = None,
     requires_verification: bool = False,
-    note: Optional[str] = None,
+    note: str | None = None,
 ) -> tuple[str, ReferenceParameter]:
     return id, ReferenceParameter(
         id=id,

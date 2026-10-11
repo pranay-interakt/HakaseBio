@@ -37,8 +37,40 @@ markers = [
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+# Explicit rule set so results do not change with ruff's defaults.
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "BLE", "ISC"]
+ignore = [
+  "ISC004",  # multi-line string literals inside tuples are intentional (method assumptions/limits)
+  "E501",    # line length is advisory; long citations and user-facing messages are kept whole
+  "RUF005",  # list concatenation vs unpacking is a style preference
+]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI dependency injection is declared with Depends() in argument defaults by design.
+"hos/api/app.py" = ["B008"]
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# RDKit ships partial type stubs that omit many functions present at runtime
+# (Descriptors.MolWt, Crippen.MolLogP, RDLogger.DisableLog, ...). Treat it as untyped.
+module = ["rdkit", "rdkit.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The RDKit stubs that ship in the wheel are partial, so attribute lookups on
+# RDKit modules are unverifiable; the descriptor tests check them at runtime.
+module = ["hos.core.descriptors"]
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+# SciPy publishes no inline type information.
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true
+

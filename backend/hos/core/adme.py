@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any
 
 import numpy as np
 import scipy
@@ -34,15 +34,15 @@ from hos.core.reference_params import ReferenceParameterSet
 __all__ = [
     "DepletionFit",
     "IVIVEResult",
-    "fit_depletion",
-    "clint_in_vitro",
-    "fu_mic_hallifax_houston",
-    "scale_clint_to_liver",
-    "fu_blood_from_plasma",
-    "hepatic_clearance_well_stirred",
-    "extraction_ratio",
     "classify_extraction",
+    "clint_in_vitro",
+    "extraction_ratio",
+    "fit_depletion",
+    "fu_blood_from_plasma",
+    "fu_mic_hallifax_houston",
+    "hepatic_clearance_well_stirred",
     "ivive_from_depletion",
+    "scale_clint_to_liver",
 ]
 
 _SOFTWARE = {"numpy": np.__version__, "scipy": scipy.__version__}
@@ -286,8 +286,8 @@ def scale_clint_to_liver(
     clint_app: Quantity,
     species: str,
     *,
-    params: Optional[ReferenceParameterSet] = None,
-    fu_mic: Optional[Quantity] = None,
+    params: ReferenceParameterSet | None = None,
+    fu_mic: Quantity | None = None,
 ) -> Quantity:
     """Scale apparent in vitro CLint to whole-liver intrinsic clearance.
 
@@ -372,7 +372,7 @@ def hepatic_clearance_well_stirred(
     fu_blood: Quantity,
     species: str,
     *,
-    params: Optional[ReferenceParameterSet] = None,
+    params: ReferenceParameterSet | None = None,
 ) -> Quantity:
     """Hepatic blood clearance by the well-stirred model.
 
@@ -411,7 +411,7 @@ def extraction_ratio(
     clh: Quantity,
     species: str,
     *,
-    params: Optional[ReferenceParameterSet] = None,
+    params: ReferenceParameterSet | None = None,
 ) -> Quantity:
     """Hepatic extraction ratio ``E = CLh / Qh`` (Wilkinson & Shand 1975)."""
     params = params or ReferenceParameterSet()
@@ -457,7 +457,7 @@ class IVIVEResult:
     species: str
     fit: DepletionFit
     clint_app: Quantity
-    fu_mic: Optional[Quantity]
+    fu_mic: Quantity | None
     clint_in_vivo: Quantity
     fu_blood: Quantity
     clh: Quantity
@@ -491,8 +491,8 @@ def ivive_from_depletion(
     blood_plasma_ratio: Quantity,
     min_r2: float,
     min_depletion_pct: float,
-    lipophilicity_for_fu_mic: Optional[Quantity] = None,
-    params: Optional[ReferenceParameterSet] = None,
+    lipophilicity_for_fu_mic: Quantity | None = None,
+    params: ReferenceParameterSet | None = None,
 ) -> IVIVEResult:
     """Run the full IVIVE chain from a raw depletion series.
 

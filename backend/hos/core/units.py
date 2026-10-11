@@ -14,7 +14,7 @@ from typing import Final
 
 import pint
 
-__all__ = ["UREG", "DIMENSIONLESS", "parse_unit", "is_valid_unit", "convert", "compatible"]
+__all__ = ["DIMENSIONLESS", "UREG", "compatible", "convert", "is_valid_unit", "parse_unit"]
 
 UREG: Final[pint.UnitRegistry] = pint.UnitRegistry(autoconvert_offset_to_baseunit=False)
 UREG.formatter.default_format = "~P"

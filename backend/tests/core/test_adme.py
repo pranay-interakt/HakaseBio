@@ -7,7 +7,6 @@ import pytest
 from hos.core.adme import (
     classify_extraction,
     clint_in_vitro,
-    extraction_ratio,
     fit_depletion,
     fu_blood_from_plasma,
     fu_mic_hallifax_houston,

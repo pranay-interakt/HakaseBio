@@ -12,16 +12,16 @@ cLogP 1.3101, QED 0.5501.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import rdkit
 from rdkit import Chem, RDLogger
-from rdkit.Chem import Crippen, Descriptors, QED, rdMolDescriptors
+from rdkit.Chem import QED, Crippen, Descriptors, rdMolDescriptors
 
 from hos.core.methods import method
 from hos.core.quantity import Quantity
 
-__all__ = ["MolecularProfile", "parse_smiles", "compute_profile", "RDKIT_VERSION"]
+__all__ = ["RDKIT_VERSION", "MolecularProfile", "compute_profile", "parse_smiles"]
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -53,8 +53,8 @@ class MolecularProfile:
 
     input_smiles: str
     canonical_smiles: str
-    inchi: Optional[str]
-    inchikey: Optional[str]
+    inchi: str | None
+    inchikey: str | None
     formula: str
     molecular_weight: Quantity
     exact_mass: Quantity
@@ -127,7 +127,7 @@ def compute_profile(smiles: str) -> MolecularProfile:
     try:
         inchi = Chem.MolToInchi(mol)
         inchikey = Chem.MolToInchiKey(mol) if inchi else None
-    except Exception:  # InChI generation can fail for exotic valences
+    except Exception:  # noqa: BLE001 - RDKit InChI generation can fail for exotic valences
         inchi, inchikey = None, None
 
     mw = Descriptors.MolWt(mol)

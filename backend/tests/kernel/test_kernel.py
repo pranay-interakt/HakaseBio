@@ -8,7 +8,11 @@ from hos.db.store import Database, FileStore
 from hos.drivers.base import IngestError
 from hos.kernel.attestation import PrincipalKind, Role, SignatureMeaning
 from hos.kernel.errors import (
-    AttestationRequired, DriverError, EvidenceInadmissible, KernelError, LedgerIntegrityError,
+    AttestationRequired,
+    DriverError,
+    EvidenceInadmissible,
+    KernelError,
+    LedgerIntegrityError,
     PermissionDenied,
 )
 from hos.kernel.kernel import Kernel
@@ -121,7 +125,7 @@ def test_rejected_upload_is_recorded_with_errors(k):
 
 
 def test_agents_can_work_but_never_sign(k):
-    sci, _, sid = _setup(k)
+    _sci, _, sid = _setup(k)
     agent = k.get_principal("agent")
     k.design_study(agent, sid, PARAMS, reason="agent re-design for test")
     k.plan_study(agent, sid)

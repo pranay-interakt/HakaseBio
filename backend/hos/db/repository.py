@@ -4,7 +4,7 @@ the kernel facade (``hos.kernel.kernel``) owns every state change."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -113,7 +113,7 @@ class Repository:
                 raise NotFound(f"no study {study_id!r}")
             return r
 
-    def studies(self, program_id: Optional[str] = None) -> list[StudyRow]:
+    def studies(self, program_id: str | None = None) -> list[StudyRow]:
         with self.db.session() as s:
             q = select(StudyRow).order_by(StudyRow.created_at)
             if program_id:
@@ -133,7 +133,7 @@ class Repository:
     # -- append-only artefacts -------------------------------------------------------
 
     def add_artifact(self, study_id: str, kind: str, content: dict[str, Any], *, actor: str,
-                     reason: Optional[str] = None) -> ArtifactRow:
+                     reason: str | None = None) -> ArtifactRow:
         with self.db.session() as s:
             prev = s.execute(select(ArtifactRow).where(ArtifactRow.study_id == study_id,
                                                        ArtifactRow.kind == kind)
@@ -147,7 +147,7 @@ class Repository:
             s.flush()
             return row
 
-    def artifacts(self, study_id: str, kind: Optional[str] = None) -> list[ArtifactRow]:
+    def artifacts(self, study_id: str, kind: str | None = None) -> list[ArtifactRow]:
         with self.db.session() as s:
             q = select(ArtifactRow).where(ArtifactRow.study_id == study_id)
             if kind:

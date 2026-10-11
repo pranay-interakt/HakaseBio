@@ -18,8 +18,9 @@ import hashlib
 import io
 import json
 import zipfile
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Optional
+from typing import Any
 
 from hos.core.quantity import SIMULATION_TAINT, Quantity
 from hos.drivers.base import (
@@ -60,9 +61,9 @@ def check_driver(
     *,
     compound: CompoundInfo,
     parameters: Mapping[str, Any],
-    simulation_parameters: Optional[Mapping[str, Any]] = None,
-    measured_example: Optional[bytes] = None,
-    analysis_inputs: Optional[Mapping[str, Quantity]] = None,
+    simulation_parameters: Mapping[str, Any] | None = None,
+    measured_example: bytes | None = None,
+    analysis_inputs: Mapping[str, Quantity] | None = None,
     study_reference: str = "HOS-CONFORMANCE-1",
 ) -> ConformanceReport:
     rep = ConformanceReport(driver_id=getattr(driver, "id", "?"))

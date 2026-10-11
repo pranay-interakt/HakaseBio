@@ -14,3 +14,5 @@ dist/
 *.sqlite3
 .claude/launch.json
 *.tsbuildinfo
+backend/scripts/dev_principals.local.json
+backend/demo-out/

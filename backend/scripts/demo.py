@@ -17,19 +17,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import tempfile
 from pathlib import Path
 
-import sys
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hos.core.regulatory import ClinicalPopulation, Indication, Modality, ProgramContext, Route  # noqa: E402
-from hos.db.store import Database, FileStore  # noqa: E402
-from hos.ind import assemble_module4, readiness_report  # noqa: E402
-from hos.kernel.attestation import PrincipalKind, Role, SignatureMeaning  # noqa: E402
-from hos.kernel.errors import EvidenceInadmissible  # noqa: E402
-from hos.kernel.kernel import Kernel  # noqa: E402
+from hos.core.regulatory import ClinicalPopulation, Indication, Modality, ProgramContext, Route
+from hos.db.store import Database, FileStore
+from hos.ind import assemble_module4, readiness_report
+from hos.kernel.attestation import PrincipalKind, Role, SignatureMeaning
+from hos.kernel.errors import EvidenceInadmissible
+from hos.kernel.kernel import Kernel
 
 DEMO_PW = "demo-only-password-not-for-real-use"
 SOP = "DEMO SOP (illustrative acceptance criteria for this demonstration only)"

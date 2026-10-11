@@ -14,7 +14,7 @@ import os
 import secrets
 import threading
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,7 +42,7 @@ from hos.kernel.errors import (
 )
 from hos.kernel.kernel import Kernel
 
-__all__ = ["create_app", "app"]
+__all__ = ["app", "create_app"]
 
 SESSION_TTL = timedelta(hours=8)
 
@@ -60,7 +60,7 @@ class Sessions:
             self._tokens[tok] = (principal_id, utc_now() + ttl)
         return tok
 
-    def resolve(self, token: str) -> Optional[str]:
+    def resolve(self, token: str) -> str | None:
         with self._lock:
             entry = self._tokens.get(token)
             if entry is None:
@@ -94,13 +94,13 @@ class PrincipalBody(BaseModel):
     name: str = Field(min_length=1)
     kind: PrincipalKind
     roles: list[Role]
-    password: Optional[str] = None
-    organisation: Optional[str] = None
+    password: str | None = None
+    organisation: str | None = None
 
 
 class ProgramBody(BaseModel):
     name: str
-    sponsor: Optional[str] = None
+    sponsor: str | None = None
     context: dict[str, Any]
 
 
@@ -117,14 +117,14 @@ class CompoundBody(BaseModel):
 class StudyBody(BaseModel):
     program_id: str
     compound_id: str
-    requirement_id: Optional[str] = None
-    driver_id: Optional[str] = None
-    hypothesis: Optional[str] = None
+    requirement_id: str | None = None
+    driver_id: str | None = None
+    hypothesis: str | None = None
 
 
 class DesignBody(BaseModel):
     parameters: dict[str, Any]
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class DispatchBody(BaseModel):
@@ -136,16 +136,16 @@ class InputsBody(BaseModel):
 
 
 class ReasonBody(BaseModel):
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class DeterminationBody(BaseModel):
     key: str
-    value: Optional[float]
-    unit: Optional[str] = None
+    value: float | None
+    unit: str | None = None
     rationale: str
     password: str
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class SignBody(BaseModel):
@@ -166,7 +166,7 @@ class CancelBody(BaseModel):
 # ---- app -----------------------------------------------------------------------------
 
 
-def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
+def create_app(kernel: Kernel | None = None) -> FastAPI:
     app = FastAPI(title="Hakase Operating System API", version=__version__,
                   description="Preclinical study kernel: programmes, study sets, drivers, "
                               "execution, analysis, attestation and IND assembly. Every "
@@ -181,9 +181,10 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
     def get_kernel() -> Kernel:
         if state["kernel"] is None:
             state["kernel"] = Kernel()
-        return state["kernel"]
+        k: Kernel = state["kernel"]
+        return k
 
-    def current(authorization: Optional[str] = Header(default=None),
+    def current(authorization: str | None = Header(default=None),
                 k: Kernel = Depends(get_kernel)) -> Principal:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(401, "missing bearer token")
@@ -205,6 +206,7 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
 
     app.add_exception_handler(NotFound, lambda r, e: _err(404, e))
     app.add_exception_handler(PermissionDenied, lambda r, e: _err(403, e))
+    exc_t: type[Exception]
     for exc_t in (AttestationRequired, EvidenceInadmissible, IllegalTransition):
         app.add_exception_handler(exc_t, lambda r, e: _err(409, e))
     app.add_exception_handler(IngestError, lambda r, e: _err(422, e, errors=list(e.errors)))
@@ -234,7 +236,7 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
         return {"token": state["sessions"].issue(p.id), "principal": p.to_dict()}
 
     @app.post("/api/auth/logout")
-    def logout(authorization: Optional[str] = Header(default=None)) -> dict[str, str]:
+    def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
         if authorization and authorization.lower().startswith("bearer "):
             state["sessions"].revoke(authorization.split(" ", 1)[1])
         return {"status": "logged out"}
@@ -340,10 +342,10 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
     @app.post("/api/compounds/{compound_id}/enrich")
     def enrich(compound_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        from hos.data_sources import ChEMBLClient, PubChemClient
         from hos.data_sources.enrich import enrich_compound
         from hos.data_sources.http import CachedHttp
         from hos.db.store import default_data_dir
-        from hos.data_sources import ChEMBLClient, PubChemClient
         http = state.get("http") or CachedHttp(cache_dir=default_data_dir() / "source_cache")
         state["http"] = http
         return enrich_compound(k, actor, compound_id, pubchem=PubChemClient(http),
@@ -351,7 +353,7 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
 
     # -- studies --------------------------------------------------------------------------
     @app.get("/api/studies")
-    def studies(program_id: Optional[str] = None, actor: Principal = Depends(current),
+    def studies(program_id: str | None = None, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         return k.studies(program_id)
 
@@ -399,7 +401,7 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
 
     @app.post("/api/studies/{study_id}/data")
     async def upload(study_id: str, request: Request, filename: str = Query("upload.csv"),
-                     reason: Optional[str] = Query(None), actor: Principal = Depends(current),
+                     reason: str | None = Query(None), actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         content = await request.body()
         return k.receive_data(actor, study_id, content, filename=filename, reason=reason)
@@ -459,7 +461,7 @@ def create_app(kernel: Optional[Kernel] = None) -> FastAPI:
         return k.cancel_study(actor, study_id, reason=body.reason)
 
     @app.get("/api/studies/{study_id}/artifacts")
-    def artifacts(study_id: str, kind: Optional[str] = None, actor: Principal = Depends(current),
+    def artifacts(study_id: str, kind: str | None = None, actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         return k.artifacts(study_id, kind)
 

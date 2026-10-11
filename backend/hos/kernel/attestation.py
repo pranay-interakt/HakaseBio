@@ -19,19 +19,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from hos.core.provenance import utc_now
 from hos.kernel.errors import PermissionDenied
 
 __all__ = [
+    "SYSTEM",
+    "Principal",
     "PrincipalKind",
     "Role",
-    "SignatureMeaning",
-    "Principal",
     "Signature",
+    "SignatureMeaning",
     "sign",
-    "SYSTEM",
 ]
 
 
@@ -75,7 +75,7 @@ class Principal:
     name: str
     kind: PrincipalKind
     roles: frozenset[Role] = field(default_factory=frozenset)
-    organisation: Optional[str] = None
+    organisation: str | None = None
 
     def holds(self, role: Role) -> bool:
         return role in self.roles

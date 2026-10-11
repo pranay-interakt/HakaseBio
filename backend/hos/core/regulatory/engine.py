@@ -14,20 +14,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from hos.core.citations import cite
 from hos.core.provenance import Citation
-from hos.core.regulatory.context import Indication, Modality, ProgramContext
+from hos.core.regulatory.context import Modality, ProgramContext
 
 __all__ = [
     "StudyCategory",
-    "Timing",
     "StudyRequirement",
     "StudySet",
+    "Timing",
     "derive_study_set",
-    "m3r2_trial_support_duration",
     "m3r2_marketing_duration",
+    "m3r2_trial_support_duration",
 ]
 
 
@@ -90,10 +90,10 @@ class StudyRequirement:
     rationale: str
     glp: bool
     species: tuple[str, ...] = ()
-    duration_weeks: Optional[float] = None
-    driver_id: Optional[str] = None
-    pending_fact: Optional[str] = None
-    ctd_section: Optional[str] = None
+    duration_weeks: float | None = None
+    driver_id: str | None = None
+    pending_fact: str | None = None
+    ctd_section: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {

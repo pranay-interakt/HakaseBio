@@ -13,7 +13,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -21,7 +21,7 @@ import httpx
 from hos.core.provenance import utc_now
 from hos.data_sources.base import SourceStatus
 
-__all__ = ["CachedHttp", "USER_AGENT"]
+__all__ = ["USER_AGENT", "CachedHttp"]
 
 USER_AGENT = "hakase-os/0.1 (+https://hakase.ai)"
 
@@ -31,7 +31,7 @@ _MIN_INTERVAL_S = {"pubchem.ncbi.nlm.nih.gov": 0.25, "www.ebi.ac.uk": 0.25}
 
 
 class CachedHttp:
-    def __init__(self, client: Optional[httpx.Client] = None, cache_dir: Optional[Path] = None,
+    def __init__(self, client: httpx.Client | None = None, cache_dir: Path | None = None,
                  ttl: timedelta = timedelta(days=30), retries: int = 2,
                  timeout_s: float = 30.0) -> None:
         self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT},
@@ -44,7 +44,7 @@ class CachedHttp:
         self._last: dict[str, float] = {}
         self._lock = threading.Lock()
 
-    def _cache_path(self, url: str) -> Optional[Path]:
+    def _cache_path(self, url: str) -> Path | None:
         if self.cache_dir is None:
             return None
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest() + ".json")
@@ -59,7 +59,7 @@ class CachedHttp:
             self._last[host] = time.monotonic()
 
     def get_json(self, url: str, *, refresh: bool = False
-                 ) -> tuple[SourceStatus, Optional[Any], Optional[str], bool, Optional[str]]:
+                 ) -> tuple[SourceStatus, Any | None, str | None, bool, str | None]:
         path = self._cache_path(url)
         if path is not None and path.exists() and not refresh:
             entry = json.loads(path.read_text())
@@ -109,7 +109,7 @@ def _fault(r: httpx.Response) -> str:
         return r.text[:300]
 
 
-def _retry_after(r: httpx.Response) -> Optional[float]:
+def _retry_after(r: httpx.Response) -> float | None:
     v = r.headers.get("Retry-After")
     try:
         return float(v) if v else None

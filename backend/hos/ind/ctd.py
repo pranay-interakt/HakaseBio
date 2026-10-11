@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-__all__ = ["MODULE4", "ctd_title", "ctd_sort_key"]
+__all__ = ["MODULE4", "ctd_sort_key", "ctd_title"]
 
 MODULE4: tuple[tuple[str, str], ...] = (
     ("4.1", "Table of Contents of Module 4"),

@@ -22,9 +22,10 @@ rather than silently folded into the BSA calculation.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 from hos.core.methods import method
 from hos.core.qc import QCFinding, QCStatus, QCVerdict
@@ -32,12 +33,12 @@ from hos.core.quantity import Quantity, QuantityError
 from hos.core.reference_params import ReferenceParameterSet
 
 __all__ = [
+    "SAFETY_FACTOR_TRIGGERS",
     "DoseBasis",
-    "SpeciesHED",
     "DoseProjection",
+    "SpeciesHED",
     "human_equivalent_dose",
     "project_starting_dose",
-    "SAFETY_FACTOR_TRIGGERS",
 ]
 
 
@@ -93,7 +94,7 @@ def human_equivalent_dose(
     noael: Quantity,
     species: str,
     *,
-    params: Optional[ReferenceParameterSet] = None,
+    params: ReferenceParameterSet | None = None,
 ) -> SpeciesHED:
     """Convert an animal NOAEL (mg/kg) to a human equivalent dose by BSA scaling.
 
@@ -140,13 +141,13 @@ class DoseProjection:
 
     basis: DoseBasis
     species_heds: tuple[SpeciesHED, ...]
-    most_sensitive_species: Optional[str]
+    most_sensitive_species: str | None
     governing_hed: Quantity
     safety_factor: Quantity
     mrsd_per_kg: Quantity
     mrsd_total: Quantity
     reference_body_weight: Quantity
-    pad: Optional[Quantity]
+    pad: Quantity | None
     pad_below_mrsd: bool
     safety_factor_justification: tuple[str, ...]
     qc: QCVerdict
@@ -205,12 +206,12 @@ class DoseProjection:
 def project_starting_dose(
     noaels: Mapping[str, Quantity],
     *,
-    safety_factor: Optional[float] = None,
+    safety_factor: float | None = None,
     safety_factor_justification: Sequence[str] = (),
-    pad: Optional[Quantity] = None,
-    override_species: Optional[str] = None,
-    override_reason: Optional[str] = None,
-    params: Optional[ReferenceParameterSet] = None,
+    pad: Quantity | None = None,
+    override_species: str | None = None,
+    override_reason: str | None = None,
+    params: ReferenceParameterSet | None = None,
 ) -> DoseProjection:
     """Derive the maximum recommended starting dose from species NOAELs.
 

@@ -27,7 +27,7 @@ import hashlib
 import io
 import json
 import zipfile
-from typing import Any, Optional
+from typing import Any
 
 from hos.core.dose import project_starting_dose
 from hos.core.provenance import utc_now
@@ -40,7 +40,7 @@ from hos.kernel.attestation import Principal
 from hos.kernel.errors import EvidenceInadmissible
 from hos.kernel.lifecycle import StudyState
 
-__all__ = ["readiness_report", "assemble_module4"]
+__all__ = ["assemble_module4", "readiness_report"]
 
 _ACTIVE = {StudyState.PROPOSED, StudyState.DESIGNED, StudyState.PLANNED, StudyState.DISPATCHED,
            StudyState.DATA_RECEIVED, StudyState.ANALYZED, StudyState.REPORTED}
@@ -101,7 +101,8 @@ def readiness_report(kernel: Any, program_id: str,
     counts: dict[str, int] = {}
     for i in items:
         if i["due_for_milestone"]:
-            counts[i["status"]] = counts.get(i["status"], 0) + 1
+            status = str(i["status"])
+            counts[status] = counts.get(status, 0) + 1
     return {
         "program_id": program_id, "program": program.name, "milestone": milestone.value,
         "generated_at": utc_now().isoformat(),
@@ -143,7 +144,7 @@ def _check_no_simulation(obj: Any, path: str = "") -> None:
             _check_no_simulation(v, f"{path}[{i}]")
 
 
-def _dose_projection(kernel: Any, studies: list[Any]) -> Optional[dict[str, Any]]:
+def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
     noaels: dict[str, Quantity] = {}
     sources = []
     for s in studies:
