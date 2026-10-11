@@ -4,7 +4,7 @@ import { ErrorBox, roleLabel, Section } from "../components/common";
 import { cleanContext, ContextForm, type Ctx } from "../components/ContextForm";
 import { fieldLabel, prune, SchemaFields } from "../components/SchemaForm";
 import { Empty, Facts, Loading, Pill, toast } from "../components/ui";
-import { humanize, statusLabel } from "../lib/format";
+import { humanize, sentence, statusLabel } from "../lib/format";
 import type { Driver, Program } from "../types";
 
 interface Change {
@@ -131,8 +131,7 @@ export function WhatIf({ p, reload }: { p: Program; reload: () => void }) {
                 <tr>
                   <th>Study</th>
                   <th>Change</th>
-                  <th>Before</th>
-                  <th>After</th>
+                  <th>Before → after</th>
                   <th>Basis</th>
                 </tr>
               </thead>
@@ -140,13 +139,14 @@ export function WhatIf({ p, reload }: { p: Program; reload: () => void }) {
                 {res.changes.map((c, i) => (
                   <tr key={i}>
                     <td>{c.name}</td>
-                    <td>
+                    <td className="nowrap">
                       <Pill tone={c.change === "added" ? "warn" : c.change === "removed" ? "neutral" : "accent"}>
                         {humanize(c.change)}
                       </Pill>
                     </td>
-                    <td className="small">{withUnit(c.change, c.before)}</td>
-                    <td className="small">{withUnit(c.change, c.after)}</td>
+                    <td className="nowrap">
+                      {withUnit(c.change, c.before)} <span className="muted">→</span> {withUnit(c.change, c.after)}
+                    </td>
                     <td className="small">
                       {c.section_after ?? c.section_before}
                       <div className="muted">{c.rationale}</div>
@@ -304,56 +304,85 @@ export function RehearsalView({ p }: { p: Program }) {
     }
   }
 
+  const chosen = runnable.filter((r) => plan[r.id]?.include).length;
+  const setAll = (include: boolean) =>
+    setPlan((o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { ...v, include }])));
   return (
     <>
       <Section
         title="Programme rehearsal"
-        subtitle="Runs every runnable requirement through its driver with SIMULATED data and reports what would block the real programme. Design parameters come from here, the requirement, or studies already designed; the simulated truth and a seed must be stated. Nothing is defaulted and nothing is saved."
+        subtitle="Runs each chosen study through its driver on SIMULATED data and reports what would block the real programme. Nothing is saved."
         right={
-          <button className="primary" disabled={busy || runnable.length === 0} onClick={run}>
+          <button className="primary" disabled={busy || chosen === 0} onClick={run}>
             {busy ? "Rehearsing…" : res ? "Run again" : "Run rehearsal"}
           </button>
         }
       >
         <ErrorBox error={err} onDismiss={() => setErr(null)} />
-        {runnable.length === 0 && <Empty title="Nothing to rehearse">No required study has an installed driver.</Empty>}
-        <div className="stack">
-          {runnable.map((r) => {
-            const e = plan[r.id];
-            const o = outcome[r.id];
-            const isOpen = open === r.id;
-            return (
-              <div className="sf-row" key={r.id}>
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <label className="row" style={{ gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={e.include}
-                      onChange={(ev) => upd(r.id, { include: ev.target.checked })}
-                    />
-                    <strong>{r.name}</strong>
-                  </label>
-                  <span className="row">
-                    {o?.outcome && <Pill tone={OUTCOME_TONE[o.outcome] ?? "neutral"}>{humanize(o.outcome)}</Pill>}
-                    <button className="small" onClick={() => setOpen(isOpen ? null : r.id)}>
-                      {isOpen ? "Close" : "Edit plan"}
-                    </button>
-                  </span>
-                </div>
-                {o?.detail && (
-                  <div className="muted small" style={{ marginTop: 4 }}>
-                    {o.detail}
+        {runnable.length === 0 ? (
+          <Empty title="Nothing to rehearse">No required study has an installed driver.</Empty>
+        ) : (
+          <>
+            <div className="list-toolbar">
+              <span className="muted small">
+                {chosen} of {runnable.length} studies chosen
+              </span>
+              <span className="row">
+                <button className="ghost small" onClick={() => setAll(true)}>
+                  Select all
+                </button>
+                <button className="ghost small" onClick={() => setAll(false)}>
+                  Clear
+                </button>
+              </span>
+            </div>
+            <div className="item-list">
+              {runnable.map((r) => {
+                const e = plan[r.id];
+                const o = outcome[r.id];
+                const isOpen = open === r.id;
+                const driverName = (p.drivers[r.id] ?? []).find((d) => d.id === e.driverId)?.name;
+                return (
+                  <div className={`item-row${isOpen ? " open" : ""}${e.include ? "" : " off"}`} key={r.id}>
+                    <div className="item-head">
+                      <input
+                        type="checkbox"
+                        aria-label={`Include ${r.name}`}
+                        checked={e.include}
+                        onChange={(ev) => upd(r.id, { include: ev.target.checked })}
+                      />
+                      <div className="item-main">
+                        <div className="item-title">{r.name}</div>
+                        {(o?.detail || driverName) && (
+                          <div className="muted small">{sentence(o?.detail ?? driverName ?? "")}</div>
+                        )}
+                      </div>
+                      {o?.outcome && <Pill tone={OUTCOME_TONE[o.outcome] ?? "neutral"}>{humanize(o.outcome)}</Pill>}
+                      <button className="small" onClick={() => setOpen(isOpen ? null : r.id)}>
+                        {isOpen ? "Done" : "Edit plan"}
+                      </button>
+                    </div>
+                    {isOpen && (
+                      <div className="item-body">
+                        <RehearsalEntry p={p} rid={r.id} entry={e} item={o} onChange={(patch) => upd(r.id, patch)} />
+                      </div>
+                    )}
                   </div>
-                )}
-                {isOpen && (
-                  <RehearsalEntry p={p} rid={r.id} entry={e} item={o} onChange={(patch) => upd(r.id, patch)} />
-                )}
+                );
+              })}
+            </div>
+            <details className="more-options" style={{ marginTop: 12 }}>
+              <summary>How the plan is filled</summary>
+              <div className="muted small" style={{ padding: "8px 2px" }}>
+                Design parameters come from this plan, the requirement, or studies already designed. The simulated truth
+                and a seed must be stated for each study; nothing is defaulted. Results are labelled SIMULATED and are
+                never evidence.
               </div>
-            );
-          })}
-        </div>
+            </details>
+          </>
+        )}
       </Section>
-      {res && <RehearsalResult res={res} />}
+      {res && <RehearsalResult p={p} res={res} />}
     </>
   );
 }
@@ -380,7 +409,7 @@ function RehearsalEntry({
   const choices = p.drivers[rid] ?? [];
   const known = new Set(entry.inputs.map((i) => i.name));
   return (
-    <div className="stack" style={{ marginTop: 12 }}>
+    <div className="stack">
       {choices.length > 1 && (
         <label className="field" style={{ maxWidth: 360 }}>
           <span className="field-label">Driver</span>
@@ -450,13 +479,14 @@ function RehearsalEntry({
                     <button
                       key={n}
                       className="small"
+                      title={n}
                       onClick={() =>
                         onChange({
                           inputs: [...entry.inputs, { name: n, value: "", unit: "", kind: "literature", source: "" }],
                         })
                       }
                     >
-                      + {n}
+                      + {humanize(n)}
                     </button>
                   ))}
               </div>
@@ -536,8 +566,35 @@ function InputRows({ rows, onChange }: { rows: InputRow[]; onChange: (r: InputRo
   );
 }
 
-function RehearsalResult({ res }: { res: Rehearsal }) {
+/** A short list inline; a long one folds behind its count. */
+function Brief({ label, items }: { label: string; items: string[] }) {
+  if (items.length === 0) return null;
+  if (items.length <= 4)
+    return (
+      <div>
+        {label}: {items.join(", ")}
+      </div>
+    );
+  return (
+    <details className="brief">
+      <summary>
+        {items.length} {label.toLowerCase()}
+      </summary>
+      <div>{items.join(", ")}</div>
+    </details>
+  );
+}
+
+function RehearsalResult({ p, res }: { p: Program; res: Rehearsal }) {
   const cp = res.summary.critical_path;
+  const names = Object.fromEntries(p.study_set.requirements.map((r) => [r.id, r.name]));
+  const reqName = (id: string) => names[id] ?? id;
+  // "dose_range_finding@1.0.0" -> the installed driver's name and version
+  const driverLabel = (rid: string, ref: string) => {
+    const [id, version] = ref.split("@");
+    const d = (p.drivers[rid] ?? []).find((x) => x.id === id);
+    return d ? `${d.name}${version ? ` · v${version}` : ""}` : ref;
+  };
   return (
     <Section
       title="Rehearsal result"
@@ -547,7 +604,7 @@ function RehearsalResult({ res }: { res: Rehearsal }) {
         {Object.entries(res.summary.by_outcome).map(([k, n]) => (
           <div className="stat" key={k}>
             <div className="stat-v">{n}</div>
-            <div className="stat-l">{humanize(k).toLowerCase()}</div>
+            <div className="stat-l">{humanize(k)}</div>
           </div>
         ))}
       </div>
@@ -557,9 +614,9 @@ function RehearsalResult({ res }: { res: Rehearsal }) {
             "Critical path",
             cp.requirements.length === 0
               ? cp.note
-              : `${cp.requirements.join(" → ")} · ${cp.known_duration_days} days known`,
+              : `${cp.requirements.map(reqName).join(" → ")} · ${cp.known_duration_days} days known`,
           ],
-          ["Unknown durations on the path", cp.unknown_durations_on_path.join(", ") || "none"],
+          ["Unknown durations on the path", cp.unknown_durations_on_path.map(reqName).join(", ") || "None"],
         ]}
       />
       {res.summary.unassigned_determinations.length > 0 && (
@@ -578,40 +635,43 @@ function RehearsalResult({ res }: { res: Rehearsal }) {
             </tr>
           </thead>
           <tbody>
-            {res.items.map((i) => (
-              <tr key={i.requirement_id}>
-                <td>
-                  {i.name}
-                  {i.driver && <div className="muted small">{i.driver}</div>}
-                </td>
-                <td>
-                  <Pill tone={OUTCOME_TONE[i.outcome ?? ""] ?? "neutral"}>{humanize(i.outcome ?? "")}</Pill>
-                  {i.qc && <div className="small">QC {statusLabel(i.qc)}</div>}
-                  {i.duration_days !== undefined && i.duration_days !== null && (
-                    <div className="small muted">{i.duration_days} days</div>
-                  )}
-                </td>
-                <td className="small">
-                  {i.missing_parameters && i.missing_parameters.length > 0 && (
-                    <div>Parameters: {i.missing_parameters.map(paramLabel).join(", ")}</div>
-                  )}
-                  {i.missing_inputs && i.missing_inputs.length > 0 && <div>Inputs: {i.missing_inputs.join(", ")}</div>}
-                  {i.unavailable_results && i.unavailable_results.length > 0 && (
-                    <div>{i.unavailable_results.length} result(s) unavailable</div>
-                  )}
-                  {i.determinations?.map((d) => (
-                    <div key={d.label}>
-                      {d.label}:{" "}
-                      {d.assigned_to.length ? (
-                        d.assigned_to.join(", ")
-                      ) : (
-                        <span className="qc-warn">no {roleLabel(d.role)}</span>
-                      )}
-                    </div>
-                  ))}
-                </td>
-              </tr>
-            ))}
+            {res.items.map((i) => {
+              const dets = i.determinations ?? [];
+              const unassigned = dets.filter((d) => d.assigned_to.length === 0);
+              const assignees = [...new Set(dets.flatMap((d) => d.assigned_to))];
+              return (
+                <tr key={i.requirement_id}>
+                  <td>
+                    {i.name}
+                    {i.driver && <div className="muted small">{driverLabel(i.requirement_id, i.driver)}</div>}
+                  </td>
+                  <td className="nowrap">
+                    <Pill tone={OUTCOME_TONE[i.outcome ?? ""] ?? "neutral"}>{humanize(i.outcome ?? "")}</Pill>
+                    {i.qc && <div className="small">QC {statusLabel(i.qc)}</div>}
+                    {i.duration_days !== undefined && i.duration_days !== null && (
+                      <div className="small muted">{i.duration_days} days</div>
+                    )}
+                  </td>
+                  <td className="small">
+                    <Brief label="Design parameters" items={(i.missing_parameters ?? []).map(paramLabel)} />
+                    <Brief label="Analysis inputs" items={(i.missing_inputs ?? []).map(humanize)} />
+                    {i.unavailable_results && i.unavailable_results.length > 0 && (
+                      <div>{i.unavailable_results.length} result(s) unavailable</div>
+                    )}
+                    {dets.length > 0 && unassigned.length === 0 && (
+                      <div className="muted">
+                        {dets.length} determination{dets.length === 1 ? "" : "s"} by {assignees.join(", ")}
+                      </div>
+                    )}
+                    {unassigned.map((d) => (
+                      <div key={d.label}>
+                        {d.label}: <span className="qc-warn">no {roleLabel(d.role)}</span>
+                      </div>
+                    ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

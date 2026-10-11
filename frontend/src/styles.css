@@ -372,10 +372,29 @@ tr.clickable {
 .table-wrap table {
   margin: 0;
 }
+.table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
 .table-title {
   font-weight: 620;
   font-size: 13px;
-  margin-bottom: 6px;
+}
+input.table-filter {
+  max-width: 220px;
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: 12.5px;
+}
+.table-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
 }
 
 /* ---- shell ----------------------------------------------------------------------------- */
@@ -1732,10 +1751,9 @@ p.drafted {
 .chip-user_supplied {
   color: var(--user);
 }
+/* red like every simulated mark, but unfilled: a simulated study has one on every cell */
 .chip-simulated {
   color: var(--simulated);
-  background: var(--sim-bg);
-  opacity: 1;
 }
 .chip-unavailable {
   color: var(--unavailable);
@@ -2035,4 +2053,112 @@ td.nowrap .tag-group {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
+}
+
+/* ---- item lists: one bordered list with divided rows instead of a box per item ---------- */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.item-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.item-row + .item-row {
+  border-top: 1px solid var(--line-2);
+}
+.item-row.open {
+  background: var(--panel-2);
+}
+.item-row.off .item-main {
+  opacity: 0.55;
+}
+.item-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+}
+.item-main {
+  flex: 1;
+  min-width: 0;
+}
+.item-title {
+  font-weight: 560;
+}
+.item-body {
+  padding: 4px 12px 14px 40px;
+}
+:root[data-density="compact"] .item-head {
+  padding: 6px 10px;
+}
+details.brief > summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+details.brief[open] > div {
+  margin-top: 2px;
+}
+.changed-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+.field.is-changed :is(input, select, textarea) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.nowrap {
+  white-space: nowrap;
+}
+@media (max-width: 1000px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+.recorded {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ok);
+}
+/* a table title outside a table head keeps its gap to the table */
+:not(.table-head) > .table-title {
+  margin-bottom: 6px;
+}
+ul.notes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+details.basis {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+details.basis > summary {
+  cursor: pointer;
+}
+details.basis .cites {
+  margin: 4px 0 2px;
 }

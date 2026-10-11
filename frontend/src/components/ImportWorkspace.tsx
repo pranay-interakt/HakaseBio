@@ -5,7 +5,7 @@ import { href } from "../lib/router";
 import type { Principal, Study, StudySummary } from "../types";
 import { roleLabel, Section } from "./common";
 import { QuantityView } from "./QuantityView";
-import { Pill, ReasonAction } from "./ui";
+import { Facts, Pill, ReasonAction } from "./ui";
 import { humanize, statusLabel } from "../lib/format";
 
 type Run = <T>(fn: () => Promise<T>, done?: string) => Promise<void>;
@@ -84,20 +84,30 @@ export function ImportWorkspace({
       <Section
         title="Imported report"
         right={
-          <button onClick={() => api.download(`/studies/${s.id}/import/report`, rec.report.filename)}>
+          <button className="small" onClick={() => api.download(`/studies/${s.id}/import/report`, rec.report.filename)}>
             Download report
           </button>
         }
       >
-        <div className="small">
-          <strong>{rec.report.title}</strong> · {rec.report.laboratory} · {rec.report.report_date}
-          {rec.report.lab_study_number && <> · lab study {rec.report.lab_study_number}</>} · {s.glp ? "GLP" : "non-GLP"}{" "}
-          · CTD {rec.ctd_section}
-        </div>
-        <div className="small muted">
-          {rec.report.filename} · SHA-256 <code>{rec.report.sha256.slice(0, 16)}</code> · requirement{" "}
-          {rec.requirement.name} ({rec.requirement.section})
-        </div>
+        <Facts
+          items={[
+            ["Title", rec.report.title],
+            ["Laboratory", rec.report.laboratory],
+            ["Report date", rec.report.report_date],
+            ...(rec.report.lab_study_number
+              ? ([["Lab study number", rec.report.lab_study_number]] as [string, string][])
+              : []),
+            ["GLP", s.glp ? "Yes" : "No"],
+            ["CTD section", rec.ctd_section],
+            ["Required by", rec.requirement.section],
+            [
+              "File",
+              <span>
+                {rec.report.filename} <span className="mono muted">{rec.report.sha256.slice(0, 16)}</span>
+              </span>,
+            ],
+          ]}
+        />
         {rec.superseded_by && (
           <div className="note small">
             Superseded by driver-run study{" "}

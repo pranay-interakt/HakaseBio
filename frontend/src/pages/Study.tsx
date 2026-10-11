@@ -10,6 +10,7 @@ import {
   Section,
   StateTag,
 } from "../components/common";
+import { AuditTrail } from "../components/AuditTrail";
 import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
 import { prune, SchemaFields, SchemaForm } from "../components/SchemaForm";
@@ -27,17 +28,17 @@ import {
   type TabItem,
 } from "../components/ui";
 import {
-  actionLabel,
   fmtDateTime,
   humanize,
   meaningLabel,
   MEANINGS,
+  sentence,
   shortHash,
   statusLabel,
   targetLabel,
 } from "../lib/format";
 import { href } from "../lib/router";
-import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
+import type { Citation, Driver, Principal, Study as StudyT, StudySummary } from "../types";
 
 const DESIGNABLE = ["proposed", "designed", "planned", "dispatched"];
 const RECEIVABLE = ["dispatched", "data_received", "analyzed"];
@@ -139,7 +140,7 @@ export function Study({ id, tab, me }: { id: string; tab: string | null; me: Pri
           <Lifecycle state={s.state} />
         </PageHeader>
         <section className="card">
-          <Facts items={[...facts, ["GLP", s.glp ? "Yes" : "No"]]} />
+          <Facts items={facts} />
         </section>
         <ErrorBox error={err} onDismiss={() => setErr(null)} />
         <ImportWorkspace s={s} me={me} siblings={siblings} busy={busy} run={run} />
@@ -173,7 +174,12 @@ export function Study({ id, tab, me }: { id: string; tab: string | null; me: Pri
         <div className="banner-sim">SIMULATED data: for demonstration only; never approved or included in an IND.</div>
       )}
 
-      {active === "overview" && <Overview s={s} driver={driver} facts={facts} />}
+      {active === "overview" && (
+        <>
+          <Overview s={s} driver={driver} facts={facts} />
+          {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
+        </>
+      )}
 
       {active === "design" && (
         <>
@@ -251,12 +257,7 @@ export function Study({ id, tab, me }: { id: string; tab: string | null; me: Pri
 
       {active === "send" && <SendExport studyId={id} key={s.updated_at} />}
 
-      {active === "audit" && (
-        <>
-          <AuditTrail id={id} key={s.state + s.updated_at} open />
-          {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
-        </>
-      )}
+      {active === "audit" && <AuditTrail id={id} key={s.state + s.updated_at} open />}
     </div>
   );
 }
@@ -276,7 +277,8 @@ function Overview({ s, driver, facts }: { s: StudyT; driver: Driver; facts: [Rea
   return (
     <>
       <NextStep s={s} />
-      {s.simulated && (
+      {/* once analysed, the next-step callout carries this message with its action */}
+      {s.simulated && !simulatedEnd(s) && (
         <div className="banner-sim">
           This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be
           approved or included in an IND.
@@ -397,6 +399,9 @@ function Glance({
 
 // ---- what to do next ------------------------------------------------------------------------
 
+/** A simulated study that has gone as far as simulated data can take it. */
+const simulatedEnd = (s: StudyT) => s.simulated && ["analyzed", "reported"].includes(s.state);
+
 function NextStep({ s }: { s: StudyT }) {
   const protocolApproved = s.signatures.some(
     (g) =>
@@ -411,13 +416,14 @@ function NextStep({ s }: { s: StudyT }) {
   let text: ReactNode = null;
   let target: string | null = null;
   let tone = "";
-  if (s.simulated && ["analyzed", "reported"].includes(s.state))
+  if (simulatedEnd(s))
     return (
       <div className="callout warn">
         <div>
           <div className="callout-label">Simulated</div>
           <div className="callout-text">
-            This study runs on simulated data: it can be reported for demonstration but never approved.{" "}
+            This study runs on SIMULATED data: it can be reported for demonstration but never approved or included in an
+            IND.{" "}
             {s.state === "analyzed"
               ? "Replace the data with measured data to take it further."
               : "To take the requirement further, start a new study with measured data."}
@@ -547,7 +553,11 @@ function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy
   return (
     <div style={{ marginTop: 10 }}>
       {approvals.length === 0 ? (
-        <div className="muted small">Not yet approved by the Study Director.</div>
+        <div className="muted small">
+          {s.glp
+            ? "Not yet approved by the Study Director."
+            : "Non-GLP study: the protocol does not wait for Study Director approval."}
+        </div>
       ) : (
         approvals.map((g, i) => (
           <div key={i} className="signed small">
@@ -668,14 +678,14 @@ function PlanView({ plan }: { plan: Record<string, unknown> }) {
           [
             "Duration",
             plan.execution_duration_days === null
-              ? "set by the laboratory"
+              ? "Set by the laboratory"
               : `${String(plan.execution_duration_days)} days`,
           ],
-          ["Duration basis", String(plan.duration_basis ?? "—")],
+          ["Duration basis", sentence(String(plan.duration_basis ?? "—"))],
           ["Samples / animals", String(plan.sample_count ?? "—")],
-          ["Sample basis", String(plan.sample_count_basis ?? "—")],
-          ["Cost", String(plan.cost_note ?? "—")],
-          ["Depends on", ((plan.dependencies as string[] | undefined) ?? []).join("; ") || "nothing"],
+          ["Sample basis", sentence(String(plan.sample_count_basis ?? "—"))],
+          ["Cost", sentence(String(plan.cost_note ?? "—"))],
+          ["Depends on", sentence(((plan.dependencies as string[] | undefined) ?? []).join("; ")) || "Nothing"],
         ]}
       />
     </Section>
@@ -816,7 +826,7 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
       />
       {ex.notes.map((n) => (
         <div key={n} className="muted small">
-          {n}
+          {sentence(n)}
         </div>
       ))}
       {RECEIVABLE.includes(s.state) && (
@@ -825,6 +835,15 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
             <span className="sf-group-title">{replacing ? "Replace the data" : "Receive the data"}</span>
           </div>
           <div className="upload">
+            {replacing && (
+              <input
+                style={{ maxWidth: 360 }}
+                placeholder="Reason for replacing the data *"
+                aria-label="Reason for replacing the data"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            )}
             {ex.target_kind === "simulation" ? (
               <button
                 className="primary"
@@ -861,12 +880,6 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
               </>
             )}
           </div>
-          {replacing && (
-            <label className="field">
-              <span className="field-label">Reason for replacing the data *</span>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} />
-            </label>
-          )}
         </div>
       )}
       {s.raw_files.length > 0 && (
@@ -937,14 +950,13 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
   const upd = (n: string, k: string, v: string) => setEdits((o) => ({ ...o, [n]: { ...val(n), [k]: v } }));
   const recorded = (n: string) => s.analysis_inputs[n]?.value !== undefined;
   return (
-    <Section id="sec-inputs" title="Analysis inputs">
+    <Section
+      id="sec-inputs"
+      title="Analysis inputs"
+      subtitle="Values the analysis needs that this study does not measure, each with its provenance and source. A missing input leaves the results that depend on it unavailable, never assumed."
+    >
       {names.length > 0 && (
         <>
-          <p className="muted small">
-            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured
-            (name the study or assay), literature (name the source) or user-supplied. A missing input makes the results
-            that depend on it unavailable, never assumed.
-          </p>
           <div className="table-wrap">
             <table className="sf-table">
               <thead>
@@ -959,9 +971,13 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
               <tbody>
                 {names.map((n) => (
                   <tr key={n}>
-                    <td>
-                      {humanize(n)} <div className="muted small mono">{n}</div>
-                      {recorded(n) && <Pill tone="ok">recorded</Pill>}
+                    <td title={n}>
+                      {humanize(n)}
+                      {recorded(n) && (
+                        <span className="recorded" title="Recorded on the study">
+                          ✓ recorded
+                        </span>
+                      )}
                     </td>
                     <td>
                       <input
@@ -1010,9 +1026,7 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
               <tbody>
                 {selNames.map((n) => (
                   <tr key={n}>
-                    <td>
-                      {humanize(n)} <div className="muted small mono">{n}</div>
-                    </td>
+                    <td title={n}>{humanize(n)}</td>
                     <td>
                       <input
                         inputMode="decimal"
@@ -1103,7 +1117,13 @@ function ResultsView({ s }: { s: StudyT }) {
         {r.tables.map((t) => (
           <DataTable key={t.title} t={t} />
         ))}
-        {r.notes.length > 0 && <div className="muted small">{r.notes.join(" · ")}</div>}
+        {r.notes.length > 0 && (
+          <ul className="notes">
+            {r.notes.map((n, i) => (
+              <li key={i}>{sentence(n)}</li>
+            ))}
+          </ul>
+        )}
       </Section>
       {interp && (
         <Section
@@ -1113,9 +1133,14 @@ function ResultsView({ s }: { s: StudyT }) {
           {interp.statements.map((st, i) => (
             <div key={i} className={`statement sev-${st.severity}`}>
               <div>{st.statement}</div>
-              <div className="muted small">
-                Basis: {st.basis} · {st.citations.map((c) => c.key).join(", ")}
-              </div>
+              {st.citations.length > 0 ? (
+                <details className="basis">
+                  <summary>Basis: {st.basis}</summary>
+                  <Citations list={st.citations} />
+                </details>
+              ) : (
+                <div className="muted small">Basis: {st.basis}</div>
+              )}
             </div>
           ))}
           {interp.requires_expert_judgement.length > 0 && (
@@ -1373,40 +1398,6 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
 }
 
 // ---- audit trail & cancel -------------------------------------------------------------------
-
-function AuditTrail({ id, open = false }: { id: string; open?: boolean }) {
-  const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
-  useEffect(() => {
-    api
-      .getAll<LedgerEntry>(`/ledger/${id}`)
-      .then(setEntries)
-      .catch(() => setEntries([]));
-  }, [id]);
-  return (
-    <Collapsible id="sec-audit" title={`Audit trail${entries ? ` (${entries.length})` : ""}`} defaultOpen={open}>
-      {entries === null ? (
-        <Loading />
-      ) : entries.length === 0 ? (
-        <div className="muted small">No entries.</div>
-      ) : (
-        <ol className="timeline">
-          {[...entries].reverse().map((e) => (
-            <li key={e.seq}>
-              <span className="when">{fmtDateTime(e.recorded_at)}</span>
-              <span>
-                <span className="what">{actionLabel(e.action)}</span> <span className="who">by {e.actor_id}</span>
-                {e.reason && <div className="small">Reason: {e.reason}</div>}
-              </span>
-              <span className="hash mono" title={`entry #${e.seq}, hash ${e.entry_hash}`}>
-                #{e.seq} · {shortHash(e.entry_hash, 10)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </Collapsible>
-  );
-}
 
 function CancelSection({ id, run }: { id: string; run: Run }) {
   const [reason, setReason] = useState("");

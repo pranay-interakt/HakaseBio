@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "../api";
 import { stateLabel } from "../lib/format";
 import { isQuantity, type Table } from "../types";
@@ -60,11 +60,33 @@ export function Cell({ v }: { v: unknown }) {
 
 const numeric = (v: unknown) => isQuantity(v) || typeof v === "number";
 
+// a long table shows its first rows and a filter; the rest is one click away
+const PREVIEW_ROWS = 12;
+const cellText = (v: unknown) =>
+  isQuantity(v) ? `${v.value ?? ""} ${v.unit}` : v === null || v === undefined ? "" : String(v);
+
 export function DataTable({ t }: { t: Table }) {
+  const [q, setQ] = useState("");
+  const [all, setAll] = useState(false);
   const numCols = t.columns.map((_, j) => t.rows.length > 0 && t.rows.every((r) => r[j] === null || numeric(r[j])));
+  const long = t.rows.length > PREVIEW_ROWS;
+  const needle = q.trim().toLowerCase();
+  const matched = needle ? t.rows.filter((r) => r.map(cellText).join(" ").toLowerCase().includes(needle)) : t.rows;
+  const shown = all || needle ? matched : matched.slice(0, PREVIEW_ROWS);
   return (
     <div className="table-block">
-      <div className="table-title">{t.title}</div>
+      <div className="table-head">
+        <div className="table-title">{t.title}</div>
+        {long && (
+          <input
+            className="table-filter"
+            placeholder="Filter rows"
+            aria-label={`Filter ${t.title}`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        )}
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -77,7 +99,7 @@ export function DataTable({ t }: { t: Table }) {
             </tr>
           </thead>
           <tbody>
-            {t.rows.map((r, i) => (
+            {shown.map((r, i) => (
               <tr key={i}>
                 {r.map((c, j) => (
                   <td key={j} className={numCols[j] ? "num" : undefined}>
@@ -86,9 +108,30 @@ export function DataTable({ t }: { t: Table }) {
                 ))}
               </tr>
             ))}
+            {shown.length === 0 && (
+              <tr>
+                <td colSpan={t.columns.length} className="muted">
+                  No row matches “{q}”.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      {long && (
+        <div className="table-more">
+          <span className="muted small">
+            {needle
+              ? `${matched.length} of ${t.rows.length} rows match`
+              : `Showing ${shown.length} of ${t.rows.length} rows`}
+          </span>
+          {!needle && (
+            <button className="ghost small" onClick={() => setAll(!all)}>
+              {all ? "Show fewer" : `Show all ${t.rows.length}`}
+            </button>
+          )}
+        </div>
+      )}
       {t.note && <div className="muted small">{t.note}</div>}
       {t.rows.some((r) => r.some(isQuantity)) && <ProvenanceLegend />}
     </div>

@@ -243,34 +243,42 @@ export function SendExport({ studyId }: { studyId: string }) {
 
 function ExportHistory({ exports, download }: { exports: SendExportRecord[]; download: (sha: string) => void }) {
   return (
-    <table className="small">
-      <thead>
-        <tr>
-          <th>Export</th>
-          <th>When</th>
-          <th>By</th>
-          <th>Outcome</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        {[...exports].reverse().map((e) => (
-          <tr key={e.version}>
-            <td>v{e.version}</td>
-            <td>{fmtDateTime(e.created_at)}</td>
-            <td>{e.created_by}</td>
-            <td>
-              {e.ok ? (
-                <span className="tag tag-pass">package built</span>
-              ) : (
-                <span className="tag tag-fail">refused ({e.errors.length} errors)</span>
-              )}
-            </td>
-            <td>{e.package_sha256 && <button onClick={() => download(e.package_sha256!)}>Download</button>}</td>
+    <div className="table-wrap">
+      <table className="compact">
+        <thead>
+          <tr>
+            <th>Export</th>
+            <th>When</th>
+            <th>By</th>
+            <th>Outcome</th>
+            <th />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {[...exports].reverse().map((e) => (
+            <tr key={e.version}>
+              <td>v{e.version}</td>
+              <td className="nowrap">{fmtDateTime(e.created_at)}</td>
+              <td title={e.created_by}>{e.created_by_name ?? e.created_by}</td>
+              <td>
+                {e.ok ? (
+                  <span className="tag tag-pass">package built</span>
+                ) : (
+                  <span className="tag tag-fail">refused ({e.errors.length} errors)</span>
+                )}
+              </td>
+              <td>
+                {e.package_sha256 && (
+                  <button className="small" onClick={() => download(e.package_sha256!)}>
+                    Download
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

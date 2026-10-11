@@ -53,13 +53,22 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="field">
+    <label className={changed ? "field is-changed" : "field"}>
       <span className="field-label">
-        {label} {changed && <span className="pill pill-accent">changed</span>}
+        {label} {changed && <Changed />}
       </span>
       {children}
       {help && <span className="field-help">{help}</span>}
     </label>
+  );
+}
+
+/** A quiet marker on a fact that differs from the programme's current value. */
+function Changed() {
+  return (
+    <span className="changed-dot" title="Changed from the programme's current value">
+      <span className="sr-only">changed</span>
+    </span>
   );
 }
 
@@ -221,9 +230,7 @@ export function ContextForm({
         </Field>
       </div>
       <div>
-        <div className="field-label">
-          Clinical populations {changed("populations") && <span className="pill pill-accent">changed</span>}
-        </div>
+        <div className="field-label">Clinical populations {changed("populations") && <Changed />}</div>
         <div className="checks">
           {Object.entries(POPULATIONS).map(([p, l]) => (
             <label key={p}>
@@ -247,7 +254,7 @@ export function ContextForm({
         ).map(([k, l]) => (
           <label key={k}>
             <input type="checkbox" checked={Boolean(value[k])} onChange={(e) => set(k, e.target.checked)} />
-            {l} {changed(k) && <span className="pill pill-accent">changed</span>}
+            {l} {changed(k) && <Changed />}
           </label>
         ))}
       </div>

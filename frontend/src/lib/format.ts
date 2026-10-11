@@ -7,6 +7,12 @@ export function humanize(s: string | null | undefined): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Capitalise the first letter of an engine-written phrase; the rest is left as written. */
+export function sentence(s: string | null | undefined): string {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function lookup(map: Record<string, string>) {
   return (key: string | null | undefined): string => (key ? (map[key] ?? humanize(key)) : "—");
 }

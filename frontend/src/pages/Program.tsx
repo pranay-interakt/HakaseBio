@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { AuditTrail } from "../components/AuditTrail";
 import { Citations, ErrorBox, roleLabel, Section, StateTag } from "../components/common";
 import { ProvenanceLegend, QuantityView } from "../components/QuantityView";
 import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
@@ -42,6 +43,7 @@ const TABS = [
   "whatif",
   "rehearsal",
   "access",
+  "history",
 ] as const;
 type Tab = (typeof TABS)[number];
 const ACTIVE = [
@@ -74,6 +76,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
     whatif: "What-if",
     rehearsal: "Rehearsal",
     access: "Access",
+    history: "History",
   };
   useBreadcrumbs([
     { label: "Programmes", href: href.programs() },
@@ -126,7 +129,13 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
                 { id: "rehearsal", label: "Rehearsal" },
               ],
             },
-            { label: "Settings", items: [{ id: "access", label: "Access" }] },
+            {
+              label: "Settings",
+              items: [
+                { id: "access", label: "Access" },
+                { id: "history", label: "History" },
+              ],
+            },
           ]}
         />
         <div className="side-content">
@@ -140,10 +149,11 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
           {active === "studies" && <Studies p={p} />}
           {active === "readiness" && <ReadinessView id={id} />}
           {active === "module2" && <ProgramSummaries programId={id} me={me} />}
-          {active === "module4" && <Module4 id={id} />}
+          {active === "module4" && <Module4 id={id} studies={p.studies} />}
           {active === "whatif" && <WhatIf p={p} reload={load} />}
           {active === "rehearsal" && <RehearsalView p={p} />}
           {active === "access" && <ProgramAccess id={id} me={me} onErr={setErr} />}
+          {active === "history" && <AuditTrail id={id} title="Programme history" open />}
         </div>
       </div>
     </div>
@@ -269,14 +279,16 @@ function StudyTable({
   compounds: Compound[];
 }) {
   const cname = Object.fromEntries(compounds.map((c) => [c.id, c.name]));
+  // with a single compound the column repeats the same name on every row
+  const showCompound = new Set(studies.map((s) => s.compound_id)).size > 1;
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Study</th>
-            <th>Requirement</th>
-            <th>Compound</th>
+            <th className="hide-narrow">Requirement</th>
+            {showCompound && <th>Compound</th>}
             <th>Status</th>
             <th>Updated</th>
           </tr>
@@ -293,12 +305,12 @@ function StudyTable({
                   {s.glp && " · GLP"}
                 </div>
               </td>
-              <td className="small">{(s.requirement_id && names[s.requirement_id]) ?? "—"}</td>
-              <td className="small">{cname[s.compound_id] ?? "—"}</td>
-              <td>
+              <td className="small hide-narrow">{(s.requirement_id && names[s.requirement_id]) ?? "—"}</td>
+              {showCompound && <td className="small">{cname[s.compound_id] ?? "—"}</td>}
+              <td className="nowrap">
                 <StateTag state={s.state} simulated={s.simulated} />
               </td>
-              <td className="muted small" title={fmtDateTime(s.updated_at)}>
+              <td className="muted small nowrap" title={fmtDateTime(s.updated_at)}>
                 {fmtAgo(s.updated_at)}
               </td>
             </tr>
@@ -925,9 +937,12 @@ function ReadinessView({ id }: { id: string }) {
 // ---- module 4 -------------------------------------------------------------------------------
 
 interface Module4Pkg {
+  /** present when read back from the stored bundle */
+  assembled?: { at: string; by: string; by_name: string | null };
   package_hash: string;
   bundle_sha256: string;
   included_studies: number;
+  imported_studies?: number;
   refused_studies: { study_id: string; reason: string }[];
   toc: {
     section: string;
@@ -944,16 +959,29 @@ interface VerifyResult {
   checks: { subject: string; check: string; status: string; detail: string }[];
 }
 
-function Module4({ id }: { id: string }) {
-  const [pkg, setPkg] = useState<Module4Pkg | null>(null);
+function Module4({ id, studies }: { id: string; studies: StudySummary[] }) {
+  const titles = Object.fromEntries(studies.map((x) => [x.id, x.title]));
+  // undefined while the last assembly loads; null when Module 4 has never been assembled
+  const [pkg, setPkg] = useState<Module4Pkg | null | undefined>(undefined);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api
+      .get<Module4Pkg | null>(`/programs/${id}/module4`)
+      .then(setPkg)
+      .catch((e) => {
+        setPkg(null);
+        setErr(e);
+      });
+  }, [id]);
   async function assemble() {
     setBusy(true);
     setVerify(null);
     try {
-      setPkg(await api.post<Module4Pkg>(`/programs/${id}/module4`));
+      await api.post<Module4Pkg>(`/programs/${id}/module4`);
+      // read the package back from the stored bundle, with who assembled it and when
+      setPkg(await api.get<Module4Pkg | null>(`/programs/${id}/module4`));
       toast("Module 4 assembled");
     } catch (e) {
       setErr(e);
@@ -973,7 +1001,8 @@ function Module4({ id }: { id: string }) {
         }
       >
         <ErrorBox error={err} onDismiss={() => setErr(null)} />
-        {!pkg && (
+        {pkg === undefined && <Loading />}
+        {pkg === null && (
           <Empty title="Not assembled yet">
             Assembling builds the Module 4 tree, a verification bundle and the FIH dose projection.
           </Empty>
@@ -982,7 +1011,13 @@ function Module4({ id }: { id: string }) {
           <>
             <Facts
               items={[
+                ...(pkg.assembled
+                  ? ([
+                      ["Assembled", `${fmtDateTime(pkg.assembled.at)} by ${pkg.assembled.by_name ?? pkg.assembled.by}`],
+                    ] as [string, string][])
+                  : []),
                 ["Reports included", pkg.included_studies],
+                ...(pkg.imported_studies ? ([["Imported reports", pkg.imported_studies]] as [string, number][]) : []),
                 ["Package", <span className="mono">{pkg.package_hash.slice(0, 16)}</span>],
                 [
                   "Bundle",
@@ -1015,7 +1050,7 @@ function Module4({ id }: { id: string }) {
                 <ul>
                   {pkg.refused_studies.map((r) => (
                     <li key={r.study_id}>
-                      <a href={href.study(r.study_id)}>{r.study_id}</a>: {r.reason}
+                      <a href={href.study(r.study_id)}>{titles[r.study_id] ?? r.study_id}</a>: {r.reason}
                     </li>
                   ))}
                 </ul>

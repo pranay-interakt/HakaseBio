@@ -115,6 +115,21 @@ export interface TabItem {
 }
 
 /** Tabs are links, so each tab has its own URL and back/forward moves between tabs. */
+/** When a tab strip scrolls sideways (narrow screens), keep the active entry in view without
+ * moving the page. */
+function useActiveInView(active: string) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = ref.current;
+    const el = nav?.querySelector<HTMLElement>("[aria-current='page'], [aria-selected='true']");
+    if (!nav || !el || nav.scrollWidth <= nav.clientWidth) return;
+    const left = el.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+    if (left < nav.scrollLeft || left + el.offsetWidth > nav.scrollLeft + nav.clientWidth)
+      nav.scrollLeft = Math.max(0, left - (nav.clientWidth - el.offsetWidth) / 2);
+  }, [active]);
+  return ref;
+}
+
 export function Tabs({
   items,
   active,
@@ -124,8 +139,9 @@ export function Tabs({
   active: string;
   hrefFor: (id: string) => string;
 }) {
+  const ref = useActiveInView(active);
   return (
-    <nav className="tabs" role="tablist">
+    <nav className="tabs" role="tablist" ref={ref}>
       {items.map((t) => (
         <a
           key={t.id}
@@ -157,8 +173,9 @@ export function SideNav({
   active: string;
   hrefFor: (id: string) => string;
 }) {
+  const ref = useActiveInView(active);
   return (
-    <nav className="side-nav" aria-label="Sections">
+    <nav className="side-nav" aria-label="Sections" ref={ref}>
       {groups.map((g) => (
         <div key={g.label} className="side-group">
           <div className="side-group-label">{g.label}</div>

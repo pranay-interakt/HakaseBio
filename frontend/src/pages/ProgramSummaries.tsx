@@ -56,6 +56,7 @@ interface Doc {
   status: "draft" | "signed";
   content_hash: string;
   created_by: string;
+  created_by_name?: string | null;
   created_at: string;
   reason: string | null;
   signatures: { signer_name: string; role: string; meaning: string; statement: string; signed_at: string }[];
@@ -394,7 +395,7 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
               </Pill>
               {doc.version !== latest && <Pill tone="neutral">earlier version</Pill>}
               <span className="muted small">
-                by {doc.created_by}, {fmtDateTime(doc.created_at)} · fingerprint{" "}
+                by {doc.created_by_name ?? doc.created_by}, {fmtDateTime(doc.created_at)} · fingerprint{" "}
                 <span className="mono">{shortHash(doc.content_hash, 12)}</span>
               </span>
               <span className="spacer" />

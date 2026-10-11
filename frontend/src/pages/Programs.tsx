@@ -82,8 +82,8 @@ export function Programs() {
                   <th>Programme</th>
                   <th>Modality</th>
                   <th>Indication</th>
-                  <th>Route</th>
-                  <th className="num">Compounds</th>
+                  <th className="hide-narrow">Route</th>
+                  <th className="num hide-narrow">Compounds</th>
                   <th className="num">Studies</th>
                   <th>Last activity</th>
                 </tr>
@@ -99,10 +99,10 @@ export function Programs() {
                     </td>
                     <td>{modalityLabel(p.modality)}</td>
                     <td>{indicationLabel(p.indication)}</td>
-                    <td>{routeLabel(p.route)}</td>
-                    <td className="num">{p.compounds}</td>
+                    <td className="hide-narrow">{routeLabel(p.route)}</td>
+                    <td className="num hide-narrow">{p.compounds}</td>
                     <td className="num">{p.studies}</td>
-                    <td className="muted" title={fmtDateTime(p.updated_at)}>
+                    <td className="muted nowrap" title={fmtDateTime(p.updated_at)}>
                       {fmtAgo(p.updated_at)}
                     </td>
                   </tr>

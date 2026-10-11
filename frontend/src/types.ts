@@ -306,6 +306,8 @@ export interface LedgerEntry {
   seq: number;
   recorded_at: string;
   actor_id: string;
+  /** display only, looked up when the trail is read */
+  actor_name?: string | null;
   actor_kind: string;
   action: string;
   subject_id: string;
@@ -522,6 +524,7 @@ export interface SendExportRecord {
   version?: number;
   created_at?: string;
   created_by?: string;
+  created_by_name?: string | null;
 }
 
 export interface SendContext {
