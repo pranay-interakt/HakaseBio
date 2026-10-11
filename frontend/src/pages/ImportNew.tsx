@@ -14,6 +14,7 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
   const [date, setDate] = useState("");
   const [glp, setGlp] = useState<"" | "true" | "false">("");
   const [labNo, setLabNo] = useState("");
+  const [parts, setParts] = useState<string[]>([]);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,6 +44,7 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
         glp,
       });
       if (labNo) q.set("lab_study_number", labNo);
+      if (parts.length) q.set("components", parts.join(","));
       const s = await api.upload<Study>(`/programs/${programId}/imports?${q.toString()}`, file);
       go(`#/study/${s.id}`);
     } catch (e) {
@@ -112,12 +114,31 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
             </select>
           </div>
         </div>
+        {req && req.components.length > 0 && (
+          <div className="field">
+            <label className="field-label">Parts of the requirement this report covers *</label>
+            {req.components.map((c) => (
+              <label key={c} className="small" style={{ marginRight: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={parts.includes(c)}
+                  onChange={(e) => setParts((x) => (e.target.checked ? [...x, c] : x.filter((y) => y !== c)))}
+                />{" "}
+                {c}
+              </label>
+            ))}
+          </div>
+        )}
         {fields.length > 0 && (
           <p className="small">
             You will transcribe: {fields.map((f) => f.label + (f.unit ? ` [${f.unit}]` : "")).join(", ")}.
           </p>
         )}
-        <button className="primary" disabled={busy || !file || !compound} onClick={create}>
+        <button
+          className="primary"
+          disabled={busy || !file || !compound || (!!req && req.components.length > 0 && parts.length === 0)}
+          onClick={create}
+        >
           Upload report and create import
         </button>
       </Section>

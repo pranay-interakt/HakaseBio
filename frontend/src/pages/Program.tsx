@@ -69,12 +69,13 @@ function StudySet({ p, go, onErr }: { p: ProgramT; go: (h: string) => void; onEr
   const reqs = [...p.study_set.requirements].sort(
     (a, b) => TIMING_ORDER.indexOf(a.timing) - TIMING_ORDER.indexOf(b.timing),
   );
-  async function start(r: Requirement) {
+  async function start(r: Requirement, driverId: string) {
     try {
       const s = await api.post<Study>("/studies", {
         program_id: p.id,
         compound_id: compound,
         requirement_id: r.id,
+        driver_id: driverId,
       });
       go(`#/study/${s.id}`);
     } catch (e) {
@@ -141,10 +142,19 @@ function StudySet({ p, go, onErr }: { p: ProgramT; go: (h: string) => void; onEr
                 </td>
                 <td className="small">{r.ctd_section ?? "—"}</td>
                 <td>
-                  {r.driver_id && r.status !== "not_required" && compound && (
-                    <button onClick={() => start(r)}>Start study</button>
+                  {r.status !== "not_required" &&
+                    compound &&
+                    (p.drivers?.[r.id] ?? []).map((d) => (
+                      <button key={d.id} onClick={() => start(r, d.id)} title={d.name}>
+                        Start study{(p.drivers[r.id] ?? []).length > 1 || d.components.length > 0
+                          ? `: ${d.components.length ? d.components.join(", ") : d.name}`
+                          : ""}
+                      </button>
+                    ))}
+                  {r.components.length > 0 && <div className="muted small">parts: {r.components.join(", ")}</div>}
+                  {(p.drivers?.[r.id] ?? []).length === 0 && r.status !== "not_required" && (
+                    <div className="muted small">no driver</div>
                   )}
-                  {!r.driver_id && r.status !== "not_required" && <div className="muted small">no driver</div>}
                   {r.status !== "not_required" && compound && (
                     <button onClick={() => go(`#/import/${p.id}/${r.id}`)}>Import report</button>
                   )}
@@ -355,6 +365,13 @@ function ReadinessView({ id }: { id: string }) {
                 </td>
                 <td>
                   <span className={`tag tag-${i.status}`}>{i.status.replace(/_/g, " ")}</span>
+                  {i.components && (
+                    <div className="small">
+                      {i.components.done.length > 0 && <div>done: {i.components.done.join(", ")}</div>}
+                      {i.components.imported.length > 0 && <div>imported: {i.components.imported.join(", ")}</div>}
+                      {i.components.missing.length > 0 && <div>missing: {i.components.missing.join(", ")}</div>}
+                    </div>
+                  )}
                   {i.pending_fact && <div className="small">pending: {i.pending_fact}</div>}
                 </td>
                 <td className="small">{i.section}</td>

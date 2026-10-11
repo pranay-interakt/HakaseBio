@@ -161,3 +161,4 @@ details.card summary { cursor: pointer; color: var(--muted); }
 }
 .tag-imported, .tag-import_draft { color: var(--literature); }
 .tag-superseded { color: var(--muted); }
+.tag-partial { color: var(--warn); }

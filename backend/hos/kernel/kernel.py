@@ -668,8 +668,15 @@ class Kernel:
 
     def program_view(self, program_id: str) -> dict[str, Any]:
         row = self.repo.program(program_id)
+        # the live derivation from the current engine (readiness uses the same); the set
+        # recorded when the programme was created stays in the ledger
+        ss = derive_study_set(ProgramContext.from_dict(row.context))
+        drivers = {r.id: [{"id": d.id, "name": d.name,
+                           "components": list(d.components_for(r.id))}
+                          for d, _ in self.registry.match(r, ss.context)]
+                   for r in ss.requirements}
         return {"id": row.id, "name": row.name, "sponsor": row.sponsor, "context": row.context,
-                "study_set": row.study_set, "created_by": row.created_by,
+                "study_set": ss.to_dict(), "drivers": drivers, "created_by": row.created_by,
                 "created_at": row.created_at.isoformat(),
                 "compounds": [self.compound_view(c.id) for c in self.repo.compounds(program_id)],
                 "studies": [self._study_summary(s) for s in self.repo.studies(program_id)]}

@@ -38,6 +38,7 @@ BUILTIN_DRIVERS: tuple[str, ...] = (
     "hos.drivers.ames:AmesDriver",
     "hos.drivers.dose_range_finding:DoseRangeFindingDriver",
     "hos.drivers.in_vitro_potency:InVitroPotencyDriver",
+    "hos.drivers.safety_pharm_cns:SafetyPharmCNSDriver",
 )
 
 _REQUIRED_ATTRS = ("id", "name", "version", "requirement_ids", "modalities", "ctd_section")

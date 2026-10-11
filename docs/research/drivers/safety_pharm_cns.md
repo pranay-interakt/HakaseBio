@@ -67,3 +67,18 @@ S7A's reference list (refs 1–6, p.9), so no Moser citation is attached to S7A.
 2. Irwin S. Comprehensive observational assessment: Ia. A systematic, quantitative procedure for assessing the behavioral and physiologic state of the mouse. *Psychopharmacologia.* 1968;13(3):222–257. DOI: 10.1007/BF00401402 *(bibliographic only — cite as the method named by S7A, not for any parameter value)*.
 3. Mattsson JL, Spencer PJ, Albee RR. A performance standard for clinical and Functional Observational Battery examinations of rats. *J Am Coll Toxicol.* 1996;15(3):239–254. DOI: 10.3109/10915819609008716 *(bibliographic only)*.
 4. Haggerty GC. Strategy for and experience with neurotoxicity testing of new pharmaceuticals. *J Am Coll Toxicol.* 1991;10(6):677–688. DOI: 10.3109/10915819109078660 *(bibliographic only)*.
+
+## Implementation record (driver `safety_pharm_cns` v1.0.0, 2026-10-11)
+
+- **Citations re-verified on Crossref.**
+  - Mattsson 1996: J Am Coll Toxicol 15(3):239–254.
+  - Irwin 1968: Psychopharmacologia 13(3):222–257.
+  - Haggerty 1991: J Am Coll Toxicol 10(6):677–688.
+
+  All three are registered as bibliographic only, cited as the methods S7A names.
+- **Observation list and scoring are protocol inputs.** Each observation maps to an S7A §2.7.1
+  domain, and the protocol is refused if any domain is uncovered.
+- **No incidence statistic.** Per this note, none is verified. Continuous measures may use
+  Dunnett's test (already verified for repeat-dose) when the protocol states it.
+- **The core battery is now a multi-part requirement** (CNS, cardiovascular, respiratory).
+  This driver covers `cns`, and readiness reports `partial` until all three parts are covered.

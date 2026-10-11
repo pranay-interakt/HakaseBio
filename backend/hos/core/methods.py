@@ -272,6 +272,18 @@ METHODS: Final[dict[str, Method]] = dict(
                    "with the effect level (Ritz et al. 2015)",
                    "IC50s from assays at different substrate or ligand concentrations are not "
                    "affinities; no Ki conversion is applied",)),
+        _m("safety.observation_incidence",
+           "Animals with a finding (a score other than the protocol's normal score) per group "
+           "and timepoint", ("ich_s7a",),
+           assumptions=("dose-response and time course are described per S7A 2.4.1; the "
+                        "observation list and scoring are protocol inputs",),
+           limits=("descriptive: no statistical test for incidence is applied (none is "
+                   "verified for S7A core-battery endpoints)",)),
+        _m("sim.cns_declared",
+           "Simulated functional-observation scores and continuous CNS measures from declared "
+           "incidences and effects", ("ich_s7a",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

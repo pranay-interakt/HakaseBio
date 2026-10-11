@@ -49,9 +49,12 @@ def test_readiness_on_a_new_programme(k):  # noqa: F811
     # driver availability follows the registry, whatever drivers are installed
     reg = k.registry
     for i in r["items"]:
-        if i["status"] == "missing":
+        if i["status"] == "missing" and not i["components"]:
             served = any(i["requirement_id"] in reg.get(d).requirement_ids for d in reg.ids())
             assert i["driver_available"] == served, i["requirement_id"]
+    cb = next(i for i in r["items"] if i["requirement_id"] == "safety.core_battery")
+    parts = {c for d in reg.ids() for c in reg.get(d).components_for("safety.core_battery")}
+    assert cb["driver_available"] == (parts >= {"cns", "cardiovascular", "respiratory"})
     assert "UV-visible absorption spectrum" in s["conditional_pending_facts"]
 
 
@@ -127,3 +130,46 @@ def test_assembler_refuses_simulated_content():
                               {"kind": "simulated"}}]]}]}]})
     with pytest.raises(EvidenceInadmissible):
         _check_no_simulation({"q": {"qc_flags": ["derived_from_simulated_data"]}})
+
+
+def _imported_core_battery(k, sci, pid, cid, components):  # noqa: F811
+    sid = k.imports.import_study(
+        sci, program_id=pid, compound_id=cid, requirement_id="safety.core_battery",
+        report=b"%PDF-1.4 core battery report", filename="sp.pdf", title="Safety pharmacology",
+        laboratory="CRO", report_date="2026-06-30", glp=False, components=components)["id"]
+    k.imports.add_import_value(sci, sid, key="overall_conclusion", page="5",
+                               category="no_effect_identified")
+    k.imports.sign_import(sci, sid, role=Role.RESPONSIBLE_SCIENTIST,
+                          meaning=SignatureMeaning.APPROVAL, statement="Reviewed.")
+    k.imports.complete_import(sci, sid)
+    return sid
+
+
+def test_core_battery_is_done_only_when_every_s7a_part_is_covered(k):  # noqa: F811
+    sci, pid, cid = _program(k)
+    item = lambda: next(i for i in readiness_report(k, pid)["items"]  # noqa: E731
+                        if i["requirement_id"] == "safety.core_battery")
+    assert item()["status"] == "missing"
+    assert item()["components"]["missing"] == ["cns", "cardiovascular", "respiratory"]
+    _imported_core_battery(k, sci, pid, cid, ["cns"])
+    i = item()
+    assert i["status"] == "partial" and i["components"]["imported"] == ["cns"]
+    assert i["components"]["missing"] == ["cardiovascular", "respiratory"]
+    _imported_core_battery(k, sci, pid, cid, ["cardiovascular", "respiratory"])
+    assert item()["status"] == "imported" and not item()["components"]["missing"]
+
+
+def test_core_battery_import_must_name_its_parts(k):  # noqa: F811
+    from hos.kernel.errors import KernelError
+    sci, pid, cid = _program(k)
+    for bad in (None, [], ["renal"]):
+        with pytest.raises(KernelError, match="parts"):
+            k.imports.import_study(
+                sci, program_id=pid, compound_id=cid, requirement_id="safety.core_battery",
+                report=b"%PDF", filename="sp.pdf", title="SP", laboratory="CRO",
+                report_date="2026-06-30", glp=False, components=bad)
+    with pytest.raises(KernelError, match="no parts"):
+        k.imports.import_study(
+            sci, program_id=pid, compound_id=cid, requirement_id="safety.herg",
+            report=b"%PDF", filename="h.pdf", title="hERG", laboratory="CRO",
+            report_date="2026-06-30", glp=False, components=["cns"])

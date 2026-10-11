@@ -538,6 +538,8 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
                             report_date: str = Query(...), glp: bool = Query(...),
                             lab_study_number: str | None = Query(None),
                             ctd_section: str | None = Query(None),
+                            components: str | None = Query(
+                                None, description="comma-separated parts the report covers"),
                             actor: Principal = Depends(current),
                             k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         report = await request.body()
@@ -545,7 +547,9 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
             actor, program_id=program_id, compound_id=compound_id,
             requirement_id=requirement_id, report=report, filename=filename, title=title,
             laboratory=laboratory, report_date=report_date, glp=glp,
-            lab_study_number=lab_study_number, ctd_section=ctd_section)
+            lab_study_number=lab_study_number, ctd_section=ctd_section,
+            components=[c.strip() for c in components.split(",") if c.strip()]
+            if components else None)
 
     @app.post("/api/studies/{study_id}/import/datasets")
     async def import_dataset(study_id: str, request: Request, filename: str = Query(...),

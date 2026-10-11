@@ -103,6 +103,14 @@ export interface Requirement {
   driver_id: string | null;
   pending_fact: string | null;
   ctd_section: string | null;
+  /** Parts that must all be covered (e.g. the S7A core battery's CNS, CV, respiratory). */
+  components: string[];
+}
+
+export interface DriverChoice {
+  id: string;
+  name: string;
+  components: string[];
 }
 
 export interface StudySummary {
@@ -163,6 +171,8 @@ export interface Program {
   };
   compounds: Compound[];
   studies: StudySummary[];
+  /** Installed drivers able to serve each requirement of the live study set. */
+  drivers: Record<string, DriverChoice[]>;
 }
 
 export interface QCFinding {
@@ -313,6 +323,7 @@ export interface ReadinessItem {
   driver_available: boolean;
   ctd_section: string | null;
   studies: { id: string; state: string; simulated: boolean }[];
+  components: { required: string[]; done: string[]; imported: string[]; missing: string[] } | null;
 }
 
 export interface Readiness {

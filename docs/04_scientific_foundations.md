@@ -353,6 +353,24 @@ is a new registry version; it never silently alters past results.
     conversion is applied; its source is NOT VERIFIED.
 - No selectivity threshold is applied. None exists in ICH M3(R2), S7A, S7B or the E14/S7B Q&A.
 
+## 4.19 CNS safety pharmacology and multi-part requirements  [`safety.observation_incidence`]
+
+- **Domains.** ICH S7A §2.7.1 requires motor activity, behavioural changes, coordination,
+  sensory/motor reflex responses and body temperature. It names the FOB (Mattsson et al. 1996),
+  the modified Irwin's (Irwin 1968) or another test (Haggerty 1991). The itemised batteries
+  could not be read, so the protocol lists its observations and scoring scales. Each
+  observation maps to a domain, and a protocol that leaves a domain uncovered is refused.
+- **Incidence.** Animals whose score differs from the protocol's normal score, per observation ×
+  dose × sex × timepoint, giving the dose-response and time course of S7A §2.4.1. No incidence
+  statistic is applied, because none is verified for S7A endpoints.
+- **Continuous measures** use the group comparison of §4.11 against the vehicle group.
+- **Multi-part requirements.** The S7A core battery (`safety.core_battery`) is made of the CNS,
+  cardiovascular and respiratory parts (S7A §2.7.1–2.7.3).
+  - Readiness reports it as `partial` until every part is covered by an approved driver-run
+    study (its driver declares the part) or an import (the importer states the parts, which are
+    signed into the import hash).
+  - It is runnable in HOS only when the installed drivers cover every part.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

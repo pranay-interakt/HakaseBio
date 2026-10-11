@@ -37,6 +37,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, ClassVar
 
 import numpy as np
@@ -964,6 +965,13 @@ class StudyDriver(ABC):
     glp_capable: ClassVar[bool] = False
     description: ClassVar[str] = ""
     reference_keys: ClassVar[tuple[str, ...]] = ()
+    components: ClassVar[Mapping[str, tuple[str, ...]]] = MappingProxyType({})
+    """For requirements made of parts: requirement id -> the parts this driver's study covers
+    (e.g. {"safety.core_battery": ("cns",)})."""
+
+    @classmethod
+    def components_for(cls, requirement_id: str) -> tuple[str, ...]:
+        return tuple(cls.components.get(requirement_id, ()))
 
     # -- identity / probe ------------------------------------------------------
 
@@ -974,6 +982,7 @@ class StudyDriver(ABC):
             "requirement_ids": list(cls.requirement_ids),
             "modalities": sorted(m.value for m in cls.modalities),
             "ctd_section": cls.ctd_section, "glp_capable": cls.glp_capable,
+            "components": {k: list(v) for k, v in cls.components.items()},
             "description": cls.description,
             "references": [cite(k).to_dict() for k in cls.reference_keys],
             "parameters_schema": cls.parameters_model().model_json_schema(),
@@ -991,6 +1000,10 @@ class StudyDriver(ABC):
             return Support(False, f"{self.id} does not serve requirement {requirement.id}")
         if context is not None and context.modality not in self.modalities:
             return Support(False, f"{self.id} does not support modality {context.modality.value}")
+        if requirement.components and not (set(self.components_for(requirement.id))
+                                           & set(requirement.components)):
+            return Support(False, f"{self.id} declares none of {requirement.id}'s parts "
+                                  f"{list(requirement.components)}")
         return Support(True, "requirement matched by driver match table",
                        prefill=self.prefill_from_requirement(requirement))
 

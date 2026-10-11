@@ -76,6 +76,11 @@ class RequirementStatus(str, Enum):
     NOT_REQUIRED = "not_required"        # recorded explicitly so the waiver is auditable
 
 
+#: ICH S7A 2.7: the core battery assesses the central nervous (2.7.1), cardiovascular (2.7.2)
+#: and respiratory (2.7.3) systems.
+CORE_BATTERY_COMPONENTS = ("cns", "cardiovascular", "respiratory")
+
+
 @dataclass(frozen=True, slots=True)
 class StudyRequirement:
     """One study the programme must (or conditionally must) perform."""
@@ -94,6 +99,9 @@ class StudyRequirement:
     driver_id: str | None = None
     pending_fact: str | None = None
     ctd_section: str | None = None
+    components: tuple[str, ...] = ()
+    """Parts that must all be covered before the requirement is met (e.g. the S7A core
+    battery's CNS, cardiovascular and respiratory assessments)."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +116,7 @@ class StudyRequirement:
             "glp": self.glp,
             "species": list(self.species),
             "duration_weeks": self.duration_weeks,
+            "components": list(self.components),
             "driver_id": self.driver_id,
             "pending_fact": self.pending_fact,
             "ctd_section": self.ctd_section,
@@ -268,8 +277,11 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             category=StudyCategory.SAFETY_PHARMACOLOGY, status=RequirementStatus.REQUIRED,
             timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7a"),
             section="S7A sections 2.7, 2.10.1",
-            rationale="The core battery must be completed before first administration in humans",
+            rationale="The core battery must be completed before first administration in "
+                      "humans; it covers the central nervous (2.7.1), cardiovascular (2.7.2) "
+                      "and respiratory (2.7.3) systems",
             glp=True, species=("rat", "dog"), ctd_section="4.2.1.3",
+            components=CORE_BATTERY_COMPONENTS,
         ))
     out.append(_req(
         id="safety.herg", name="In vitro hERG (IKr) assay",

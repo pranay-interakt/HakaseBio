@@ -11,6 +11,7 @@ subsystem:
 |---|---|
 | subsystem core shared by all drivers | `StudyDriver` base class: strict CSV ingest, SHA-256 of raw files, unit conversion, simulation detection, simulation taint, interpretation citation check, report appendices and disclaimer |
 | driver hooks | `design`, `plan`, `data_template`, `sample_manifest`, `validate_records`, `_analyze`, `_interpret`, `_report_sections`, optional `_simulate_rows` |
+| sub-devices | `components`: for a multi-part requirement (the S7A core battery), the parts this driver's study covers; readiness needs every part |
 | device-ID match table | `requirement_ids` + `modalities`; `probe(requirement, context)` returns `Support` with design-parameter pre-fill |
 | module registration / ABI | `DriverRegistry.register` refuses a missing identity attribute, an ABI-major mismatch, or a duplicate id |
 | loadable modules | `DriverRegistry.discover()` loads drivers from the `hos.drivers` Python entry-point group |
@@ -385,6 +386,36 @@ The kit checks:
   - The Ritz Eq. 2 identity with the implemented 4PL (b = hill).
   - Exact IC50 and Hill slope recovery and the exact ratio.
   - The delta-method SE by hand.
+
+### `safety_pharm_cns` v1.0.0 — CNS core battery (ICH S7A §2.7.1)
+
+- **Serves.** `safety.core_battery`, part `cns`. CTD 4.2.1.3. GLP-capable.
+- **Research note.** `docs/research/drivers/safety_pharm_cns.md`.
+- **Design.** Required inputs:
+  - species and strain, sexes, route, vehicle;
+  - method (FOB, modified Irwin or other) and the laboratory procedure;
+  - doses with their basis (S7A §2.4.1);
+  - group size with its basis (S7A §2.3.3.1);
+  - a positive control, or a justification for omitting it (S7A §2.3.3.1);
+  - timepoints with their basis (S7A §2.3.1), including any baseline;
+  - observations, each with an S7A domain, a scale (binary, ordinal or continuous), a normal
+    score or a unit;
+  - the statistics choice for continuous measures.
+- **Return data.** One row per animal × observation × timepoint: group (vehicle / test /
+  positive), dose, unit, result.
+- **Analysis.**
+  - Incidence of findings.
+  - Continuous measures against vehicle.
+  - The positive-control check (FAIL if no data).
+  - Missing-animal warnings.
+- **Determinations.** Both by the Study Director:
+  - adverse CNS effect (no effect identified / effect identified, the same categories as an
+    imported core-battery conclusion), required;
+  - highest dose without an adverse effect, optional.
+- **Known-value tests.**
+  - Exact incidence from declared fractions, including a normal score of 1.
+  - % vs vehicle for body temperature.
+  - Refusal of a protocol missing an S7A domain.
 
 ## 8.4 Writing a new driver
 

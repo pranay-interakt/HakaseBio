@@ -57,9 +57,15 @@ def _rid(prefix: str) -> str:
 
 
 def compute_import_hash(record: dict[str, Any]) -> str:
-    """Hash of an import's attested content (shared with the offline verifier)."""
-    return content_hash({"report": record.get("report"), "datasets": record.get("datasets", []),
-                         "values": [v for v in record.get("values", []) if not v.get("withdrawn")]})
+    """Hash of an import's attested content (shared with the offline verifier). The parts of a
+    multi-part requirement the report covers are attested too, when the requirement has
+    parts."""
+    body: dict[str, Any] = {
+        "report": record.get("report"), "datasets": record.get("datasets", []),
+        "values": [v for v in record.get("values", []) if not v.get("withdrawn")]}
+    if record.get("components"):
+        body["components"] = record["components"]
+    return content_hash(body)
 
 
 class ImportService:
@@ -75,7 +81,8 @@ class ImportService:
                      requirement_id: str, report: bytes, filename: str, title: str,
                      laboratory: str, report_date: str, glp: bool,
                      lab_study_number: str | None = None,
-                     ctd_section: str | None = None) -> dict[str, Any]:
+                     ctd_section: str | None = None,
+                     components: list[str] | None = None) -> dict[str, Any]:
         self.k._require_worker(actor)
         if actor.kind is not PrincipalKind.HUMAN:
             raise PermissionDenied("an import is created by a human; agents may propose values")
@@ -95,6 +102,16 @@ class ImportService:
             date.fromisoformat(report_date)
         except ValueError:
             raise KernelError(f"report_date {report_date!r} is not an ISO 8601 date") from None
+        parts: list[str] = []
+        if req.components:
+            parts = [c for c in req.components if c in set(components or [])]
+            unknown = sorted(set(components or []) - set(req.components))
+            if unknown or not parts:
+                raise KernelError(f"{requirement_id} has parts {list(req.components)}: state "
+                                  "which of them the report covers"
+                                  + (f" (unknown: {unknown})" if unknown else ""))
+        elif components:
+            raise KernelError(f"{requirement_id} has no parts")
         section = ctd_section or req.ctd_section
         if not section:
             raise KernelError(f"requirement {requirement_id} has no CTD section; state one")
@@ -115,6 +132,8 @@ class ImportService:
                             "citation": req.citation.to_dict()},
             "datasets": [], "values": [], "proposals": [],
         }
+        if parts:
+            record["components"] = parts
         self.k.repo.add(StudyRow(
             id=sid, program_id=program_id, compound_id=compound_id, requirement_id=requirement_id,
             driver_id=IMPORT_DRIVER_ID, driver_version="1", title=f"{req.name}: {compound.name} "

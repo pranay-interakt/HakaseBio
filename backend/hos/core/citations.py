@@ -209,6 +209,22 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "Ritz C, Baty F, Streibig JC, Gerhard D. Dose-response analysis using R. PLoS One. "
            "2015;10(12):e0146021.",
            year=2015, doi="10.1371/journal.pone.0146021"),
+        _c("mattsson1996",
+           "Mattsson JL, Spencer PJ, Albee RR. A performance standard for clinical and "
+           "Functional Observational Battery examinations of rats. J Am Coll Toxicol. "
+           "1996;15(3):239-254. (Named by ICH S7A 2.7.1; bibliographic only.)",
+           year=1996, doi="10.3109/10915819609008716"),
+        _c("irwin1968",
+           "Irwin S. Comprehensive observational assessment: Ia. A systematic, quantitative "
+           "procedure for assessing the behavioral and physiologic state of the mouse. "
+           "Psychopharmacologia. 1968;13(3):222-257. (Named by ICH S7A 2.7.1; bibliographic "
+           "only.)",
+           year=1968, doi="10.1007/BF00401402"),
+        _c("haggerty1991",
+           "Haggerty GC. Strategy for and experience with neurotoxicity testing of new "
+           "pharmaceuticals. J Am Coll Toxicol. 1991;10(6):677-688. (Named by ICH S7A 2.7.1; "
+           "bibliographic only.)",
+           year=1991, doi="10.3109/10915819109078660"),
         _c("redfern2003",
            "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical "
            "cardiac electrophysiology, clinical QT interval prolongation and torsade de "

@@ -65,6 +65,16 @@ def _simulated(study: Any) -> bool:
     return any(f["origin"] == "simulated" for f in study.raw_files or [])
 
 
+def _study_components(kernel: Any, study: Any, requirement_id: str) -> list[str]:
+    """Parts of a multi-part requirement a study covers: declared by its driver, or by the
+    importer for an imported report."""
+    if study.origin == "import":
+        return list((study.import_record or {}).get("components") or [])
+    if study.driver_id in kernel.registry:
+        return list(kernel.registry.get(study.driver_id).components_for(requirement_id))
+    return []
+
+
 def readiness_report(kernel: Any, program_id: str,
                      milestone: Timing = Timing.BEFORE_FIRST_IN_HUMAN) -> dict[str, Any]:
     program = kernel.repo.program(program_id)
@@ -81,11 +91,38 @@ def readiness_report(kernel: Any, program_id: str,
         real = [s for s in mine if not _simulated(s)]
         approved = [s for s in real if s.state == StudyState.APPROVED.value and s.evidence_admissible]
         imported = [s for s in real if _imported(s)]
-        drivers = [d.id for d, _ in kernel.registry.match(r, ss.context)]
+        matched = [d for d, _ in kernel.registry.match(r, ss.context)]
+        drivers = [d.id for d in matched]
+        runnable = bool(matched)
+        if r.components:  # runnable only if the installed drivers cover every part
+            runnable = set(r.components) <= {c for d in matched for c in d.components_for(r.id)}
+        parts: dict[str, list[str]] = {}
+        if r.components:
+            done_parts = {c for s in approved if not _qc_failed(s)
+                          for c in _study_components(kernel, s, r.id)}
+            imp_parts = {c for s in imported for c in _study_components(kernel, s, r.id)}
+            parts = {"required": list(r.components),
+                     "done": [c for c in r.components if c in done_parts],
+                     "imported": [c for c in r.components if c in imp_parts and
+                                  c not in done_parts],
+                     "missing": [c for c in r.components if c not in done_parts | imp_parts]}
         if r.status is RequirementStatus.NOT_REQUIRED:
             status = "not_required"
         elif r.status is RequirementStatus.CONDITIONAL:
             status = "conditional"
+        elif parts:
+            if not parts["missing"] and not parts["imported"]:
+                status = "done"
+            elif not parts["missing"]:
+                status = "imported"
+            elif parts["done"] or parts["imported"]:
+                status = "partial"
+            elif any(StudyState(s.state) in _ACTIVE for s in real):
+                status = "in_progress"
+            elif mine and not real:
+                status = "simulated_only"
+            else:
+                status = "missing"
         elif any(not _qc_failed(s) for s in approved):
             status = "done"
         elif imported:
@@ -104,7 +141,8 @@ def readiness_report(kernel: Any, program_id: str,
             "glp": r.glp, "species": list(r.species), "duration_weeks": r.duration_weeks,
             "ctd_section": r.ctd_section, "citation": r.citation.to_dict(),
             "section": r.section, "rationale": r.rationale, "pending_fact": r.pending_fact,
-            "driver_available": bool(drivers), "drivers": drivers,
+            "driver_available": runnable, "drivers": drivers,
+            "components": parts or None,
             "studies": [{"id": s.id, "state": s.state, "origin": s.origin or "driver",
                          "simulated": _simulated(s), "qc_failed": _qc_failed(s)} for s in mine],
         })
