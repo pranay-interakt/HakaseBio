@@ -8,8 +8,11 @@ Volunteers* (CDER, 2005):
 2. convert each NOAEL to a human equivalent dose by body-surface-area scaling
 3. select the most sensitive species (the lowest HED) unless there is a
    documented reason to do otherwise
-4. divide by a safety factor (default 10) to obtain the MRSD
-5. compare against the pharmacologically active dose; the lower value governs
+4. divide by a safety factor (default 10) to obtain the MRSD (Section VII)
+5. compare the MRSD with an HED derived from the pharmacologically active dose; if that is
+   lower, "it may be appropriate to decrease the clinical starting dose" (Section VIII). That
+   is a judgement for the responsible clinician/toxicologist, so the comparison is reported
+   and flagged, never applied automatically.
 
 For biologics and immune agonists the MABEL approach of the EMA first-in-human
 guideline applies and generally governs; for anticancer pharmaceuticals ICH S9
@@ -48,18 +51,21 @@ class DoseBasis(str, Enum):
     ICH_S9_HNSTD = "ich_s9_hnstd"    # oncology, non-rodent
 
 
-#: Conditions under which FDA 2005 directs a safety factor larger than the default 10.
+#: FDA 2005 Section VII.A (pp. 10-11): considerations that "might warrant increasing the
+#: safety factor" above the default of 10.
 SAFETY_FACTOR_TRIGGERS: tuple[str, ...] = (
-    "steep dose-response curve",
-    "severe toxicity that is not monitorable",
-    "toxicity without premonitory signs",
-    "irreversible toxicity",
-    "unexplained mortality",
-    "large variability in dose or exposure response",
-    "non-linear pharmacokinetics",
-    "inadequate dose-response data",
-    "novel therapeutic target",
-    "animal models of limited relevance",
+    "Steep dose response curve",
+    "Severe toxicities",
+    "Nonmonitorable toxicity",
+    "Toxicities without premonitory signs",
+    "Variable bioavailability",
+    "Irreversible toxicity",
+    "Unexplained mortality",
+    "Large variability in doses or plasma drug levels eliciting effect",
+    "Nonlinear pharmacokinetics",
+    "Inadequate dose-response data",
+    "Novel therapeutic targets",
+    "Animal models with limited utility",
 )
 
 
@@ -141,7 +147,7 @@ class DoseProjection:
     mrsd_total: Quantity
     reference_body_weight: Quantity
     pad: Optional[Quantity]
-    pad_governed: bool
+    pad_below_mrsd: bool
     safety_factor_justification: tuple[str, ...]
     qc: QCVerdict
 
@@ -162,11 +168,6 @@ class DoseProjection:
                 f"most sensitive species = {self.most_sensitive_species} "
                 f"(lowest HED = {self.governing_hed.value:.4g} mg/kg)"
             )
-        if self.pad_governed and self.pad is not None:
-            steps.append(
-                f"pharmacologically active dose ({self.pad.value:.4g} {self.pad.unit}) is lower "
-                "than the NOAEL-derived HED and therefore governs"
-            )
         steps.append(
             f"MRSD = governing HED {self.governing_hed.value:.4g} mg/kg / "
             f"safety factor {self.safety_factor.value:g} = {self.mrsd_per_kg.value:.4g} mg/kg"
@@ -175,6 +176,12 @@ class DoseProjection:
             f"for a {self.reference_body_weight.value:g} kg adult: "
             f"MRSD = {self.mrsd_total.value:.4g} mg total"
         )
+        if self.pad_below_mrsd and self.pad is not None:
+            steps.append(
+                f"PAD-derived HED ({self.pad.value:.4g} {self.pad.unit}) is below the MRSD; per "
+                "FDA 2005 Section VIII it may be appropriate to decrease the starting dose "
+                "(decision for the responsible scientist, not made by the system)"
+            )
         return steps
 
     def to_dict(self) -> dict[str, Any]:
@@ -188,7 +195,7 @@ class DoseProjection:
             "mrsd_total": self.mrsd_total.to_dict(),
             "reference_body_weight": self.reference_body_weight.to_dict(),
             "pad": self.pad.to_dict() if self.pad else None,
-            "pad_governed": self.pad_governed,
+            "pad_below_mrsd": self.pad_below_mrsd,
             "safety_factor_justification": list(self.safety_factor_justification),
             "derivation": self.derivation_steps(),
             "qc": self.qc.to_dict(),
@@ -207,9 +214,9 @@ def project_starting_dose(
 ) -> DoseProjection:
     """Derive the maximum recommended starting dose from species NOAELs.
 
-    ``noaels`` maps species name to the NOAEL in that species. Supplying ``pad``
-    adds the pharmacologically-active-dose comparison the guidance requires; if
-    the PAD is lower it governs and that is recorded.
+    ``noaels`` maps species name to the NOAEL in that species. ``pad`` is an HED derived
+    from the pharmacologically active dose (FDA 2005 Section VIII); it is compared with the
+    MRSD and a lower PAD is flagged for the responsible scientist, not applied.
     """
     params = params or ReferenceParameterSet()
     if not noaels:
@@ -234,7 +241,7 @@ def project_starting_dose(
             mrsd_total=Quantity.unavailable("mg", reason=reason, label="MRSD (total)"),
             reference_body_weight=params.quantity("bw.human"),
             pad=pad,
-            pad_governed=False,
+            pad_below_mrsd=False,
             safety_factor_justification=tuple(safety_factor_justification),
             qc=QCVerdict.of(
                 [QCFinding(code="no_usable_noael", status=QCStatus.FAIL,
@@ -274,23 +281,6 @@ def project_starting_dose(
 
     governing_hed = chosen.hed
     basis = DoseBasis.NOAEL_BSA
-    pad_governed = False
-
-    if pad is not None and pad.is_available:
-        pad_mgkg = pad.magnitude_in("mg/kg")
-        if pad_mgkg < governing_hed.require():
-            governing_hed = pad.to("mg/kg").relabel("Pharmacologically active dose (governing)")
-            basis = DoseBasis.PAD
-            pad_governed = True
-            findings.append(
-                QCFinding(
-                    code="pad_governs",
-                    status=QCStatus.WARN,
-                    message="the pharmacologically active dose is below the NOAEL-derived HED "
-                            "and therefore governs the starting dose (FDA 2005 section 6)",
-                    observed=pad_mgkg,
-                )
-            )
 
     sf_q = params.quantity("mrsd.default_safety_factor")
     if safety_factor is not None:
@@ -326,6 +316,24 @@ def project_starting_dose(
         label="MRSD",
         qc_flags=tuple(dict.fromkeys(list(governing_hed.qc_flags) + [f.code for f in findings])),
     )
+    pad_below_mrsd = False
+    if pad is not None and pad.is_available:
+        pad_mgkg = pad.magnitude_in("mg/kg")
+        if pad_mgkg < mrsd_per_kg.require():
+            pad_below_mrsd = True
+            findings.append(
+                QCFinding(
+                    code="pad_below_mrsd",
+                    status=QCStatus.WARN,
+                    message="the HED derived from the pharmacologically active dose is below the "
+                            "MRSD; FDA 2005 Section VIII: it may be appropriate to decrease the "
+                            "clinical starting dose",
+                    observed=pad_mgkg,
+                    threshold=mrsd_per_kg.require(),
+                )
+            )
+            mrsd_per_kg = mrsd_per_kg.with_flags("pad_below_mrsd")
+
     bw = params.quantity("bw.human")
     mrsd_total = Quantity.computed(
         mrsd_per_kg.require() * bw.require(),
@@ -347,7 +355,7 @@ def project_starting_dose(
         mrsd_total=mrsd_total,
         reference_body_weight=bw,
         pad=pad,
-        pad_governed=pad_governed,
+        pad_below_mrsd=pad_below_mrsd,
         safety_factor_justification=tuple(safety_factor_justification),
         qc=QCVerdict.of(findings),
     )

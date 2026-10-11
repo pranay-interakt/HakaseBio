@@ -59,12 +59,38 @@ def test_mrsd_selects_most_sensitive_species():
     assert p.mrsd_total.value == pytest.approx(10 * 20 / 37 / 10 * 60)
 
 
-def test_pad_governs_when_lower():
+def test_pad_below_mrsd_is_flagged_not_applied():
+    # FDA 2005 Section VIII: compare PAD-derived HED with the MRSD; lowering is a judgement
     p = project_starting_dose(
         {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")},
         pad=Quantity.measured(0.2, "mg/kg", source_name="PD model"),
     )
-    assert p.basis is DoseBasis.PAD and p.pad_governed
+    assert p.basis is DoseBasis.NOAEL_BSA and p.pad_below_mrsd
+    assert p.mrsd_per_kg.value == pytest.approx(100 * 6 / 37 / 10)
+    assert "pad_below_mrsd" in p.mrsd_per_kg.qc_flags
+
+
+def test_pad_above_mrsd_not_flagged():
+    p = project_starting_dose(
+        {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")},
+        pad=Quantity.measured(5.0, "mg/kg", source_name="PD model"),
+    )
+    assert not p.pad_below_mrsd
+
+
+def test_reference_values_match_fda_2005():
+    from hos.core.reference_params import get_parameter
+    assert get_parameter("bw.minipig").value == 40.0      # Table 3: mini-pig 40 kg
+    assert get_parameter("bw.micropig").value == 20.0     # Table 3: micro-pig 20 kg
+    assert get_parameter("km.rat").unit == "kg/m**2"      # Appendix D: kg/m2
+
+
+def test_reference_values_match_davies_morris_1993():
+    from hos.core.reference_params import get_parameter
+    assert get_parameter("qh.mouse").value == pytest.approx(1.8 / 0.02)
+    assert get_parameter("qh.rabbit").value == pytest.approx(177 / 2.5)
+    assert get_parameter("liver_weight.rat").value == pytest.approx(10.0 / 0.25)
+    assert get_parameter("liver_weight.mouse").value == pytest.approx(1.75 / 0.02)
 
 
 def test_reduced_safety_factor_requires_justification():

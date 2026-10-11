@@ -90,6 +90,21 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "values of human microsomal protein and hepatocellularity per gram of liver. "
            "Curr Drug Metab. 2007;8(1):33-45.",
            year=2007, doi="10.2174/138920007779315053"),
+        _c("hakooz2006",
+           "Hakooz N, Ito K, Rawden H, et al. Determination of a human hepatic microsomal "
+           "scaling factor for predicting in vivo drug clearance. Pharm Res. "
+           "2006;23(3):533-539.",
+           year=2006, doi="10.1007/s11095-006-9531-2"),
+        _c("smith2008",
+           "Smith R, Jones RDO, Ballard PG, Griffiths HH. Determination of microsome and "
+           "hepatocyte scaling factors for in vitro/in vivo extrapolation in the rat and dog. "
+           "Xenobiotica. 2008;38(11):1386-1398.",
+           year=2008, doi="10.1080/00498250802491662"),
+        _c("barter2008",
+           "Barter ZE, Chowdry JE, Harlow JR, et al. Covariation of human microsomal protein "
+           "per gram of liver with age: absence of influence of operator and sample storage "
+           "may justify interlaboratory data pooling. Drug Metab Dispos. 2008;36(12):2405-2409.",
+           year=2008, doi="10.1124/dmd.108.021311"),
         _c("di_kerns2016",
            "Di L, Kerns EH. Drug-Like Properties: Concepts, Structure Design and Methods "
            "from ADME to Toxicity Optimization. 2nd ed. Academic Press; 2016.",

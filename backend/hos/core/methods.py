@@ -68,6 +68,10 @@ METHODS: Final[dict[str, Method]] = dict(
                "an R-squared below the configured threshold, or total depletion under "
                "about 20%, makes the rate constant poorly estimable",
            )),
+        _m("adme.percent_remaining", "Parent remaining relative to the zero-time sample",
+           ("obach1999",),
+           assumptions=("response is proportional to concentration over the measured range",),
+           limits=("a ratio of instrument responses; requires a common internal standard",)),
         _m("adme.clint_invitro", "Apparent in vitro intrinsic clearance from depletion half-life",
            ("obach1999", "houston1994"),
            assumptions=("first-order depletion", "no significant non-specific binding unless corrected"),

@@ -31,7 +31,12 @@ from hos.core.provenance import (
     ProvenanceKind,
 )
 
-__all__ = ["Quantity", "MeasurementSeries", "QuantityError"]
+__all__ = ["Quantity", "MeasurementSeries", "QuantityError", "SIMULATION_TAINT"]
+
+#: QC flag carried by every value derived, at any distance, from simulated data. A COMPUTED
+#: value is only as admissible as its inputs; this flag is how that is preserved once the
+#: inputs are no longer attached.
+SIMULATION_TAINT = "derived_from_simulated_data"
 
 
 class QuantityError(ValueError):
@@ -267,7 +272,12 @@ class Quantity:
 
     @property
     def admissible_as_evidence(self) -> bool:
-        return self.provenance.kind.admissible_as_evidence
+        """False for simulated or unavailable values and for anything derived from simulation."""
+        return self.provenance.kind.admissible_as_evidence and SIMULATION_TAINT not in self.qc_flags
+
+    def tainted_by_simulation(self) -> "Quantity":
+        """Mark this value as derived from simulated data (idempotent)."""
+        return self.with_flags(SIMULATION_TAINT)
 
     @property
     def id(self) -> str:

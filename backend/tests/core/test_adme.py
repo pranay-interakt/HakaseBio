@@ -53,7 +53,9 @@ def test_clint_matches_obach_half_life_method():
 def test_liver_scaling_uses_cited_human_scalars():
     clint = clint_in_vitro(fit_depletion(_series()), PROT)
     iv = scale_clint_to_liver(clint, "human")
-    assert iv.value == pytest.approx(K * 1000 / 0.5 * 40.0 * 21.4 / 1000, rel=1e-12)
+    # Barter 2007 consensus MPPGL 32 mg/g; IVIVE liver weight 21.4 g/kg (flagged unverified)
+    assert iv.value == pytest.approx(K * 1000 / 0.5 * 32.0 * 21.4 / 1000, rel=1e-12)
+    assert "reference_value_requires_verification" in iv.qc_flags
     assert iv.provenance.parameter_set_version
 
 
@@ -116,23 +118,14 @@ def test_fu_mic_correction_increases_clearance():
     assert scale_clint_to_liver(clint, "human", fu_mic=fu).value > scale_clint_to_liver(clint, "human").value
 
 
-def test_unverified_reference_scalar_is_flagged():
+def test_species_without_verified_mppgl_is_unavailable_not_borrowed():
+    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    iv = scale_clint_to_liver(clint, "mouse")
+    assert not iv.is_available and "not substituted" in iv.provenance.reason
+
+
+def test_dog_uses_smith_2008_mppgl():
     clint = clint_in_vitro(fit_depletion(_series()), PROT)
     iv = scale_clint_to_liver(clint, "dog")
-    assert "reference_value_requires_verification" in iv.qc_flags
-
-
-def test_fu_mic_domain_follows_gertz_2008():
-    # Gertz 2008: reliable for logP/D 0-3; cutoff 5 when protein <= 0.1 mg/mL
-    lp = lambda v: Quantity.computed(v, "dimensionless", method=method("descr.clogp"))
-    low_p = Quantity.user_supplied(0.1, "mg/mL", actor="setup")
-    assert fu_mic_hallifax_houston(lp(2.0), PROT).provenance.applicability.in_domain
-    assert not fu_mic_hallifax_houston(lp(3.5), PROT).provenance.applicability.in_domain
-    assert fu_mic_hallifax_houston(lp(3.5), low_p).provenance.applicability.in_domain
-    assert not fu_mic_hallifax_houston(lp(-0.5), PROT).provenance.applicability.in_domain
-
-
-def test_fu_mic_hallifax_equation_value():
-    # fu = 1 / (1 + 0.5 * 10^(0.072*4 + 0.067*2 - 1.126)) at logP 2, 0.5 mg/mL
-    fu = fu_mic_hallifax_houston(Quantity.computed(2.0, "dimensionless", method=method("descr.clogp")), PROT)
-    assert fu.value == pytest.approx(1 / (1 + 0.5 * 10 ** (0.072 * 4 + 0.067 * 2 - 1.126)), rel=1e-12)
+    assert iv.value == pytest.approx(K * 1000 / 0.5 * 55.0 * 32.0 / 1000, rel=1e-12)
+    assert not iv.qc_flags

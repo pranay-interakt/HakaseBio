@@ -303,6 +303,15 @@ def scale_clint_to_liver(
             "mL/min/kg", reason=f"no in vitro CLint: {clint_app.provenance.reason}",
             label="CLint,in vivo",
         )
+    sp = species.lower()
+    for pid in (f"mppgl.{sp}", f"liver_weight.{sp}"):
+        if not params.has(pid):
+            return Quantity.unavailable(
+                "mL/min/kg",
+                reason=f"no verified reference value {pid!r} in registry {params.version}; "
+                       "a value from another species is not substituted",
+                label=f"CLint,in vivo ({species})",
+            )
     mppgl = params.for_species("mppgl", species)
     liver_wt = params.for_species("liver_weight", species)
 
@@ -377,6 +386,9 @@ def hepatic_clearance_well_stirred(
             reason=f"cannot compute hepatic clearance: {missing.provenance.reason}",
             label="CLh",
         )
+    if not params.has(f"qh.{species.lower()}"):
+        return Quantity.unavailable(
+            "mL/min/kg", reason=f"no verified hepatic blood flow for {species}", label="CLh")
     qh_q = params.for_species("qh", species)
     qh = qh_q.magnitude_in("mL/min/kg")
     clint = clint_in_vivo.magnitude_in("mL/min/kg")

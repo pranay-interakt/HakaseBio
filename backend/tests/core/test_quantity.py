@@ -101,3 +101,12 @@ def test_simulated_requires_parameters_and_is_never_evidence():
     q = Quantity(value=1.0, unit="percent", provenance=p)
     assert q.is_simulated and not q.admissible_as_evidence
     assert "not a measurement" in q.provenance.notes
+
+
+def test_values_derived_from_simulation_are_inadmissible():
+    from hos.core.quantity import SIMULATION_TAINT
+    q = Quantity.computed(2.0, "mg", method=M)
+    assert q.admissible_as_evidence
+    tq = q.tainted_by_simulation()
+    assert SIMULATION_TAINT in tq.qc_flags and not tq.admissible_as_evidence
+    assert tq.tainted_by_simulation().qc_flags.count(SIMULATION_TAINT) == 1
