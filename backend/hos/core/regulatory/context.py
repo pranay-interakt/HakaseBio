@@ -119,6 +119,25 @@ class ProgramContext:
     def includes_pregnant(self) -> bool:
         return ClinicalPopulation.PREGNANT_WOMEN in self.populations
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ProgramContext":
+        return cls(
+            modality=Modality(d["modality"]),
+            indication=Indication(d["indication"]),
+            route=Route(d["route"]),
+            intended_clinical_duration_days=int(d["intended_clinical_duration_days"]),
+            max_trial_duration_days=int(d["max_trial_duration_days"]),
+            populations=tuple(ClinicalPopulation(p) for p in d.get(
+                "populations", [ClinicalPopulation.HEALTHY_VOLUNTEERS.value])),
+            supports_marketing=bool(d.get("supports_marketing", False)),
+            molar_extinction_coefficient_ge_1000=d.get("molar_extinction_coefficient_ge_1000"),
+            pharmacologically_relevant_species=tuple(d.get("pharmacologically_relevant_species", ())),
+            is_immunomodulatory_agonist=bool(d.get("is_immunomodulatory_agonist", False)),
+            is_integrating_vector=d.get("is_integrating_vector"),
+            intended_pediatric_use=bool(d.get("intended_pediatric_use", False)),
+            notes=dict(d.get("notes", {})),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "modality": self.modality.value,

@@ -7,7 +7,8 @@ from datetime import datetime
 from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-__all__ = ["Base", "ProgramRow", "CompoundRow", "StudyRow", "FileRow", "LedgerRow", "PrincipalRow"]
+__all__ = ["Base", "ProgramRow", "CompoundRow", "StudyRow", "FileRow", "LedgerRow", "PrincipalRow",
+           "ArtifactRow", "SimulatedFileRow"]
 
 
 class Base(DeclarativeBase):
@@ -72,6 +73,11 @@ class StudyRow(Base):
     interpretation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     report: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     signatures: Mapped[list] = mapped_column(JSON, default=list)
+    determinations: Mapped[list] = mapped_column(JSON, default=list)
+    analysis_inputs: Mapped[dict] = mapped_column(JSON, default=dict)
+    protocol_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    report_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    glp: Mapped[bool] = mapped_column(default=False)
     evidence_admissible: Mapped[bool] = mapped_column(default=True)
     created_by: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -104,3 +110,33 @@ class LedgerRow(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("ix_ledger_subject", "subject_id"),)
+
+
+class ArtifactRow(Base):
+    """Append-only, versioned study artefacts. Rows are never updated: a correction is a new
+    version that names the version it supersedes and the reason."""
+
+    __tablename__ = "artifacts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    study_id: Mapped[str] = mapped_column(ForeignKey("studies.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    version: Mapped[int] = mapped_column(Integer)
+    content: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    supersedes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_artifact_study_kind", "study_id", "kind", "version", unique=True),)
+
+
+class SimulatedFileRow(Base):
+    """Hashes of every file the system has simulated, so one can never be re-uploaded as
+    a measurement."""
+
+    __tablename__ = "simulated_files"
+    sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    study_id: Mapped[str] = mapped_column(String(64))
+    method_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

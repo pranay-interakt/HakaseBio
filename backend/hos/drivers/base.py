@@ -95,9 +95,23 @@ SIMULATION_DISCLAIMER = (
 )
 
 
+#: Wall-clock keys excluded from content hashes: two computations of the same result at
+#: different times are the same content. The times themselves are kept in the record.
+VOLATILE_KEYS = frozenset({"recorded_at", "retrieved_at", "content_hash"})
+
+
+def _strip_volatile(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _strip_volatile(v) for k, v in obj.items() if k not in VOLATILE_KEYS}
+    if isinstance(obj, (list, tuple)):
+        return [_strip_volatile(v) for v in obj]
+    return obj
+
+
 def canonical_hash(obj: Any) -> str:
-    """SHA-256 of the canonical JSON of ``obj`` (sorted keys, no whitespace)."""
-    blob = json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
+    """SHA-256 of the canonical JSON of ``obj`` (sorted keys, no whitespace), excluding
+    wall-clock timestamps (:data:`VOLATILE_KEYS`)."""
+    blob = json.dumps(_strip_volatile(obj), sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
 
 

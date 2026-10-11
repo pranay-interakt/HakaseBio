@@ -35,7 +35,7 @@ the kernel facade imports drivers through the registry only; API imports the fac
 | 2 | Primary-source verification | citations vs Crossref/official PDFs; guideline sections vs ICH text; every constant verified or flagged | Done: 25 section refs, 6 constants, 1 invented model domain, FDA Step 5 logic corrected |
 | 3 | Driver framework + reference driver | ABI, registry, conformance kit, strict ingest; **metabolic stability driver passes conformance** + known-value tests | Done (15/15 conformance checks) |
 | 4 | Execution targets | external lab bundle + awaited return; in-house; simulation (SIMULATED only) | Done |
-| 5 | Kernel facade + repository | programme → study set → compound → study → design/plan/dispatch → ingest → analyse → report → sign/approve, all through lifecycle + ledger; GLP needs SD + QA; simulated never approvable | Planned |
+| 5 | Kernel facade + repository | programme → study set → compound → study → design/plan/dispatch → ingest → analyse → report → sign/approve, all through lifecycle + ledger; GLP needs SD + QA; simulated never approvable | Done |
 | 6 | hERG + repeat-dose tox drivers | conformance + known-value tests; Dunnett per endpoint; NOAEL only by signed human determination | Planned |
 | 7 | ChEMBL / PubChem clients | documented APIs, cache, honest UNAVAILABLE; dated real fixtures; `@pytest.mark.live` | Planned |
 | 8 | IND assembler | Module 4 skeleton from completed studies; readiness (done/in progress/missing/conditional); refuses simulated | Planned |
