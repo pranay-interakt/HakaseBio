@@ -598,6 +598,19 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
         from hos.kernel.import_specs import import_fields
         return [f.to_dict() for f in import_fields(requirement_id)]
 
+    # -- verification bundle (docs/14 P9) ----------------------------------------------------
+    @app.post("/api/verify")
+    async def verify_upload(request: Request, actor: Principal = Depends(current)
+                            ) -> dict[str, Any]:
+        from hos.verify import verify_bundle
+        return verify_bundle(await request.body()).to_dict()
+
+    @app.get("/api/files/{sha}/verify")
+    def verify_stored(sha: str, actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        from hos.verify import verify_bundle
+        return verify_bundle(k.files.get(sha)).to_dict()
+
     @app.get("/api/ledger/verify")
     def verify(actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:

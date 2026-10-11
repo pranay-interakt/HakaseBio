@@ -30,7 +30,7 @@ from pydantic import BaseModel, ValidationError
 
 from hos.core import units as U
 from hos.core.descriptors import compute_profile
-from hos.core.provenance import Citation, utc_now
+from hos.core.provenance import utc_now
 from hos.core.quantity import Quantity
 from hos.core.regulatory import ProgramContext, derive_study_set
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
@@ -64,6 +64,7 @@ from hos.kernel.errors import (
 )
 from hos.kernel.execution import TargetKind, target_from_spec
 from hos.kernel.imports import ImportService
+from hos.kernel.inputs import input_quantity
 from hos.kernel.ledger import Ledger
 from hos.kernel.lifecycle import TRANSITIONS, StudyState, assert_transition
 
@@ -781,33 +782,7 @@ class Kernel:
 
     def _input_quantity(self, name: str, spec: Mapping[str, Any],
                         actor: Principal | None) -> Quantity:
-        try:
-            value = float(spec["value"])
-            unit = str(spec["unit"])
-        except (KeyError, TypeError, ValueError):
-            raise KernelError(f"{name}: an input needs a numeric value and a unit") from None
-        kind = spec.get("kind", "user_supplied")
-        source = spec.get("source")
-        if kind == "measured":
-            if not source:
-                raise KernelError(f"{name}: a measured input must name its source study/assay")
-            return Quantity.measured(value, unit, source_name=str(source), label=name,
-                                     notes=spec.get("note"))
-        if kind == "literature":
-            if not source:
-                raise KernelError(f"{name}: a literature input must name its source")
-            cit = Citation(key=f"input:{name}", text=str(source), url=spec.get("url"),
-                           doi=spec.get("doi"))
-            return Quantity.literature(value, unit, source_name=str(source), citation=cit,
-                                       source_url=spec.get("url"), label=name,
-                                       notes=spec.get("note"))
-        if kind == "user_supplied":
-            who = spec.get("entered_by") or (actor.name if actor else None)
-            if not who:
-                raise KernelError(f"{name}: a user-supplied input must be attributable")
-            return Quantity.user_supplied(value, unit, actor=str(who), label=name,
-                                          notes=spec.get("note"))
-        raise KernelError(f"{name}: unknown input kind {kind!r}")
+        return input_quantity(name, spec, actor.name if actor else None)
 
     @staticmethod
     def _determination_spec(driver: StudyDriver, params: BaseModel,

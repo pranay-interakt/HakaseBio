@@ -34,7 +34,7 @@ from hos.kernel.lifecycle import StudyState, assert_transition
 if TYPE_CHECKING:
     from hos.kernel.kernel import Kernel
 
-__all__ = ["ATTESTATION_SENTENCE", "IMPORT_DRIVER_ID", "ImportService"]
+__all__ = ["ATTESTATION_SENTENCE", "IMPORT_DRIVER_ID", "ImportService", "compute_import_hash"]
 
 IMPORT_DRIVER_ID = "import"
 ATTESTATION_SENTENCE = ("I attest that every value recorded in this import was transcribed from "
@@ -54,6 +54,12 @@ def _media_type(filename: str) -> str:
 
 def _rid(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
+
+
+def compute_import_hash(record: dict[str, Any]) -> str:
+    """Hash of an import's attested content (shared with the offline verifier)."""
+    return content_hash({"report": record.get("report"), "datasets": record.get("datasets", []),
+                         "values": [v for v in record.get("values", []) if not v.get("withdrawn")]})
 
 
 class ImportService:
@@ -258,9 +264,7 @@ class ImportService:
 
     def import_hash(self, row: StudyRow) -> str:
         """Content hash a signature binds to: report, datasets and active values."""
-        rec = row.import_record or {}
-        return content_hash({"report": rec.get("report"), "datasets": rec.get("datasets", []),
-                             "values": [v for v in rec.get("values", []) if not v.get("withdrawn")]})
+        return compute_import_hash(row.import_record or {})
 
     def import_missing(self, row: StudyRow) -> list[str]:
         """Required transcriptions not yet present."""

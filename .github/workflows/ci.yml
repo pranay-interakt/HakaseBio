@@ -38,6 +38,8 @@ jobs:
         run: python scripts/demo.py --out demo-out
         env:
           HOS_DATA_DIR: ${{ runner.temp }}/hos-ci
+      - name: Verify the demo's Module 4 export offline
+        run: hos-verify demo-out/module4.zip
 
   frontend:
     name: frontend

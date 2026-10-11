@@ -106,7 +106,9 @@ Generate per release: requirements-to-test traceability matrix from the test sui
 with expected results, release notes, and known-issues list. This reduces, not removes, a customer's
 GxP validation effort.
 
-### P9. Verification bundle and verifier
+### P9. Verification bundle and verifier — **built**
+
+*Every Module 4 zip carries `verification/` (raw files, driver ids and versions, parameters, inputs, compound structure, programme context, recorded protocol/data/analysis/report hashes, determinations, signatures, the full ledger chain and the programme's entries). `hos-verify <zip>` (`hos/verify/`) re-runs every driver offline and checks every hash, the ledger chain and signature bindings; imports are checked on report hash and signatures. Also `GET /api/files/{sha}/verify`, the Module 4 'Verify bundle' button, and CI.*
 
 (Strategy innovation 1.) Module 4 export with a manifest of hashes, methods, versions, signatures
 and ledger head; a standalone `hos-verify` that recomputes every driver-run figure from raw files

@@ -79,6 +79,15 @@ It runs three studies through their drivers with **SIMULATED** execution and sho
 rules firing (approval refused, readiness `simulated_only`, Module 4 excludes them). Reports and
 the Module 4 zip are written to `demo-out/`.
 
+### Verify a Module 4 export offline
+
+Every Module 4 zip is a verification bundle. `hos-verify` re-runs every driver from the raw files,
+checks every file hash, the ledger chain and every signature binding, with no database or network:
+
+```bash
+cd backend && .venv/bin/hos-verify demo-out/module4.zip
+```
+
 ### API
 
 ```bash

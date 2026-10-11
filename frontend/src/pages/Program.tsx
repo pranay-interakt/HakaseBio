@@ -384,8 +384,15 @@ interface Module4Pkg {
   dose_projection: { projection: { derivation: string[] } } | null;
 }
 
+interface VerifyResult {
+  passed: boolean;
+  counts: { pass: number; warn: number; fail: number };
+  checks: { subject: string; check: string; status: string; detail: string }[];
+}
+
 function Module4({ id }: { id: string }) {
   const [pkg, setPkg] = useState<Module4Pkg | null>(null);
+  const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [err, setErr] = useState<unknown>(null);
   async function assemble() {
     try {
@@ -409,8 +416,29 @@ function Module4({ id }: { id: string }) {
         <>
           <p className="small">
             {pkg.included_studies} report(s) · package <code>{pkg.package_hash.slice(0, 16)}</code>{" "}
-            <button onClick={() => api.download(`/files/${pkg.bundle_sha256}`, "module4.zip")}>Download zip</button>
+            <button onClick={() => api.download(`/files/${pkg.bundle_sha256}`, "module4.zip")}>Download zip</button>{" "}
+            <button onClick={() => api.get<VerifyResult>(`/files/${pkg.bundle_sha256}/verify`).then(setVerify).catch(setErr)}>
+              Verify bundle (recompute every figure)
+            </button>
           </p>
+          <p className="muted small">
+            Anyone can verify this export offline with <code>hos-verify module4.zip</code>: it re-runs every driver from the raw
+            files and checks every hash, signature and the ledger chain.
+          </p>
+          {verify && (
+            <div className={verify.passed ? "note" : "error"}>
+              <strong>{verify.passed ? "VERIFIED" : "VERIFICATION FAILED"}</strong> — {verify.counts.pass} passed,{" "}
+              {verify.counts.warn} warnings, {verify.counts.fail} failed
+              <ul className="small">
+                {verify.checks.map((c, i) => (
+                  <li key={i} className={c.status === "fail" ? "qc-fail" : c.status === "warn" ? "qc-warn" : ""}>
+                    [{c.status}] {c.subject}: {c.check}
+                    {c.detail && ` — ${c.detail}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {pkg.refused_studies.length > 0 && (
             <div className="error">
               Refused: {pkg.refused_studies.map((r) => `${r.study_id} (${r.reason})`).join(", ")}

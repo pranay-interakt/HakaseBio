@@ -44,6 +44,7 @@ from hos.ind.ctd import MODULE4, ctd_sort_key, ctd_title
 from hos.kernel.attestation import Principal
 from hos.kernel.errors import EvidenceInadmissible
 from hos.kernel.lifecycle import StudyState
+from hos.verify.bundle import verification_files
 
 __all__ = ["assemble_module4", "readiness_report"]
 
@@ -300,6 +301,11 @@ def assemble_module4(kernel: Any, actor: Principal, program_id: str) -> dict[str
         "literature_references": sorted(refs.values(), key=lambda r: r["key"]),
         "readiness": readiness["summary"], "dose_projection": dose,
     }
+    vfiles, vmanifest = verification_files(kernel, program, included, imports)
+    files.update(vfiles)
+    package["verification"] = {"format": vmanifest["format"], "ledger_head": vmanifest["ledger"]["head"],
+                               "software": vmanifest["software"],
+                               "how_to_verify": "hos-verify <this zip> (offline)"}
     package["package_hash"] = canonical_hash({k: v for k, v in package.items()
                                               if k != "generated_at"})
     files["m4/index.md"] = _index_markdown(package).encode()
