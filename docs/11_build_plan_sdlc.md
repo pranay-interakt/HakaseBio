@@ -41,7 +41,7 @@ the kernel facade imports drivers through the registry only; API imports the fac
 | 8 | IND assembler | Module 4 skeleton from completed studies; readiness (done/in progress/missing/conditional); refuses simulated | Done |
 | 9 | FastAPI | full flow, OpenAPI, re-auth signatures | Done |
 | 10 | Frontend | full flow; provenance badges; no science in browser | Done |
-| 11 | Demo + README run instructions | end-to-end script; demo data real or labelled SIMULATED | Planned |
+| 11 | Demo + README run instructions | end-to-end script; demo data real or labelled SIMULATED | Done |
 | 1 | Docs 07–13 | each describes implemented behaviour; updated as steps land | 07, 11, 13 done |
 
 ## 11.4 Process per step

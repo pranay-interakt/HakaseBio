@@ -1,59 +1,150 @@
 # Hakase Operating System (HOS)
 
-**An AI-native operating system for preclinical drug development.**
+**An operating system for preclinical drug development.** A candidate molecule goes in. The
+kernel derives the nonclinical study set the regulations require. A driver for each study type
+designs the study, dispatches it to a laboratory, ingests the returned data, analyses it with
+cited methods and writes the report. The kernel assembles CTD Module 4 for the IND. Every
+number carries its provenance, and only humans sign.
 
-A drug candidate goes in. A scientifically defensible, IND-enabling data package comes out.
-The wet-lab biology is executed by real labs and CROs; the *operating system* designs every
-study, orchestrates its execution, ingests and analyzes the data with published pharmacology
-methods, and assembles the regulatory package — with full provenance on every single number.
+> **The one rule:** no number exists without provenance. Every value is *measured*, from the
+> *literature*, *computed* by a cited method, *predicted* by a named model with an
+> applicability-domain check, from a *guideline*, *user-supplied* by a named person,
+> *simulated* (never evidence), or *unavailable* with a reason. Nothing is defaulted or guessed.
 
----
+Read [`CLAUDE.md`](CLAUDE.md) before writing code. The plan of record and status are in
+[`docs/11_build_plan_sdlc.md`](docs/11_build_plan_sdlc.md).
 
-## What this repository is (right now)
+## What is built
 
-This is the **specification and build contract**, not yet the code. It is the complete, documented
-vision — product, science, architecture, data model, driver design, build plan, compliance posture,
-and go-to-market — written to a standard precise enough to hand directly to an engineering team
-(human or Claude Code) and have them build the real thing without inventing anything.
+| OS concept | Component | Where |
+|---|---|---|
+| math library | descriptors (RDKit), IVIVE / well-stirred CLh, 4PL Hill fit, hERG margin, FDA 2005 HED/MRSD, ICH study-set rules, cited reference-parameter registry | `backend/hos/core` |
+| kernel | study lifecycle, hash-chained ledger, human-only signatures, append-only versioned artefacts, kernel facade | `backend/hos/kernel` |
+| driver model | `StudyDriver` ABI, registry with requirement matching and plug-in discovery, conformance kit, strict CSV ingest | `backend/hos/drivers` |
+| drivers | microsomal metabolic stability · hERG patch clamp (ICH E14/S7B Q&A) · repeat-dose toxicity (OECD TG 407/408/409, Dunnett) | `backend/hos/drivers/*` |
+| devices | execution targets: external lab (CRO dispatch bundle), in-house lab, simulation | `backend/hos/kernel/execution` |
+| external data | ChEMBL and PubChem clients, cached, honest failure | `backend/hos/data_sources` |
+| output | IND readiness report, CTD Module 4 (ICH M4S(R2)) assembler | `backend/hos/ind` |
+| syscalls | REST API (FastAPI, OpenAPI), re-authenticated e-signatures | `backend/hos/api` |
+| userland | React + TypeScript app with provenance badges | `frontend` |
 
-Read the documents in `docs/` in order. Read `CLAUDE.md` **first** if you are an AI or engineer
-about to write code: it contains the non-negotiable engineering contract (the rules that protect
-scientific integrity).
+Integrity guarantees enforced in code, each covered by tests:
 
-## The one rule that governs everything
+- **Constructor-level provenance rules.** A computed value without a cited method, a prediction
+  without an applicability check, or a simulated value without its generator parameters cannot
+  be constructed.
+- **Simulation taint.** Values derived from simulated data stay inadmissible. A simulated file
+  re-uploaded as "measured" is detected by hash and forced to SIMULATED. Simulated studies can
+  never be approved or enter Module 4.
+- **Determinism.** Before dispatch and before reporting, the kernel re-runs the driver and refuses
+  if it no longer reproduces the recorded protocol or analysis hash.
+- **Human attestation.** NOAELs and other expert judgements are signed determinations by the role
+  that owns them. GLP approval needs Study Director plus QA signatures on the current report.
+  Every signature re-verifies the password (21 CFR 11.200).
+- **Tamper evidence.** Every state change is a hash-chained ledger entry, and rejected uploads are
+  recorded too.
 
-> **No number exists in this system without provenance.**
-> Every quantity is either *measured*, *from the literature*, *computed by a cited method*,
-> *predicted by a named model* (and labeled as such), or *derived from a regulatory guideline*.
-> If a value is not available, the system returns `Unavailable` with a reason. It is structurally
-> impossible for the system to silently invent, guess, or hard-code a scientific value.
+Every citation, guideline section and physiological constant was checked against its primary
+source. The records are in [`docs/research/`](docs/research/), and anything that could not be
+verified is flagged in the data (`requires_verification`) and propagates as a QC flag.
 
-Everything else in these documents serves that rule.
+## Run it
 
-## Document map
+Requirements: Python 3.11+, Node 18+.
 
-| # | Document | What it covers |
-|---|----------|----------------|
-| 00 | `docs/00_INDEX.md` | How to read this set; status; glossary pointer |
-| 01 | `docs/01_vision_and_thesis.md` | The problem, the thesis, why now, what we are building |
-| 02 | `docs/02_market_and_competition.md` | Market, buyers, competitors, the open gap |
-| 03 | `docs/03_product_architecture_os.md` | The OS concept: kernel + study drivers; module map |
-| 04 | `docs/04_scientific_foundations.md` | Every equation and method, with primary citations |
-| 05 | `docs/05_data_sources_and_licensing.md` | Real databases, API contracts, licensing posture |
-| 06 | `docs/06_system_architecture.md` | Backend, frontend, services, deployment, repo layout |
-| 07 | `docs/07_data_model_and_provenance.md` | The provenance-typed data model (the integrity core) |
-| 08 | `docs/08_driver_spec_and_catalog.md` | The driver interface + the first drivers in full detail |
-| 09 | `docs/09_scientific_integrity_and_validation.md` | Integrity rules, validation gates, test strategy |
-| 10 | `docs/10_compliance_gxp_regulatory.md` | GxP, 21 CFR Part 11, ALCOA+, audit trail, two-plane design |
-| 11 | `docs/11_build_plan_sdlc.md` | The SDLC: phases, milestones, deliverables, exit criteria |
-| 12 | `docs/12_go_to_market_and_business.md` | Wedge, pricing, ladder, funding posture |
-| 13 | `docs/13_glossary.md` | Domain and system terms |
+### Backend
 
-## Environment facts (verified 2026-10-11)
+```bash
+cd backend && python3.11 -m venv .venv && .venv/bin/pip install -e ".[api,db,dev]"
+```
 
-- Build target: **Python 3.11+ backend** (RDKit, SciPy stack) + **TypeScript/React frontend**.
-- RDKit installs cleanly and returns correct reference descriptor values.
-- Public science APIs require normal internet (blocked in the sandbox used to author this spec);
-  all external-data code must run on a machine with outbound HTTPS to the listed hosts.
-- No code in this repo yet. The build plan (doc 11) defines the order of implementation.
+```bash
+cd backend && .venv/bin/pytest
+```
 
+The suite runs offline against real responses recorded from ChEMBL and PubChem. To re-run the
+contract against the live services:
+
+```bash
+cd backend && .venv/bin/pytest -m live
+```
+
+### End-to-end demo (no setup, temporary database)
+
+```bash
+cd backend && .venv/bin/python scripts/demo.py --out demo-out
+```
+
+It runs three studies through their drivers with **SIMULATED** execution and shows the integrity
+rules firing (approval refused, readiness `simulated_only`, Module 4 excludes them). Reports and
+the Module 4 zip are written to `demo-out/`.
+
+### API
+
+```bash
+cd backend && HOS_DATA_DIR=./data .venv/bin/uvicorn hos.api.app:app --port 8000
+```
+
+OpenAPI docs are served at <http://127.0.0.1:8000/docs>. Storage defaults to SQLite under
+`HOS_DATA_DIR` (default `~/.hakase_os`); set `HOS_DATABASE_URL` for PostgreSQL. On first run,
+create the administrator from the UI, or seed demo accounts (development only; credentials are in
+`backend/scripts/dev_principals.example.json`):
+
+```bash
+cd backend && .venv/bin/python scripts/seed_dev.py http://127.0.0.1:8000
+```
+
+### Frontend
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Open <http://localhost:5173>. `/api` is proxied to port 8000.
+
+### Running a real study
+
+1. Create a programme. Its context drives the ICH-derived study set.
+2. Register the compound and, optionally, look it up in PubChem / ChEMBL.
+3. Start a study from a requirement, then design it. Scientific values and acceptance criteria are
+   required inputs with their stated basis.
+4. Plan, then dispatch to an **external lab**. Download the dispatch bundle (protocol, sample
+   manifest, data template, return instructions, SHA-256 manifest) and send it to the lab.
+5. Upload the lab's CSV. It is validated strictly, and every problem is reported with its line
+   number.
+6. Supply external inputs (e.g. fu,p) with their provenance. Analyse, record expert
+   determinations, report, sign, approve.
+7. Check IND readiness and assemble Module 4.
+
+## Repository
+
+```
+backend/hos/core        scientific core (pure; no web/DB imports)
+backend/hos/kernel      lifecycle, ledger, attestation, execution targets, kernel facade
+backend/hos/drivers     driver ABI, registry, conformance kit, three drivers
+backend/hos/data_sources ChEMBL, PubChem, enrichment
+backend/hos/ind         readiness, Module 4
+backend/hos/api         FastAPI app
+backend/hos/db          SQLAlchemy models, repository, content-addressed file store
+backend/tests           unit, driver, kernel, API, data-source and demo tests; recorded fixtures
+backend/scripts         demo, fixture capture, dev seed
+frontend/               React + TypeScript (Vite)
+docs/                   specification (00-13) and research records
+```
+
+## Known limits (tracked, not hidden)
+
+- **Unverified constant.** Human liver weight (21.4 g/kg) for IVIVE has no traced primary source
+  and is flagged on every value computed from it. Mouse and monkey MPPGL have no primary
+  determination, so IVIVE for those species returns UNAVAILABLE.
+- **No metabolic-stability defaults.** No citable consensus exists for the "standard" assay
+  conditions, so the driver offers no defaults.
+- **Pending re-verification.** The OECD TG 409 parameters were read from a mirrored copy and are
+  marked for re-verification.
+- **Single-workstation deployment.** Persistence uses SQLite with `create_all()` and API sessions
+  are held in memory. Alembic migrations and a shared session store are needed before a
+  multi-user deployment.
+- **Not yet built.** SEND dataset generation, additional study drivers (Ames, plasma protein
+  binding, safety pharmacology, TK), and histopathology incidence statistics.
+- **Licensing.** ChEMBL data are CC BY-SA 3.0; review the share-alike implications before
+  commercial redistribution.
