@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 __all__ = [
     "ArtifactRow",
@@ -23,6 +26,28 @@ __all__ = [
 ]
 
 
+class UtcDateTime(TypeDecorator[datetime]):
+    """A timestamp that always comes back timezone-aware.
+
+    Every timestamp is written in UTC (``hos.core.provenance.utc_now``). SQLite has no
+    timezone type and hands back a naive datetime, which a reader — a browser formatting
+    "3 hours ago", an export, another service — would then take for local time and shift by
+    its own offset. Labelling it here, at the one place every read passes through, keeps a
+    recorded time meaning the same thing everywhere, on either database.
+
+    The stored type is unchanged (``DateTime(timezone=True)``), so no migration is needed
+    and the schema-drift check sees the same DDL.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: Any, dialect: Dialect) -> datetime | None:
+        if not isinstance(value, datetime):
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -35,10 +60,10 @@ class PrincipalRow(Base):
     roles: Mapped[list] = mapped_column(JSON, default=list)
     organisation: Mapped[str | None] = mapped_column(String(256), nullable=True)
     signing_secret_hash: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -49,10 +74,10 @@ class SessionRow(Base):
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), index=True)
     kind: Mapped[str] = mapped_column(String(16))  # session | agent_key
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
 
 class ProgramRow(Base):
@@ -65,8 +90,8 @@ class ProgramRow(Base):
     context: Mapped[dict] = mapped_column(JSON)
     study_set: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class CompoundRow(Base):
@@ -84,7 +109,7 @@ class CompoundRow(Base):
     entity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     """The sequence entity as registered (hos.kernel.entities.SequenceEntity)."""
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class StudyRow(Base):
@@ -118,8 +143,8 @@ class StudyRow(Base):
     import_record: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     evidence_admissible: Mapped[bool] = mapped_column(default=True)
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class FileRow(Base):
@@ -129,7 +154,7 @@ class FileRow(Base):
     media_type: Mapped[str] = mapped_column(String(128))
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     uploaded_by: Mapped[str] = mapped_column(String(64))
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    uploaded_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class ProgramMemberRow(Base):
@@ -139,7 +164,7 @@ class ProgramMemberRow(Base):
     program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), primary_key=True)
     principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), primary_key=True)
     added_by: Mapped[str] = mapped_column(String(64))
-    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    added_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class FileLinkRow(Base):
@@ -184,7 +209,7 @@ class ArtifactRow(Base):
     supersedes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
     __table_args__ = (Index("ix_artifact_study_kind", "study_id", "kind", "version", unique=True),)
 
@@ -197,7 +222,7 @@ class SimulatedFileRow(Base):
     sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
     study_id: Mapped[str] = mapped_column(String(64))
     method_id: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
 
 class WriterLockRow(Base):
@@ -227,7 +252,7 @@ class ProgramDocumentRow(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     signatures: Mapped[list] = mapped_column(JSON, default=list)
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
     __table_args__ = (
         Index("ix_program_document_version", "program_id", "kind", "version", unique=True),
@@ -250,6 +275,6 @@ class TriageReportRow(Base):
     content: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64))
     created_by: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
 
     __table_args__ = (Index("ix_triage_version", "compound_id", "version", unique=True),)

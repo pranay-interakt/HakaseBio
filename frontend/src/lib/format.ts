@@ -183,10 +183,18 @@ export const actionLabel = lookup(ACTIONS);
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** Parse a recorded timestamp. Records are kept in UTC; a value that arrives without a zone
+ * is read as UTC rather than as this browser's local time, which would shift it silently by
+ * the reader's own offset. */
+function parse(iso: string): Date {
+  const zoned = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(zoned);
+}
+
 /** "11 Oct 2026, 14:06 UTC": records are kept in UTC, so times are shown in UTC too. */
 export function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const d = new Date(iso);
+  const d = parse(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
@@ -194,7 +202,7 @@ export function fmtDateTime(iso: string | null | undefined): string {
 
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const d = new Date(iso);
+  const d = parse(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
@@ -202,7 +210,7 @@ export function fmtDate(iso: string | null | undefined): string {
 /** "3 h ago"; the exact time belongs in a title attribute. */
 export function fmtAgo(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const s = (Date.now() - parse(iso).getTime()) / 1000;
   if (Number.isNaN(s)) return iso;
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
