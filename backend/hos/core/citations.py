@@ -212,6 +212,10 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "ICH Harmonised Guideline S11: Nonclinical Safety Testing in Support of "
            "Development of Paediatric Pharmaceuticals. Step 4, 14 April 2020.",
            year=2020, url="https://database.ich.org/sites/default/files/S11_Step4_FinalGuideline_2020_0310.pdf"),
+        _c("ich_m4s_r2",
+           "ICH Harmonised Tripartite Guideline M4S(R2): The Common Technical Document for the "
+           "Registration of Pharmaceuticals for Human Use: Safety. Step 4, 20 December 2002.",
+           year=2002, url="https://database.ich.org/sites/default/files/M4S_R2_Guideline.pdf"),
         _c("ich_m10",
            "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study "
            "Sample Analysis. Step 4, 24 May 2022.",

@@ -696,6 +696,12 @@ class Kernel:
                  "created_at": a.created_at.isoformat(), "content": a.content}
                 for a in self.repo.artifacts(study_id, kind)]
 
+    def record_event(self, actor: Principal, action: str, subject_type: str, subject_id: str,
+                     payload: dict[str, Any], *, reason: Optional[str] = None) -> None:
+        """Ledger an event raised by a kernel service (e.g. IND assembly)."""
+        self._require_worker(actor)
+        self._record(actor, action, subject_type, subject_id, payload, reason=reason)
+
     def history(self, subject_id: str) -> list[dict[str, Any]]:
         return [e.to_dict() for e in self.ledger.history(subject_id)]
 
