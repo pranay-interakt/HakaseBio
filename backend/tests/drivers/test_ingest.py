@@ -117,3 +117,16 @@ def test_tables_refuse_bare_floats():
 def test_numeric_column_must_declare_unit():
     with pytest.raises(DriverError):
         DataColumn("x", "x", kind="number")
+
+
+def test_per_row_unit_column_is_validated():
+    t = DataTemplate(template_id="u/1", description="d", columns=(
+        DataColumn("endpoint", "e", kind="text"),
+        DataColumn("unit", "u", kind="text"),
+        DataColumn("value", "v", unit_column="unit"),
+    ))
+    ok = parse_return_file(_csv("endpoint,unit,value\nALT,U/L,30\nliver,g,10.2\n"), t)
+    assert ok.records[0]["value"] == 30.0
+    with pytest.raises(IngestError) as e:
+        parse_return_file(_csv("endpoint,unit,value\nALT,bananas,30\n"), t)
+    assert any("not a recognised unit" in x for x in e.value.errors)

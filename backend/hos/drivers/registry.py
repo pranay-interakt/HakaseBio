@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 #: Import paths of the drivers shipped with HOS.
 BUILTIN_DRIVERS: tuple[str, ...] = (
     "hos.drivers.metabolic_stability:MetabolicStabilityDriver",
+    "hos.drivers.herg:HergPatchClampDriver",
 )
 
 _REQUIRED_ATTRS = ("id", "name", "version", "requirement_ids", "modalities", "ctd_section")

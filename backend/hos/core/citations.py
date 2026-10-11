@@ -120,6 +120,20 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "cardiac electrophysiology, clinical QT interval prolongation and torsade de "
            "pointes for a broad range of drugs. Cardiovasc Res. 2003;58(1):32-45.",
            year=2003, doi="10.1016/S0008-6363(02)00846-5"),
+        _c("crumb2016",
+           "Crumb WJ Jr, Vicente J, Johannesen L, Strauss DG. An evaluation of 30 clinical drugs "
+           "against the comprehensive in vitro proarrhythmia assay (CiPA) proposed ion channel "
+           "panel. J Pharmacol Toxicol Methods. 2016;81:251-262.",
+           year=2016, doi="10.1016/j.vascn.2016.03.009"),
+        _c("ridder2020",
+           "Ridder BJ, Leishman DJ, Bridgland-Taylor M, et al. A systematic strategy for "
+           "estimating hERG block potency and its implications in a new cardiac safety "
+           "paradigm. Toxicol Appl Pharmacol. 2020;394:114961.",
+           year=2020, doi="10.1016/j.taap.2020.114961"),
+        _c("jaki2013",
+           "Jaki T, Hothorn LA. Statistical evaluation of toxicological assays: Dunnett or "
+           "Williams test - take both. Arch Toxicol. 2013;87(11):1901-1910.",
+           year=2013, doi="10.1007/s00204-013-1065-x"),
         _c("dunnett1955",
            "Dunnett CW. A multiple comparison procedure for comparing several treatments "
            "with a control. J Am Stat Assoc. 1955;50(272):1096-1121.",

@@ -339,12 +339,16 @@ class DataColumn:
     minimum: Optional[float] = None
     maximum: Optional[float] = None
     exclusive_minimum: bool = False
+    unit_column: Optional[str] = None
+    """For numeric columns whose unit varies by row: the text column holding each row's unit."""
 
     def __post_init__(self) -> None:
         if self.kind not in ("number", "integer", "text"):
             raise DriverError(f"column {self.name!r}: unknown kind {self.kind!r}")
-        if self.kind == "number" and not self.unit:
-            raise DriverError(f"numeric column {self.name!r} must declare a unit")
+        if self.kind == "number" and not (self.unit or self.unit_column):
+            raise DriverError(f"numeric column {self.name!r} must declare a unit or unit_column")
+        if self.unit and self.unit_column:
+            raise DriverError(f"column {self.name!r}: give unit or unit_column, not both")
         if self.unit:
             U.parse_unit(self.unit)
 
@@ -353,7 +357,7 @@ class DataColumn:
                 "unit": self.unit, "required": self.required,
                 "choices": list(self.choices) if self.choices else None,
                 "minimum": self.minimum, "maximum": self.maximum,
-                "exclusive_minimum": self.exclusive_minimum}
+                "exclusive_minimum": self.exclusive_minimum, "unit_column": self.unit_column}
 
 
 @dataclass(frozen=True, slots=True)
@@ -573,8 +577,8 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
         if unit is None:
             col_units[n] = col.unit
             continue
-        if col.kind != "number":
-            errors.append(f"line {header_line_no}: column {n!r} is {col.kind}; it takes no unit")
+        if col.kind != "number" or col.unit_column:
+            errors.append(f"line {header_line_no}: column {n!r} takes no unit in the header")
             continue
         if not U.is_valid_unit(unit):
             errors.append(f"line {header_line_no}: column {n!r} has unrecognised unit {unit!r}")
@@ -629,10 +633,10 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
                 if not math.isfinite(v):
                     errors.append(f"line {line_no}: {n!r} value {cell!r} is not finite")
                     continue
-                src_unit = col_units.get(n) or col.unit
-                assert src_unit is not None and col.unit is not None
-                if U.parse_unit(src_unit) != U.parse_unit(col.unit):
-                    v = U.convert(v, src_unit, col.unit)
+                if col.unit is not None:
+                    src_unit = col_units.get(n) or col.unit
+                    if U.parse_unit(src_unit) != U.parse_unit(col.unit):
+                        v = U.convert(v, src_unit, col.unit)
             if col.minimum is not None and (v < col.minimum or (col.exclusive_minimum and v == col.minimum)):
                 errors.append(f"line {line_no}: {n!r} value {v:g} below physical minimum "
                               f"{'>' if col.exclusive_minimum else '>='} {col.minimum:g}")
@@ -640,6 +644,12 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
                 errors.append(f"line {line_no}: {n!r} value {v:g} above physical maximum "
                               f"{col.maximum:g}")
             rec[n] = int(v) if col.kind == "integer" else v
+        for col in template.columns:
+            if col.unit_column and rec.get(col.name) is not None:
+                u = rec.get(col.unit_column)
+                if not u or not U.is_valid_unit(str(u)):
+                    errors.append(f"line {line_no}: {col.unit_column!r} value {u!r} is not a "
+                                  f"recognised unit for {col.name!r}")
         records.append(rec)
 
     if not records and not errors:

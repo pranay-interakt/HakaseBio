@@ -111,6 +111,33 @@ METHODS: Final[dict[str, Method]] = dict(
         _m("safety.herg_margin", "hERG safety margin over free therapeutic exposure",
            ("redfern2003", "ich_s7b", "ich_e14_s7b_qa"),
            limits=("a single-channel in vitro margin; it is not a proarrhythmia prediction",)),
+        _m("pharm.percent_inhibition",
+           "Per-cell fractional current inhibition with background subtraction",
+           ("ich_e14_s7b_qa", "ridder2020"),
+           assumptions=("residual current after a saturating selective blocker is "
+                        "non-hERG background (E14/S7B Q&A 2.1 item 2)",
+                        "drug effect measured at steady state"),
+           limits=("rundown during the recording is not corrected; vehicle controls show its "
+                   "magnitude",)),
+        _m("pharm.molar_to_mass_concentration", "Molar to mass concentration (IC50 in ng/mL)",
+           ("ich_e14_s7b_qa",),
+           assumptions=("molecular weight of the registered structure (free form, not a salt)",)),
+        _m("safety.free_cmax_qa12",
+           "Free high clinical exposure with the 1% unbound-fraction floor",
+           ("ich_e14_s7b_qa",),
+           assumptions=("fu,p below 1% is set to 1% because of protein-binding measurement "
+                        "uncertainty (S7B Q&A 1.2)",),
+           limits=("the clinical Cmax,ss is an input; its uncertainty is not propagated",)),
+        _m("stats.group_summary", "Group mean and standard deviation per dose level",
+           ("oecd_tg408",),
+           limits=("descriptive only",)),
+        _m("stats.dunnett", "Dunnett many-to-one comparison of each dose group with control",
+           ("dunnett1955", "jaki2013"),
+           assumptions=("approximately normal residuals within groups",
+                        "homogeneous variances across groups"),
+           limits=("statistical significance is not adversity; biologically significant "
+                   "effects can be non-significant (FDA 2005 glossary, NOAEL)",
+                   "no transformation or non-parametric alternative is applied",)),
         # ---- verification data generators ------------------------------------
         _m("sim.first_order_depletion",
            "Simulated microsomal depletion from a declared first-order model with "
@@ -122,6 +149,11 @@ METHODS: Final[dict[str, Method]] = dict(
         _m("sim.four_parameter_logistic",
            "Simulated concentration-response from a declared 4PL model with additive noise",
            ("delean1978",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
+        _m("sim.repeat_dose_normal",
+           "Simulated individual-animal endpoint values from declared normal distributions",
+           ("dunnett1955",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
         # ---- dose projection -------------------------------------------------
