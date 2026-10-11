@@ -210,7 +210,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 2",
         rationale="Mechanism and pharmacologically active dose are needed to set the starting "
                   "dose and to interpret toxicity",
-        glp=False, ctd_section="4.2.1.1",
+        glp=False, ctd_section="4.2.1.1", driver_id="in_vitro_potency",
     ))
     out.append(_req(
         id="adme.metabolic_stability", name="In vitro metabolic stability (liver microsomes)",

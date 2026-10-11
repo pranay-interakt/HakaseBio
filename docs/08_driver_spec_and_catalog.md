@@ -360,6 +360,32 @@ The kit checks:
   - Incidence counts.
   - Each M3(R2) §1.5 statement triggered only by its conditions.
 
+### `in_vitro_potency` v1.0.0 — potency and selectivity (ICH M3(R2) §2; S7A Note 2)
+
+- **Serves.** `pharm.primary`, CTD 4.2.1.1. Not GLP (M3(R2) §2: primary PD is generally
+  non-GLP).
+- **Research note.** `docs/research/drivers/in_vitro_potency.md`.
+- **Design.**
+  - Concentration unit, and the curve-fit acceptance (R²) with its basis.
+  - Assays, each with: target, primary or off-target role, format, species and conditions;
+    readout (percent inhibition or activity); asymptotes fitted or fixed at 0/100;
+    concentrations and replicates; and an optional reference compound with its acceptance
+    range and basis.
+- **Return data.** One row per well: assay, compound, concentration, replicate, response in
+  percent.
+- **Analysis.**
+  - A 4PL fit per assay and compound.
+  - The reference-compound check (FAIL outside its range).
+  - The relative potency of the test article for each off-target against each primary assay,
+    with its delta-method CI. It is given as a lower bound when the off-target is inactive in
+    range, and is unavailable when a run failed its reference check.
+- **Determinations.** None. Relevance at clinical exposure is listed as needing expert
+  judgement.
+- **Known-value tests.**
+  - The Ritz Eq. 2 identity with the implemented 4PL (b = hill).
+  - Exact IC50 and Hill slope recovery and the exact ratio.
+  - The delta-method SE by hand.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

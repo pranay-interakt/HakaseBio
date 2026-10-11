@@ -33,7 +33,7 @@ Confidence labels: **verified-from-primary** (exact wording read this session); 
 | Parameter | Value | Source | Verbatim quote (≤2 sentences) | Confidence |
 |---|---|---|---|---|
 | Four-parameter log-logistic model | f(x,(b,c,d,e)) = c + (d − c) / (1 + exp(b(log(x) − log(e)))) — b slope, c lower and d upper asymptote, e = ED50 | Ritz et al. 2015, PLoS One 10(12):e0146021, DOI 10.1371/journal.pone.0146021, "Model functions" section, Eq (2) (equation read from the MathML of the PMC XML) | "The four-parameter log-logistic model corresponds to the model function:" (parameter meanings paraphrased from the same section) | verified-from-primary (methods paper; open access) |
-| Equivalence to the form already in `docs/04` §4.5 | `bottom + (top − bottom)/(1 + (IC50/C)^h)` is the same function with c = bottom, d = top, e = IC50 and b = −h, since exp(b(log x − log e)) = (x/e)^b | Algebraic identity (no citation needed beyond Ritz Eq 2); sign convention must be stated in code | — | derived (exact) |
+| Equivalence to the form implemented in `hos/core/pharmacology.py` | `bottom + (top − bottom)/(1 + (C/IC50)^h)` is the same function with c = bottom, d = top, e = IC50 and **b = h**, since exp(b(log x − log e)) = (x/e)^b. **Correction (implementation, 2026-10-11):** this row previously said b = −h, which holds only for the form `(IC50/C)^h` that `docs/04` §4.5 had written; the code uses `(C/IC50)^h`. A known-value test now asserts the identity. | Algebraic identity (no citation needed beyond Ritz Eq 2) | — | derived (exact) |
 | DeLean, Munson & Rodbard 1978 (the citation currently in `docs/04` §4.5) | Bibliographic record confirmed; describes simultaneous fitting of sigmoidal families in terms of basal, maximal, ED50 and steepness | Am J Physiol 1978;235(2):E97–E102; DOI 10.1152/ajpendo.1978.235.2.E97; PMID 686171 (abstract via Europe PMC) | "in terms of basal and maximal responses, ED50, and curve shape or steepness" | verified-bibliographic + abstract; **the equation itself was not read from DeLean** (closed access) |
 | **Ratio of effective doses / relative potency / "selectivity index"** | ρ(α1, α2) = ED_A(100α1) / ED_B(100α2), 0 < α1, α2 < 1; for α1 = α2 it is the **relative potency**; "selectivity index" is noted as an alternative term | Ritz et al. 2015, "Effective doses" / ED-ratio passage (equation after Eq 10; cites Finney 1971 [11] and Christensen et al. 2003 [48]) | "the ratio is referred to as the relative potency" … "The term selectivity index is also sometimes used" | verified-from-primary — **but** this is a general dose-response statistics source (two curves, same or different substances), not a pharmacology guideline. Applying it to "off-target IC50 / on-target IC50 for one compound" is a reasonable but *derived* use; label it so. |
 | Non-parallel curves | Relative potency is constant across α only under parallelism; otherwise it changes with α | Ritz et al. 2015, same passage | paraphrased: under "parallelism" the relative potency is the same at every effect level | verified-from-primary |
@@ -72,3 +72,18 @@ different substrate/radioligand concentrations are compared) was **not** read: C
 2. ICH (2000). *S7A: Safety Pharmacology Studies for Human Pharmaceuticals.* Step 4, 8 November 2000. Sections 2.2, 2.4.1, Note 2. https://database.ich.org/sites/default/files/S7A_Guideline.pdf
 3. Ritz C, Baty F, Streibig JC, Gerhard D. Dose-Response Analysis Using R. *PLoS One.* 2015;10(12):e0146021. DOI: 10.1371/journal.pone.0146021 (PMCID PMC4696819).
 4. DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. *Am J Physiol.* 1978;235(2):E97–E102. DOI: 10.1152/ajpendo.1978.235.2.E97 *(bibliographic + abstract only)*.
+
+## Implementation record (driver `in_vitro_potency` v1.0.0, 2026-10-11)
+
+- **Ritz 2015 verified on Crossref.** "Dose-Response Analysis Using R", PLOS ONE 10(12):e0146021,
+  2015-12-30, authors Ritz, Baty, Streibig, Gerhard.
+- **Model identity corrected.** See the correction above. The implemented 4PL is Ritz Eq. 2 with
+  b = hill, asserted by a known-value test. `docs/04` §4.5 had written the inverse form; it is
+  now corrected.
+- **Existing hERG method left unchanged.** `pharm.hill_4pl` still cites DeLean 1978 only.
+  Adding Ritz 2015 to it would change every hERG analysis hash (see the registry lock).
+  Ritz 2015 is cited by the new `pharm.relative_potency`.
+- **Not built.**
+  - Cheng–Prusoff Ki conversion (NOT VERIFIED).
+  - Parallelism tests between curves.
+  - Fieller intervals.

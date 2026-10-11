@@ -263,6 +263,15 @@ METHODS: Final[dict[str, Method]] = dict(
            "incidences and deaths", ("oecd_tg407",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("pharm.relative_potency",
+           "Relative potency: ratio of fitted 50% effective concentrations (off-target / primary)",
+           ("ritz2015",),
+           assumptions=("the two curves are fitted independently; the standard error is the "
+                        "first-order delta method for a ratio of independent estimates",),
+           limits=("the ratio holds at the 50% effect level; with non-parallel curves it changes "
+                   "with the effect level (Ritz et al. 2015)",
+                   "IC50s from assays at different substrate or ligand concentrations are not "
+                   "affinities; no Ki conversion is applied",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

@@ -82,9 +82,14 @@ extrapolation.
 
 ## 4.5 Concentration–response (hERG and any potency/inhibition assay)  [`pharm.hill_4pl`]
 
-- **Equation (4-parameter logistic / Hill):**
-  `response = bottom + (top − bottom) / (1 + (IC50 / C)^hillslope)` (inhibition form),
-  fit by non-linear least squares (SciPy `curve_fit`) with bounds; report IC50/EC50, Hill slope,
+- **Equation (4-parameter logistic / Hill), as implemented in `hos/core/pharmacology.py`:**
+  `response = bottom + (top − bottom) / (1 + (C / IC50)^hillslope)`. Here `top` is the response
+  at low concentration and `bottom` the response at high concentration. This is Ritz et al.
+  2015 Eq. 2, f = c + (d − c)/(1 + exp(b(ln x − ln e))), with c = bottom, d = top, e = IC50 and
+  b = hillslope. A known-value test checks the identity. (An earlier version of this line wrote
+  `(IC50 / C)`, which swaps the asymptotes and the slope's sign; the code never used that form.)
+  The fit is
+  by non-linear least squares (SciPy `curve_fit`) with bounds; report IC50/EC50, Hill slope,
   top/bottom, and the fit covariance → **confidence interval** on IC50.
 - **Inputs:** concentration–response pairs (`MEASURED`). **Output:** `IC50` as `Quantity(µM)` with CI,
   provenance `COMPUTED`; fit R²/convergence recorded; QC flag if curve does not plateau or fit fails.
@@ -331,6 +336,22 @@ is a new registry version; it never silently alters past results.
   Exposures and the clinical dose are inputs with their own provenance.
 - M3(R2) does not define the MTD. The protocol states the MTD criteria. The MTD, the high-dose
   basis and the recommended doses are Study Director determinations.
+
+## 4.18 Potency and relative potency  [`pharm.relative_potency`]
+
+- Each assay is fitted with the 4PL of §4.5, optionally with asymptotes fixed at 0 and 100%,
+  and reports IC50/EC50 with a 95% CI and the Hill slope. A reference compound must fall in an
+  acceptance range the protocol states with its basis. Otherwise the run fails, and no ratio
+  is computed from it.
+- Relative potency is off-target / primary 50% effective concentration (Ritz et al. 2015,
+  "ratio of effective doses"). Its standard error is the first-order delta method for a ratio
+  of independent estimates: SE(R) = R·√((SE_off/off)² + (SE_on/on)²).
+  - It holds at the 50% effect level. With different Hill slopes it changes with the level, so
+    both slopes are shown.
+  - An off-target IC50 above the top concentration gives only a lower bound.
+  - IC50s from assays under different conditions are not affinities. No Cheng–Prusoff
+    conversion is applied; its source is NOT VERIFIED.
+- No selectivity threshold is applied. None exists in ICH M3(R2), S7A, S7B or the E14/S7B Q&A.
 
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 

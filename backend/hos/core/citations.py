@@ -205,6 +205,10 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "curves: application to bioassay, radioligand assay, and physiological "
            "dose-response curves. Am J Physiol. 1978;235(2):E97-E102.",
            year=1978, doi="10.1152/ajpendo.1978.235.2.E97"),
+        _c("ritz2015",
+           "Ritz C, Baty F, Streibig JC, Gerhard D. Dose-response analysis using R. PLoS One. "
+           "2015;10(12):e0146021.",
+           year=2015, doi="10.1371/journal.pone.0146021"),
         _c("redfern2003",
            "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical "
            "cardiac electrophysiology, clinical QT interval prolongation and torsade de "
