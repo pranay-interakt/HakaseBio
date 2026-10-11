@@ -26,9 +26,15 @@ type Cell =
   | { study: string; text: string }
   | { quantity: Quantity; source: { study_id: string; key: string } }
   | { determination: Determination; source: { study_id: string; key: string } }
-  | { imported: { quantity: Quantity | null; category: string | null }; source: { study_id: string; page: string; table: string | null } }
+  | {
+      imported: { quantity: Quantity | null; category: string | null };
+      source: { study_id: string; page: string; table: string | null };
+    }
   | { cells: Cell[] }
-  | { findings: { determinations: Cell[]; statements: { text: string; basis: string; severity: string }[] }; source: { study_id: string } };
+  | {
+      findings: { determinations: Cell[]; statements: { text: string; basis: string; severity: string }[] };
+      source: { study_id: string };
+    };
 
 interface SummaryTable {
   number: string;
@@ -206,7 +212,15 @@ function TableView({ t }: { t: SummaryTable }) {
   );
 }
 
-function SectionView({ s, editable, onSave }: { s: SectionDoc; editable: boolean; onSave: (text: string) => Promise<void> }) {
+function SectionView({
+  s,
+  editable,
+  onSave,
+}: {
+  s: SectionDoc;
+  editable: boolean;
+  onSave: (text: string) => Promise<void>;
+}) {
   const [text, setText] = useState(s.author_text ?? "");
   const [busy, setBusy] = useState(false);
   useEffect(() => setText(s.author_text ?? ""), [s.author_text]);
@@ -337,13 +351,19 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
         }
       >
         {!doc ? (
-          <Empty title="No draft yet">Drafting reads every approved study and completed import of this programme.</Empty>
+          <Empty title="No draft yet">
+            Drafting reads every approved study and completed import of this programme.
+          </Empty>
         ) : (
           <div className="stack">
             <div className="row">
               <label className="row small">
                 Version
-                <select style={{ width: "auto" }} value={doc.version} onChange={(e) => openVersion(Number(e.target.value))}>
+                <select
+                  style={{ width: "auto" }}
+                  value={doc.version}
+                  onChange={(e) => openVersion(Number(e.target.value))}
+                >
                   {[...listing.versions].reverse().map((v) => (
                     <option key={v.version} value={v.version}>
                       v{v.version} · {v.status} · {fmtDate(v.created_at)}
@@ -351,18 +371,29 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
                   ))}
                 </select>
               </label>
-              <Pill tone={doc.status === "signed" ? "ok" : "accent"}>{doc.status === "signed" ? "Signed" : "Draft"}</Pill>
+              <Pill tone={doc.status === "signed" ? "ok" : "accent"}>
+                {doc.status === "signed" ? "Signed" : "Draft"}
+              </Pill>
               {doc.version !== latest && <Pill tone="neutral">earlier version</Pill>}
               <span className="muted small">
-                by {doc.created_by}, {fmtDateTime(doc.created_at)} · fingerprint <span className="mono">{shortHash(doc.content_hash, 12)}</span>
+                by {doc.created_by}, {fmtDateTime(doc.created_at)} · fingerprint{" "}
+                <span className="mono">{shortHash(doc.content_hash, 12)}</span>
               </span>
               <span className="spacer" />
-              <button className="small" onClick={() => api.download(`${base}/${doc.version}/markdown`, `module2_nonclinical_v${doc.version}.md`).catch(setErr)}>
+              <button
+                className="small"
+                onClick={() =>
+                  api
+                    .download(`${base}/${doc.version}/markdown`, `module2_nonclinical_v${doc.version}.md`)
+                    .catch(setErr)
+                }
+              >
                 Download Markdown
               </button>
             </div>
             <div className="small">
-              Test article: <strong>{doc.content.test_article.join(", ") || "—"}</strong> · built from {doc.content.studies.length} stud
+              Test article: <strong>{doc.content.test_article.join(", ") || "—"}</strong> · built from{" "}
+              {doc.content.studies.length} stud
               {doc.content.studies.length === 1 ? "y" : "ies"}:{" "}
               {doc.content.studies.map((s, i) => (
                 <span key={s.study_id}>
@@ -398,7 +429,12 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
               )
             ) : (
               shown.sections.map((s) => (
-                <SectionView key={`${doc.version}-${s.id}`} s={s} editable={editable} onSave={(t) => saveSection(s.id, t)} />
+                <SectionView
+                  key={`${doc.version}-${s.id}`}
+                  s={s}
+                  editable={editable}
+                  onSave={(t) => saveSection(s.id, t)}
+                />
               ))
             )}
           </Section>
@@ -444,17 +480,25 @@ function SignPanel({
       <Section title="Signature">
         {doc.signatures.map((s, i) => (
           <div key={i} className="signed small">
-            <strong>{s.signer_name}</strong> — {roleLabel(s.role)} ({meaningLabel(s.meaning).toLowerCase()}), {fmtDateTime(s.signed_at)}: “{s.statement}”
+            <strong>{s.signer_name}</strong> — {roleLabel(s.role)} ({meaningLabel(s.meaning).toLowerCase()}),{" "}
+            {fmtDateTime(s.signed_at)}: “{s.statement}”
           </div>
         ))}
-        <p className="muted small">A signed version is never edited. Drafting again starts a new version that keeps the author&apos;s text.</p>
+        <p className="muted small">
+          A signed version is never edited. Drafting again starts a new version that keeps the author&apos;s text.
+        </p>
       </Section>
     );
   if (doc.version !== latest) return null;
   return (
-    <Section title="Sign this version" subtitle="Signed by a Responsible Scientist or Programme Lead; the signature fixes this version.">
+    <Section
+      title="Sign this version"
+      subtitle="Signed by a Responsible Scientist or Programme Lead; the signature fixes this version."
+    >
       {doc.missing_author_sections.length > 0 && (
-        <div className="note small">Before signing, the author&apos;s text is needed in: {doc.missing_author_sections.join("; ")}.</div>
+        <div className="note small">
+          Before signing, the author&apos;s text is needed in: {doc.missing_author_sections.join("; ")}.
+        </div>
       )}
       {me.kind !== "human" || roles.length === 0 ? (
         <p className="muted small">You do not hold a role that signs the summaries.</p>
@@ -483,11 +527,20 @@ function SignPanel({
             </label>
             <label className="field">
               <span className="field-label">Statement *</span>
-              <input value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="I am the author of these summaries." />
+              <input
+                value={statement}
+                onChange={(e) => setStatement(e.target.value)}
+                placeholder="I am the author of these summaries."
+              />
             </label>
             <label className="field">
               <span className="field-label">Your password *</span>
-              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+              <input
+                type="password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                autoComplete="current-password"
+              />
             </label>
           </div>
           <div className="row-end">

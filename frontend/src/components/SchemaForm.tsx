@@ -27,17 +27,7 @@ function unwrapOptional(s: JsonSchema, root: JsonSchema): { schema: JsonSchema; 
 }
 
 type Kind =
-  | "enum"
-  | "boolean"
-  | "number"
-  | "string"
-  | "multi-enum"
-  | "list"
-  | "tuple"
-  | "records"
-  | "object"
-  | "map"
-  | "json";
+  "enum" | "boolean" | "number" | "string" | "multi-enum" | "list" | "tuple" | "records" | "object" | "map" | "json";
 
 function kindOf(s: JsonSchema, root: JsonSchema): Kind {
   if (s.enum) return "enum";
@@ -60,15 +50,67 @@ function kindOf(s: JsonSchema, root: JsonSchema): Kind {
 const SCALAR: Kind[] = ["enum", "boolean", "number", "string", "list", "multi-enum"];
 
 const UNITS: Record<string, string> = {
-  uM: "µM", nM: "nM", mM: "mM", uL: "µL", mL: "mL", L: "L", ug: "µg", ng: "ng", mg: "mg", g: "g", kg: "kg",
-  C: "°C", c: "°C", min: "min", h: "h", ms: "ms", pA: "pA", mmhg: "mmHg", percent: "%", ul: "µL", da: "Da",
-  day: "day", Hz: "Hz", bpm: "bpm", pctvv: "% v/v",
+  uM: "µM",
+  nM: "nM",
+  mM: "mM",
+  uL: "µL",
+  mL: "mL",
+  L: "L",
+  ug: "µg",
+  ng: "ng",
+  mg: "mg",
+  g: "g",
+  kg: "kg",
+  C: "°C",
+  c: "°C",
+  min: "min",
+  h: "h",
+  ms: "ms",
+  pA: "pA",
+  mmhg: "mmHg",
+  percent: "%",
+  ul: "µL",
+  da: "Da",
+  day: "day",
+  Hz: "Hz",
+  bpm: "bpm",
+  pctvv: "% v/v",
 };
 const ABBREV: Record<string, string> = {
-  ic50: "IC50", ec50: "EC50", nadph: "NADPH", r2: "r²", tk: "TK", pk: "PK", qtc: "QTc", qt: "QT", rr: "RR", bp: "BP",
-  cv: "CV", lloq: "LLOQ", uloq: "ULOQ", isr: "ISR", auc: "AUC", cmax: "Cmax", tmax: "Tmax", noael: "NOAEL",
-  glp: "GLP", ppb: "PPB", herg: "hERG", fu: "fu", clint: "CLint", mtd: "MTD", id: "ID", sd: "SD", ci: "CI",
-  is: "IS", mwco: "MWCO", blq: "BLQ", qc: "QC", spo2: "SpO2", pr: "PR", qrs: "QRS",
+  ic50: "IC50",
+  ec50: "EC50",
+  nadph: "NADPH",
+  r2: "r²",
+  tk: "TK",
+  pk: "PK",
+  qtc: "QTc",
+  qt: "QT",
+  rr: "RR",
+  bp: "BP",
+  cv: "CV",
+  lloq: "LLOQ",
+  uloq: "ULOQ",
+  isr: "ISR",
+  auc: "AUC",
+  cmax: "Cmax",
+  tmax: "Tmax",
+  noael: "NOAEL",
+  glp: "GLP",
+  ppb: "PPB",
+  herg: "hERG",
+  fu: "fu",
+  clint: "CLint",
+  mtd: "MTD",
+  id: "ID",
+  sd: "SD",
+  ci: "CI",
+  is: "IS",
+  mwco: "MWCO",
+  blq: "BLQ",
+  qc: "QC",
+  spo2: "SpO2",
+  pr: "PR",
+  qrs: "QRS",
 };
 
 /** "acceptance_clint_low_uL_min_mg" -> "Acceptance CLint low (µL/min/mg)": units in brackets. */
@@ -105,7 +147,15 @@ function placeholderFor(s: JsonSchema): string | undefined {
 
 // ---- inputs ---------------------------------------------------------------------------------
 
-function NumberInput({ value, onChange, placeholder }: { value: Json; onChange: (v: Json) => void; placeholder?: string }) {
+function NumberInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: Json;
+  onChange: (v: Json) => void;
+  placeholder?: string;
+}) {
   const [text, setText] = useState(value === undefined || value === null ? "" : String(value));
   useEffect(() => {
     const cur = text.trim() === "" ? undefined : Number(text);
@@ -130,7 +180,17 @@ function NumberInput({ value, onChange, placeholder }: { value: Json; onChange: 
   );
 }
 
-function ListInput({ value, onChange, numeric, placeholder }: { value: Json; onChange: (v: Json) => void; numeric: boolean; placeholder?: string }) {
+function ListInput({
+  value,
+  onChange,
+  numeric,
+  placeholder,
+}: {
+  value: Json;
+  onChange: (v: Json) => void;
+  numeric: boolean;
+  placeholder?: string;
+}) {
   const [text, setText] = useState(Array.isArray(value) ? value.join(", ") : "");
   return (
     <input
@@ -179,14 +239,27 @@ function JsonInput({ value, onChange }: { value: Json; onChange: (v: Json) => vo
 
 // ---- one value of any shape -----------------------------------------------------------------
 
-function ValueInput({ schema, value, onChange, root }: { schema: JsonSchema; value: Json; onChange: (v: Json) => void; root: JsonSchema }) {
+function ValueInput({
+  schema,
+  value,
+  onChange,
+  root,
+}: {
+  schema: JsonSchema;
+  value: Json;
+  onChange: (v: Json) => void;
+  root: JsonSchema;
+}) {
   const s = schema;
   const k = kindOf(s, root);
   const ph = placeholderFor(s);
   switch (k) {
     case "enum":
       return (
-        <select value={value === undefined || value === null ? "" : String(value)} onChange={(e) => onChange(e.target.value || undefined)}>
+        <select
+          value={value === undefined || value === null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value || undefined)}
+        >
           <option value="">{ph ? `— (${ph})` : "—"}</option>
           {s.enum!.map((o) => (
             <option key={o} value={o}>
@@ -209,7 +282,13 @@ function ValueInput({ schema, value, onChange, root }: { schema: JsonSchema; val
     case "number":
       return <NumberInput value={value} onChange={onChange} placeholder={ph} />;
     case "string":
-      return <input value={value === undefined || value === null ? "" : String(value)} placeholder={ph} onChange={(e) => onChange(e.target.value || undefined)} />;
+      return (
+        <input
+          value={value === undefined || value === null ? "" : String(value)}
+          placeholder={ph}
+          onChange={(e) => onChange(e.target.value || undefined)}
+        />
+      );
     case "list": {
       const it = resolve(unwrapOptional(s.items!, root).schema, root);
       return <ListInput value={value} onChange={onChange} numeric={it.type !== "string"} placeholder={ph} />;
@@ -259,7 +338,9 @@ function ValueInput({ schema, value, onChange, root }: { schema: JsonSchema; val
       );
     }
     case "object":
-      return <ObjectFields schema={s} value={(value as Obj | undefined) ?? {}} onChange={(v) => onChange(v)} root={root} />;
+      return (
+        <ObjectFields schema={s} value={(value as Obj | undefined) ?? {}} onChange={(v) => onChange(v)} root={root} />
+      );
     case "records":
       return <RecordsEditor schema={s} value={value} onChange={onChange} root={root} />;
     case "map":
@@ -282,7 +363,17 @@ function Label({ name, raw, s, required }: { name: string; raw: JsonSchema; s: J
   );
 }
 
-export function ObjectFields({ schema, value, onChange, root }: { schema: JsonSchema; value: Obj; onChange: (v: Obj) => void; root: JsonSchema }) {
+export function ObjectFields({
+  schema,
+  value,
+  onChange,
+  root,
+}: {
+  schema: JsonSchema;
+  value: Obj;
+  onChange: (v: Obj) => void;
+  root: JsonSchema;
+}) {
   const props = schema.properties ?? {};
   const required = new Set(schema.required ?? []);
   const set = (k: string, v: Json) => {
@@ -321,7 +412,17 @@ export function ObjectFields({ schema, value, onChange, root }: { schema: JsonSc
   );
 }
 
-function RecordsEditor({ schema, value, onChange, root }: { schema: JsonSchema; value: Json; onChange: (v: Json) => void; root: JsonSchema }) {
+function RecordsEditor({
+  schema,
+  value,
+  onChange,
+  root,
+}: {
+  schema: JsonSchema;
+  value: Json;
+  onChange: (v: Json) => void;
+  root: JsonSchema;
+}) {
   const item = resolve(unwrapOptional(schema.items!, root).schema, root);
   const rows = Array.isArray(value) ? (value as Obj[]) : [];
   const props = Object.entries(item.properties ?? {}).map(([k, raw]) => {
@@ -362,7 +463,12 @@ function RecordsEditor({ schema, value, onChange, root }: { schema: JsonSchema; 
                     </td>
                   ))}
                   <td>
-                    <button className="icon-btn danger" title="Remove row" aria-label="Remove row" onClick={() => remove(i)}>
+                    <button
+                      className="icon-btn danger"
+                      title="Remove row"
+                      aria-label="Remove row"
+                      onClick={() => remove(i)}
+                    >
                       ×
                     </button>
                   </td>
@@ -402,7 +508,17 @@ function setKey(o: Obj, k: string, v: Json): Obj {
   return next;
 }
 
-function MapEditor({ schema, value, onChange, root }: { schema: JsonSchema; value: Json; onChange: (v: Json) => void; root: JsonSchema }) {
+function MapEditor({
+  schema,
+  value,
+  onChange,
+  root,
+}: {
+  schema: JsonSchema;
+  value: Json;
+  onChange: (v: Json) => void;
+  root: JsonSchema;
+}) {
   const valueSchema = resolve(unwrapOptional(schema.additionalProperties as JsonSchema, root).schema, root);
   // keep row order and allow a key being typed to be empty for a moment
   const [rows, setRows] = useState<[string, Json][]>(() => Object.entries((value as Obj | undefined) ?? {}));
@@ -420,18 +536,41 @@ function MapEditor({ schema, value, onChange, root }: { schema: JsonSchema; valu
         complexValue ? (
           <div className="sf-row" key={i}>
             <div className="sf-row-head">
-              <input style={{ maxWidth: 260 }} placeholder="name *" value={k} onChange={(e) => emit(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))} />
+              <input
+                style={{ maxWidth: 260 }}
+                placeholder="name *"
+                value={k}
+                onChange={(e) => emit(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))}
+              />
               <button className="small danger" onClick={() => emit(rows.filter((_, j) => j !== i))}>
                 Remove
               </button>
             </div>
-            <ValueInput schema={valueSchema} value={v} root={root} onChange={(nv) => emit(rows.map((r, j) => (j === i ? [r[0], nv] : r)))} />
+            <ValueInput
+              schema={valueSchema}
+              value={v}
+              root={root}
+              onChange={(nv) => emit(rows.map((r, j) => (j === i ? [r[0], nv] : r)))}
+            />
           </div>
         ) : (
           <div className="sf-map-row" key={i}>
-            <input placeholder="name *" value={k} onChange={(e) => emit(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))} />
-            <ValueInput schema={valueSchema} value={v} root={root} onChange={(nv) => emit(rows.map((r, j) => (j === i ? [r[0], nv] : r)))} />
-            <button className="icon-btn danger" aria-label="Remove" onClick={() => emit(rows.filter((_, j) => j !== i))}>
+            <input
+              placeholder="name *"
+              value={k}
+              onChange={(e) => emit(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))}
+            />
+            <ValueInput
+              schema={valueSchema}
+              value={v}
+              root={root}
+              onChange={(nv) => emit(rows.map((r, j) => (j === i ? [r[0], nv] : r)))}
+            />
+            <button
+              className="icon-btn danger"
+              aria-label="Remove"
+              onClick={() => emit(rows.filter((_, j) => j !== i))}
+            >
               ×
             </button>
           </div>
@@ -466,7 +605,15 @@ export function prune(v: Json): Json {
   return v;
 }
 
-export function SchemaFields({ schema, value, onChange }: { schema: JsonSchema; value: Obj; onChange: (v: Obj) => void }) {
+export function SchemaFields({
+  schema,
+  value,
+  onChange,
+}: {
+  schema: JsonSchema;
+  value: Obj;
+  onChange: (v: Obj) => void;
+}) {
   return <ObjectFields schema={schema} value={value} onChange={onChange} root={schema} />;
 }
 

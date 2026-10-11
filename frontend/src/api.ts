@@ -103,12 +103,12 @@ async function send<T>(
 }
 
 export const api = {
-  get: <T,>(path: string) => request<T>("GET", path),
-  getAll: <T,>(path: string) => getAll<T>(path),
-  post: <T,>(path: string, body: unknown = {}) => request<T>("POST", path, body),
-  put: <T,>(path: string, body: unknown) => request<T>("PUT", path, body),
-  patch: <T,>(path: string, body: unknown) => request<T>("PATCH", path, body),
-  upload: <T,>(path: string, file: Blob) => request<T>("POST", path, undefined, file),
+  get: <T>(path: string) => request<T>("GET", path),
+  getAll: <T>(path: string) => getAll<T>(path),
+  post: <T>(path: string, body: unknown = {}) => request<T>("POST", path, body),
+  put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
+  patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
+  upload: <T>(path: string, file: Blob) => request<T>("POST", path, undefined, file),
   async download(path: string, filename: string): Promise<void> {
     const token = getToken();
     const res = await fetch(`/api${path}`, {

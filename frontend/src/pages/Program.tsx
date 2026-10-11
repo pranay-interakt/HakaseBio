@@ -31,9 +31,29 @@ import type {
 import { RehearsalView, WhatIf } from "./ProgramPlanning";
 import { ProgramSummaries } from "./ProgramSummaries";
 
-const TABS = ["overview", "studyset", "compounds", "studies", "readiness", "module2", "module4", "whatif", "rehearsal", "access"] as const;
+const TABS = [
+  "overview",
+  "studyset",
+  "compounds",
+  "studies",
+  "readiness",
+  "module2",
+  "module4",
+  "whatif",
+  "rehearsal",
+  "access",
+] as const;
 type Tab = (typeof TABS)[number];
-const ACTIVE = ["proposed", "designed", "planned", "dispatched", "data_received", "analyzed", "reported", "import_draft"];
+const ACTIVE = [
+  "proposed",
+  "designed",
+  "planned",
+  "dispatched",
+  "data_received",
+  "analyzed",
+  "reported",
+  "import_draft",
+];
 
 export function Program({ id, tab, me }: { id: string; tab: string | null; me: Principal }) {
   const [p, setP] = useState<ProgramT | null>(null);
@@ -95,7 +115,9 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
       />
       <ErrorBox error={err} onDismiss={() => setErr(null)} />
       {active === "overview" && <Overview p={p} />}
-      {active === "studyset" && ctx.modality === "peptide" && <PeptideRouting p={p} me={me} reload={load} onErr={setErr} />}
+      {active === "studyset" && ctx.modality === "peptide" && (
+        <PeptideRouting p={p} me={me} reload={load} onErr={setErr} />
+      )}
       {active === "studyset" && <StudySet p={p} onErr={setErr} />}
       {active === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
       {active === "studies" && <Studies p={p} />}
@@ -114,11 +136,16 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
 function Overview({ p }: { p: ProgramT }) {
   const [r, setR] = useState<Readiness | null>(null);
   useEffect(() => {
-    api.get<Readiness>(`/programs/${p.id}/readiness?milestone=before_first_in_human`).then(setR).catch(() => setR(null));
+    api
+      .get<Readiness>(`/programs/${p.id}/readiness?milestone=before_first_in_human`)
+      .then(setR)
+      .catch(() => setR(null));
   }, [p.id]);
   const ctx = p.context;
   const names = requirementNames(p);
-  const active = p.studies.filter((s) => ACTIVE.includes(s.state)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const active = p.studies
+    .filter((s) => ACTIVE.includes(s.state))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const missing = (r?.items ?? []).filter((i) => i.due_for_milestone && i.status === "missing");
   const s = r?.summary;
   return (
@@ -138,7 +165,9 @@ function Overview({ p }: { p: ProgramT }) {
           <div className="stat-l">studies in progress</div>
         </div>
         <div className="stat">
-          <div className="stat-v">{p.studies.filter((x) => x.state === "approved" || x.state === "imported").length}</div>
+          <div className="stat-v">
+            {p.studies.filter((x) => x.state === "approved" || x.state === "imported").length}
+          </div>
           <div className="stat-l">approved or imported</div>
         </div>
         <div className="stat">
@@ -160,11 +189,16 @@ function Overview({ p }: { p: ProgramT }) {
           ]}
         />
       </Section>
-      <Section title="Due before first-in-human, not started" right={<a href={href.program(p.id, "studyset")}>Open study set</a>}>
+      <Section
+        title="Due before first-in-human, not started"
+        right={<a href={href.program(p.id, "studyset")}>Open study set</a>}
+      >
         {r === null ? (
           <Loading />
         ) : missing.length === 0 ? (
-          <Empty title="Nothing outstanding">Every requirement due before first-in-human has a study or an imported report.</Empty>
+          <Empty title="Nothing outstanding">
+            Every requirement due before first-in-human has a study or an imported report.
+          </Empty>
         ) : (
           <div className="table-wrap">
             <table>
@@ -206,7 +240,15 @@ function requirementNames(p: ProgramT): Record<string, string> {
   return Object.fromEntries(p.study_set.requirements.map((r) => [r.id, r.name]));
 }
 
-function StudyTable({ studies, names, compounds }: { studies: StudySummary[]; names: Record<string, string>; compounds: Compound[] }) {
+function StudyTable({
+  studies,
+  names,
+  compounds,
+}: {
+  studies: StudySummary[];
+  names: Record<string, string>;
+  compounds: Compound[];
+}) {
   const cname = Object.fromEntries(compounds.map((c) => [c.id, c.name]));
   return (
     <div className="table-wrap">
@@ -252,7 +294,17 @@ function StudyTable({ studies, names, compounds }: { studies: StudySummary[]; na
 
 /** Peptide facts and their consequences: US classification (21 CFR 600.3(h)(6)) and ICH routing
  * by origin (S6(R1) section 1.3), with the responsible scientist's signed S6(R1) determination. */
-function PeptideRouting({ p, me, reload, onErr }: { p: ProgramT; me: Principal; reload: () => void; onErr: (e: unknown) => void }) {
+function PeptideRouting({
+  p,
+  me,
+  reload,
+  onErr,
+}: {
+  p: ProgramT;
+  me: Principal;
+  reload: () => void;
+  onErr: (e: unknown) => void;
+}) {
   const ctx = p.context as {
     peptide_origin?: string | null;
     amino_acid_chains?: number[];
@@ -266,7 +318,12 @@ function PeptideRouting({ p, me, reload, onErr }: { p: ProgramT; me: Principal; 
   const det = ctx.s6_determination;
   async function sign() {
     try {
-      await api.post(`/programs/${p.id}/determinations`, { key: "s6_principles_apply", applies: applies === "true", rationale, password: pw });
+      await api.post(`/programs/${p.id}/determinations`, {
+        key: "s6_principles_apply",
+        applies: applies === "true",
+        rationale,
+        password: pw,
+      });
       setPw("");
       toast("Determination signed and recorded");
       reload();
@@ -287,7 +344,11 @@ function PeptideRouting({ p, me, reload, onErr }: { p: ProgramT; me: Principal; 
             "US classification",
             cls ? (
               <Pill tone={cls.outcome === "pending" ? "warn" : "ok"}>
-                {cls.outcome === "protein" ? "Protein (biological product)" : cls.outcome === "not_protein" ? "Not a protein" : "Pending"}
+                {cls.outcome === "protein"
+                  ? "Protein (biological product)"
+                  : cls.outcome === "not_protein"
+                    ? "Not a protein"
+                    : "Pending"}
               </Pill>
             ) : (
               "—"
@@ -303,46 +364,58 @@ function PeptideRouting({ p, me, reload, onErr }: { p: ProgramT; me: Principal; 
       )}
       <h4>ICH S6(R1) applicability</h4>
       <div className="small">
-        {ctx.peptide_origin === "recombinant" && "Recombinant expression: within ICH S6(R1) (section 1.3); the S6(R1) study set applies."}
-        {!ctx.peptide_origin && "Origin unknown: the governing guideline depends on it, so the affected studies are conditional."}
+        {ctx.peptide_origin === "recombinant" &&
+          "Recombinant expression: within ICH S6(R1) (section 1.3); the S6(R1) study set applies."}
+        {!ctx.peptide_origin &&
+          "Origin unknown: the governing guideline depends on it, so the affected studies are conditional."}
         {ctx.peptide_origin === "chemical_synthesis" &&
           (det ? (
             <div className="signed">
-              Signed by {det.signature.signer_name} ({roleLabel(det.signature.role)}) on {fmtDate(det.signature.signed_at)}: S6(R1)
-              principles <strong>{det.applies ? "apply" : "do not apply"}</strong>. “{det.rationale}”
+              Signed by {det.signature.signer_name} ({roleLabel(det.signature.role)}) on{" "}
+              {fmtDate(det.signature.signed_at)}: S6(R1) principles{" "}
+              <strong>{det.applies ? "apply" : "do not apply"}</strong>. “{det.rationale}”
             </div>
           ) : (
             <>
-              Chemically synthesised: ICH M3(R2) governs, and S6(R1) principles “may also be applicable” (S6(R1) section 1.3). The
-              species-relevance and anti-drug-antibody items stay conditional until the responsible scientist signs whether they apply.
+              Chemically synthesised: ICH M3(R2) governs, and S6(R1) principles “may also be applicable” (S6(R1) section
+              1.3). The species-relevance and anti-drug-antibody items stay conditional until the responsible scientist
+              signs whether they apply.
             </>
           ))}
       </div>
-      {ctx.peptide_origin === "chemical_synthesis" && !det && me.kind === "human" && me.roles.includes("responsible_scientist") && (
-        <div className="grid2" style={{ marginTop: 10 }}>
-          <label className="field">
-            <span className="field-label">S6(R1) principles *</span>
-            <select value={applies} onChange={(e) => setApplies(e.target.value)}>
-              <option value="">Choose…</option>
-              <option value="true">Apply</option>
-              <option value="false">Do not apply</option>
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">Rationale (the evidence for the judgement) *</span>
-            <input value={rationale} onChange={(e) => setRationale(e.target.value)} />
-          </label>
-          <label className="field">
-            <span className="field-label">Your password (re-authentication) *</span>
-            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
-          </label>
-          <div className="field" style={{ justifyContent: "flex-end" }}>
-            <button className="primary" disabled={!applies || !rationale.trim() || !pw} onClick={sign}>
-              Sign determination
-            </button>
+      {ctx.peptide_origin === "chemical_synthesis" &&
+        !det &&
+        me.kind === "human" &&
+        me.roles.includes("responsible_scientist") && (
+          <div className="grid2" style={{ marginTop: 10 }}>
+            <label className="field">
+              <span className="field-label">S6(R1) principles *</span>
+              <select value={applies} onChange={(e) => setApplies(e.target.value)}>
+                <option value="">Choose…</option>
+                <option value="true">Apply</option>
+                <option value="false">Do not apply</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Rationale (the evidence for the judgement) *</span>
+              <input value={rationale} onChange={(e) => setRationale(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="field-label">Your password (re-authentication) *</span>
+              <input
+                type="password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+            <div className="field" style={{ justifyContent: "flex-end" }}>
+              <button className="primary" disabled={!applies || !rationale.trim() || !pw} onClick={sign}>
+                Sign determination
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </Section>
   );
 }
@@ -363,7 +436,12 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
   })).filter((g) => g.reqs.length > 0);
   async function start(r: Requirement, driverId: string) {
     try {
-      const s = await api.post<Study>("/studies", { program_id: p.id, compound_id: compound, requirement_id: r.id, driver_id: driverId });
+      const s = await api.post<Study>("/studies", {
+        program_id: p.id,
+        compound_id: compound,
+        requirement_id: r.id,
+        driver_id: driverId,
+      });
       toast("Study created");
       go(href.study(s.id));
     } catch (e) {
@@ -387,7 +465,12 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
           <>
             <label className="checks small" style={{ margin: 0 }}>
               <span>
-                <input type="checkbox" checked={showNotRequired} onChange={(e) => setShowNotRequired(e.target.checked)} /> Show not required
+                <input
+                  type="checkbox"
+                  checked={showNotRequired}
+                  onChange={(e) => setShowNotRequired(e.target.checked)}
+                />{" "}
+                Show not required
               </span>
             </label>
             {p.compounds.length > 0 ? (
@@ -431,7 +514,11 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
                         <td>
                           <strong>{r.name}</strong>
                           <div className="muted small">
-                            {[r.species.length > 0 && r.species.join(", "), r.duration_weeks && `${r.duration_weeks} weeks`, r.components.length > 0 && `parts: ${r.components.join(", ")}`]
+                            {[
+                              r.species.length > 0 && r.species.join(", "),
+                              r.duration_weeks && `${r.duration_weeks} weeks`,
+                              r.components.length > 0 && `parts: ${r.components.join(", ")}`,
+                            ]
                               .filter(Boolean)
                               .join(" · ")}
                           </div>
@@ -549,8 +636,16 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
             <Facts
               items={[
                 ["InChIKey", <span className="mono">{c.inchikey}</span>],
-                ["Lipinski rule of five", <Pill tone={c.profile.lipinski_pass ? "ok" : "warn"}>{c.profile.lipinski_pass ? "Pass" : "Fail"}</Pill>],
-                ["Veber rules", <Pill tone={c.profile.veber_pass ? "ok" : "warn"}>{c.profile.veber_pass ? "Pass" : "Fail"}</Pill>],
+                [
+                  "Lipinski rule of five",
+                  <Pill tone={c.profile.lipinski_pass ? "ok" : "warn"}>
+                    {c.profile.lipinski_pass ? "Pass" : "Fail"}
+                  </Pill>,
+                ],
+                [
+                  "Veber rules",
+                  <Pill tone={c.profile.veber_pass ? "ok" : "warn"}>{c.profile.veber_pass ? "Pass" : "Fail"}</Pill>,
+                ],
                 ["Computed with", `RDKit ${c.profile.rdkit_version}`],
               ]}
             />
@@ -576,14 +671,20 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
                   <span className={`tag tag-${r.status}`}>{statusLabel(r.status)}</span>
                   {r.from_cache && <span className="muted small">cached</span>}
                   <span className="muted small">
-                    {[r.attribution, r.license, r.retrieved_at && `retrieved ${fmtDate(r.retrieved_at)}`].filter(Boolean).join(" · ")}
+                    {[r.attribution, r.license, r.retrieved_at && `retrieved ${fmtDate(r.retrieved_at)}`]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </div>
                 {r.error && <div className="muted small">{r.error}</div>}
                 {r.records.slice(0, 1).map((rec, i) => (
                   <div key={i} style={{ marginTop: 6 }}>
                     <ValueView
-                      value={Object.fromEntries(Object.entries(rec).filter(([, v]) => v !== null && typeof v !== "object").slice(0, 12))}
+                      value={Object.fromEntries(
+                        Object.entries(rec)
+                          .filter(([, v]) => v !== null && typeof v !== "object")
+                          .slice(0, 12),
+                      )}
                     />
                   </div>
                 ))}
@@ -605,7 +706,10 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
       )}
       {p.compounds.length === 0 && <Empty title="No compounds yet">Register the test article to start studies.</Empty>}
       {aminoAcid && <SequenceRegistration p={p} reload={reload} onErr={onErr} />}
-      <Section title={aminoAcid ? "Register by structure (SMILES)" : "Register a compound"} subtitle="The structure is profiled with RDKit; every descriptor carries its method and citation.">
+      <Section
+        title={aminoAcid ? "Register by structure (SMILES)" : "Register a compound"}
+        subtitle="The structure is profiled with RDKit; every descriptor carries its method and citation."
+      >
         <div className="grid2">
           <label className="field">
             <span className="field-label">Name *</span>
@@ -633,14 +737,25 @@ function Studies({ p }: { p: ProgramT }) {
   const names = requirementNames(p);
   const rows = p.studies
     .filter((s) =>
-      filter === "all" ? true : filter === "active" ? ACTIVE.includes(s.state) : filter === "done" ? ["approved", "imported"].includes(s.state) : ["cancelled", "failed", "superseded"].includes(s.state),
+      filter === "all"
+        ? true
+        : filter === "active"
+          ? ACTIVE.includes(s.state)
+          : filter === "done"
+            ? ["approved", "imported"].includes(s.state)
+            : ["cancelled", "failed", "superseded"].includes(s.state),
     )
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   return (
     <Section
       title="Studies"
       right={
-        <select style={{ width: "auto" }} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter studies">
+        <select
+          style={{ width: "auto" }}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          aria-label="Filter studies"
+        >
           <option value="all">All studies</option>
           <option value="active">In progress</option>
           <option value="done">Approved or imported</option>
@@ -736,7 +851,9 @@ function ReadinessView({ id }: { id: string }) {
               <tr key={i.requirement_id}>
                 <td>
                   {i.name}
-                  {!i.driver_available && i.status === "missing" && <div className="muted small">no installed driver: import the report</div>}
+                  {!i.driver_available && i.status === "missing" && (
+                    <div className="muted small">no installed driver: import the report</div>
+                  )}
                 </td>
                 <td>
                   <span className={`tag tag-${i.status}`}>{statusLabel(i.status)}</span>
@@ -744,7 +861,9 @@ function ReadinessView({ id }: { id: string }) {
                     <div className="small" style={{ marginTop: 4 }}>
                       {i.components.done.length > 0 && <div>done: {i.components.done.join(", ")}</div>}
                       {i.components.imported.length > 0 && <div>imported: {i.components.imported.join(", ")}</div>}
-                      {i.components.missing.length > 0 && <div className="qc-fail">missing: {i.components.missing.join(", ")}</div>}
+                      {i.components.missing.length > 0 && (
+                        <div className="qc-fail">missing: {i.components.missing.join(", ")}</div>
+                      )}
                     </div>
                   )}
                   {i.pending_fact && <div className="small muted">pending: {i.pending_fact}</div>}
@@ -825,7 +944,11 @@ function Module4({ id }: { id: string }) {
         }
       >
         <ErrorBox error={err} onDismiss={() => setErr(null)} />
-        {!pkg && <Empty title="Not assembled yet">Assembling builds the Module 4 tree, a verification bundle and the FIH dose projection.</Empty>}
+        {!pkg && (
+          <Empty title="Not assembled yet">
+            Assembling builds the Module 4 tree, a verification bundle and the FIH dose projection.
+          </Empty>
+        )}
         {pkg && (
           <>
             <Facts
@@ -835,10 +958,18 @@ function Module4({ id }: { id: string }) {
                 [
                   "Bundle",
                   <span className="row">
-                    <button className="small" onClick={() => api.download(`/files/${pkg.bundle_sha256}`, "module4.zip")}>
+                    <button
+                      className="small"
+                      onClick={() => api.download(`/files/${pkg.bundle_sha256}`, "module4.zip")}
+                    >
                       Download zip
                     </button>
-                    <button className="small" onClick={() => api.get<VerifyResult>(`/files/${pkg.bundle_sha256}/verify`).then(setVerify).catch(setErr)}>
+                    <button
+                      className="small"
+                      onClick={() =>
+                        api.get<VerifyResult>(`/files/${pkg.bundle_sha256}/verify`).then(setVerify).catch(setErr)
+                      }
+                    >
                       Verify (recompute every figure)
                     </button>
                   </span>,
@@ -846,8 +977,8 @@ function Module4({ id }: { id: string }) {
               ]}
             />
             <p className="muted small">
-              Anyone can verify this export offline with <code>hos-verify module4.zip</code>: it re-runs every driver from the raw files and
-              checks every hash, signature and the audit-trail chain.
+              Anyone can verify this export offline with <code>hos-verify module4.zip</code>: it re-runs every driver
+              from the raw files and checks every hash, signature and the audit-trail chain.
             </p>
             {pkg.refused_studies.length > 0 && (
               <div className="error">
@@ -906,7 +1037,9 @@ function Module4({ id }: { id: string }) {
                 {t.reports.map((r) => (
                   <div key={r.study_id} className="small" style={{ marginLeft: 18 }}>
                     ↳ <a href={href.study(r.study_id)}>{r.title}</a>{" "}
-                    <span className="muted">· {r.signatures.map((s) => `${roleLabel(s.role)}: ${s.signer}`).join(", ")}</span>
+                    <span className="muted">
+                      · {r.signatures.map((s) => `${roleLabel(s.role)}: ${s.signer}`).join(", ")}
+                    </span>
                   </div>
                 ))}
               </li>
@@ -963,8 +1096,8 @@ function ProgramAccess({ id, me, onErr }: { id: string; me: Principal; onErr: (e
       title="Access"
       subtitle={
         <>
-          Everyone in <strong>{m.organisation ?? "the default organisation"}</strong> can see this programme. People from other
-          organisations see it only when added here; each change is recorded with its reason.
+          Everyone in <strong>{m.organisation ?? "the default organisation"}</strong> can see this programme. People
+          from other organisations see it only when added here; each change is recorded with its reason.
         </>
       }
     >
@@ -997,7 +1130,13 @@ function ProgramAccess({ id, me, onErr }: { id: string; me: Principal; onErr: (e
                         className="small danger"
                         disabled={!removeReason.trim()}
                         title={removeReason.trim() ? "" : "Enter a reason below first"}
-                        onClick={() => act(() => api.post(`/programs/${id}/members/${g.principal_id}/remove`, { reason: removeReason }), `${g.name} removed`)}
+                        onClick={() =>
+                          act(
+                            () =>
+                              api.post(`/programs/${id}/members/${g.principal_id}/remove`, { reason: removeReason }),
+                            `${g.name} removed`,
+                          )
+                        }
                       >
                         Remove
                       </button>
@@ -1025,14 +1164,20 @@ function ProgramAccess({ id, me, onErr }: { id: string; me: Principal; onErr: (e
             </label>
             <label className="field" style={{ gridColumn: "span 2" }}>
               <span className="field-label">Reason *</span>
-              <input placeholder="e.g. CRO running the Ames study" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <input
+                placeholder="e.g. CRO running the Ames study"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
             </label>
           </div>
           <div className="row-end">
             <button
               className="primary"
               disabled={!pid.trim() || !reason.trim()}
-              onClick={() => act(() => api.post(`/programs/${id}/members`, { principal_id: pid, reason }), `Access given to ${pid}`)}
+              onClick={() =>
+                act(() => api.post(`/programs/${id}/members`, { principal_id: pid, reason }), `Access given to ${pid}`)
+              }
             >
               Give access
             </button>

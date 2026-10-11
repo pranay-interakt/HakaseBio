@@ -59,8 +59,8 @@ export function Programs() {
           guidelines.
           <div style={{ marginTop: 10 }}>
             <a className="btn primary" href={href.newProgram()}>
-            New programme
-          </a>
+              New programme
+            </a>
           </div>
         </Empty>
       )}

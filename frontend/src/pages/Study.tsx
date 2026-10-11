@@ -1,12 +1,30 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
-import { Citations, DataTable, ErrorBox, Lifecycle, Markdown, roleLabel, Section, StateTag } from "../components/common";
+import {
+  Citations,
+  DataTable,
+  ErrorBox,
+  Lifecycle,
+  Markdown,
+  roleLabel,
+  Section,
+  StateTag,
+} from "../components/common";
 import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
 import { prune, SchemaFields, SchemaForm } from "../components/SchemaForm";
 import { SendExport } from "../components/SendExport";
 import { Collapsible, Facts, Loading, PageHeader, Pill, toast, useBreadcrumbs, ValueView } from "../components/ui";
-import { actionLabel, fmtDateTime, humanize, meaningLabel, MEANINGS, shortHash, statusLabel, targetLabel } from "../lib/format";
+import {
+  actionLabel,
+  fmtDateTime,
+  humanize,
+  meaningLabel,
+  MEANINGS,
+  shortHash,
+  statusLabel,
+  targetLabel,
+} from "../lib/format";
 import { href } from "../lib/router";
 import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
 
@@ -42,7 +60,12 @@ export function Study({ id, me }: { id: string; me: Principal }) {
   }, [load]);
   useBreadcrumbs([
     { label: "Programmes", href: href.programs() },
-    ...(s ? [{ label: s.program_name ?? "Programme", href: href.program(s.program_id) }, { label: "Studies", href: href.program(s.program_id, "studies") }] : []),
+    ...(s
+      ? [
+          { label: s.program_name ?? "Programme", href: href.program(s.program_id) },
+          { label: "Studies", href: href.program(s.program_id, "studies") },
+        ]
+      : []),
     { label: s?.title ?? "Study" },
   ]);
 
@@ -95,10 +118,20 @@ export function Study({ id, me }: { id: string; me: Principal }) {
   add("sec-plan", "Plan", s.state === "designed" || s.plan);
   add("sec-dispatch", "Dispatch", s.state === "planned");
   add("sec-execution", "Execution & data", s.execution);
-  add("sec-inputs", "Analysis inputs", s.expected_inputs && Object.keys(s.expected_inputs).length > 0 && !["reported", "approved", "cancelled", "failed"].includes(s.state));
+  add(
+    "sec-inputs",
+    "Analysis inputs",
+    s.expected_inputs &&
+      Object.keys(s.expected_inputs).length > 0 &&
+      !["reported", "approved", "cancelled", "failed"].includes(s.state),
+  );
   add("sec-analyse", "Analyse", ["data_received", "analyzed", "reported"].includes(s.state));
   add("sec-results", "Results", s.results);
-  add("sec-determinations", "Expert determinations", s.expert_determinations && s.expert_determinations.length > 0 && s.results);
+  add(
+    "sec-determinations",
+    "Expert determinations",
+    s.expert_determinations && s.expert_determinations.length > 0 && s.results,
+  );
   add("sec-report", "Report", s.state === "analyzed" || s.report);
   add("sec-send", "SEND export", driver.id === "repeat_dose_toxicity" && s.data);
   add("sec-audit", "Audit trail", true);
@@ -132,22 +165,32 @@ export function Study({ id, me }: { id: string; me: Principal }) {
       <NextStep s={s} />
       {s.simulated && (
         <div className="banner-sim">
-          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be approved or included in an
-          IND.
+          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be
+          approved or included in an IND.
         </div>
       )}
       <ErrorBox error={err} onDismiss={() => setErr(null)} />
       <div className="with-toc">
         <div className="stack">
-          {DESIGNABLE.includes(s.state) && <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />}
+          {DESIGNABLE.includes(s.state) && (
+            <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />
+          )}
           {s.protocol && (
             <ProtocolView protocol={s.protocol} hash={s.protocol_hash} version={s.protocol_version}>
               <ProtocolApproval s={s} me={me} busy={busy} run={run} />
             </ProtocolView>
           )}
           {s.state === "designed" && (
-            <Section id="sec-plan" title="Plan" subtitle="Works out duration, sample size and dependencies from the protocol.">
-              <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/plan`), "Study planned")}>
+            <Section
+              id="sec-plan"
+              title="Plan"
+              subtitle="Works out duration, sample size and dependencies from the protocol."
+            >
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => run(() => api.post(`/studies/${id}/plan`), "Study planned")}
+              >
                 Plan study
               </button>
             </Section>
@@ -155,17 +198,29 @@ export function Study({ id, me }: { id: string; me: Principal }) {
           {s.plan && <PlanView plan={s.plan} />}
           {s.state === "planned" && <DispatchSection s={s} driver={driver} busy={busy} run={run} />}
           {s.execution && <ExecutionView s={s} busy={busy} run={run} />}
-          {s.expected_inputs && Object.keys(s.expected_inputs).length > 0 && !["reported", "approved", "cancelled", "failed"].includes(s.state) && (
-            <InputsSection s={s} busy={busy} run={run} />
+          {s.expected_inputs &&
+            Object.keys(s.expected_inputs).length > 0 &&
+            !["reported", "approved", "cancelled", "failed"].includes(s.state) && (
+              <InputsSection s={s} busy={busy} run={run} />
+            )}
+          {["data_received", "analyzed", "reported"].includes(s.state) && (
+            <AnalyzeSection s={s} busy={busy} run={run} />
           )}
-          {["data_received", "analyzed", "reported"].includes(s.state) && <AnalyzeSection s={s} busy={busy} run={run} />}
           {s.results && <ResultsView s={s} />}
           {s.expert_determinations && s.expert_determinations.length > 0 && s.results && (
             <DeterminationsSection s={s} me={me} busy={busy} run={run} />
           )}
           {s.state === "analyzed" && (
-            <Section id="sec-report" title="Report" subtitle="Renders the protocol, data, results and interpretation, with every value's provenance.">
-              <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/report`), "Report generated")}>
+            <Section
+              id="sec-report"
+              title="Report"
+              subtitle="Renders the protocol, data, results and interpretation, with every value's provenance."
+            >
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => run(() => api.post(`/studies/${id}/report`), "Report generated")}
+              >
                 Generate report
               </button>
             </Section>
@@ -196,10 +251,15 @@ export function Study({ id, me }: { id: string; me: Principal }) {
 
 function NextStep({ s }: { s: StudyT }) {
   const protocolApproved = s.signatures.some(
-    (g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`) && g.subject_hash === s.protocol_hash,
+    (g) =>
+      g.role === "study_director" &&
+      (g.subject_id ?? "").startsWith(`${s.id}/protocol/`) &&
+      g.subject_hash === s.protocol_hash,
   );
   const current = s.determinations.filter((d) => s.results && d.analysis_hash === s.results.analysis_hash);
-  const pendingDets = (s.expert_determinations ?? []).filter((d) => d.required_for_approval && !current.some((x) => x.key === d.key));
+  const pendingDets = (s.expert_determinations ?? []).filter(
+    (d) => d.required_for_approval && !current.some((x) => x.key === d.key),
+  );
   let text: ReactNode = null;
   let target: string | null = null;
   let tone = "";
@@ -284,7 +344,19 @@ function NextStep({ s }: { s: StudyT }) {
 
 // ---- design & protocol ----------------------------------------------------------------------
 
-function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: Driver; amending: boolean; busy: boolean; run: Run }) {
+function DesignSection({
+  s,
+  driver,
+  amending,
+  busy,
+  run,
+}: {
+  s: StudyT;
+  driver: Driver;
+  amending: boolean;
+  busy: boolean;
+  run: Run;
+}) {
   const [reason, setReason] = useState("");
   return (
     <Section
@@ -305,7 +377,10 @@ function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: 
         busy={busy}
         submitLabel={amending ? "Amend protocol" : "Design protocol"}
         onSubmit={(parameters) =>
-          run(() => api.post(`/studies/${s.id}/design`, { parameters, reason: amending ? reason : null }), amending ? "Protocol amended" : "Protocol designed")
+          run(
+            () => api.post(`/studies/${s.id}/design`, { parameters, reason: amending ? reason : null }),
+            amending ? "Protocol amended" : "Protocol designed",
+          )
         }
       />
     </Section>
@@ -317,7 +392,9 @@ function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: 
 function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy: boolean; run: Run }) {
   const [statement, setStatement] = useState("");
   const [pw, setPw] = useState("");
-  const approvals = s.signatures.filter((g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`));
+  const approvals = s.signatures.filter(
+    (g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`),
+  );
   const signedCurrent = approvals.some((g) => g.subject_hash === s.protocol_hash);
   return (
     <div style={{ marginTop: 10 }}>
@@ -335,7 +412,11 @@ function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy
         <div className="grid3" style={{ marginTop: 8, alignItems: "end" }}>
           <label className="field" style={{ gridColumn: "span 2" }}>
             <span className="field-label">Statement of approval *</span>
-            <input value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="I approve this protocol." />
+            <input
+              value={statement}
+              onChange={(e) => setStatement(e.target.value)}
+              placeholder="I approve this protocol."
+            />
           </label>
           <label className="field">
             <span className="field-label">Your password *</span>
@@ -345,7 +426,9 @@ function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy
             <button
               className="primary"
               disabled={busy || !statement || !pw}
-              onClick={() => run(() => api.post(`/studies/${s.id}/protocol/sign`, { statement, password: pw }), "Protocol approved")}
+              onClick={() =>
+                run(() => api.post(`/studies/${s.id}/protocol/sign`, { statement, password: pw }), "Protocol approved")
+              }
             >
               Approve protocol
             </button>
@@ -356,7 +439,17 @@ function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy
   );
 }
 
-function ProtocolView({ protocol, hash, version, children }: { protocol: Record<string, unknown>; hash: string | null; version: number; children?: ReactNode }) {
+function ProtocolView({
+  protocol,
+  hash,
+  version,
+  children,
+}: {
+  protocol: Record<string, unknown>;
+  hash: string | null;
+  version: number;
+  children?: ReactNode;
+}) {
   const p = protocol as {
     title: string;
     objective: string;
@@ -424,7 +517,12 @@ function PlanView({ plan }: { plan: Record<string, unknown> }) {
     <Section id="sec-plan" title="Plan">
       <Facts
         items={[
-          ["Duration", plan.execution_duration_days === null ? "set by the laboratory" : `${String(plan.execution_duration_days)} days`],
+          [
+            "Duration",
+            plan.execution_duration_days === null
+              ? "set by the laboratory"
+              : `${String(plan.execution_duration_days)} days`,
+          ],
           ["Duration basis", String(plan.duration_basis ?? "—")],
           ["Samples / animals", String(plan.sample_count ?? "—")],
           ["Sample basis", String(plan.sample_count_basis ?? "—")],
@@ -449,14 +547,22 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
   const [seed, setSeed] = useState("");
   function dispatch() {
     let target: Record<string, unknown>;
-    if (kind === "external_lab") target = { kind, laboratory: lab, contact: contact || null, quote_reference: quote || null, glp_certified: glp };
+    if (kind === "external_lab")
+      target = { kind, laboratory: lab, contact: contact || null, quote_reference: quote || null, glp_certified: glp };
     else if (kind === "in_house") target = { kind, laboratory: lab, responsible_scientist: scientist };
     else target = { kind, simulation_parameters: prune(sim) ?? {}, seed: seed.trim() === "" ? null : Number(seed) };
-    run(() => api.post(`/studies/${s.id}/dispatch`, { target }), kind === "simulation" ? "Simulation set up" : `Dispatched to ${lab}`);
+    run(
+      () => api.post(`/studies/${s.id}/dispatch`, { target }),
+      kind === "simulation" ? "Simulation set up" : `Dispatched to ${lab}`,
+    );
   }
   const kinds = ["external_lab", "in_house", ...(driver.can_simulate ? ["simulation"] : [])];
   return (
-    <Section id="sec-dispatch" title="Dispatch" subtitle="Where the study is run. The dispatch bundle (protocol, sample manifest, data template) is produced for the laboratory.">
+    <Section
+      id="sec-dispatch"
+      title="Dispatch"
+      subtitle="Where the study is run. The dispatch bundle (protocol, sample manifest, data template) is produced for the laboratory."
+    >
       <div className="checks">
         {kinds.map((k) => (
           <label key={k}>
@@ -482,7 +588,8 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
               </label>
               <label className="checks">
                 <span>
-                  <input type="checkbox" checked={glp} onChange={(e) => setGlp(e.target.checked)} /> GLP-certified facility
+                  <input type="checkbox" checked={glp} onChange={(e) => setGlp(e.target.checked)} /> GLP-certified
+                  facility
                 </span>
               </label>
             </>
@@ -497,7 +604,8 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
       {kind === "simulation" && (
         <div className="stack">
           <div className="banner-sim">
-            Simulation generates data from a model you state. It is labelled SIMULATED everywhere and can never be approved or used as evidence.
+            Simulation generates data from a model you state. It is labelled SIMULATED everywhere and can never be
+            approved or used as evidence.
           </div>
           {driver.simulation_parameters_schema && (
             <div className="sf-group">
@@ -523,7 +631,13 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
 }
 
 function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }) {
-  const ex = s.execution as { target: Record<string, unknown>; target_kind: string; bundle_sha256: string; dispatched_at: string; notes: string[] };
+  const ex = s.execution as {
+    target: Record<string, unknown>;
+    target_kind: string;
+    bundle_sha256: string;
+    dispatched_at: string;
+    notes: string[];
+  };
   const [file, setFile] = useState<File | null>(null);
   const [reason, setReason] = useState("");
   const replacing = s.state !== "dispatched";
@@ -544,7 +658,10 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
     >
       <Facts
         items={[
-          ["Run by", `${targetLabel(ex.target_kind)}${ex.target.laboratory ? `: ${String(ex.target.laboratory)}` : ""}`],
+          [
+            "Run by",
+            `${targetLabel(ex.target_kind)}${ex.target.laboratory ? `: ${String(ex.target.laboratory)}` : ""}`,
+          ],
           ["Dispatched", fmtDateTime(ex.dispatched_at)],
           ["Bundle", <span className="mono">{shortHash(ex.bundle_sha256, 16)}</span>],
         ]}
@@ -564,7 +681,12 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
               <button
                 className="primary"
                 disabled={busy || (replacing && !reason.trim())}
-                onClick={() => run(() => api.post(`/studies/${s.id}/data/simulated`, { reason: replacing ? reason : null }), "Simulated data loaded")}
+                onClick={() =>
+                  run(
+                    () => api.post(`/studies/${s.id}/data/simulated`, { reason: replacing ? reason : null }),
+                    "Simulated data loaded",
+                  )
+                }
               >
                 Load simulated data
               </button>
@@ -671,9 +793,9 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
       {names.length > 0 && (
         <>
           <p className="muted small">
-            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured (name the study or
-            assay), literature (name the source) or user-supplied. A missing input makes the results that depend on it unavailable, never
-            assumed.
+            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured
+            (name the study or assay), literature (name the source) or user-supplied. A missing input makes the results
+            that depend on it unavailable, never assumed.
           </p>
           <div className="table-wrap">
             <table className="sf-table">
@@ -694,7 +816,11 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
                       {recorded(n) && <Pill tone="ok">recorded</Pill>}
                     </td>
                     <td>
-                      <input inputMode="decimal" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                      <input
+                        inputMode="decimal"
+                        value={val(n).value}
+                        onChange={(e) => upd(n, "value", e.target.value)}
+                      />
                     </td>
                     <td>
                       <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
@@ -719,8 +845,9 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
       {selNames.length > 0 && (
         <>
           <p className="muted small">
-            Selections only you can make after seeing the data (for example the start of each profile&apos;s terminal phase; see the
-            candidate table in the results). Each is recorded as user-supplied under your name, and the next analysis uses it.
+            Selections only you can make after seeing the data (for example the start of each profile&apos;s terminal
+            phase; see the candidate table in the results). Each is recorded as user-supplied under your name, and the
+            next analysis uses it.
           </p>
           <div className="table-wrap">
             <table className="sf-table">
@@ -739,7 +866,11 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
                       {humanize(n)} <div className="muted small mono">{n}</div>
                     </td>
                     <td>
-                      <input inputMode="decimal" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                      <input
+                        inputMode="decimal"
+                        value={val(n).value}
+                        onChange={(e) => upd(n, "value", e.target.value)}
+                      />
                     </td>
                     <td>
                       <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
@@ -767,13 +898,26 @@ function AnalyzeSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }
   const [reason, setReason] = useState("");
   const re = s.state !== "data_received";
   return (
-    <Section id="sec-analyse" title={re ? "Re-analyse" : "Analyse"} subtitle={re ? "A new analysis is a new version; the earlier one stays on the record." : undefined}>
+    <Section
+      id="sec-analyse"
+      title={re ? "Re-analyse" : "Analyse"}
+      subtitle={re ? "A new analysis is a new version; the earlier one stays on the record." : undefined}
+    >
       <div className="row">
-        {re && <input style={{ maxWidth: 420 }} placeholder="Reason for re-analysis *" value={reason} onChange={(e) => setReason(e.target.value)} />}
+        {re && (
+          <input
+            style={{ maxWidth: 420 }}
+            placeholder="Reason for re-analysis *"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        )}
         <button
           className="primary"
           disabled={busy || (re && !reason.trim())}
-          onClick={() => run(() => api.post(`/studies/${s.id}/analyze`, { reason: re ? reason : null }), "Analysis complete")}
+          onClick={() =>
+            run(() => api.post(`/studies/${s.id}/analyze`, { reason: re ? reason : null }), "Analysis complete")
+          }
         >
           {re ? "Re-analyse" : "Run analysis"}
         </button>
@@ -792,7 +936,8 @@ function ResultsView({ s }: { s: StudyT }) {
         title="Results"
         subtitle={
           <>
-            Click any value for its derivation. Analysis fingerprint <span className="mono">{shortHash(r.analysis_hash, 16)}</span>
+            Click any value for its derivation. Analysis fingerprint{" "}
+            <span className="mono">{shortHash(r.analysis_hash, 16)}</span>
           </>
         }
         right={<span className={`tag tag-${r.qc.status}`}>QC {statusLabel(r.qc.status)}</span>}
@@ -813,7 +958,10 @@ function ResultsView({ s }: { s: StudyT }) {
         {r.notes.length > 0 && <div className="muted small">{r.notes.join(" · ")}</div>}
       </Section>
       {interp && (
-        <Section title="Interpretation" subtitle="Statements come from cited rules only; judgements are left to the accountable expert.">
+        <Section
+          title="Interpretation"
+          subtitle="Statements come from cited rules only; judgements are left to the accountable expert."
+        >
           {interp.statements.map((st, i) => (
             <div key={i} className={`statement sev-${st.severity}`}>
               <div>{st.statement}</div>
@@ -841,11 +989,18 @@ function ResultsView({ s }: { s: StudyT }) {
 function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: boolean; run: Run }) {
   const specs = s.expert_determinations ?? [];
   const current = s.determinations.filter((d) => s.results && d.analysis_hash === s.results.analysis_hash);
-  const [form, setForm] = useState<Record<string, { value: string; notEstablished: boolean; rationale: string; password: string; reason: string }>>({});
+  const [form, setForm] = useState<
+    Record<string, { value: string; notEstablished: boolean; rationale: string; password: string; reason: string }>
+  >({});
   const f = (k: string) => form[k] ?? { value: "", notEstablished: false, rationale: "", password: "", reason: "" };
-  const upd = (k: string, patch: Partial<ReturnType<typeof f>>) => setForm((o) => ({ ...o, [k]: { ...f(k), ...patch } }));
+  const upd = (k: string, patch: Partial<ReturnType<typeof f>>) =>
+    setForm((o) => ({ ...o, [k]: { ...f(k), ...patch } }));
   return (
-    <Section id="sec-determinations" title="Expert determinations" subtitle="Each is signed by the accountable person; the system never decides these.">
+    <Section
+      id="sec-determinations"
+      title="Expert determinations"
+      subtitle="Each is signed by the accountable person; the system never decides these."
+    >
       {specs.map((d) => {
         const rec = current.find((x) => x.key === d.key);
         const canSign = me.kind === "human" && me.roles.includes(d.role);
@@ -859,8 +1014,8 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
             <div className="muted small">{d.guidance}</div>
             {rec && (
               <div className="signed small">
-                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} (
-                {roleLabel(rec.role)}), {fmtDateTime(rec.signed_at)}. Rationale: {rec.rationale}
+                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} —{" "}
+                {rec.signer_name} ({roleLabel(rec.role)}), {fmtDateTime(rec.signed_at)}. Rationale: {rec.rationale}
               </div>
             )}
             {s.state === "analyzed" && canSign && (
@@ -886,15 +1041,24 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
                     />
                     <span className="checks small" style={{ margin: 0 }}>
                       <label>
-                        <input type="checkbox" checked={f(d.key).notEstablished} onChange={(e) => upd(d.key, { notEstablished: e.target.checked })} /> Not
-                        established
+                        <input
+                          type="checkbox"
+                          checked={f(d.key).notEstablished}
+                          onChange={(e) => upd(d.key, { notEstablished: e.target.checked })}
+                        />{" "}
+                        Not established
                       </label>
                     </span>
                   </label>
                 )}
                 <label className="field">
                   <span className="field-label">Rationale *</span>
-                  <textarea className="prose" rows={2} value={f(d.key).rationale} onChange={(e) => upd(d.key, { rationale: e.target.value })} />
+                  <textarea
+                    className="prose"
+                    rows={2}
+                    value={f(d.key).rationale}
+                    onChange={(e) => upd(d.key, { rationale: e.target.value })}
+                  />
                 </label>
                 {rec && (
                   <label className="field">
@@ -904,7 +1068,12 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
                 )}
                 <label className="field">
                   <span className="field-label">Your password *</span>
-                  <input type="password" value={f(d.key).password} onChange={(e) => upd(d.key, { password: e.target.value })} autoComplete="current-password" />
+                  <input
+                    type="password"
+                    value={f(d.key).password}
+                    onChange={(e) => upd(d.key, { password: e.target.value })}
+                    autoComplete="current-password"
+                  />
                 </label>
                 <div className="field" style={{ justifyContent: "flex-end" }}>
                   <button
@@ -931,7 +1100,9 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
                 </div>
               </div>
             )}
-            {s.state === "analyzed" && !canSign && !rec && <div className="muted small">Awaiting the {roleLabel(d.role)}.</div>}
+            {s.state === "analyzed" && !canSign && !rec && (
+              <div className="muted small">Awaiting the {roleLabel(d.role)}.</div>
+            )}
           </div>
         );
       })}
@@ -965,7 +1136,8 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
       {current.length === 0 && <p className="muted small">None yet.</p>}
       {current.map((g, i) => (
         <div key={i} className="signed small">
-          <strong>{g.signer_name}</strong> — {roleLabel(g.role)} ({meaningLabel(g.meaning).toLowerCase()}), {fmtDateTime(g.signed_at)}: “{g.statement}”
+          <strong>{g.signer_name}</strong> — {roleLabel(g.role)} ({meaningLabel(g.meaning).toLowerCase()}),{" "}
+          {fmtDateTime(g.signed_at)}: “{g.statement}”
         </div>
       ))}
       {s.state === "reported" && me.kind === "human" && (
@@ -994,17 +1166,31 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
             </label>
             <label className="field">
               <span className="field-label">Statement *</span>
-              <input value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="I approve this report as an accurate account." />
+              <input
+                value={statement}
+                onChange={(e) => setStatement(e.target.value)}
+                placeholder="I approve this report as an accurate account."
+              />
             </label>
             <label className="field">
               <span className="field-label">Your password *</span>
-              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+              <input
+                type="password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                autoComplete="current-password"
+              />
             </label>
           </div>
           <div className="row-end">
             <button
               disabled={busy || !statement || !pw}
-              onClick={() => run(() => api.post(`/studies/${s.id}/sign`, { role, meaning, statement, password: pw }), "Report signed")}
+              onClick={() =>
+                run(
+                  () => api.post(`/studies/${s.id}/sign`, { role, meaning, statement, password: pw }),
+                  "Report signed",
+                )
+              }
             >
               Sign report
             </button>
@@ -1016,7 +1202,13 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
             <p className="small">Still required before approval: {s.approval_missing.join(", ")}</p>
           ) : (
             <div className="row">
-              <input style={{ maxWidth: 260 }} type="password" placeholder="Your password *" value={apw} onChange={(e) => setApw(e.target.value)} />
+              <input
+                style={{ maxWidth: 260 }}
+                type="password"
+                placeholder="Your password *"
+                value={apw}
+                onChange={(e) => setApw(e.target.value)}
+              />
               <button
                 className="primary"
                 disabled={busy || !apw}
@@ -1074,8 +1266,17 @@ function CancelSection({ id, run }: { id: string; run: Run }) {
     <Collapsible title="Cancel this study" defaultOpen={false}>
       <p className="muted small">Cancelling ends the study. Everything recorded so far is kept unchanged.</p>
       <div className="row">
-        <input style={{ maxWidth: 420 }} placeholder="Reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
-        <button className="danger" disabled={!reason.trim()} onClick={() => run(() => api.post(`/studies/${id}/cancel`, { reason }), "Study cancelled")}>
+        <input
+          style={{ maxWidth: 420 }}
+          placeholder="Reason *"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+        <button
+          className="danger"
+          disabled={!reason.trim()}
+          onClick={() => run(() => api.post(`/studies/${id}/cancel`, { reason }), "Study cancelled")}
+        >
           Cancel study
         </button>
       </div>

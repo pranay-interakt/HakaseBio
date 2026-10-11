@@ -39,9 +39,7 @@ export function App() {
   const [checked, setChecked] = useState(false);
   const [crumbs, setCrumbs] = useState<{ hash: string; crumbs: Crumb[] } | null>(null);
   // "failed" only when the server reports a broken hash chain; any other error is "unavailable"
-  const [ledger, setLedger] = useState<{ status: "verified" | "failed" | "unavailable"; entries: number } | null>(
-    null,
-  );
+  const [ledger, setLedger] = useState<{ status: "verified" | "failed" | "unavailable"; entries: number } | null>(null);
   const setPageCrumbs = useCallback((c: { hash: string; crumbs: Crumb[] }) => setCrumbs(c), []);
 
   useEffect(() => {
@@ -140,7 +138,9 @@ export function App() {
         <Breadcrumbs crumbs={shown} />
         {ledger && (
           <span
-            className={ledger.status === "verified" ? "ledger ok" : ledger.status === "failed" ? "ledger bad" : "ledger"}
+            className={
+              ledger.status === "verified" ? "ledger ok" : ledger.status === "failed" ? "ledger bad" : "ledger"
+            }
             title="Every change is recorded in a hash-chained audit trail, checked against the stored records"
           >
             {ledger.status === "verified"

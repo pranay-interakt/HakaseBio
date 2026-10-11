@@ -16,7 +16,11 @@ import { QuantityView } from "./QuantityView";
 
 const ROLES: SequenceChain["role"][] = ["peptide", "heavy_chain", "light_chain", "other"];
 
-export function SequenceRegistration({ p, reload, onErr }: {
+export function SequenceRegistration({
+  p,
+  reload,
+  onErr,
+}: {
   p: Program;
   reload: () => void;
   onErr: (e: unknown) => void;
@@ -57,13 +61,19 @@ export function SequenceRegistration({ p, reload, onErr }: {
   }
   async function checkHelm() {
     try {
-      const r = await api.post<{ structure: { polymers: { id: string; monomers: number }[]; warnings: string[] } | null; errors: string[] }>(
-        "/sequence/helm",
-        { text: helm },
-      );
+      const r = await api.post<{
+        structure: { polymers: { id: string; monomers: number }[]; warnings: string[] } | null;
+        errors: string[];
+      }>("/sequence/helm", { text: helm });
       setHelmCheck(
         r.structure
-          ? { ok: true, lines: [r.structure.polymers.map((x) => `${x.id}: ${x.monomers} monomers`).join("; "), ...r.structure.warnings] }
+          ? {
+              ok: true,
+              lines: [
+                r.structure.polymers.map((x) => `${x.id}: ${x.monomers} monomers`).join("; "),
+                ...r.structure.warnings,
+              ],
+            }
           : { ok: false, lines: r.errors },
       );
     } catch (e) {
@@ -115,7 +125,12 @@ export function SequenceRegistration({ p, reload, onErr }: {
         <>
           <label className="field">
             <span className="field-label">FASTA (one record per chain; upper-case one-letter codes)</span>
-            <textarea rows={5} value={fasta} onChange={(e) => setFasta(e.target.value)} placeholder={antibody ? ">heavy chain\nQVQL...\n>light chain\nDIQM..." : ">peptide\nHAEG..."} />
+            <textarea
+              rows={5}
+              value={fasta}
+              onChange={(e) => setFasta(e.target.value)}
+              placeholder={antibody ? ">heavy chain\nQVQL...\n>light chain\nDIQM..." : ">peptide\nHAEG..."}
+            />
           </label>
           <button onClick={parse} disabled={!fasta.trim()}>
             Read chains
@@ -146,14 +161,23 @@ export function SequenceRegistration({ p, reload, onErr }: {
                       <input value={c.name} onChange={(e) => putChain(i, { ...c, name: e.target.value })} />
                     </td>
                     <td>
-                      <select value={c.role} onChange={(e) => putChain(i, { ...c, role: e.target.value as SequenceChain["role"] })}>
+                      <select
+                        value={c.role}
+                        onChange={(e) => putChain(i, { ...c, role: e.target.value as SequenceChain["role"] })}
+                      >
                         {ROLES.map((r) => (
                           <option key={r}>{r}</option>
                         ))}
                       </select>
                     </td>
                     <td>
-                      <input type="number" min="1" step="1" value={c.copies} onChange={(e) => putChain(i, { ...c, copies: Number(e.target.value) })} />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={c.copies}
+                        onChange={(e) => putChain(i, { ...c, copies: Number(e.target.value) })}
+                      />
                     </td>
                     <td>{c.sequence.length}</td>
                   </tr>
@@ -168,21 +192,58 @@ export function SequenceRegistration({ p, reload, onErr }: {
           </p>
           {mutations.map((m, i) => (
             <div className="row" key={i} style={{ marginBottom: 4 }}>
-              <select style={{ width: 140 }} value={m.chain} onChange={(e) => putMut(i, { ...m, chain: e.target.value })}>
+              <select
+                style={{ width: 140 }}
+                value={m.chain}
+                onChange={(e) => putMut(i, { ...m, chain: e.target.value })}
+              >
                 <option value="">chain…</option>
                 {chains.map((c) => (
                   <option key={c.name}>{c.name}</option>
                 ))}
               </select>
-              <input style={{ width: 80 }} type="number" min="1" placeholder="position" value={m.position || ""} onChange={(e) => putMut(i, { ...m, position: Number(e.target.value) })} />
-              <input style={{ width: 60 }} maxLength={1} placeholder="from" value={m.from_residue} onChange={(e) => putMut(i, { ...m, from_residue: e.target.value.toUpperCase() })} />
-              <input style={{ width: 60 }} maxLength={1} placeholder="to" value={m.to_residue} onChange={(e) => putMut(i, { ...m, to_residue: e.target.value.toUpperCase() })} />
-              <input style={{ flex: 1 }} placeholder="purpose *" value={m.purpose} onChange={(e) => putMut(i, { ...m, purpose: e.target.value })} />
-              <input style={{ width: 160 }} placeholder="label (optional)" value={m.label ?? ""} onChange={(e) => putMut(i, { ...m, label: e.target.value || null })} />
+              <input
+                style={{ width: 80 }}
+                type="number"
+                min="1"
+                placeholder="position"
+                value={m.position || ""}
+                onChange={(e) => putMut(i, { ...m, position: Number(e.target.value) })}
+              />
+              <input
+                style={{ width: 60 }}
+                maxLength={1}
+                placeholder="from"
+                value={m.from_residue}
+                onChange={(e) => putMut(i, { ...m, from_residue: e.target.value.toUpperCase() })}
+              />
+              <input
+                style={{ width: 60 }}
+                maxLength={1}
+                placeholder="to"
+                value={m.to_residue}
+                onChange={(e) => putMut(i, { ...m, to_residue: e.target.value.toUpperCase() })}
+              />
+              <input
+                style={{ flex: 1 }}
+                placeholder="purpose *"
+                value={m.purpose}
+                onChange={(e) => putMut(i, { ...m, purpose: e.target.value })}
+              />
+              <input
+                style={{ width: 160 }}
+                placeholder="label (optional)"
+                value={m.label ?? ""}
+                onChange={(e) => putMut(i, { ...m, label: e.target.value || null })}
+              />
               <button onClick={() => setMutations(mutations.filter((_, j) => j !== i))}>Remove</button>
             </div>
           ))}
-          <button onClick={() => setMutations([...mutations, { chain: "", position: 0, from_residue: "", to_residue: "", purpose: "" }])}>
+          <button
+            onClick={() =>
+              setMutations([...mutations, { chain: "", position: 0, from_residue: "", to_residue: "", purpose: "" }])
+            }
+          >
             Add mutation
           </button>
         </>
@@ -190,7 +251,12 @@ export function SequenceRegistration({ p, reload, onErr }: {
         <>
           <label className="field">
             <span className="field-label">HELM string</span>
-            <textarea rows={3} value={helm} onChange={(e) => setHelm(e.target.value)} placeholder="PEPTIDE1{H.[Aib].E.G}$$$$" />
+            <textarea
+              rows={3}
+              value={helm}
+              onChange={(e) => setHelm(e.target.value)}
+              placeholder="PEPTIDE1{H.[Aib].E.G}$$$$"
+            />
           </label>
           <button onClick={checkHelm} disabled={!helm.trim()}>
             Check HELM
@@ -248,7 +314,11 @@ export function SequenceRegistration({ p, reload, onErr }: {
         {surrogate && (
           <label className="field">
             <span className="field-label">Why a surrogate *</span>
-            <input value={rationale} onChange={(e) => setRationale(e.target.value)} placeholder="e.g. the candidate does not bind the rat target" />
+            <input
+              value={rationale}
+              onChange={(e) => setRationale(e.target.value)}
+              placeholder="e.g. the candidate does not bind the rat target"
+            />
           </label>
         )}
       </div>
@@ -259,7 +329,12 @@ export function SequenceRegistration({ p, reload, onErr }: {
   );
 }
 
-export function SequenceEntityView({ c, p, reload, onErr }: {
+export function SequenceEntityView({
+  c,
+  p,
+  reload,
+  onErr,
+}: {
   c: Compound;
   p: Program;
   reload: () => void;
@@ -288,7 +363,8 @@ export function SequenceEntityView({ c, p, reload, onErr }: {
         fingerprint <code>{e.fingerprint.slice(0, 12)}</code>
         {target && (
           <>
-            {" "}· <strong>surrogate for {target.name}</strong>: {s.surrogate_rationale}
+            {" "}
+            · <strong>surrogate for {target.name}</strong>: {s.surrogate_rationale}
           </>
         )}
       </div>
@@ -320,8 +396,9 @@ export function SequenceEntityView({ c, p, reload, onErr }: {
       )}
       {d.helm && (
         <div className="small">
-          HELM {d.helm.version ?? "1.x"}: {d.helm.polymers.map((x) => `${x.id} (${x.monomers} monomers)`).join(", ")}; {d.helm.connections}{" "}
-          connections; monomers {d.helm.monomer_ids.join(", ")}; library {s.monomer_library?.name} {s.monomer_library?.version}
+          HELM {d.helm.version ?? "1.x"}: {d.helm.polymers.map((x) => `${x.id} (${x.monomers} monomers)`).join(", ")};{" "}
+          {d.helm.connections} connections; monomers {d.helm.monomer_ids.join(", ")}; library {s.monomer_library?.name}{" "}
+          {s.monomer_library?.version}
         </div>
       )}
       <div className="small">
@@ -351,7 +428,12 @@ export function SequenceEntityView({ c, p, reload, onErr }: {
               <span className="muted">These chain lengths are the programme's classification facts.</span>
             ) : (
               <div className="row">
-                <input style={{ flex: 1 }} placeholder="reason (to use these chains for the programme's classification) *" value={reason} onChange={(ev) => setReason(ev.target.value)} />
+                <input
+                  style={{ flex: 1 }}
+                  placeholder="reason (to use these chains for the programme's classification) *"
+                  value={reason}
+                  onChange={(ev) => setReason(ev.target.value)}
+                />
                 <button disabled={!reason.trim()} onClick={useForClassification}>
                   Use for 21 CFR 600.3(h)(6)
                 </button>

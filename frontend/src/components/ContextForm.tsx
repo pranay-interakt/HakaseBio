@@ -88,7 +88,15 @@ function Options({ map }: { map: Record<string, string> }) {
   );
 }
 
-export function ContextForm({ value, onChange, compareTo }: { value: Ctx; onChange: (c: Ctx) => void; compareTo?: Ctx }) {
+export function ContextForm({
+  value,
+  onChange,
+  compareTo,
+}: {
+  value: Ctx;
+  onChange: (c: Ctx) => void;
+  compareTo?: Ctx;
+}) {
   const set = (k: string, v: unknown) => onChange({ ...value, [k]: v });
   const changed = (k: string) => compareTo !== undefined && !same(value[k], compareTo[k]);
   const modality = String(value.modality);
@@ -140,11 +148,21 @@ export function ContextForm({ value, onChange, compareTo }: { value: Ctx; onChan
           help="MEC above 1000 L/mol/cm between 290 and 700 nm; decides phototoxicity testing"
           changed={changed("molar_extinction_coefficient_ge_1000")}
         >
-          <Tri value={value.molar_extinction_coefficient_ge_1000} onChange={(v) => set("molar_extinction_coefficient_ge_1000", v)} />
+          <Tri
+            value={value.molar_extinction_coefficient_ge_1000}
+            onChange={(v) => set("molar_extinction_coefficient_ge_1000", v)}
+          />
         </Field>
         {modality === "peptide" && (
-          <Field label="Peptide origin" help="ICH S6(R1) section 1.3 scopes peptides by origin" changed={changed("peptide_origin")}>
-            <select value={String(value.peptide_origin ?? "")} onChange={(e) => set("peptide_origin", e.target.value || null)}>
+          <Field
+            label="Peptide origin"
+            help="ICH S6(R1) section 1.3 scopes peptides by origin"
+            changed={changed("peptide_origin")}
+          >
+            <select
+              value={String(value.peptide_origin ?? "")}
+              onChange={(e) => set("peptide_origin", e.target.value || null)}
+            >
               <option value="">Unknown</option>
               <option value="chemical_synthesis">Chemical synthesis</option>
               <option value="recombinant">Recombinant expression</option>

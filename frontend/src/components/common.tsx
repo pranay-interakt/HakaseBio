@@ -121,7 +121,11 @@ export function Section({
   );
 }
 
-export function Citations({ list }: { list: { key: string; text: string; doi?: string | null; url?: string | null }[] }) {
+export function Citations({
+  list,
+}: {
+  list: { key: string; text: string; doi?: string | null; url?: string | null }[];
+}) {
   return (
     <ul className="cites">
       {list.map((c) => (

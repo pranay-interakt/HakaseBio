@@ -52,7 +52,9 @@ export function Users({ me }: { me: Principal }) {
   };
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase();
-    return (users ?? []).filter((u) => !n || `${u.name} ${u.id} ${u.organisation ?? ""} ${u.roles.join(" ")}`.toLowerCase().includes(n));
+    return (users ?? []).filter(
+      (u) => !n || `${u.name} ${u.id} ${u.organisation ?? ""} ${u.roles.join(" ")}`.toLowerCase().includes(n),
+    );
   }, [users, q]);
   return (
     <div className="page">
@@ -68,8 +70,16 @@ export function Users({ me }: { me: Principal }) {
       <NewUser me={me} act={act} />
       <section className="card">
         <div className="card-head">
-          <input style={{ maxWidth: 320 }} placeholder="Search users" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" />
-          <span className="muted small">A deactivated user can neither sign in nor sign; their earlier signatures stay valid.</span>
+          <input
+            style={{ maxWidth: 320 }}
+            placeholder="Search users"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Search users"
+          />
+          <span className="muted small">
+            A deactivated user can neither sign in nor sign; their earlier signatures stay valid.
+          </span>
         </div>
         {users === null ? (
           <Loading />
@@ -99,7 +109,13 @@ export function Users({ me }: { me: Principal }) {
                       <td className="small">{u.roles.map(roleLabel).join(", ")}</td>
                       <td>
                         <span className="tag-group">
-                          {!u.active ? <Pill tone="bad">Deactivated</Pill> : u.locked ? <Pill tone="warn">Locked</Pill> : <Pill tone="ok">Active</Pill>}
+                          {!u.active ? (
+                            <Pill tone="bad">Deactivated</Pill>
+                          ) : u.locked ? (
+                            <Pill tone="warn">Locked</Pill>
+                          ) : (
+                            <Pill tone="ok">Active</Pill>
+                          )}
                           {u.must_change_password && <Pill tone="warn">Must change password</Pill>}
                         </span>
                       </td>
@@ -132,7 +148,11 @@ function RolePicker({ roles, setRoles, human }: { roles: string[]; setRoles: (r:
     <div className="checks">
       {ROLES.filter((r) => human || !ATTESTORS.includes(r)).map((r) => (
         <label key={r}>
-          <input type="checkbox" checked={roles.includes(r)} onChange={(e) => setRoles(e.target.checked ? [...roles, r] : roles.filter((x) => x !== r))} />
+          <input
+            type="checkbox"
+            checked={roles.includes(r)}
+            onChange={(e) => setRoles(e.target.checked ? [...roles, r] : roles.filter((x) => x !== r))}
+          />
           {roleLabel(r)}
         </label>
       ))}
@@ -150,7 +170,15 @@ function NewUser({ me, act }: { me: Principal; act: Act }) {
   const platform = me.organisation === null || me.organisation === undefined;
   async function add() {
     const ok = await act(
-      () => api.post("/principals", { principal_id: id, name, kind, roles, password: kind === "human" ? pw : null, organisation: org.trim() || null }),
+      () =>
+        api.post("/principals", {
+          principal_id: id,
+          name,
+          kind,
+          roles,
+          password: kind === "human" ? pw : null,
+          organisation: org.trim() || null,
+        }),
       `${name} added`,
     );
     if (ok) {
@@ -196,9 +224,17 @@ function NewUser({ me, act }: { me: Principal; act: Act }) {
         Roles
       </div>
       <RolePicker roles={roles} setRoles={setRoles} human={kind === "human"} />
-      {kind !== "human" && <div className="muted small">Signature roles (Study Director, QA, Attending Veterinarian, QP) can only be held by people.</div>}
+      {kind !== "human" && (
+        <div className="muted small">
+          Signature roles (Study Director, QA, Attending Veterinarian, QP) can only be held by people.
+        </div>
+      )}
       <div className="row-end">
-        <button className="primary" disabled={!id.trim() || !name.trim() || (kind === "human" && pw.length < 12)} onClick={add}>
+        <button
+          className="primary"
+          disabled={!id.trim() || !name.trim() || (kind === "human" && pw.length < 12)}
+          onClick={add}
+        >
           Add
         </button>
       </div>
@@ -227,20 +263,34 @@ function ManageUser({ u, me, act }: { u: UserRow; me: Principal; act: Act }) {
         <RolePicker roles={roles} setRoles={setRoles} human={u.kind === "human"} />
       </div>
       <div className="row">
-        <button disabled={!reason.trim()} onClick={() => act(() => api.post(`/principals/${u.id}/roles`, { roles, reason }), "Roles changed")}>
+        <button
+          disabled={!reason.trim()}
+          onClick={() => act(() => api.post(`/principals/${u.id}/roles`, { roles, reason }), "Roles changed")}
+        >
           Save roles
         </button>
         {u.active ? (
-          <button className="danger" disabled={!reason.trim() || self} title={self ? "You cannot deactivate yourself" : ""} onClick={() => act(() => api.post(`/principals/${u.id}/deactivate`, r), `${u.name} deactivated`)}>
+          <button
+            className="danger"
+            disabled={!reason.trim() || self}
+            title={self ? "You cannot deactivate yourself" : ""}
+            onClick={() => act(() => api.post(`/principals/${u.id}/deactivate`, r), `${u.name} deactivated`)}
+          >
             Deactivate
           </button>
         ) : (
-          <button disabled={!reason.trim()} onClick={() => act(() => api.post(`/principals/${u.id}/reactivate`, r), `${u.name} reactivated`)}>
+          <button
+            disabled={!reason.trim()}
+            onClick={() => act(() => api.post(`/principals/${u.id}/reactivate`, r), `${u.name} reactivated`)}
+          >
             Reactivate
           </button>
         )}
         {u.locked && (
-          <button disabled={!reason.trim()} onClick={() => act(() => api.post(`/principals/${u.id}/unlock`, r), `${u.name} unlocked`)}>
+          <button
+            disabled={!reason.trim()}
+            onClick={() => act(() => api.post(`/principals/${u.id}/unlock`, r), `${u.name} unlocked`)}
+          >
             Unlock
           </button>
         )}
@@ -257,7 +307,12 @@ function ManageUser({ u, me, act }: { u: UserRow; me: Principal; act: Act }) {
           />
           <button
             disabled={!reason.trim() || temp.length < 12}
-            onClick={() => act(() => api.post(`/principals/${u.id}/reset-password`, { new_password: temp, reason }), "Temporary password set; it must be changed at next sign-in").then(() => setTemp(""))}
+            onClick={() =>
+              act(
+                () => api.post(`/principals/${u.id}/reset-password`, { new_password: temp, reason }),
+                "Temporary password set; it must be changed at next sign-in",
+              ).then(() => setTemp(""))
+            }
           >
             Reset password
           </button>
@@ -303,11 +358,19 @@ export function ChangePassword({ forced, onDone }: { forced: boolean; onDone: ()
     }
   }
   return (
-    <Section title="Change password" subtitle={forced ? "Your password was reset by an administrator. Choose a new one to continue." : undefined}>
+    <Section
+      title="Change password"
+      subtitle={forced ? "Your password was reset by an administrator. Choose a new one to continue." : undefined}
+    >
       <div className="stack" style={{ maxWidth: 420 }}>
         <label className="field">
           <span className="field-label">Current password</span>
-          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
+          <input
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            autoComplete="current-password"
+          />
         </label>
         <label className="field">
           <span className="field-label">New password (12+ characters)</span>

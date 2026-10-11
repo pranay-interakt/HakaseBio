@@ -24,7 +24,14 @@ const paramLabel = (path: string) =>
     .split(".")
     .map((x) => (/^\d+$/.test(x) ? `#${Number(x) + 1}` : fieldLabel(x)))
     .join(" › ");
-const show = (v: unknown) => (v === null || v === undefined ? "—" : Array.isArray(v) ? v.join(", ") : typeof v === "string" ? humanize(v) : String(v));
+const show = (v: unknown) =>
+  v === null || v === undefined
+    ? "—"
+    : Array.isArray(v)
+      ? v.join(", ")
+      : typeof v === "string"
+        ? humanize(v)
+        : String(v);
 // a lengthened or shortened study changes its duration, which the engine states in weeks
 const withUnit = (change: string, v: unknown) =>
   (change === "lengthened" || change === "shortened") && typeof v === "number" ? `${v} weeks` : show(v);
@@ -134,7 +141,9 @@ export function WhatIf({ p, reload }: { p: Program; reload: () => void }) {
                   <tr key={i}>
                     <td>{c.name}</td>
                     <td>
-                      <Pill tone={c.change === "added" ? "warn" : c.change === "removed" ? "neutral" : "accent"}>{humanize(c.change)}</Pill>
+                      <Pill tone={c.change === "added" ? "warn" : c.change === "removed" ? "neutral" : "accent"}>
+                        {humanize(c.change)}
+                      </Pill>
                     </td>
                     <td className="small">{withUnit(c.change, c.before)}</td>
                     <td className="small">{withUnit(c.change, c.after)}</td>
@@ -152,7 +161,11 @@ export function WhatIf({ p, reload }: { p: Program; reload: () => void }) {
           <div className="grid2" style={{ marginTop: 12, alignItems: "end" }}>
             <label className="field">
               <span className="field-label">Reason for the change *</span>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. phase 1 extended to 28 days" />
+              <input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. phase 1 extended to 28 days"
+              />
             </label>
             <div className="field">
               <button className="primary" disabled={!reason.trim() || busy} onClick={apply}>
@@ -188,7 +201,12 @@ interface Rehearsal {
     by_outcome: Record<string, number>;
     missing_drivers: string[];
     unassigned_determinations: { requirement_id: string; determination: string; role: string }[];
-    critical_path: { requirements: string[]; known_duration_days: number; unknown_durations_on_path: string[]; note: string };
+    critical_path: {
+      requirements: string[];
+      known_duration_days: number;
+      unknown_durations_on_path: string[];
+      note: string;
+    };
   };
 }
 
@@ -227,12 +245,21 @@ function loadDriver(id: string): Promise<Driver> {
 
 /** Run every runnable study with simulated data and the parameters stated here; nothing is saved. */
 export function RehearsalView({ p }: { p: Program }) {
-  const runnable = p.study_set.requirements.filter((r) => r.status === "required" && (p.drivers?.[r.id] ?? []).length > 0);
+  const runnable = p.study_set.requirements.filter(
+    (r) => r.status === "required" && (p.drivers?.[r.id] ?? []).length > 0,
+  );
   const [plan, setPlan] = useState<Record<string, Entry>>(() =>
     Object.fromEntries(
       runnable.map((r) => [
         r.id,
-        { include: true, driverId: p.drivers[r.id][0].id, parameters: {}, simulation: {}, seed: "", inputs: [] } as Entry,
+        {
+          include: true,
+          driverId: p.drivers[r.id][0].id,
+          parameters: {},
+          simulation: {},
+          seed: "",
+          inputs: [],
+        } as Entry,
       ]),
     ),
   );
@@ -299,7 +326,11 @@ export function RehearsalView({ p }: { p: Program }) {
               <div className="sf-row" key={r.id}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <label className="row" style={{ gap: 8 }}>
-                    <input type="checkbox" checked={e.include} onChange={(ev) => upd(r.id, { include: ev.target.checked })} />
+                    <input
+                      type="checkbox"
+                      checked={e.include}
+                      onChange={(ev) => upd(r.id, { include: ev.target.checked })}
+                    />
                     <strong>{r.name}</strong>
                   </label>
                   <span className="row">
@@ -309,8 +340,14 @@ export function RehearsalView({ p }: { p: Program }) {
                     </button>
                   </span>
                 </div>
-                {o?.detail && <div className="muted small" style={{ marginTop: 4 }}>{o.detail}</div>}
-                {isOpen && <RehearsalEntry p={p} rid={r.id} entry={e} item={o} onChange={(patch) => upd(r.id, patch)} />}
+                {o?.detail && (
+                  <div className="muted small" style={{ marginTop: 4 }}>
+                    {o.detail}
+                  </div>
+                )}
+                {isOpen && (
+                  <RehearsalEntry p={p} rid={r.id} entry={e} item={o} onChange={(patch) => upd(r.id, patch)} />
+                )}
               </div>
             );
           })}
@@ -347,7 +384,10 @@ function RehearsalEntry({
       {choices.length > 1 && (
         <label className="field" style={{ maxWidth: 360 }}>
           <span className="field-label">Driver</span>
-          <select value={entry.driverId} onChange={(e) => onChange({ driverId: e.target.value, parameters: {}, simulation: {} })}>
+          <select
+            value={entry.driverId}
+            onChange={(e) => onChange({ driverId: e.target.value, parameters: {}, simulation: {} })}
+          >
             {choices.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -370,7 +410,11 @@ function RehearsalEntry({
                 Still missing or invalid: {item.missing_parameters.map(paramLabel).join(", ")}
               </div>
             )}
-            <SchemaFields schema={driver.parameters_schema} value={entry.parameters} onChange={(v) => onChange({ parameters: v })} />
+            <SchemaFields
+              schema={driver.parameters_schema}
+              value={entry.parameters}
+              onChange={(v) => onChange({ parameters: v })}
+            />
           </div>
           {driver.simulation_parameters_schema ? (
             <div className="sf-group">
@@ -406,7 +450,11 @@ function RehearsalEntry({
                     <button
                       key={n}
                       className="small"
-                      onClick={() => onChange({ inputs: [...entry.inputs, { name: n, value: "", unit: "", kind: "literature", source: "" }] })}
+                      onClick={() =>
+                        onChange({
+                          inputs: [...entry.inputs, { name: n, value: "", unit: "", kind: "literature", source: "" }],
+                        })
+                      }
                     >
                       + {n}
                     </button>
@@ -421,7 +469,8 @@ function RehearsalEntry({
 }
 
 function InputRows({ rows, onChange }: { rows: InputRow[]; onChange: (r: InputRow[]) => void }) {
-  const set = (i: number, k: keyof InputRow, v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const set = (i: number, k: keyof InputRow, v: string) =>
+    onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   return (
     <>
       {rows.length === 0 ? (
@@ -462,7 +511,11 @@ function InputRows({ rows, onChange }: { rows: InputRow[]; onChange: (r: InputRo
                     <input value={r.source} onChange={(e) => set(i, "source", e.target.value)} />
                   </td>
                   <td>
-                    <button className="icon-btn danger" aria-label="Remove" onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+                    <button
+                      className="icon-btn danger"
+                      aria-label="Remove"
+                      onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                    >
                       ×
                     </button>
                   </td>
@@ -472,7 +525,11 @@ function InputRows({ rows, onChange }: { rows: InputRow[]; onChange: (r: InputRo
           </table>
         </div>
       )}
-      <button className="small" style={{ marginTop: 8 }} onClick={() => onChange([...rows, { name: "", value: "", unit: "", kind: "literature", source: "" }])}>
+      <button
+        className="small"
+        style={{ marginTop: 8 }}
+        onClick={() => onChange([...rows, { name: "", value: "", unit: "", kind: "literature", source: "" }])}
+      >
         + Add input
       </button>
     </>
@@ -482,7 +539,10 @@ function InputRows({ rows, onChange }: { rows: InputRow[]; onChange: (r: InputRo
 function RehearsalResult({ res }: { res: Rehearsal }) {
   const cp = res.summary.critical_path;
   return (
-    <Section title="Rehearsal result" subtitle="SIMULATED: shows what would block the real programme; nothing here is evidence.">
+    <Section
+      title="Rehearsal result"
+      subtitle="SIMULATED: shows what would block the real programme; nothing here is evidence."
+    >
       <div className="stats">
         {Object.entries(res.summary.by_outcome).map(([k, n]) => (
           <div className="stat" key={k}>
@@ -495,14 +555,17 @@ function RehearsalResult({ res }: { res: Rehearsal }) {
         items={[
           [
             "Critical path",
-            cp.requirements.length === 0 ? cp.note : `${cp.requirements.join(" → ")} · ${cp.known_duration_days} days known`,
+            cp.requirements.length === 0
+              ? cp.note
+              : `${cp.requirements.join(" → ")} · ${cp.known_duration_days} days known`,
           ],
           ["Unknown durations on the path", cp.unknown_durations_on_path.join(", ") || "none"],
         ]}
       />
       {res.summary.unassigned_determinations.length > 0 && (
         <div className="note small qc-warn" style={{ marginTop: 8 }}>
-          Nobody holds the role for: {res.summary.unassigned_determinations.map((d) => `${d.determination} (${roleLabel(d.role)})`).join(", ")}
+          Nobody holds the role for:{" "}
+          {res.summary.unassigned_determinations.map((d) => `${d.determination} (${roleLabel(d.role)})`).join(", ")}
         </div>
       )}
       <div className="table-wrap" style={{ marginTop: 10 }}>
@@ -524,15 +587,26 @@ function RehearsalResult({ res }: { res: Rehearsal }) {
                 <td>
                   <Pill tone={OUTCOME_TONE[i.outcome ?? ""] ?? "neutral"}>{humanize(i.outcome ?? "")}</Pill>
                   {i.qc && <div className="small">QC {statusLabel(i.qc)}</div>}
-                  {i.duration_days !== undefined && i.duration_days !== null && <div className="small muted">{i.duration_days} days</div>}
+                  {i.duration_days !== undefined && i.duration_days !== null && (
+                    <div className="small muted">{i.duration_days} days</div>
+                  )}
                 </td>
                 <td className="small">
-                  {i.missing_parameters && i.missing_parameters.length > 0 && <div>Parameters: {i.missing_parameters.map(paramLabel).join(", ")}</div>}
+                  {i.missing_parameters && i.missing_parameters.length > 0 && (
+                    <div>Parameters: {i.missing_parameters.map(paramLabel).join(", ")}</div>
+                  )}
                   {i.missing_inputs && i.missing_inputs.length > 0 && <div>Inputs: {i.missing_inputs.join(", ")}</div>}
-                  {i.unavailable_results && i.unavailable_results.length > 0 && <div>{i.unavailable_results.length} result(s) unavailable</div>}
+                  {i.unavailable_results && i.unavailable_results.length > 0 && (
+                    <div>{i.unavailable_results.length} result(s) unavailable</div>
+                  )}
                   {i.determinations?.map((d) => (
                     <div key={d.label}>
-                      {d.label}: {d.assigned_to.length ? d.assigned_to.join(", ") : <span className="qc-warn">no {roleLabel(d.role)}</span>}
+                      {d.label}:{" "}
+                      {d.assigned_to.length ? (
+                        d.assigned_to.join(", ")
+                      ) : (
+                        <span className="qc-warn">no {roleLabel(d.role)}</span>
+                      )}
                     </div>
                   ))}
                 </td>

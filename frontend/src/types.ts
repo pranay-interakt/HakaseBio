@@ -2,14 +2,7 @@
 // The frontend renders these; it never computes a scientific value.
 
 export type ProvenanceKind =
-  | "measured"
-  | "literature"
-  | "computed"
-  | "predicted"
-  | "guideline"
-  | "user_supplied"
-  | "simulated"
-  | "unavailable";
+  "measured" | "literature" | "computed" | "predicted" | "guideline" | "user_supplied" | "simulated" | "unavailable";
 
 export interface Citation {
   key: string;
@@ -71,13 +64,7 @@ export interface Quantity {
 }
 
 export function isQuantity(x: unknown): x is Quantity {
-  return (
-    typeof x === "object" &&
-    x !== null &&
-    "provenance" in x &&
-    "unit" in x &&
-    "available" in x
-  );
+  return typeof x === "object" && x !== null && "provenance" in x && "unit" in x && "available" in x;
 }
 
 export interface Principal {
@@ -549,7 +536,14 @@ export interface SendContext {
   recovery: boolean;
   study_start: string | null;
   study_director: string | null;
-  tk_studies: { id: string; title: string; state: string; simulated: boolean; analysed: boolean; subjects: SendSubject[] }[];
+  tk_studies: {
+    id: string;
+    title: string;
+    state: string;
+    simulated: boolean;
+    analysed: boolean;
+    subjects: SendSubject[];
+  }[];
   exports: SendExportRecord[];
   standards: Record<string, string>;
   ts_fda_desired: string[];
@@ -615,7 +609,13 @@ export interface SequenceEntityRecord {
   spec: SequenceEntitySpec;
   fingerprint: string;
   derived: {
-    helm: { polymers: { id: string; type: string; monomers: number }[]; connections: number; version: string | null; monomer_ids: string[]; warnings: string[] } | null;
+    helm: {
+      polymers: { id: string; type: string; monomers: number }[];
+      connections: number;
+      version: string | null;
+      monomer_ids: string[];
+      warnings: string[];
+    } | null;
     chains: { name: string; role: string; copies: number; residues: number; average_mass: Quantity }[];
     total_mass: Quantity;
     amino_acid_chains: number[];

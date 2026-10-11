@@ -21,12 +21,15 @@ export function ImportNew({ programId, requirementId }: { programId: string; req
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get<Program>(`/programs/${programId}`).then((prog) => {
-      setP(prog);
-      setCompound(prog.compounds[0]?.id ?? "");
-      const req = prog.study_set.requirements.find((r) => r.id === requirementId);
-      if (req) setGlp(req.glp ? "true" : "false");
-    }).catch(setErr);
+    api
+      .get<Program>(`/programs/${programId}`)
+      .then((prog) => {
+        setP(prog);
+        setCompound(prog.compounds[0]?.id ?? "");
+        const req = prog.study_set.requirements.find((r) => r.id === requirementId);
+        if (req) setGlp(req.glp ? "true" : "false");
+      })
+      .catch(setErr);
     api.get<ImportFieldSpec[]>(`/requirements/${requirementId}/import-fields`).then(setFields).catch(setErr);
   }, [programId, requirementId]);
 
@@ -80,10 +83,10 @@ export function ImportNew({ programId, requirementId }: { programId: string; req
         }
       />
       <div className="note small">
-        Use this for a study run outside Hakase (at a CRO, before Hakase, or of a type without a driver). The report is stored by
-        its SHA-256. Every value you transcribe needs the page or table it came from, and the import is signed by the
-        responsible people (Study Director and QA for a GLP study). Readiness counts it as <em>imported</em>, never as
-        driver-run.
+        Use this for a study run outside Hakase (at a CRO, before Hakase, or of a type without a driver). The report is
+        stored by its SHA-256. Every value you transcribe needs the page or table it came from, and the import is signed
+        by the responsible people (Study Director and QA for a GLP study). Readiness counts it as <em>imported</em>,
+        never as driver-run.
       </div>
       <ErrorBox error={err} onDismiss={() => setErr(null)} />
       <Section title="Report">

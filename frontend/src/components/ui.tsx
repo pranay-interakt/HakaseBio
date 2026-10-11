@@ -38,7 +38,11 @@ export function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
     <nav className="crumbs" aria-label="Breadcrumb">
       {crumbs.map((c, i) => (
         <span key={i} className="crumb">
-          {i > 0 && <span className="crumb-sep" aria-hidden>›</span>}
+          {i > 0 && (
+            <span className="crumb-sep" aria-hidden>
+              ›
+            </span>
+          )}
           {c.href && i < crumbs.length - 1 ? (
             <a href={c.href}>{c.label}</a>
           ) : (
@@ -53,10 +57,22 @@ export function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
 export function NavArrows({ canBack, canForward }: { canBack: boolean; canForward: boolean }) {
   return (
     <span className="nav-arrows">
-      <button className="icon-btn" disabled={!canBack} onClick={() => window.history.back()} title="Back (Alt+←)" aria-label="Back">
+      <button
+        className="icon-btn"
+        disabled={!canBack}
+        onClick={() => window.history.back()}
+        title="Back (Alt+←)"
+        aria-label="Back"
+      >
         ←
       </button>
-      <button className="icon-btn" disabled={!canForward} onClick={() => window.history.forward()} title="Forward (Alt+→)" aria-label="Forward">
+      <button
+        className="icon-btn"
+        disabled={!canForward}
+        onClick={() => window.history.forward()}
+        title="Forward (Alt+→)"
+        aria-label="Forward"
+      >
         →
       </button>
     </span>
@@ -99,11 +115,25 @@ export interface TabItem {
 }
 
 /** Tabs are links, so each tab has its own URL and back/forward moves between tabs. */
-export function Tabs({ items, active, hrefFor }: { items: TabItem[]; active: string; hrefFor: (id: string) => string }) {
+export function Tabs({
+  items,
+  active,
+  hrefFor,
+}: {
+  items: TabItem[];
+  active: string;
+  hrefFor: (id: string) => string;
+}) {
   return (
     <nav className="tabs" role="tablist">
       {items.map((t) => (
-        <a key={t.id} role="tab" aria-selected={t.id === active} className={t.id === active ? "tab active" : "tab"} href={hrefFor(t.id)}>
+        <a
+          key={t.id}
+          role="tab"
+          aria-selected={t.id === active}
+          className={t.id === active ? "tab active" : "tab"}
+          href={hrefFor(t.id)}
+        >
           {t.label}
           {t.count !== undefined && <span className="tab-count">{t.count}</span>}
         </a>
@@ -366,7 +396,13 @@ export function ReasonAction({
     );
   return (
     <span className="row" style={{ flexWrap: "nowrap" }}>
-      <input autoFocus style={{ minWidth: 180 }} placeholder="Reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
+      <input
+        autoFocus
+        style={{ minWidth: 180 }}
+        placeholder="Reason *"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
       <button
         className={`small${danger ? " danger" : ""}`}
         disabled={!reason.trim()}

@@ -18,18 +18,7 @@ import type {
 import { ErrorBox, Section } from "./common";
 
 type Tab = "facts" | "subjects" | "endpoints" | "tk" | "ts";
-const NULL_FLAVORS = [
-  "NI",
-  "INV",
-  "OTH",
-  "UNK",
-  "ASKU",
-  "NAV",
-  "NASK",
-  "MSK",
-  "NA",
-  "NP",
-];
+const NULL_FLAVORS = ["NI", "INV", "OTH", "UNK", "ASKU", "NAV", "NASK", "MSK", "NA", "NP"];
 
 const EMPTY_FACTS: SendFacts = {
   studyid: "",
@@ -81,14 +70,9 @@ function blankAnimal(subject_id: string): SendAnimal {
 }
 
 /** Keep the user's earlier entries for subjects still in the record; add the others blank. */
-function animalsFor(
-  subjects: SendSubject[],
-  previous: SendAnimal[] | undefined,
-): SendAnimal[] {
+function animalsFor(subjects: SendSubject[], previous: SendAnimal[] | undefined): SendAnimal[] {
   const prev = new Map((previous ?? []).map((a) => [a.subject_id, a]));
-  return subjects.map(
-    (s) => prev.get(s.subject_id) ?? blankAnimal(s.subject_id),
-  );
+  return subjects.map((s) => prev.get(s.subject_id) ?? blankAnimal(s.subject_id));
 }
 
 function initialSpec(ctx: SendContext): SendSpec {
@@ -105,11 +89,8 @@ function initialSpec(ctx: SendContext): SendSpec {
     };
   }
   const tp = (prev: Record<string, number> | undefined) =>
-    Object.fromEntries(
-      ctx.timepoints.filter((t) => prev && t in prev).map((t) => [t, prev![t]]),
-    );
-  const tk =
-    last?.pk && ctx.tk_studies.find((t) => t.id === last.pk!.tk_study_id);
+    Object.fromEntries(ctx.timepoints.filter((t) => prev && t in prev).map((t) => [t, prev![t]]));
+  const tk = last?.pk && ctx.tk_studies.find((t) => t.id === last.pk!.tk_study_id);
   return {
     facts: last?.facts ?? EMPTY_FACTS,
     animals: animalsFor(ctx.subjects, last?.animals),
@@ -117,10 +98,7 @@ function initialSpec(ctx: SendContext): SendSpec {
     timepoints: tp(last?.timepoints),
     recovery_timepoints: tp(last?.recovery_timepoints),
     baseline_timepoint: last?.baseline_timepoint ?? null,
-    pk:
-      tk && last?.pk
-        ? { ...last.pk, animals: animalsFor(tk.subjects, last.pk.animals) }
-        : null,
+    pk: tk && last?.pk ? { ...last.pk, animals: animalsFor(tk.subjects, last.pk.animals) } : null,
   };
 }
 
@@ -134,9 +112,7 @@ function payload(spec: SendSpec): unknown {
       glp_type: opt(spec.facts.glp_type),
       age_text: opt(spec.facts.age_text),
       recovery_sacrifice: opt(spec.facts.recovery_sacrifice),
-      values: Object.fromEntries(
-        Object.entries(spec.facts.values).filter(([, v]) => v.trim() !== ""),
-      ),
+      values: Object.fromEntries(Object.entries(spec.facts.values).filter(([, v]) => v.trim() !== "")),
     },
     endpoints: Object.fromEntries(
       Object.entries(spec.endpoints).map(([k, e]) => [
@@ -171,8 +147,7 @@ export function SendExport({ studyId }: { studyId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studyId]);
   useEffect(() => {
-    if (open && !terms)
-      api.get<SendTerms>("/send/terms").then(setTerms).catch(setErr);
+    if (open && !terms) api.get<SendTerms>("/send/terms").then(setTerms).catch(setErr);
   }, [open, terms]);
 
   async function exportNow() {
@@ -181,12 +156,7 @@ export function SendExport({ studyId }: { studyId: string }) {
     setErr(null);
     setResult(null);
     try {
-      setResult(
-        await api.post<SendExportRecord>(
-          `/studies/${studyId}/send-export`,
-          payload(spec),
-        ),
-      );
+      setResult(await api.post<SendExportRecord>(`/studies/${studyId}/send-export`, payload(spec)));
       await load();
     } catch (e) {
       setErr(e);
@@ -196,40 +166,29 @@ export function SendExport({ studyId }: { studyId: string }) {
   }
 
   if (!ctx) return err ? <ErrorBox error={err} /> : null;
-  const download = (sha: string) =>
-    api.download(`/files/${sha}`, `${spec?.facts.studyid || studyId}_send.zip`);
+  const download = (sha: string) => api.download(`/files/${sha}`, `${spec?.facts.studyid || studyId}_send.zip`);
   return (
     <Section
       title={`SEND export · SENDIG ${ctx.standards.SENDIG} · CT ${ctx.standards["SEND CT"]}`}
-      right={
-        <button onClick={() => setOpen(!open)}>
-          {open ? "Hide" : "Prepare export"}
-        </button>
-      }
+      right={<button onClick={() => setOpen(!open)}>{open ? "Hide" : "Prepare export"}</button>}
     >
       <div className="small">
         Study start (STSTDTC):{" "}
         {ctx.study_start ? (
           <>
-            <strong>{ctx.study_start}</strong>, the Study Director&apos;s
-            protocol signature ({ctx.study_director})
+            <strong>{ctx.study_start}</strong>, the Study Director&apos;s protocol signature ({ctx.study_director})
           </>
         ) : (
           <span className="qc-fail">
-            no Study Director protocol signature yet. FDA defines the study
-            start date as that signature (TCG 4.1.3), so the export is refused
-            until it is recorded.
+            no Study Director protocol signature yet. FDA defines the study start date as that signature (TCG 4.1.3), so
+            the export is refused until it is recorded.
           </span>
         )}
       </div>
       {ctx.simulated && (
-        <div className="banner-sim">
-          This study holds simulated data. SEND datasets are never made from it.
-        </div>
+        <div className="banner-sim">This study holds simulated data. SEND datasets are never made from it.</div>
       )}
-      {ctx.exports.length > 0 && (
-        <ExportHistory exports={ctx.exports} download={download} />
-      )}
+      {ctx.exports.length > 0 && <ExportHistory exports={ctx.exports} download={download} />}
       <ErrorBox error={err} />
       {open && spec && !ctx.simulated && (
         <>
@@ -243,11 +202,7 @@ export function SendExport({ studyId }: { studyId: string }) {
                 ["ts", "Other TS parameters"],
               ] as [Tab, string][]
             ).map(([t, l]) => (
-              <button
-                key={t}
-                className={tab === t ? "tab active" : "tab"}
-                onClick={() => setTab(t)}
-              >
+              <button key={t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>
                 {l}
               </button>
             ))}
@@ -270,19 +225,9 @@ export function SendExport({ studyId }: { studyId: string }) {
               set={(animals) => setSpec({ ...spec, animals })}
             />
           )}
-          {tab === "endpoints" && (
-            <EndpointsForm ctx={ctx} spec={spec} terms={terms} set={setSpec} />
-          )}
-          {tab === "tk" && (
-            <TkForm ctx={ctx} spec={spec} terms={terms} set={setSpec} />
-          )}
-          {tab === "ts" && (
-            <TsForm
-              ctx={ctx}
-              f={spec.facts}
-              set={(facts) => setSpec({ ...spec, facts })}
-            />
-          )}
+          {tab === "endpoints" && <EndpointsForm ctx={ctx} spec={spec} terms={terms} set={setSpec} />}
+          {tab === "tk" && <TkForm ctx={ctx} spec={spec} terms={terms} set={setSpec} />}
+          {tab === "ts" && <TsForm ctx={ctx} f={spec.facts} set={(facts) => setSpec({ ...spec, facts })} />}
           <div className="row" style={{ marginTop: 10 }}>
             <button className="primary" disabled={busy} onClick={exportNow}>
               {busy ? "Building…" : "Build and check SEND package"}
@@ -296,13 +241,7 @@ export function SendExport({ studyId }: { studyId: string }) {
   );
 }
 
-function ExportHistory({
-  exports,
-  download,
-}: {
-  exports: SendExportRecord[];
-  download: (sha: string) => void;
-}) {
+function ExportHistory({ exports, download }: { exports: SendExportRecord[]; download: (sha: string) => void }) {
   return (
     <table className="small">
       <thead>
@@ -324,18 +263,10 @@ function ExportHistory({
               {e.ok ? (
                 <span className="tag tag-pass">package built</span>
               ) : (
-                <span className="tag tag-fail">
-                  refused ({e.errors.length} errors)
-                </span>
+                <span className="tag tag-fail">refused ({e.errors.length} errors)</span>
               )}
             </td>
-            <td>
-              {e.package_sha256 && (
-                <button onClick={() => download(e.package_sha256!)}>
-                  Download
-                </button>
-              )}
-            </td>
+            <td>{e.package_sha256 && <button onClick={() => download(e.package_sha256!)}>Download</button>}</td>
           </tr>
         ))}
       </tbody>
@@ -343,28 +274,16 @@ function ExportHistory({
   );
 }
 
-function ExportResult({
-  r,
-  download,
-}: {
-  r: SendExportRecord;
-  download: (sha: string) => void;
-}) {
+function ExportResult({ r, download }: { r: SendExportRecord; download: (sha: string) => void }) {
   return (
     <div style={{ marginTop: 10 }}>
       <h4>
         {r.ok ? (
-          <span className="tag tag-pass">
-            Package built: every check passed
-          </span>
+          <span className="tag tag-pass">Package built: every check passed</span>
         ) : (
           <span className="tag tag-fail">Export refused</span>
         )}{" "}
-        {r.package_sha256 && (
-          <button onClick={() => download(r.package_sha256!)}>
-            Download package
-          </button>
-        )}
+        {r.package_sha256 && <button onClick={() => download(r.package_sha256!)}>Download package</button>}
       </h4>
       {r.package_sha256 && (
         <div className="small muted">
@@ -409,9 +328,7 @@ function ExportResult({
                 </td>
                 <td className="muted">{c.source}</td>
                 <td>
-                  <span className={`tag tag-${c.passed ? "pass" : "fail"}`}>
-                    {c.passed ? "pass" : "fail"}
-                  </span>
+                  <span className={`tag tag-${c.passed ? "pass" : "fail"}`}>{c.passed ? "pass" : "fail"}</span>
                 </td>
               </tr>
             ))}
@@ -454,15 +371,7 @@ function TermLists({ terms }: { terms: SendTerms }) {
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
@@ -495,13 +404,7 @@ function Term({
       </select>
     );
   }
-  return (
-    <input
-      list={`ct-${field}`}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
+  return <input list={`ct-${field}`} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function FactsForm({
@@ -519,45 +422,25 @@ function FactsForm({
 }) {
   const text = (k: keyof SendFacts, label: string, hint?: string) => (
     <Field label={label} hint={hint}>
-      <input
-        value={(f[k] as string | null) ?? ""}
-        onChange={(e) => set({ ...f, [k]: e.target.value })}
-      />
+      <input value={(f[k] as string | null) ?? ""} onChange={(e) => set({ ...f, [k]: e.target.value })} />
     </Field>
   );
   const term = (k: keyof SendFacts, label: string, field: string = k) => (
     <Field
       label={label}
-      hint={
-        terms?.fields[field]
-          ? `${terms.fields[field].name} (${terms.fields[field].code})`
-          : undefined
-      }
+      hint={terms?.fields[field] ? `${terms.fields[field].name} (${terms.fields[field].code})` : undefined}
     >
-      <Term
-        field={field}
-        value={(f[k] as string | null) ?? ""}
-        terms={terms}
-        onChange={(v) => set({ ...f, [k]: v })}
-      />
+      <Term field={field} value={(f[k] as string | null) ?? ""} terms={terms} onChange={(v) => set({ ...f, [k]: v })} />
     </Field>
   );
   const date = (k: keyof SendFacts, label: string) => (
     <Field label={label}>
-      <input
-        type="date"
-        value={(f[k] as string) ?? ""}
-        onChange={(e) => set({ ...f, [k]: e.target.value })}
-      />
+      <input type="date" value={(f[k] as string) ?? ""} onChange={(e) => set({ ...f, [k]: e.target.value })} />
     </Field>
   );
   return (
     <div className="grid2">
-      {text(
-        "studyid",
-        "Sponsor study ID (STUDYID)",
-        "letters, digits, - and _; the eCTD study id",
-      )}
+      {text("studyid", "Sponsor study ID (STUDYID)", "letters, digits, - and _; the eCTD study id")}
       {text("test_facility_study_id", "Test facility study ID (SPREFID)")}
       {text("study_title", "Study title (STITLE)")}
       {text("sponsor", "Sponsor (SSPONSOR)")}
@@ -571,10 +454,7 @@ function FactsForm({
       {glp && term("glp_type", "GLP type (GLPTYP)")}
       {term("species", "Species")}
       {term("strain", "Strain")}
-      <Field
-        label="Age at start of dosing (AGE)"
-        hint="a number; or give a range in AGETXT instead"
-      >
+      <Field label="Age at start of dosing (AGE)" hint="a number; or give a range in AGETXT instead">
         <input
           type="number"
           min="0"
@@ -588,11 +468,7 @@ function FactsForm({
           }
         />
       </Field>
-      {text(
-        "age_text",
-        "Age range (AGETXT)",
-        "e.g. 6-8; only when AGE is not given",
-      )}
+      {text("age_text", "Age range (AGETXT)", "e.g. 6-8; only when AGE is not given")}
       {term("age_unit", "Age unit (AGEU)")}
       {term("route", "Route (ROUTE / EXROUTE)")}
       {term("dose_form", "Dose form (EXDOSFRM)")}
@@ -604,22 +480,9 @@ function FactsForm({
       {date("dosing_end", "Dosing end (DOSENDTC)")}
       {date("experimental_start", "Experimental start (EXPSTDTC)")}
       {date("experimental_end", "Experimental end (EXPENDTC)")}
-      {text(
-        "dosing_duration",
-        "Dosing duration (DOSDUR)",
-        "ISO 8601 duration, e.g. P28D; excludes recovery",
-      )}
-      {text(
-        "terminal_sacrifice",
-        "Time to terminal sacrifice (TRMSAC)",
-        "ISO 8601 duration",
-      )}
-      {recovery &&
-        text(
-          "recovery_sacrifice",
-          "Time to recovery sacrifice (RECSAC)",
-          "ISO 8601 duration",
-        )}
+      {text("dosing_duration", "Dosing duration (DOSDUR)", "ISO 8601 duration, e.g. P28D; excludes recovery")}
+      {text("terminal_sacrifice", "Time to terminal sacrifice (TRMSAC)", "ISO 8601 duration")}
+      {recovery && text("recovery_sacrifice", "Time to recovery sacrifice (RECSAC)", "ISO 8601 duration")}
     </div>
   );
 }
@@ -649,12 +512,7 @@ function AnimalInput({
 }) {
   if (kind === "term")
     return (
-      <Term
-        field="disposition"
-        value={a.disposition}
-        terms={terms}
-        onChange={(v) => set({ ...a, disposition: v })}
-      />
+      <Term field="disposition" value={a.disposition} terms={terms} onChange={(v) => set({ ...a, disposition: v })} />
     );
   if (kind === "number")
     return (
@@ -665,19 +523,12 @@ function AnimalInput({
         onChange={(e) =>
           set({
             ...a,
-            disposition_nominal_day:
-              e.target.value === "" ? null : Number(e.target.value),
+            disposition_nominal_day: e.target.value === "" ? null : Number(e.target.value),
           })
         }
       />
     );
-  return (
-    <input
-      type={kind}
-      value={String(a[k] ?? "")}
-      onChange={(e) => set({ ...a, [k]: e.target.value })}
-    />
-  );
+  return <input type={kind} value={String(a[k] ?? "")} onChange={(e) => set({ ...a, [k]: e.target.value })} />;
 }
 
 /** Per-subject dates and dispositions, with a fill that copies the entered values to a group. */
@@ -692,37 +543,21 @@ function AnimalsForm({
   terms: SendTerms | null;
   set: (a: SendAnimal[]) => void;
 }) {
-  const phases = useMemo(
-    () => [...new Set(subjects.map((s) => s.phase))],
-    [subjects],
-  );
+  const phases = useMemo(() => [...new Set(subjects.map((s) => s.phase))], [subjects]);
   const [phase, setPhase] = useState(phases[0] ?? "");
   const [fill, setFill] = useState<SendAnimal>(blankAnimal("*"));
   const phaseOf = new Map(subjects.map((s) => [s.subject_id, s]));
-  const members = animals.filter(
-    (a) => phaseOf.get(a.subject_id)?.phase === phase,
-  );
+  const members = animals.filter((a) => phaseOf.get(a.subject_id)?.phase === phase);
   const apply = () =>
-    set(
-      animals.map((a) =>
-        phaseOf.get(a.subject_id)?.phase === phase
-          ? { ...fill, subject_id: a.subject_id }
-          : a,
-      ),
-    );
+    set(animals.map((a) => (phaseOf.get(a.subject_id)?.phase === phase ? { ...fill, subject_id: a.subject_id } : a)));
   return (
     <div>
       <div className="note small">
-        Fill a group: enter the values once, then apply them to every animal of
-        the chosen phase. Edit single animals below (unscheduled deaths, early
-        removals).
+        Fill a group: enter the values once, then apply them to every animal of the chosen phase. Edit single animals
+        below (unscheduled deaths, early removals).
       </div>
       <div className="row" style={{ margin: "6px 0" }}>
-        <select
-          style={{ width: "auto" }}
-          value={phase}
-          onChange={(e) => setPhase(e.target.value)}
-        >
+        <select style={{ width: "auto" }} value={phase} onChange={(e) => setPhase(e.target.value)}>
           {phases.map((p) => (
             <option key={p}>{p}</option>
           ))}
@@ -734,22 +569,11 @@ function AnimalsForm({
       <div className="grid2">
         {ANIMAL_FIELDS.map(([k, l, kind]) => (
           <Field key={k} label={l}>
-            <AnimalInput
-              a={fill}
-              k={k}
-              kind={kind}
-              terms={terms}
-              set={setFill}
-            />
+            <AnimalInput a={fill} k={k} kind={kind} terms={terms} set={setFill} />
           </Field>
         ))}
       </div>
-      <AnimalTable
-        animals={animals}
-        subjects={phaseOf}
-        terms={terms}
-        set={set}
-      />
+      <AnimalTable animals={animals} subjects={phaseOf} terms={terms} set={set} />
     </div>
   );
 }
@@ -765,8 +589,7 @@ function AnimalTable({
   terms: SendTerms | null;
   set: (a: SendAnimal[]) => void;
 }) {
-  const put = (i: number, a: SendAnimal) =>
-    set(animals.map((x, j) => (j === i ? a : x)));
+  const put = (i: number, a: SendAnimal) => set(animals.map((x, j) => (j === i ? a : x)));
   return (
     <div className="table-wrap">
       <table className="small send-animals">
@@ -792,13 +615,7 @@ function AnimalTable({
                 </td>
                 {ANIMAL_FIELDS.map(([k, , kind]) => (
                   <td key={k}>
-                    <AnimalInput
-                      a={a}
-                      k={k}
-                      kind={kind}
-                      terms={terms}
-                      set={(x) => put(i, x)}
-                    />
+                    <AnimalInput a={a} k={k} kind={kind} terms={terms} set={(x) => put(i, x)} />
                   </td>
                 ))}
                 <td>
@@ -806,9 +623,7 @@ function AnimalTable({
                     type="checkbox"
                     style={{ width: "auto" }}
                     checked={a.unscheduled}
-                    onChange={(e) =>
-                      put(i, { ...a, unscheduled: e.target.checked })
-                    }
+                    onChange={(e) => put(i, { ...a, unscheduled: e.target.checked })}
                   />
                 </td>
               </tr>
@@ -831,15 +646,9 @@ function EndpointsForm({
   terms: SendTerms | null;
   set: (s: SendSpec) => void;
 }) {
-  const put = (name: string, e: SendEndpointMap) =>
-    set({ ...spec, endpoints: { ...spec.endpoints, [name]: e } });
-  const testName = (domain: string, cd: string) =>
-    terms?.tests[domain]?.find(([c]) => c === cd)?.[1];
-  const day = (
-    which: "timepoints" | "recovery_timepoints",
-    t: string,
-    v: string,
-  ) => {
+  const put = (name: string, e: SendEndpointMap) => set({ ...spec, endpoints: { ...spec.endpoints, [name]: e } });
+  const testName = (domain: string, cd: string) => terms?.tests[domain]?.find(([c]) => c === cd)?.[1];
+  const day = (which: "timepoints" | "recovery_timepoints", t: string, v: string) => {
     const next = { ...spec[which] };
     if (v === "") delete next[t];
     else next[t] = Number(v);
@@ -901,20 +710,10 @@ function EndpointsForm({
                   />
                 </td>
                 <td>
-                  <input
-                    value={e.test}
-                    onChange={(x) =>
-                      put(ep.name, { ...e, test: x.target.value })
-                    }
-                  />
+                  <input value={e.test} onChange={(x) => put(ep.name, { ...e, test: x.target.value })} />
                 </td>
                 <td>
-                  <Term
-                    field="unit"
-                    value={e.unit}
-                    terms={terms}
-                    onChange={(v) => put(ep.name, { ...e, unit: v })}
-                  />
+                  <Term field="unit" value={e.unit} terms={terms} onChange={(v) => put(ep.name, { ...e, unit: v })} />
                 </td>
                 <td>
                   {e.domain === "LB" && (
@@ -942,9 +741,8 @@ function EndpointsForm({
         </tbody>
       </table>
       <p className="muted small">
-        The unit term must be the protocol unit: results are exported as
-        collected and the export is refused if they differ. A known --TESTCD
-        fills its SEND CT --TEST name.
+        The unit term must be the protocol unit: results are exported as collected and the export is refused if they
+        differ. A known --TESTCD fills its SEND CT --TEST name.
       </p>
       <h4>Timepoints → nominal study day</h4>
       <table className="small">
@@ -974,9 +772,7 @@ function EndpointsForm({
                     type="number"
                     step="1"
                     value={spec.recovery_timepoints[t] ?? ""}
-                    onChange={(e) =>
-                      day("recovery_timepoints", t, e.target.value)
-                    }
+                    onChange={(e) => day("recovery_timepoints", t, e.target.value)}
                   />
                 </td>
               )}
@@ -994,9 +790,7 @@ function EndpointsForm({
         </tbody>
       </table>
       {spec.baseline_timepoint && (
-        <button onClick={() => set({ ...spec, baseline_timepoint: null })}>
-          Clear baseline
-        </button>
+        <button onClick={() => set({ ...spec, baseline_timepoint: null })}>Clear baseline</button>
       )}
     </div>
   );
@@ -1036,14 +830,8 @@ function TkForm({
   const tk = pk && ctx.tk_studies.find((t) => t.id === pk.tk_study_id);
   return (
     <div>
-      <Field
-        label="Toxicokinetic study (PC, PP)"
-        hint="same programme and compound, analysed, with laboratory data"
-      >
-        <select
-          value={pk?.tk_study_id ?? ""}
-          onChange={(e) => choose(e.target.value)}
-        >
+      <Field label="Toxicokinetic study (PC, PP)" hint="same programme and compound, analysed, with laboratory data">
+        <select value={pk?.tk_study_id ?? ""} onChange={(e) => choose(e.target.value)}>
           <option value="">none: export without PC/PP</option>
           {usable.map((t) => (
             <option key={t.id} value={t.id}>
@@ -1055,17 +843,14 @@ function TkForm({
       {ctx.tk_studies.length > usable.length && (
         <p className="muted small">
           {ctx.tk_studies.length - usable.length} toxicokinetic stud
-          {ctx.tk_studies.length - usable.length === 1 ? "y is" : "ies are"} not
-          analysed or hold simulated data, and cannot be exported.
+          {ctx.tk_studies.length - usable.length === 1 ? "y is" : "ies are"} not analysed or hold simulated data, and
+          cannot be exported.
         </p>
       )}
       {pk && tk && (
         <>
           <div className="grid2">
-            <Field
-              label="Analyte code (PCTESTCD)"
-              hint="at most 8 characters, starting with a letter"
-            >
+            <Field label="Analyte code (PCTESTCD)" hint="at most 8 characters, starting with a letter">
               <input
                 value={pk.analyte_testcd}
                 onChange={(e) =>
@@ -1079,9 +864,7 @@ function TkForm({
             <Field label="Analyte name (PCTEST)">
               <input
                 value={pk.analyte_test}
-                onChange={(e) =>
-                  set({ ...spec, pk: { ...pk, analyte_test: e.target.value } })
-                }
+                onChange={(e) => set({ ...spec, pk: { ...pk, analyte_test: e.target.value } })}
               />
             </Field>
             <Field label="Specimen (PCSPEC)">
@@ -1122,15 +905,7 @@ function TkForm({
   );
 }
 
-function TsForm({
-  ctx,
-  f,
-  set,
-}: {
-  ctx: SendContext;
-  f: SendFacts;
-  set: (f: SendFacts) => void;
-}) {
+function TsForm({ ctx, f, set }: { ctx: SendContext; f: SendFacts; set: (f: SendFacts) => void }) {
   const desired = new Set(ctx.ts_fda_desired);
   const put = (code: string, v: string) => {
     const nv = { ...f.null_values };
@@ -1148,9 +923,8 @@ function TsForm({
   return (
     <div>
       <p className="small muted">
-        Trial Summary parameters Hakase cannot take from the record. FDA-desired
-        parameters (TCG v6.3 Appendix C) need a value, or a null flavor with a
-        reason; the reason goes into the nSDRG draft.
+        Trial Summary parameters Hakase cannot take from the record. FDA-desired parameters (TCG v6.3 Appendix C) need a
+        value, or a null flavor with a reason; the reason goes into the nSDRG draft.
       </p>
       <table className="small">
         <thead>
@@ -1175,32 +949,17 @@ function TsForm({
                   )}
                 </td>
                 <td>
-                  <input
-                    value={f.values[code] ?? ""}
-                    onChange={(e) => put(code, e.target.value)}
-                  />
+                  <input value={f.values[code] ?? ""} onChange={(e) => put(code, e.target.value)} />
                 </td>
                 <td>
-                  <select
-                    value={nv?.flavor ?? ""}
-                    onChange={(e) =>
-                      putNull(code, e.target.value, nv?.reason ?? "")
-                    }
-                  >
+                  <select value={nv?.flavor ?? ""} onChange={(e) => putNull(code, e.target.value, nv?.reason ?? "")}>
                     <option value="">—</option>
                     {NULL_FLAVORS.map((x) => (
                       <option key={x}>{x}</option>
                     ))}
                   </select>
                 </td>
-                <td>
-                  {nv && (
-                    <input
-                      value={nv.reason}
-                      onChange={(e) => putNull(code, nv.flavor, e.target.value)}
-                    />
-                  )}
-                </td>
+                <td>{nv && <input value={nv.reason} onChange={(e) => putNull(code, nv.flavor, e.target.value)} />}</td>
               </tr>
             );
           })}
@@ -1211,20 +970,10 @@ function TsForm({
 }
 
 /** Save the entered spec to a file, or load one saved earlier (same study's subjects only). */
-function SpecFile({
-  spec,
-  setSpec,
-  ctx,
-}: {
-  spec: SendSpec;
-  setSpec: (s: SendSpec) => void;
-  ctx: SendContext;
-}) {
+function SpecFile({ spec, setSpec, ctx }: { spec: SendSpec; setSpec: (s: SendSpec) => void; ctx: SendContext }) {
   const [msg, setMsg] = useState<string | null>(null);
   const save = () => {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(spec, null, 1)], { type: "application/json" }),
-    );
+    const url = URL.createObjectURL(new Blob([JSON.stringify(spec, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `${ctx.study_id}_send_spec.json`;
@@ -1236,19 +985,13 @@ function SpecFile({
     try {
       const s = JSON.parse(await file.text()) as SendSpec;
       const ids = new Set(ctx.subjects.map((x) => x.subject_id));
-      const foreign = (s.animals ?? []).filter(
-        (a) => !ids.has(a.subject_id),
-      ).length;
+      const foreign = (s.animals ?? []).filter((a) => !ids.has(a.subject_id)).length;
       setSpec({
         ...s,
         animals: animalsFor(ctx.subjects, s.animals),
         recovery_timepoints: s.recovery_timepoints ?? {},
       });
-      setMsg(
-        foreign
-          ? `${foreign} subjects in the file are not in this study and were left out`
-          : "loaded",
-      );
+      setMsg(foreign ? `${foreign} subjects in the file are not in this study and were left out` : "loaded");
     } catch {
       setMsg("not a SEND export spec file");
     }
@@ -1257,12 +1000,7 @@ function SpecFile({
     <>
       <button onClick={save}>Save spec (JSON)</button>
       <label className="upload small">
-        Load spec{" "}
-        <input
-          type="file"
-          accept="application/json"
-          onChange={(e) => load(e.target.files?.[0])}
-        />
+        Load spec <input type="file" accept="application/json" onChange={(e) => load(e.target.files?.[0])} />
       </label>
       {msg && <span className="small muted">{msg}</span>}
     </>

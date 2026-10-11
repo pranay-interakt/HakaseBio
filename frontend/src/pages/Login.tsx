@@ -28,9 +28,11 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
       onLogin({ ...r.principal, must_change_password: r.must_change_password });
     } catch (e) {
       // one message for every refused sign-in, so the page never hints whether a user id exists
-      setErr(e instanceof ApiError && (e.status === 401 || e.status === 403)
-        ? new Error("Sign-in failed. Check your user id and password.")
-        : e);
+      setErr(
+        e instanceof ApiError && (e.status === 401 || e.status === 403)
+          ? new Error("Sign-in failed. Check your user id and password.")
+          : e,
+      );
     }
   }
 
@@ -65,7 +67,9 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
           <div className="field">
             <label className="field-label">Setup token</label>
             <input value={setupToken} onChange={(e) => setSetupToken(e.target.value)} autoComplete="off" />
-            <span className="muted small">Printed in the server log when it first starts, or set as HOS_BOOTSTRAP_TOKEN.</span>
+            <span className="muted small">
+              Printed in the server log when it first starts, or set as HOS_BOOTSTRAP_TOKEN.
+            </span>
           </div>
         </>
       )}

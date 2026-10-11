@@ -33,7 +33,7 @@ function unitText(u: string): string {
 }
 
 export function CitationLine({ c }: { c: Citation }) {
-  const href = c.doi ? `https://doi.org/${c.doi}` : c.url ?? undefined;
+  const href = c.doi ? `https://doi.org/${c.doi}` : (c.url ?? undefined);
   return (
     <li>
       <code>{c.key}</code> {c.text}{" "}
@@ -67,7 +67,11 @@ export function Derivation({ q }: { q: Quantity }) {
       )}
       {p.method && (
         <div>
-          <strong>Method:</strong> <code>{p.method.id}@{p.method.version}</code> {p.method.name}
+          <strong>Method:</strong>{" "}
+          <code>
+            {p.method.id}@{p.method.version}
+          </code>{" "}
+          {p.method.name}
           {p.method.assumptions.length > 0 && (
             <div className="muted">Assumptions: {p.method.assumptions.join("; ")}</div>
           )}
@@ -77,7 +81,12 @@ export function Derivation({ q }: { q: Quantity }) {
       {p.source_name && (
         <div>
           <strong>Source:</strong> {p.source_name}
-          {p.source_record_id && <> · record <code>{p.source_record_id}</code></>}
+          {p.source_record_id && (
+            <>
+              {" "}
+              · record <code>{p.source_record_id}</code>
+            </>
+          )}
           {p.source_url && (
             <>
               {" "}
@@ -116,7 +125,10 @@ export function Derivation({ q }: { q: Quantity }) {
       )}
       {p.input_ids.length > 0 && (
         <div>
-          <strong>Inputs:</strong> {p.input_ids.map((i) => <code key={i}>{i} </code>)}
+          <strong>Inputs:</strong>{" "}
+          {p.input_ids.map((i) => (
+            <code key={i}>{i} </code>
+          ))}
         </div>
       )}
       {q.uncertainty && (
@@ -129,7 +141,12 @@ export function Derivation({ q }: { q: Quantity }) {
       )}
       {q.qc_flags.length > 0 && (
         <div>
-          <strong>QC flags:</strong> {q.qc_flags.map((f) => <span key={f} className="flag">{f}</span>)}
+          <strong>QC flags:</strong>{" "}
+          {q.qc_flags.map((f) => (
+            <span key={f} className="flag">
+              {f}
+            </span>
+          ))}
         </div>
       )}
       {p.notes && <div className="muted">{p.notes}</div>}
