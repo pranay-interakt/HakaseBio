@@ -302,6 +302,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             rationale="An in vivo QT assay complements the in vitro IKr result; together they "
                       "form the S7B integrated risk assessment",
             glp=True, species=("dog",), ctd_section="4.2.1.3",
+            driver_id="in_vivo_qt_telemetry",
         ))
 
     # --- general toxicology --------------------------------------------------

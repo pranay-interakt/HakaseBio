@@ -129,3 +129,24 @@ appropriate in most situations — clinical wording, not nonclinical.
 8. Best DD, Abernathy MM, Leishman DJ. A "one-step" approach to heart rate correction and statistical analysis applied to conscious dog QTc studies. *Clin Transl Sci.* 2024;17(10):e70046. DOI: 10.1111/cts.70046.
 9. Holzgrefe H, Ferber G, Champeroux P, Gill M, Honda M, Greiter-Wilke A, Baird T, Meyer O, Saulnier M. Preclinical QT safety assessment: cross-species comparisons and human translation from an industry consortium. *J Pharmacol Toxicol Methods.* 2014;69(1):61–101. DOI: 10.1016/j.vascn.2013.05.004 *(bibliographic + abstract only — no value may be taken from it)*.
 10. Bazett HC. An analysis of the time-relations of electrocardiograms. *Heart.* 1920;7:353–370 — **NOT VERIFIED**; reprint: *Ann Noninvasive Electrocardiol.* 1997;2(2):177–194, DOI: 10.1111/j.1542-474X.1997.tb00325.x (Crossref verified, not read). Register only with this caveat attached.
+
+## Implementation record (driver `in_vivo_qt_telemetry` v1.0.0, 2026-10-11)
+
+- **Crossref re-verification.**
+  - Fridericia 1920 and its 2003 translation; Van de Water 1989; Vandenberk 2016; Cobos Gil
+    2008; Chui 2021; Engwall 2023.
+  - Student 1908, "The Probable Error of a Mean", Biometrika 6(1):1–25. Its canonical DOI is
+    10.2307/2331554; 10.1093/biomet/6.1.1 redirects to it. It is cited for the t intervals and
+    p-values of within-animal changes.
+- **S7A §2.7.2 re-read.** "Blood pressure, heart rate, and the electrocardiogram should be
+  evaluated." So the study covers the core battery's cardiovascular part only when blood
+  pressure is measured.
+- **Decisions.**
+  - **Individual correction.** It uses the RR-linear form. The HR-linear dog form of Chui 2021 /
+    Best 2024 is not implemented.
+  - **Fitting data.** The vehicle-treatment data of each animal.
+  - **Bazett.** Implemented with the attribution caveat.
+  - **Crossover only.** Parallel designs are not supported, because between-group tests for them
+    are not verified here.
+  - **Not built.** Minimum detectable difference computation, and concentration-QTc modelling
+    (Q&A 3.2 mentions it but gives no method).

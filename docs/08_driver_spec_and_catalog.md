@@ -440,6 +440,40 @@ The kit checks:
   - Minute volume 1.6 mL × 150/min = 240 mL/min, and its % change.
   - Refusal of rate-only protocols.
 
+### `in_vivo_qt_telemetry` v1.0.0 — in vivo QT (ICH S7B) and S7A cardiovascular
+
+- **Serves.**
+  - `safety.in_vivo_qt`.
+  - `safety.core_battery`, part `cardiovascular`, but only when blood pressure is measured
+    (`components_covered`).
+  - CTD 4.2.1.3.
+- **Research note.** `docs/research/drivers/in_vivo_qt_telemetry.md`.
+- **Design.**
+  - Species from S7B §3.1.3 (rats and mice refused), with a Latin-square crossover and its
+    washout.
+  - Doses with their basis, and a positive control or the historical data defining sensitivity
+    (S7B §3.1.1).
+  - Telemetry system and interval, baseline type, post-dose times.
+  - Correction method with justification (and the reference RR for individual correction).
+  - BP and PR/QRS options.
+  - Minimum detectable difference with its basis.
+- **Return data.** One row per animal × period × phase × time: RR, QT, heart rate, PR/QRS, BP,
+  and plasma concentration where sampled.
+- **Analysis.**
+  - Individual slopes.
+  - QTc-RR independence.
+  - Change from baseline and vs vehicle for every endpoint.
+  - Exposure coverage.
+  - Flags: missing PK samples (Q&A 3.2) and missing baselines (FAIL).
+- **Determinations.** Both by the Study Director:
+  - QTc conclusion (no prolongation / prolongation / inconclusive);
+  - adverse cardiovascular effect, when BP is measured.
+- **Known-value tests.**
+  - Formula hand values at RR 1000 and 640 ms.
+  - Individual correction removes an exact linear rate dependence.
+  - Declared 12 ms QTc effect recovered exactly despite an 80 ms RR change.
+  - Student-t CI and p against `scipy.stats.ttest_1samp`.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

@@ -296,6 +296,45 @@ METHODS: Final[dict[str, Method]] = dict(
            "means and effects with normal variability", ("ich_s7a",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("cv.qtc_fridericia", "QTc by Fridericia: QT / RR^(1/3), RR in seconds",
+           ("fridericia1920", "vandenberk2016", "ich_s7b"),
+           limits=("a fixed rate-correction coefficient; S7B Q&A 3.3 prefers individual "
+                   "correction when the drug affects heart rate",)),
+        _m("cv.qtc_bazett", "QTc by Bazett: QT / RR^(1/2), RR in seconds",
+           ("vandenberk2016", "cobosgil2008", "ich_s7b"),
+           assumptions=("formula as stated in Vandenberk 2016; Bazett's 1920 paper could not be "
+                        "read and the corrected-QT form is attributed to Taran and Szilagyi "
+                        "1947 (Cobos Gil 2008)",),
+           limits=("a fixed rate-correction coefficient (S7B Q&A 3.3)",)),
+        _m("cv.qtc_van_de_water", "QTc by Van de Water: QT - 0.087 (RR - 1000), ms",
+           ("vandewater1989", "ich_s7b"),
+           limits=("derived in anaesthetised dogs (abstract)",
+                   "a fixed rate-correction coefficient (S7B Q&A 3.3)",)),
+        _m("cv.qtc_individual",
+           "Individual-animal QT correction: QT - b_i (RR - RR_ref), b_i the slope of each "
+           "animal's QT on RR fitted on its vehicle-treatment data",
+           ("ich_e14_s7b_qa", "chui2021", "engwall2023"),
+           assumptions=("a linear QT-RR relationship over the observed RR range in each animal",
+                        "the reference RR is stated in the protocol (published implementations "
+                        "differ)",)),
+        _m("cv.qtc_rr_independence",
+           "QTc-RR independence: least-squares slope with 95% CI, correlation and p-value",
+           ("ich_e14_s7b_qa", "student1908"),
+           assumptions=("matched QTc-RR pairs as reported (S7B Q&A 3.3)",)),
+        _m("cv.change_from_baseline",
+           "Change from baseline and from vehicle (within-animal, crossover): mean, 95% CI and "
+           "p-value by Student's t", ("ich_e14_s7b_qa", "student1908"),
+           assumptions=("each animal receives every treatment (Latin-square crossover); "
+                        "differences are approximately normal",),
+           limits=("one test per timepoint; no multiplicity adjustment",)),
+        _m("cv.exposure_multiple", "Mean animal Cmax / stated high clinical Cmax",
+           ("ich_e14_s7b_qa",),
+           assumptions=("same analyte and binding basis (total or free) in both",)),
+        _m("sim.telemetry_declared",
+           "Simulated telemetry from declared per-animal QT-RR relationships, heart-rate and "
+           "QTc effects with normal variability", ("ich_s7b",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

@@ -385,6 +385,36 @@ is a new registry version; it never silently alters past results.
   §4.11 group comparison, descriptively or by Dunnett's test when stated. This time-matched
   design is an analysis choice consistent with S7A §2.3.1 and §2.4.1, not an S7A requirement.
 
+## 4.21 In vivo QT and cardiovascular telemetry  [`cv.*`]
+
+- **Corrections** (QT, RR in ms):
+  - Fridericia: QT/RR^(1/3), RR in s (Fridericia 1920; stated in Vandenberk 2016).
+  - Bazett: QT/RR^(1/2), RR in s. The formula is as stated in Vandenberk 2016. Bazett 1920 was
+    not read, and the corrected form is attributed to Taran & Szilagyi 1947 (Cobos Gil 2008).
+  - Van de Water: QT − 0.087(RR − 1000), from the 1989 abstract (anaesthetised dogs).
+  - Individual: QT − b_i(RR − RR_ref), with b_i the least-squares slope of each animal's QT on RR
+    in its vehicle data. This is the RR-linear form of Chui 2021 and Engwall 2023, and is
+    preferred by E14/S7B Q&A 3.3 when the drug affects heart rate. RR_ref is a stated input.
+- **Justification.** The choice must be justified with data from the test system (S7B §3.1.3).
+  Independence is shown as the regression of QTc on RR (matched pairs, slope with 95% CI, Pearson
+  r, p) for all data and for vehicle data (Q&A 3.3).
+- **Changes** (Latin-square crossover, within animal):
+  - Δ = post-dose − baseline, where the baseline is time-matched (E14 Q&A 4.2 definition) or
+    pre-dose.
+  - ΔΔ = Δ(treatment) − Δ(vehicle) at the same time.
+
+  Each is reported as mean, 95% CI and two-sided p by Student's t (Student 1908), with no
+  multiplicity adjustment. The mean % change from baseline is also reported (Q&A 3.5). The same
+  applies to QT, heart rate, PR/QRS and blood pressure.
+- **Exposure.** Mean Cmax per dose from samples on the PD day (Q&A 3.2 requires at least one),
+  and its multiple of the stated high clinical Cmax. A top dose below the clinical exposure is
+  flagged (S7B Q&A 1.1).
+- **Thresholds.** No QTc threshold is encoded; the Q&A 3.4 millisecond figures are explicitly
+  hypothetical. Assay sensitivity is the protocol's stated minimum detectable difference with its
+  basis.
+- **Core battery.** When blood pressure is measured, the study also covers the S7A
+  cardiovascular part (S7B §2.3.2; S7A §2.7.2).
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

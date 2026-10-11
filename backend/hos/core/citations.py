@@ -235,6 +235,40 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "unrestrained whole-body plethysmography. J Vis Exp. 2014;(90):e51755. (Secondary "
            "statement of minute volume = tidal volume x frequency.)",
            year=2014, doi="10.3791/51755"),
+        _c("student1908",
+           "Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.",
+           year=1908, doi="10.2307/2331554"),
+        _c("fridericia1920",
+           "Fridericia LS. Die Systolendauer im Elektrokardiogramm bei normalen Menschen und bei "
+           "Herzkranken. Acta Med Scand. 1920;53(1):469-486. English translation: Ann "
+           "Noninvasive Electrocardiol. 2003;8(4):343-351, doi:10.1046/j.1542-474X.2003.08413.x.",
+           year=1920, doi="10.1111/j.0954-6820.1920.tb18266.x"),
+        _c("vandewater1989",
+           "Van de Water A, Verheyen J, Xhonneux R, Reneman RS. An improved method to correct "
+           "the QT interval of the electrocardiogram for changes in heart rate. J Pharmacol "
+           "Methods. 1989;22(3):207-217. (Formula from the abstract; derived in anaesthetised "
+           "dogs.)",
+           year=1989, doi="10.1016/0160-5402(89)90015-6"),
+        _c("vandenberk2016",
+           "Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT "
+           "monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett "
+           "and Fridericia formulae.)",
+           year=2016, doi="10.1161/JAHA.116.003264"),
+        _c("cobosgil2008",
+           "Cobos Gil MA, Garcia Rubira JC. Who was the creator of Bazett's formula? Rev Esp "
+           "Cardiol (Engl Ed). 2008;61(8):896-897. (Attribution caveat: the corrected-QT form "
+           "is due to Taran and Szilagyi 1947.)",
+           year=2008, doi="10.1016/S1885-5857(08)60243-1"),
+        _c("chui2021",
+           "Chui RW, Baublits J, Chandra FA, et al. Evaluation of moxifloxacin in canine and "
+           "non-human primate telemetry assays. Clin Transl Sci. 2021;14(6):2379-2390. "
+           "(Published individual-animal QT correction.)",
+           year=2021, doi="10.1111/cts.13103"),
+        _c("engwall2023",
+           "Engwall MJ, Baublits J, Chandra FA, et al. Evaluation of levocetirizine in beagle dog "
+           "and cynomolgus monkey telemetry assays. Clin Transl Sci. 2023;16(3):436-446. "
+           "(Published individual-animal QT correction.)",
+           year=2023, doi="10.1111/cts.13454"),
         _c("redfern2003",
            "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical "
            "cardiac electrophysiology, clinical QT interval prolongation and torsade de "

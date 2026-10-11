@@ -71,7 +71,12 @@ def _study_components(kernel: Any, study: Any, requirement_id: str) -> list[str]
     if study.origin == "import":
         return list((study.import_record or {}).get("components") or [])
     if study.driver_id in kernel.registry:
-        return list(kernel.registry.get(study.driver_id).components_for(requirement_id))
+        driver = kernel.registry.get(study.driver_id)
+        try:
+            params = driver.validate_parameters(study.parameters or {})
+        except Exception:  # noqa: BLE001 - an undesigned study covers nothing
+            return []
+        return list(driver.components_covered(requirement_id, params))
     return []
 
 

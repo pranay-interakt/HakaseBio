@@ -973,6 +973,10 @@ class StudyDriver(ABC):
     def components_for(cls, requirement_id: str) -> tuple[str, ...]:
         return tuple(cls.components.get(requirement_id, ()))
 
+    def components_covered(self, requirement_id: str, params: BaseModel) -> tuple[str, ...]:
+        """The parts a study with these parameters actually covers (default: all declared)."""
+        return self.components_for(requirement_id)
+
     # -- identity / probe ------------------------------------------------------
 
     @classmethod
