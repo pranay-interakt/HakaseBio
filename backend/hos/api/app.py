@@ -896,7 +896,12 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     @app.get("/api/ledger/verify")
     def verify(actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
-        return {"valid": True, "entries": k.verify_ledger(), "head": k.ledger.head}
+        """Chain, anchors and reconciliation. Findings name subjects across programmes, so
+        only administrators see them; everyone sees whether the record is intact."""
+        report = k.integrity()
+        if Role.ADMIN not in actor.roles:
+            report["findings"] = len(report["findings"])
+        return report
 
     @app.get("/api/ledger/{subject_id}", dependencies=[Depends(ledger_access)])
     def ledger(subject_id: str, actor: Principal = Depends(current),

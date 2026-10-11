@@ -68,6 +68,7 @@ from hos.kernel.errors import (
 from hos.kernel.execution import TargetKind, target_from_spec
 from hos.kernel.imports import ImportService
 from hos.kernel.inputs import input_quantity
+from hos.kernel.integrity import AnchorLog, reconcile
 from hos.kernel.ledger import Ledger
 from hos.kernel.lifecycle import TRANSITIONS, StudyState, assert_transition
 from hos.kernel.uow import atomic
@@ -133,6 +134,8 @@ class Kernel:
         self.registry = registry or default_registry()
         self.ledger = Ledger(SqlLedgerBackend(self.db))
         self.imports = ImportService(self)
+        # checkpoints of the ledger head outside the database (docs/15 P0.2)
+        self.anchors = AnchorLog.default(self.files.root.parent)
 
     # ======================================================================
     # principals
@@ -284,6 +287,7 @@ class Kernel:
                                  created_by=actor.id, created_at=now, updated_at=now))
         self._record(actor, "program.created", "program", pid,
                      {"name": name, "context": context.to_dict(),
+                      "organisation": actor.organisation,
                       "study_set_hash": content_hash(ss.to_dict())})
         return self.program_view(pid)
 
@@ -786,6 +790,7 @@ class Kernel:
                                state=StudyState.REPORTED.value)
         self._record(actor, "study.reported", "study", study_id,
                      {"report_hash": report.content_hash,
+                      "report_record_hash": content_hash(rd),       # includes the markdown
                       "evidence_admissible": report.evidence_admissible})
         return self.study_view(study_id)
 
@@ -986,6 +991,19 @@ class Kernel:
 
     def verify_ledger(self) -> int:
         return self.ledger.verify()
+
+    def checkpoint(self) -> None:
+        """Anchor the current ledger head outside the database (after each unit of work)."""
+        self.anchors.append(self.ledger)
+
+    def integrity(self) -> dict[str, Any]:
+        """The chain, the anchors and the reconciliation of stored state with the ledger
+        (docs/15 P0.2). ``valid`` only when all three hold."""
+        entries = self.ledger.verify()
+        findings = self.anchors.verify(self.ledger) + reconcile(self)
+        return {"valid": not findings, "entries": entries, "head": self.ledger.head,
+                "anchors": len(self.anchors.checkpoints()),
+                "findings": [f.to_dict() for f in findings]}
 
     # ======================================================================
     # internals

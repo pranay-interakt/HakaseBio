@@ -136,6 +136,29 @@ scheme-2 entries only in that redacted form. Scheme-1 entries are shown in full,
 them would break the chain. The verifier recomputes both schemes and refuses a redacted line
 that carries anything more.
 
+**Reconciled and anchored** (docs/15 P0.2, `hos/kernel/integrity.py`).
+- *Reconcile.* `Kernel.integrity()` checks every stored record against the ledger events that
+  created or last changed it:
+  - principals against their registration;
+  - programme study sets (and so contexts) against their last programme event's hash;
+  - guests against a replay of their membership events;
+  - compounds against their registration (structure, or sequence fingerprint);
+  - a study's state against its last state event;
+  - protocol, data, analysis and report against the hashes their events recorded, recomputed
+    from the stored content. The rendered report text is covered by `report_record_hash`, or
+    by the report artefact for older events;
+  - signatures and determinations against their own events;
+  - artefacts against their stored hashes.
+
+  This catches rows edited straight in the database, which the chain alone cannot see.
+- *Anchor.* After every unit of work, the head (sequence, hash, time) is appended to a log outside
+  the database. By default it sits beside the file store; for production, point `HOS_ANCHOR_DIR`
+  at write-once storage. With `HOS_ANCHOR_KEY` set, every checkpoint carries an HMAC.
+  - A truncated chain no longer reaches a checkpoint.
+  - A chain rewritten and re-hashed no longer passes through the anchored heads.
+- `/api/ledger/verify` reports all three. Its findings go to administrators only, because they
+  name subjects across programmes; everyone else gets a count.
+
 **Atomic with the state it records** (docs/15 P0.1). Every kernel operation that writes is an
 `@atomic` unit of work (`hos/kernel/uow.py`, `Database.transaction`). Its state changes,
 artefacts and ledger entry share one database transaction, so either all commit or none does.

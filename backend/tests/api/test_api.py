@@ -90,7 +90,9 @@ def test_full_flow_over_http(api):
     pkg = c.post(f"/api/programs/{prog['id']}/module4", headers=h).json()
     assert pkg["included_studies"] == 1
     assert c.get(f"/api/files/{pkg['bundle_sha256']}", headers=h).content[:2] == b"PK"
-    assert c.get("/api/ledger/verify", headers=h).json()["valid"]
+    integrity = c.get("/api/ledger/verify", headers=adm).json()
+    assert integrity["valid"], integrity["findings"]
+    assert c.get("/api/ledger/verify", headers=h).json()["findings"] == 0   # counts only
     acts = [e["action"] for e in c.get(f"/api/ledger/{sid}", headers=h).json()]
     assert "data.rejected" in acts and "study.approved" in acts
 

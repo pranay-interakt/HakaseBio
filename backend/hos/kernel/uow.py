@@ -17,7 +17,14 @@ def atomic(fn: _F) -> _F:
     (``self.db``) and on services holding it (``self.k.db``)."""
     @functools.wraps(fn)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-        db = self.db if hasattr(self, "db") else self.k.db
-        with db.transaction():
-            return fn(self, *args, **kwargs)
+        kernel = self if hasattr(self, "db") else self.k
+        outermost = not kernel.db.in_transaction()
+        try:
+            with kernel.db.transaction():
+                return fn(self, *args, **kwargs)
+        finally:
+            # anchor the head once the outermost unit has committed (docs/15 P0.2); a
+            # failed unit leaves the head unchanged, so this writes nothing new
+            if outermost:
+                kernel.checkpoint()
     return cast(_F, wrapper)

@@ -53,7 +53,9 @@ Director. The account exists, `history("bob") == []`, and the ledger verifies.
 - A concurrency test of N threads (and on PostgreSQL, N processes) recording at once yields
   a gap-free chain.
 
-### P0.2 Ledger verification does not reconcile state, and the head is not anchored
+### P0.2 Ledger verification does not reconcile state, and the head is not anchored — **fixed**
+*`Kernel.integrity()` reconciles every stored record with its events and checks the chain against checkpoints kept outside the database (HMAC with `HOS_ANCHOR_KEY`); see `docs/07` §7.6 and `backend/tests/kernel/test_integrity.py`. An RFC 3161 timestamp is not added.*
+
 `Ledger.verify()` only checks that the chain is internally consistent. It cannot detect:
 
 - a state row with no ledger event (P0.1);

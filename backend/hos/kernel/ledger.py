@@ -226,6 +226,9 @@ class Ledger:
     def entries(self) -> list[LedgerEntry]:
         return list(self._backend.iter_all())
 
+    def last(self) -> LedgerEntry | None:
+        return self._backend.last()
+
     @property
     def head(self) -> str:
         last = self._backend.last()

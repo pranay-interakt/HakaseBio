@@ -101,7 +101,9 @@ cd backend && HOS_DATA_DIR=./data .venv/bin/uvicorn hos.api.app:app --port 8000
 
 Storage defaults to SQLite under `HOS_DATA_DIR` (default `~/.hakase_os`); set
 `HOS_DATABASE_URL` for PostgreSQL. The interactive API docs (`/docs`, `/openapi.json`) are off
-unless `HOS_API_DOCS=1`.
+unless `HOS_API_DOCS=1`. Ledger checkpoints go to `HOS_ANCHOR_DIR` (default
+`$HOS_DATA_DIR/anchors`; use write-once storage in production); set `HOS_ANCHOR_KEY` to
+authenticate them.
 
 **First run.** Creating the administrator needs a one-time setup token, so only whoever runs the
 server can initialise it. The server prints the token in its log at start-up, or you can set
