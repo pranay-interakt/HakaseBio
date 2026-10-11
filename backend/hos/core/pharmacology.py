@@ -84,16 +84,19 @@ class HillFit:
 def fit_hill(
     series: MeasurementSeries,
     *,
+    min_r2: float,
     potency_label: str = "IC50",
-    min_r2: float = 0.90,
     fix_bottom: Optional[float] = None,
     fix_top: Optional[float] = None,
+    hill_slope_warn_range: Optional[tuple[float, float]] = None,
 ) -> HillFit:
     """Fit a 4PL curve to concentration-response data.
 
     ``series.x`` is concentration (must be strictly positive), ``series.y`` the
     response. ``fix_top``/``fix_bottom`` pin the asymptotes when the assay defines
-    them (for example 0 and 100 percent inhibition).
+    them (for example 0 and 100 percent inhibition). ``min_r2`` is a run-acceptance
+    criterion stated by the caller. ``hill_slope_warn_range``, if given, flags slopes
+    outside a range the caller states (with its own basis); none is applied by default.
     """
     x = np.asarray(series.x, dtype=float)
     y = np.asarray(series.y, dtype=float)
@@ -176,14 +179,16 @@ def fit_hill(
                 threshold=min_r2,
             )
         )
-    if abs(hill_v) < 0.3 or abs(hill_v) > 5.0:
+    if hill_slope_warn_range is not None and not (
+            hill_slope_warn_range[0] <= abs(hill_v) <= hill_slope_warn_range[1]):
         findings.append(
             QCFinding(
-                code="implausible_hill_slope",
+                code="hill_slope_outside_stated_range",
                 status=QCStatus.WARN,
-                message="Hill slope is far from unity, which can indicate a non-specific "
-                        "effect, solubility limitation or a multi-site interaction",
+                message="Hill slope outside the range stated for this assay; this can indicate "
+                        "a non-specific effect, solubility limitation or multi-site interaction",
                 observed=round(hill_v, 3),
+                threshold=list(hill_slope_warn_range),
             )
         )
     qc = QCVerdict.of(findings)

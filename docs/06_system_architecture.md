@@ -10,8 +10,8 @@
 - **Persistence: PostgreSQL** via **SQLAlchemy 2.x**, migrations via **Alembic**. JSONB for flexible
   provenance payloads; proper columns for queryable fields. Object storage (S3-compatible) for large
   raw files (instrument data, PDFs, images) — DB holds references + checksums.
-- **Jobs: a task queue** (Celery or RQ/Arq) for long-running work (large parses, IVIVE batches, PDF
-  extraction, report/SEND generation). The API never blocks on science.
+- **Jobs: a task queue** (Celery or RQ/Arq) for long-running work. *Not yet built:* all current
+  operations complete in milliseconds to seconds and run synchronously in the API process.
 - **Frontend: TypeScript + React (Vite).** Component library (Radix/shadcn-style). **No scientific
   computation in the frontend** — it renders backend results and the provenance badges.
 - **Agents: M17 runtime** — agents call the *same* internal API as the UI, under the same permissions
@@ -68,16 +68,19 @@ hakase_operating_system/
 │   │   │   └── regulatory/        # ICH/FDA rule engine (reg.*)
 │   │   ├── kernel/
 │   │   │   ├── lifecycle.py       # study state machine
-│   │   │   ├── entities.py        # entity graph models
-│   │   │   ├── provenance.py      # append-only ledger
-│   │   │   ├── attestation.py     # the four signatures
-│   │   │   └── execution/         # ExecutionTarget: CRO / Simulated / (robot,human later)
+│   │   │   ├── ledger.py          # append-only hash-chained ledger
+│   │   │   ├── attestation.py     # principals, roles, signatures
+│   │   │   ├── kernel.py          # kernel facade (every operation)
+│   │   │   └── execution/         # external lab / in-house / simulation targets
 │   │   ├── drivers/
-│   │   │   ├── base.py            # StudyDriver interface
+│   │   │   ├── base.py            # StudyDriver ABI + strict ingest
+│   │   │   ├── conformance.py     # conformance kit
+│   │   │   ├── registry.py        # registration, matching, entry-point discovery
 │   │   │   ├── metabolic_stability/
 │   │   │   ├── herg/
-│   │   │   └── registry.py        # driver discovery/registration
-│   │   ├── data_sources/          # chembl/ pubchem/ uniprot/ opentargets/ openfda/ fda_reviews/
+│   │   │   └── repeat_dose_tox/
+│   │   ├── ind/                   # readiness + Module 4 assembler
+│   │   ├── data_sources/          # chembl.py, pubchem.py, http cache, enrichment (others planned)
 │   │   ├── api/                   # FastAPI routers
 │   │   ├── db/                    # SQLAlchemy models, Alembic migrations
 │   │   └── jobs/                  # workers

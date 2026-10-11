@@ -37,20 +37,27 @@ extrapolation.
   equivalently `= (0.693 / t½) × (incubation volume µL / microsomal protein mg)`.
 - **Inputs:** concentration–time series (`MEASURED`), protein concentration (mg/mL), incubation volume.
 - **Output:** `CLint,app` as `Quantity(µL/min/mg)`, provenance `COMPUTED`, with the regression R²
-  recorded and a QC flag if R² below threshold or if depletion < ~20% (poorly estimable).
+  recorded and QC flags when R² or total depletion fall below the run-acceptance criteria. Those
+  criteria have no defaults in code: no consensus source fixes them, so each protocol states them
+  and their basis (`docs/09` §9.1).
 - **Assumptions/limits:** first-order (substrate ≪ Km), no significant non-specific binding unless
   corrected (see fu,mic below), linear region only.
-- **Citation:** Obach RS. *Drug Metab Dispos* 1999;27(11):1350 (the canonical IVIVE depletion method);
-  Di L, Obach RS et al. for assay practice.
+- **Citation:** Obach RS. Prediction of human clearance of twenty-nine drugs ... *Drug Metab Dispos*
+  1999;27(11):1350–1359, doi:10.1016/S0090-9556(24)14938-0. Assay conditions (substrate and protein
+  concentration, cofactor) are protocol parameters; no citable consensus set was found
+  (`docs/research/driver_protocols.md` A.8).
 
 ## 4.3 Microsomal binding correction  [`adme.fu_mic`]
 
 - **Purpose:** free fraction in the microsomal incubation (`fu,mic`) corrects CLint for non-specific
   binding to microsomal lipid. Can be measured (equilibrium dialysis) or predicted from LogP/D.
-- **Predicted model (labeled `PREDICTED`):** Hallifax & Houston 2006 relationship
-  `fu,mic = 1 / (1 + C·10^(a·logP/D + b))` with published coefficients and microsomal concentration C;
-  applicability-domain check on LogP range required.
-- **Citation:** Hallifax D, Houston JB. *Drug Metab Dispos* 2006;34:724.
+- **Predicted model (labeled `PREDICTED`):** Hallifax & Houston 2006,
+  `fu,mic = 1 / (1 + C·10^(0.072·X² + 0.067·X − 1.126))`, X = logP (bases) or logD7.4, C = protein
+  (mg/mL). Coefficients confirmed via a published reproduction (the 2006 commentary is paywalled).
+- **Applicability domain:** Gertz et al. 2008 evaluated the equation on 127 measurements and found
+  it reliable for logP/D 0–3 (< 5 when C ≤ 0.1 mg/mL); outside that range fu,inc should be measured.
+- **Citations:** Hallifax D, Houston JB. *Drug Metab Dispos* 2006;34:724. Gertz M et al. *Drug Metab
+  Dispos* 2008;36:535, doi:10.1124/dmd.107.018713.
 
 ## 4.4 IVIVE scaling to in-vivo hepatic clearance  [`adme.clint_invivo`, `adme.clh`]
 
@@ -88,9 +95,12 @@ extrapolation.
 ## 4.6 hERG cardiac safety margin  [`safety.herg_margin`]
 
 - **Equation:** `safety margin = IC50(hERG, free) / Cmax(free, therapeutic)`.
-- **Interpretation thresholds** are encoded as **cited guideline/heuristic bands with the citation**
-  (e.g. the ~30× margin discussion in Redfern et al. 2003), and are always shown *with* the raw margin
-  and the source — never as an unattributed verdict.
+- **Free exposure (ICH E14/S7B Q&A 1.2):** free Cmax = Cmax,ss (high clinical exposure) × fu,p, with
+  fu,p set to 1% when measured below 1%.
+- **Thresholds:** the Q&A sets no fixed number; the margin is compared with margins of reference
+  drugs run under the same protocol. HOS applies a threshold only when the user supplies one with
+  that basis. Redfern et al. 2003 (~30×) is shown as a historical reference point, never as a
+  verdict.
 - **Citations:** Redfern WS et al. *Cardiovasc Res* 2003;58:32; ICH S7B; ICH E14/S7B Q&A (2022) for the
   integrated nonclinical risk framework.
 
@@ -103,10 +113,11 @@ extrapolation.
 - **Most sensitive species:** choose the lowest HED unless justified otherwise (record the justification).
 - **Maximum Recommended Starting Dose:** `MRSD = HED / safety factor` (default 10; raise for steep
   dose-response, irreversible/unmonitorable toxicity, novel target, non-linear PK — each as an encoded,
-  cited condition). Compare against the **pharmacologically active dose (PAD)**; if PAD-derived is lower,
-  use it (flagged for biologics, vasodilators, anticoagulants, growth factors).
+  cited condition). Compare against the **pharmacologically active dose (PAD)**: FDA 2005 §VIII compares an HED derived from the PAD with the MRSD and says
+  that if it is lower "it may be appropriate to decrease the clinical starting dose". HOS flags this
+  (`pad_below_mrsd`) for the responsible scientist and never applies it automatically.
 - **Biologics / immune agonists:** MABEL approach (receptor occupancy / EC20 in human target cells),
-  take the **lowest** of NOAEL-HED, PAD, MABEL. **Advanced cancer:** ICH S9 — 1/10 rodent STD10 or
+  take the **lowest** of NOAEL-HED, PAD, MABEL *(not implemented; verify against EMA FIH Rev. 1 §7.2 before building)*. **Advanced cancer:** ICH S9 — 1/10 rodent STD10 or
   1/6 non-rodent HNSTD; NOAEL not required.
 - **Output:** HED and MRSD as `Quantity(mg/kg and total mg for a 60 kg human)` with the **full
   derivation chain** recorded and rendered.
@@ -131,13 +142,16 @@ Physiological and scaling constants are stored as cited data, versioned, with sp
 
 | id | value | units | species | citation |
 |----|-------|-------|---------|----------|
-| `qh.human` | 20.7 | mL/min/kg | human | Davies & Morris, *Pharm Res* 1993;10:1093 |
-| `mppgl.human` | 40 | mg/g liver | human | Barter ZE et al., *Curr Drug Metab* 2007;8:33 |
-| `liverwt.human` | 21.4 | g/kg BW | human | Barter 2007 / Davies & Morris 1993 |
-| `km.human` | 37 | kg/m² (BSA factor) | human | FDA 2005 MRSD guidance |
-| `km.rat` | 6 | — | rat | FDA 2005 |
-| `km.dog` | 20 | — | dog | FDA 2005 |
-| … | … | | | (full table maintained in the registry; this is an excerpt) |
+| `qh.human` | 20.7 | mL/min/kg | human | Davies & Morris 1993 Table III (1450 mL/min / 70 kg) |
+| `qh.mouse` | 90.0 | mL/min/kg | mouse | Davies & Morris 1993 Table III (1.8 / 0.02) |
+| `mppgl.human` | 32 | mg/g liver | human | Barter 2007 consensus (95% CI 29–34) |
+| `mppgl.rat` / `mppgl.dog` | 61 / 55 | mg/g liver | rat / dog | Smith 2008 |
+| `liver_weight.human` | 21.4 | g/kg BW | human | **requires verification** (no primary source traced) |
+| `km.human` / `km.rat` / `km.dog` | 37 / 6 / 20 | kg/m² | — | FDA 2005 Table 1 |
+| `bw.minipig` | 40 | kg | minipig | FDA 2005 Table 3 |
+
+Registry version **2026.10.2**; the full verified table and per-value sources are in
+`docs/research/reference_params_verification.md` and `docs/09` §9.4.
 
 Rules: a computation MUST pull these by id and record the registry **version** used. Changing a value
 is a new registry version; it never silently alters past results.
@@ -153,7 +167,20 @@ is a new registry version; it never silently alters past results.
 - The UI renders a distinct **provenance badge** for each kind so a scientist sees at a glance whether
   a number was measured, computed, or predicted.
 
-## 4.11 Methods deliberately out of scope initially (added later, each with citations when built)
+## 4.11 Repeat-dose statistics  [`stats.dunnett`, `stats.group_summary`]
+
+- Each dose group is compared with the concurrent control by Dunnett's many-to-one test
+  (two-sided), per endpoint × sex × phase × timepoint, using `scipy.stats.dunnett` with a fixed
+  quasi-Monte-Carlo seed so p-values reproduce. OECD TG 407/408 ¶51 require the method to be chosen
+  at design and multiple t-tests to be avoided; NTP practice uses Dunnett and Williams (Jaki &
+  Hothorn 2013).
+- Assumptions: approximately normal residuals, homogeneous variances; no transformation applied.
+- Statistical significance is not adversity. The NOAEL (FDA 2005 glossary definition) is determined
+  and signed by the Study Director.
+- Citations: Dunnett CW. *J Am Stat Assoc* 1955;50:1096, doi:10.1080/01621459.1955.10501294;
+  Jaki T, Hothorn LA. *Arch Toxicol* 2013;87:1901; OECD TG 407 (2008), 408 (2018), 409 (1998).
+
+## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond
 HED, formulation/solid-state prediction, image/omics pipelines. Each will be added to this document

@@ -7,6 +7,11 @@ team's working understanding, not legal advice.
 
 ## 5.1 Primary sources (build clients for these)
 
+**Implemented (2026-10-11):** ChEMBL (molecule by InChIKey, activities incl. hERG CHEMBL240) and
+PubChem PUG-REST (properties by InChIKey) in `hos/data_sources/`, with caching, rate limiting,
+explicit status, censored-value preservation and fixtures recorded from the live APIs. The other
+sources below are planned.
+
 | Source | Access | What we use it for | Licensing posture (verify) |
 |--------|--------|--------------------|-----------------------------|
 | **ChEMBL** | REST API + bulk download (EBI) | Measured bioactivities, assays, mechanism, known hERG/ADME data for reference & benchmarking | **CC BY-SA 3.0** — share-alike; implications for commercial derivatives — **review carefully** |

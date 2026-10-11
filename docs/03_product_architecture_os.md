@@ -10,8 +10,11 @@ execution targets, and each driver knows how to run one study type.
 ### The kernel = four primitives
 
 1. **Study/Experiment lifecycle** — a state machine:
-   `PROPOSED → DESIGNED → COSTED → SCHEDULED → IN_EXECUTION → DATA_RECEIVED → ANALYZED → REPORTED → PROMOTED`
-   (with `FAILED`, `CANCELLED`, `AMENDED` transitions). One object, one state machine, every study.
+   `PROPOSED → DESIGNED → PLANNED → DISPATCHED → DATA_RECEIVED → ANALYZED → REPORTED → APPROVED`
+   (plus `CANCELLED` and `FAILED`; amendment returns to `DESIGNED`, replacement data to
+   `DATA_RECEIVED`, re-analysis to `ANALYZED`, each with a recorded reason). There is no costing
+   state: price is a laboratory quote, not something the system estimates
+   (`hos/kernel/lifecycle.py`).
 2. **Entity graph** — the typed objects and their relationships: `Substance`, `Lot`, `Sample`,
    `Protocol`, `Run`, `Result`, `Subject`, `Study`, `Finding`, `Program`, `Instrument/ExecutionTarget`.
    Two relationships are load-bearing: **`derived_from`** (complete, bidirectional lineage) and the
@@ -27,10 +30,11 @@ execution targets, and each driver knows how to run one study type.
 ### The execution abstraction (the heart of "OS")
 
 ```
-ExecutionTarget (interface)
-├── HumanBench      # a scientist performs steps; app captures at the bench
-├── RoboticSystem   # a liquid handler / automated line; worklist in, data out
-└── ExternalCRO     # a contract lab; instruction package out, data package in
+ExecutionTarget (interface)                    implemented in hos/kernel/execution/
+├── ExternalLabTarget  # a CRO: dispatch bundle out, return file in        (built)
+├── InHouseTarget      # sponsor's lab, named responsible scientist         (built)
+├── SimulationTarget   # declared, seeded generator; SIMULATED, never evidence (built)
+└── RoboticSystem      # worklist in, data out                              (planned)
 ```
 
 The kernel dispatches a study's steps onto an `ExecutionTarget` without the driver caring which kind
@@ -40,7 +44,9 @@ later. This is what distinguishes HOS from a LIMS: it *runs* work, it does not m
 
 ### Drivers = study types
 
-A **driver** implements the `StudyDriver` interface (full spec in `docs/08`) with these capabilities:
+A **driver** implements the `StudyDriver` interface. The implemented interface is specified in
+`docs/08`; the original capability sketch below maps onto it (`qc` is part of `analyze`, the
+regulatory slot is the driver's `ctd_section`):
 
 - `design(molecule, context) -> Protocol`  — compose a correct, parameterized protocol.
 - `plan(protocol, target) -> Plan`          — cost, timeline, materials, dependencies.

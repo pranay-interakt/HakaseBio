@@ -1,7 +1,9 @@
 # 02 — Market & Competition
 
-> Figures below carry the same honesty rule as the product: where a number is soft or sourced from
-> secondary aggregation, it is marked. Treat market sizes as order-of-magnitude, not precision.
+> **Superseded for figures:** the sourced, graded research is `docs/research/preclinical_lab_os.md`
+> (2026-10-11). Several numbers below come from secondary aggregation and could not be matched to a
+> current primary source (e.g. the ~$3.1B AI-in-drug-discovery figure); do not quote them. The
+> evidenced picture is summarised in `docs/12`.
 
 ## 2.1 Where the money is
 

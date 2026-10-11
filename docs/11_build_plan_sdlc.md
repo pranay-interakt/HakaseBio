@@ -31,7 +31,7 @@ the kernel facade imports drivers through the registry only; API imports the fac
 
 | # | Deliverable | Exit criteria | Status |
 |---|---|---|---|
-| 0 | Baseline | venv, git, core suite green | Done (61 tests) |
+| 0 | Baseline | venv, git, core suite green | Done (61 tests; 189 + 1 live at step 11) |
 | 2 | Primary-source verification | citations vs Crossref/official PDFs; guideline sections vs ICH text; every constant verified or flagged | Done: 25 section refs, 6 constants, 1 invented model domain, FDA Step 5 logic corrected |
 | 3 | Driver framework + reference driver | ABI, registry, conformance kit, strict ingest; **metabolic stability driver passes conformance** + known-value tests | Done (15/15 conformance checks) |
 | 4 | Execution targets | external lab bundle + awaited return; in-house; simulation (SIMULATED only) | Done |
@@ -42,7 +42,7 @@ the kernel facade imports drivers through the registry only; API imports the fac
 | 9 | FastAPI | full flow, OpenAPI, re-auth signatures | Done |
 | 10 | Frontend | full flow; provenance badges; no science in browser | Done |
 | 11 | Demo + README run instructions | end-to-end script; demo data real or labelled SIMULATED | Done |
-| 1 | Docs 07–13 | each describes implemented behaviour; updated as steps land | 07, 11, 13 done |
+| 1 | Docs 07–13 | each describes implemented behaviour; updated as steps land | Done (00–06 corrected to match the build) |
 
 ## 11.4 Process per step
 

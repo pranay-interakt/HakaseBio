@@ -34,24 +34,26 @@ def _series(k=K, times=TIMES):
 
 
 PROT = Quantity.user_supplied(0.5, "mg/mL", actor="setup")
+#: run-acceptance criteria are caller-stated test inputs (no defaults in the core)
+ACC = {"min_r2": 0.9, "min_depletion_pct": 20.0}
 FUP = Quantity.measured(0.1, "dimensionless", source_name="RED")
 BP = Quantity.measured(1.0, "dimensionless", source_name="B:P")
 
 
 def test_half_life_is_recovered_exactly():
-    fit = fit_depletion(_series())
+    fit = fit_depletion(_series(), **ACC)
     assert fit.half_life.value == pytest.approx(T_HALF, rel=1e-9)
     assert fit.qc.status is QCStatus.PASS
 
 
 def test_clint_matches_obach_half_life_method():
-    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     assert clint.value == pytest.approx(K * 1000 / 0.5, rel=1e-12)
     assert clint.unit == "uL/min/mg"
 
 
 def test_liver_scaling_uses_cited_human_scalars():
-    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     iv = scale_clint_to_liver(clint, "human")
     # Barter 2007 consensus MPPGL 32 mg/g; IVIVE liver weight 21.4 g/kg (flagged unverified)
     assert iv.value == pytest.approx(K * 1000 / 0.5 * 32.0 * 21.4 / 1000, rel=1e-12)
@@ -60,7 +62,7 @@ def test_liver_scaling_uses_cited_human_scalars():
 
 
 def test_well_stirred_hand_calculation():
-    clint = scale_clint_to_liver(clint_in_vitro(fit_depletion(_series()), PROT), "human")
+    clint = scale_clint_to_liver(clint_in_vitro(fit_depletion(_series(), **ACC), PROT), "human")
     fub = fu_blood_from_plasma(FUP, BP)
     clh = hepatic_clearance_well_stirred(clint, fub, "human")
     c = clint.value
@@ -92,7 +94,7 @@ def test_flat_series_fails_honestly_and_propagates():
                              x_unit="min", y_unit="percent",
                              provenance=Provenance.measured(source_name="LC-MS/MS"))
     res = ivive_from_depletion(flat, species="human", protein_concentration=PROT,
-                               fu_plasma=FUP, blood_plasma_ratio=BP)
+                               fu_plasma=FUP, blood_plasma_ratio=BP, **ACC)
     assert not res.clh.is_available
     assert res.extraction_class == "undetermined"
     assert res.qc.status is QCStatus.FAIL
@@ -100,7 +102,7 @@ def test_flat_series_fails_honestly_and_propagates():
 
 def test_low_depletion_is_warned_not_hidden():
     slow = _series(k=math.log(2) / 600.0)  # t1/2 = 10 h -> ~7% depletion in 60 min
-    fit = fit_depletion(slow)
+    fit = fit_depletion(slow, **ACC)
     assert "insufficient_depletion" in fit.qc.flags
 
 
@@ -112,20 +114,20 @@ def test_fu_mic_prediction_and_domain():
 
 
 def test_fu_mic_correction_increases_clearance():
-    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     lp = Quantity.computed(4.0, "dimensionless", method=method("descr.clogp"))
     fu = fu_mic_hallifax_houston(lp, PROT)
     assert scale_clint_to_liver(clint, "human", fu_mic=fu).value > scale_clint_to_liver(clint, "human").value
 
 
 def test_species_without_verified_mppgl_is_unavailable_not_borrowed():
-    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     iv = scale_clint_to_liver(clint, "mouse")
     assert not iv.is_available and "not substituted" in iv.provenance.reason
 
 
 def test_dog_uses_smith_2008_mppgl():
-    clint = clint_in_vitro(fit_depletion(_series()), PROT)
+    clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     iv = scale_clint_to_liver(clint, "dog")
     assert iv.value == pytest.approx(K * 1000 / 0.5 * 55.0 * 32.0 / 1000, rel=1e-12)
     assert not iv.qc_flags

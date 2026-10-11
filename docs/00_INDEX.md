@@ -2,10 +2,12 @@
 
 ## Status
 
-**Phase: Specification complete / pre-implementation.**
-No application code has been written yet. This is deliberate: per the project owner's directive,
-the system is specified end-to-end — with real science and real data sources — *before* any code,
-so that no placeholder heuristics or hard-coded values leak into the build.
+**Phase: build steps 0–11 implemented (2026-10-11).** Scientific core, kernel, driver model with
+three drivers, execution targets, ChEMBL/PubChem clients, IND assembler, REST API and frontend are
+built and tested (189 offline tests + live contract test). The plan of record and status are in
+`11_build_plan_sdlc.md`; what is enforced and verified is in `09`; compliance gaps are in `10`.
+Documents 01–02 are the original thesis; their market figures are superseded by
+`research/preclinical_lab_os.md`.
 
 ## How to read this set
 

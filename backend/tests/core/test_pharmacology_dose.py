@@ -20,19 +20,19 @@ def _curve(ic50, conc=CONC):
 
 
 def test_exact_ic50_recovery():
-    f = fit_hill(_curve(2.5))
+    f = fit_hill(_curve(2.5), min_r2=0.9)
     assert f.ic50.value == pytest.approx(2.5, rel=1e-4)
     assert f.hill_slope.value == pytest.approx(1.0, rel=1e-3)
 
 
 def test_extrapolated_potency_is_flagged():
-    f = fit_hill(_curve(50.0, conc=np.array([0.001, 0.003, 0.01, 0.03, 0.1])))
+    f = fit_hill(_curve(50.0, conc=np.array([0.001, 0.003, 0.01, 0.03, 0.1])), min_r2=0.9)
     assert f.extrapolated and "potency_extrapolated" in f.ic50.qc_flags
 
 
 def test_too_few_points_rejected():
     with pytest.raises(QuantityError):
-        fit_hill(_curve(1.0, conc=np.array([0.1, 1.0, 10.0])))
+        fit_hill(_curve(1.0, conc=np.array([0.1, 1.0, 10.0])), min_r2=0.9)
 
 
 def test_herg_margin_and_reference_flag():

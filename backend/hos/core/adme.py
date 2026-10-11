@@ -47,10 +47,6 @@ __all__ = [
 
 _SOFTWARE = {"numpy": np.__version__, "scipy": scipy.__version__}
 
-#: Minimum regression quality for a depletion fit to be reported without a warning.
-DEFAULT_MIN_R2 = 0.90
-#: Minimum total substrate depletion (%) for the rate constant to be well determined.
-DEFAULT_MIN_DEPLETION_PCT = 20.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,8 +76,8 @@ class DepletionFit:
 def fit_depletion(
     series: MeasurementSeries,
     *,
-    min_r2: float = DEFAULT_MIN_R2,
-    min_depletion_pct: float = DEFAULT_MIN_DEPLETION_PCT,
+    min_r2: float,
+    min_depletion_pct: float,
 ) -> DepletionFit:
     """Fit ln(fraction remaining) against time by linear regression.
 
@@ -92,6 +88,10 @@ def fit_depletion(
 
     The elimination rate constant ``k`` is the negative slope; the half-life is
     ``ln(2)/k`` (Obach 1999).
+
+    ``min_r2`` and ``min_depletion_pct`` are run-acceptance criteria. They have no
+    defaults: no consensus source fixes them, so the caller (a protocol) states them and
+    records their basis.
     """
     t = np.asarray(series.x, dtype=float)
     y = np.asarray(series.y, dtype=float)
@@ -489,6 +489,8 @@ def ivive_from_depletion(
     protein_concentration: Quantity,
     fu_plasma: Quantity,
     blood_plasma_ratio: Quantity,
+    min_r2: float,
+    min_depletion_pct: float,
     lipophilicity_for_fu_mic: Optional[Quantity] = None,
     params: Optional[ReferenceParameterSet] = None,
 ) -> IVIVEResult:
@@ -499,7 +501,7 @@ def ivive_from_depletion(
     recorded in the provenance notes rather than assumed away.
     """
     params = params or ReferenceParameterSet()
-    fit = fit_depletion(series)
+    fit = fit_depletion(series, min_r2=min_r2, min_depletion_pct=min_depletion_pct)
     clint_app = clint_in_vitro(fit, protein_concentration)
 
     fu_mic = None
