@@ -70,7 +70,7 @@ export function Programs({ go }: { go: (hash: string) => void }) {
     .map(Number);
 
   useEffect(() => {
-    api.get<typeof list>("/programs").then(setList).catch(setErr);
+    api.getAll<(typeof list)[number]>("/programs").then(setList).catch(setErr);
   }, []);
 
   async function create() {

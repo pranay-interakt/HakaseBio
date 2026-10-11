@@ -49,6 +49,8 @@ Every setting is an environment variable. The table lists them all, with their d
 | `HOS_BOOTSTRAP_TOKEN` | generated and logged at start | creates the first administrator |
 | `HOS_DB_AUTO_UPGRADE` | `1` | `0`: refuse an out-of-date schema; run `hos-db upgrade` as its own step |
 | `HOS_WRITE_WAIT_SECONDS` | `30` | how long a write waits for another writer before answering 503 |
+| `HOS_MAX_UPLOAD_MB` | `100` | largest body for upload endpoints (data files, study reports, verification bundles); keep nginx's `client_max_body_size` above it |
+| `HOS_MAX_JSON_KB` | `2048` | largest body for every other endpoint |
 | `HOS_SESSION_HOURS` | `8` | absolute session lifetime |
 | `HOS_SESSION_IDLE_MINUTES` | `30` | idle timeout |
 | `HOS_LOCKOUT_ATTEMPTS` | `5` | consecutive failed passwords before an account locks |
@@ -75,6 +77,13 @@ Every CI run builds what a release ships, so a release cannot fail for a reason 
 Pushing a `v*` tag publishes these as a GitHub release, only after every job has passed. To
 update a dependency, re-run the lock command with `--upgrade-package NAME`, then let CI run the
 suite on the new set.
+
+## Lists
+
+`/api/programs`, `/api/studies`, `/api/studies/{id}/artifacts` and `/api/ledger/{subject}`
+take `limit` (default 100, at most 1000) and `offset`. The database applies both after the
+access filter. The body is the page, and `X-Total-Count` is the total. The web app reads every
+page.
 
 ## Health
 

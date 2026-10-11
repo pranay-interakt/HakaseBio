@@ -37,6 +37,27 @@ export function setToken(token: string | null): void {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<T> {
+  return (await send<T>(method, path, body, raw)).data;
+}
+
+/** Every item of a paged list (docs/15 P2.5): pages of at most 1000, totalled by X-Total-Count. */
+async function getAll<T>(path: string): Promise<T[]> {
+  const out: T[] = [];
+  const sep = path.includes("?") ? "&" : "?";
+  for (;;) {
+    const { data, headers } = await send<T[]>("GET", `${path}${sep}limit=1000&offset=${out.length}`);
+    out.push(...data);
+    const total = Number(headers.get("X-Total-Count") ?? out.length);
+    if (data.length === 0 || out.length >= total) return out;
+  }
+}
+
+async function send<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  raw?: BodyInit,
+): Promise<{ data: T; headers: Headers }> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -62,11 +83,12 @@ async function request<T>(method: string, path: string, body?: unknown, raw?: Bo
     }
     throw new ApiError(res.status, msg, d.errors ?? [], d.error ?? null);
   }
-  return data as T;
+  return { data: data as T, headers: res.headers };
 }
 
 export const api = {
   get: <T,>(path: string) => request<T>("GET", path),
+  getAll: <T,>(path: string) => getAll<T>(path),
   post: <T,>(path: string, body: unknown = {}) => request<T>("POST", path, body),
   put: <T,>(path: string, body: unknown) => request<T>("PUT", path, body),
   patch: <T,>(path: string, body: unknown) => request<T>("PATCH", path, body),

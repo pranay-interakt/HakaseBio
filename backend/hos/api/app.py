@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.exc import OperationalError
 
 from hos import __version__
+from hos.api.limits import BodyLimit
 from hos.core.citations import CITATIONS
 from hos.core.descriptors import InvalidStructureError
 from hos.core.methods import METHODS
@@ -270,6 +271,21 @@ def _validation_errors(errors: list[Any]) -> list[str]:
             for e in errors]
 
 
+class Page:
+    """``limit`` and ``offset`` for list endpoints (docs/15 P2.5). The body stays a list; the
+    total is in ``X-Total-Count``."""
+
+    def __init__(self, limit: int = Query(100, ge=1, le=1000),
+                 offset: int = Query(0, ge=0)) -> None:
+        self.limit, self.offset = limit, offset
+
+    @staticmethod
+    def send(response: Response, items: list[dict[str, Any]], total: int
+             ) -> list[dict[str, Any]]:
+        response.headers["X-Total-Count"] = str(total)
+        return items
+
+
 def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = None) -> FastAPI:
     """``bootstrap_token`` (or HOS_BOOTSTRAP_TOKEN) is required to create the first
     administrator; without either, a one-time token is generated and printed in the server log
@@ -297,7 +313,8 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                                          "http://localhost:5173,http://127.0.0.1:5173").split(",")
                if o]
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"],
-                       allow_headers=["*"])
+                       allow_headers=["*"], expose_headers=["X-Total-Count"])
+    app.add_middleware(BodyLimit)              # docs/15 P2.5
     state: dict[str, Any] = {"kernel": kernel}
     throttle = LoginThrottle(int(os.environ.get("HOS_LOGIN_ATTEMPTS_PER_MINUTE", "10")))
 
@@ -558,10 +575,9 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
     # -- programmes and compounds ---------------------------------------------------------
     @app.get("/api/programs")
-    def programs(actor: Principal = Depends(current),
+    def programs(response: Response, page: Page = Depends(), actor: Principal = Depends(current),
                  k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        mine = k.accessible_programs(actor)
-        return [p for p in k.programs() if p["id"] in mine]
+        return page.send(response, *k.programs_page(actor, page.limit, page.offset))
 
     @app.post("/api/programs")
     def create_program(body: ProgramBody, actor: Principal = Depends(current),
@@ -666,13 +682,12 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
     # -- studies --------------------------------------------------------------------------
     @app.get("/api/studies")
-    def studies(program_id: str | None = None, actor: Principal = Depends(current),
+    def studies(response: Response, program_id: str | None = None, page: Page = Depends(),
+                actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         if program_id is not None:
             program_access(program_id, actor, k)
-        mine = k.accessible_programs(actor)
-        return [s_ for s_ in k.studies(program_id)
-                if k.repo.study(s_["id"]).program_id in mine]
+        return page.send(response, *k.studies_page(actor, program_id, page.limit, page.offset))
 
     @app.post("/api/studies")
     def create_study(body: StudyBody, actor: Principal = Depends(current),
@@ -814,9 +829,10 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         return k.cancel_study(actor, study_id, reason=body.reason)
 
     @app.get("/api/studies/{study_id}/artifacts", dependencies=[Depends(study_access)])
-    def artifacts(study_id: str, kind: str | None = None, actor: Principal = Depends(current),
+    def artifacts(study_id: str, response: Response, kind: str | None = None,
+                  page: Page = Depends(), actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        return k.artifacts(study_id, kind)
+        return page.send(response, *k.artifacts_page(study_id, kind, page.limit, page.offset))
 
     @app.get("/api/files/{sha}", dependencies=[Depends(file_access)])
     def file(sha: str, actor: Principal = Depends(current),
@@ -967,9 +983,10 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         return report
 
     @app.get("/api/ledger/{subject_id}", dependencies=[Depends(ledger_access)])
-    def ledger(subject_id: str, actor: Principal = Depends(current),
+    def ledger(subject_id: str, response: Response, page: Page = Depends(),
+               actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        return k.history(subject_id)
+        return page.send(response, *k.history_page(subject_id, page.limit, page.offset))
 
     return app
 

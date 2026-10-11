@@ -132,6 +132,8 @@ class LedgerBackend(Protocol):
     def last(self) -> LedgerEntry | None: ...
     def iter_all(self) -> Iterator[LedgerEntry]: ...
     def for_subject(self, subject_id: str) -> list[LedgerEntry]: ...
+    def subject_page(self, subject_id: str, limit: int,
+                     offset: int) -> tuple[list[LedgerEntry], int]: ...
 
 
 class MemoryLedgerBackend:
@@ -151,6 +153,11 @@ class MemoryLedgerBackend:
 
     def for_subject(self, subject_id: str) -> list[LedgerEntry]:
         return [e for e in self._entries if e.subject_id == subject_id]
+
+    def subject_page(self, subject_id: str, limit: int,
+                     offset: int) -> tuple[list[LedgerEntry], int]:
+        mine = self.for_subject(subject_id)
+        return mine[offset:offset + limit], len(mine)
 
 
 class Ledger:
@@ -222,6 +229,10 @@ class Ledger:
 
     def history(self, subject_id: str) -> list[LedgerEntry]:
         return self._backend.for_subject(subject_id)
+
+    def history_page(self, subject_id: str, limit: int,
+                     offset: int) -> tuple[list[LedgerEntry], int]:
+        return self._backend.subject_page(subject_id, limit, offset)
 
     def entries(self) -> list[LedgerEntry]:
         return list(self._backend.iter_all())

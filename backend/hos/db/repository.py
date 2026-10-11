@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, or_, select
 
 from hos.core.provenance import utc_now
 from hos.db.models import (
@@ -110,6 +110,22 @@ class Repository:
         with self.db.session() as s:
             return list(s.execute(select(ProgramRow).order_by(ProgramRow.created_at)).scalars())
 
+    @staticmethod
+    def _page(s: Any, q: Select[Any], limit: int, offset: int) -> tuple[list[Any], int]:
+        """One page of a query and the total it would return (docs/15 P2.5)."""
+        total = s.execute(select(func.count()).select_from(q.order_by(None).subquery()))
+        return list(s.execute(q.limit(limit).offset(offset)).scalars()), int(total.scalar_one())
+
+    def programs_page(self, organisation: str | None, guest_of: set[str], limit: int,
+                      offset: int) -> tuple[list[ProgramRow], int]:
+        """Programmes owned by ``organisation`` or shared with the caller, oldest first."""
+        owned = (ProgramRow.organisation.is_(None) if organisation is None
+                 else ProgramRow.organisation == organisation)
+        q = select(ProgramRow).where(or_(owned, ProgramRow.id.in_(guest_of))) \
+            .order_by(ProgramRow.created_at, ProgramRow.id)
+        with self.db.session() as s:
+            return self._page(s, q, limit, offset)
+
     def update_program(self, program_id: str, **fields: Any) -> ProgramRow:
         with self.db.session() as s:
             r = s.get(ProgramRow, program_id)
@@ -157,6 +173,13 @@ class Repository:
                 q = q.where(StudyRow.program_id == program_id)
             return list(s.execute(q).scalars())
 
+    def studies_page(self, program_ids: set[str], limit: int,
+                     offset: int) -> tuple[list[StudyRow], int]:
+        q = select(StudyRow).where(StudyRow.program_id.in_(program_ids)) \
+            .order_by(StudyRow.created_at, StudyRow.id)
+        with self.db.session() as s:
+            return self._page(s, q, limit, offset)
+
     def update_study(self, study_id: str, **fields: Any) -> StudyRow:
         with self.db.session() as s:
             r = s.get(StudyRow, study_id)
@@ -190,6 +213,14 @@ class Repository:
             if kind:
                 q = q.where(ArtifactRow.kind == kind)
             return list(s.execute(q.order_by(ArtifactRow.id)).scalars())
+
+    def artifacts_page(self, study_id: str, kind: str | None, limit: int,
+                       offset: int) -> tuple[list[ArtifactRow], int]:
+        q = select(ArtifactRow).where(ArtifactRow.study_id == study_id)
+        if kind:
+            q = q.where(ArtifactRow.kind == kind)
+        with self.db.session() as s:
+            return self._page(s, q.order_by(ArtifactRow.id), limit, offset)
 
     # -- files ---------------------------------------------------------------------------
 

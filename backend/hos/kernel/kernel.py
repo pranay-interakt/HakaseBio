@@ -1213,6 +1213,36 @@ class Kernel:
     def history(self, subject_id: str) -> list[dict[str, Any]]:
         return [e.to_dict() for e in self.ledger.history(subject_id)]
 
+    # pages for the API (docs/15 P2.5): (items, total), filtered and limited in the database
+
+    def programs_page(self, actor: Principal, limit: int,
+                      offset: int) -> tuple[list[dict[str, Any]], int]:
+        rows, total = self.repo.programs_page(actor.organisation,
+                                              self.repo.member_programs(actor.id), limit, offset)
+        return [{"id": r.id, "name": r.name, "sponsor": r.sponsor,
+                 "created_at": r.created_at.isoformat()} for r in rows], total
+
+    def studies_page(self, actor: Principal, program_id: str | None, limit: int,
+                     offset: int) -> tuple[list[dict[str, Any]], int]:
+        ids = self.accessible_programs(actor)
+        if program_id is not None:
+            ids &= {program_id}
+        rows, total = self.repo.studies_page(ids, limit, offset)
+        return [self._study_summary(r) for r in rows], total
+
+    def artifacts_page(self, study_id: str, kind: str | None, limit: int,
+                       offset: int) -> tuple[list[dict[str, Any]], int]:
+        rows, total = self.repo.artifacts_page(study_id, kind, limit, offset)
+        return [{"id": a.id, "kind": a.kind, "version": a.version,
+                 "content_hash": a.content_hash, "supersedes": a.supersedes, "reason": a.reason,
+                 "created_by": a.created_by, "created_at": a.created_at.isoformat(),
+                 "content": a.content} for a in rows], total
+
+    def history_page(self, subject_id: str, limit: int,
+                     offset: int) -> tuple[list[dict[str, Any]], int]:
+        entries, total = self.ledger.history_page(subject_id, limit, offset)
+        return [e.to_dict() for e in entries], total
+
     def verify_ledger(self) -> int:
         return self.ledger.verify()
 

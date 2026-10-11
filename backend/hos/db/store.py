@@ -11,7 +11,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, func, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -218,6 +218,14 @@ class SqlLedgerBackend:
         with self.db.session() as s:
             rows = s.execute(select(LedgerRow).order_by(LedgerRow.seq)).scalars().all()
             return iter([self._to_entry(r) for r in rows])
+
+    def subject_page(self, subject_id: str, limit: int,
+                     offset: int) -> tuple[list[LedgerEntry], int]:
+        q = select(LedgerRow).where(LedgerRow.subject_id == subject_id)
+        with self.db.session() as s:
+            total = s.execute(select(func.count()).select_from(q.subquery())).scalar_one()
+            rows = s.execute(q.order_by(LedgerRow.seq).limit(limit).offset(offset)).scalars()
+            return [self._to_entry(r) for r in rows], int(total)
 
     def for_subject(self, subject_id: str) -> list[LedgerEntry]:
         with self.db.session() as s:

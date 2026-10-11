@@ -197,7 +197,10 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
      image.
    - An SBOM (CycloneDX) per release.
    - `hos-verify` already records versions, so make releases produce them.
-5. **Request limits.**
+5. **Request limits — fixed.** *`HOS_MAX_UPLOAD_MB` (100) for upload endpoints and
+   `HOS_MAX_JSON_KB` (2048) for the rest, enforced on the declared length and on chunked bodies
+   as they arrive (413, nothing stored); `limit`/`offset` with `X-Total-Count` on programmes,
+   studies, artefacts and ledger history, applied in SQL after the access filter.*
    - Maximum body size on upload and import endpoints (configurable).
    - Pagination on `/api/programs`, `/api/studies`, artefacts and ledger history.
 6. **Lost updates — fixed.** *Every unit of work first updates the single `writer_lock` row

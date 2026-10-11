@@ -20,7 +20,7 @@ export function Study({ id, me }: { id: string; me: Principal }) {
     try {
       const st = await api.get<StudyT>(`/studies/${id}`);
       setS(st);
-      if (st.origin === "import") setSiblings(await api.get<StudySummary[]>(`/studies?program_id=${st.program_id}`));
+      if (st.origin === "import") setSiblings(await api.getAll<StudySummary>(`/studies?program_id=${st.program_id}`));
       else setDriver(await api.get<Driver>(`/drivers/${st.driver_id}`));
     } catch (e) {
       setErr(e);
@@ -777,7 +777,7 @@ function AuditTrail({ id }: { id: string }) {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (open) api.get<LedgerEntry[]>(`/ledger/${id}`).then(setEntries).catch(() => setEntries([]));
+    if (open) api.getAll<LedgerEntry>(`/ledger/${id}`).then(setEntries).catch(() => setEntries([]));
   }, [id, open]);
   return (
     <Section title="Audit trail" right={<button onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"}</button>}>
