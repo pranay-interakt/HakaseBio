@@ -35,6 +35,7 @@ BUILTIN_DRIVERS: tuple[str, ...] = (
     "hos.drivers.toxicokinetics:ToxicokineticsDriver",
     "hos.drivers.in_vivo_pk:InVivoPKDriver",
     "hos.drivers.plasma_protein_binding:PlasmaProteinBindingDriver",
+    "hos.drivers.ames:AmesDriver",
 )
 
 _REQUIRED_ATTRS = ("id", "name", "version", "requirement_ids", "modalities", "ctd_section")

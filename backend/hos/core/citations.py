@@ -241,6 +241,10 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "Guidelines for the Testing of Chemicals, Section 4. Adopted 1998.",
            year=1998, doi="10.1787/9789264070721-en"),
         # ---- regulatory ------------------------------------------------------
+        _c("oecd_tg471",
+           "OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the "
+           "Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020.",
+           year=2020, doi="10.1787/9789264071247-en"),
         _c("fda_mrsd_2005",
            "U.S. Food and Drug Administration. Guidance for Industry: Estimating the "
            "Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in "

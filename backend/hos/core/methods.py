@@ -236,6 +236,18 @@ METHODS: Final[dict[str, Method]] = dict(
            "with log-normal analytical variability", ("thermo_red_2023",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("genetox.revertant_summary",
+           "Revertant colonies per plate: mean and SD per strain, metabolic activation and "
+           "concentration (OECD TG 471 paragraphs 32-33)", ("oecd_tg471",)),
+        _m("genetox.fold_over_vehicle",
+           "Mean revertants divided by the concurrent vehicle-control mean", ("oecd_tg471",),
+           limits=("displayed for information: neither OECD TG 471 nor ICH S2(R1) sets a fold "
+                   "threshold for a positive result",)),
+        _m("sim.ames_counts",
+           "Simulated revertant counts from declared expected values per strain, activation and "
+           "concentration (exact or Poisson-sampled)", ("oecd_tg471",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

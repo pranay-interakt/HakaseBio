@@ -41,7 +41,9 @@ def test_rehearsal_runs_supplied_plans_and_names_gaps(k):  # noqa: F811
     nr = items["tox.repeat_dose_nonrodent"]
     assert nr["outcome"] == "needs_design_parameters" and "strain" in nr["missing_parameters"]
     s = r["summary"]
-    assert "genotox.ames" in s["missing_drivers"]
+    for rid in s["missing_drivers"]:
+        assert items[rid]["outcome"] == "no_driver"
+    assert items["genotox.ames"]["outcome"] == "needs_design_parameters"
     # the metabolic-stability rehearsal reports the fu inputs it was not given
     assert "fu_plasma.human" in s["missing_inputs"]["adme.metabolic_stability"]
     assert any(u["label"].startswith("CLh") for u in items["adme.metabolic_stability"]

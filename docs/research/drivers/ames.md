@@ -107,3 +107,25 @@ Confidence labels (same scheme as `docs/research/driver_protocols.md`):
 2. ICH (2011). *S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use.* Step 4, 9 November 2011. https://database.ich.org/sites/default/files/S2%28R1%29%20Guideline.pdf
 3. Claxton LD, Allen J, Auletta A, Mortelmans K, Nestmann E, Zeiger E. Guide for the Salmonella typhimurium/mammalian microsome tests for bacterial mutagenicity. *Mutat Res.* 1987;189(2):83–91. DOI: 10.1016/0165-1218(87)90014-0 *(bibliographic only — cite as "cited by TG 471 ¶35", not for any specific value)*.
 4. Gatehouse D, Haworth S, Cebula T, Gocke E, Kier L, Matsushima T, Melcion C, Nohmi T, Ohta T, Venitt S, Zeiger E. Recommendations for the performance of bacterial mutation assays. *Mutat Res.* 1994;312(3):217–233. DOI: 10.1016/0165-1161(94)90037-x *(bibliographic only)*.
+
+## Implementation record (driver `ames` v1.0.0, 2026-10-11)
+
+- **TG 471 re-checked.** The text was re-read from the same PDF (SHA-256 `aa31b276…cc50`):
+  - ¶19, top dose and insolubility;
+  - ¶20, "At least five different analysable concentrations";
+  - ¶27–28, plate incorporation; preincubation "usually for 20 min. or more at 30°-37°C";
+  - ¶29, triplicate plating;
+  - ¶31, "37°C for 48-72 hours";
+  - ¶32–33, data presentation;
+  - ¶34–35, confirmation and evaluation.
+- **TG 471 DOI.** 10.1787/9789264071247-en was confirmed on Crossref (OECD monograph, issued
+  2020-06-29).
+- **Decisions.**
+  - **Errors vs notes.** Paragraphs with a "should" and a number (¶13, 20, 29, 31) are
+    validation errors. Paragraphs with "usually" (¶16 S9 5–30% v/v; ¶28 preincubation) are
+    design notes.
+  - **Fold over vehicle.** Computed and shown, but never used as a criterion.
+  - **Statistics.** No statistical test is applied. TG 471 ¶35 allows statistics only as an aid,
+    and its cited method (Mahon et al. 1989) is NOT VERIFIED.
+  - **Historical ranges.** Negative ranges are required per strain × S9; positive ranges are
+    optional. The range type (e.g. 95% control limits) is stated by the laboratory.

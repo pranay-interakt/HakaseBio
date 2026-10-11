@@ -295,6 +295,38 @@ The kit checks:
   - Exact fu recovery from declared chamber concentrations.
   - The M12 3-fold boundary: exactly 3-fold passes; 3.1-fold fails in either direction.
 
+### `ames` v1.0.0 — bacterial reverse mutation test (OECD TG 471; ICH S2(R1))
+
+- **Serves.** `genotox.ames`, CTD 4.2.3.3.1, for small molecules and peptides. A peptide
+  programme gets the S2(R1) §5.2.1 caveat.
+- **Research note.** `docs/research/drivers/ames.md`.
+- **Design.** Inputs are checked against the TG 471 paragraph cited in each error message:
+  - strains;
+  - S9 source and % v/v;
+  - plate incorporation or preincubation;
+  - concentrations and the top-dose basis;
+  - plates per dose;
+  - vehicle and untreated controls;
+  - incubation conditions;
+  - positive controls per strain × S9;
+  - historical negative (and optional positive) control ranges per strain × S9, with range type
+    and reference.
+- **Return data.** One row per plate: experiment, strain, S9, treatment, concentration, plate,
+  revertants, background lawn, precipitate.
+- **Analysis.**
+  - Mean (SD) per experiment × strain × S9 × treatment/concentration.
+  - Fold over vehicle, for information.
+  - Vehicle and positive means compared with the historical ranges.
+  - Test means above the historical negative upper limit.
+  - The analysable-concentration count.
+  - Top-dose evidence (lawn reduction or precipitate, depending on the stated basis).
+  - Missing controls (FAIL) and lost plates.
+- **Determination.** Positive / negative / equivocal (Study Director), guided by TG 471 ¶35–37.
+- **Known-value tests.**
+  - Exact means and folds from declared expected counts.
+  - Each TG 471 design rule refused with its paragraph.
+  - Historical-range and top-dose flags.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

@@ -372,7 +372,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 9",
             rationale="A gene mutation assay is generally considered sufficient to support "
                       "single-dose clinical trials",
-            glp=True, ctd_section="4.2.3.3.1",
+            glp=True, ctd_section="4.2.3.3.1", driver_id="ames",
         ))
         out.append(_req(
             id="genotox.chromosomal", name="Chromosomal damage assay (in vitro or in vivo micronucleus)",

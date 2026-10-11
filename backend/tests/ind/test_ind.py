@@ -46,8 +46,12 @@ def test_readiness_on_a_new_programme(k):  # noqa: F811
     assert s["done"] == 0 and s["required_for_milestone"] > 0
     ms = next(i for i in r["items"] if i["requirement_id"] == "adme.metabolic_stability")
     assert ms["status"] == "missing" and ms["driver_available"]
-    ames = next(i for i in r["items"] if i["requirement_id"] == "genotox.ames")
-    assert ames["status"] == "missing" and not ames["driver_available"]
+    # driver availability follows the registry, whatever drivers are installed
+    reg = k.registry
+    for i in r["items"]:
+        if i["status"] == "missing":
+            served = any(i["requirement_id"] in reg.get(d).requirement_ids for d in reg.ids())
+            assert i["driver_available"] == served, i["requirement_id"]
     assert "UV-visible absorption spectrum" in s["conditional_pending_facts"]
 
 

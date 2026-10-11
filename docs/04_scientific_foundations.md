@@ -292,6 +292,28 @@ is a new registry version; it never silently alters past results.
   their basis. Di et al. 2012 (abstract) found low recovery did not bias fu once equilibrium is
   established.
 
+## 4.16 Bacterial reverse mutation (Ames)  [`genetox.*`]
+
+- The protocol is checked against OECD TG 471 (adopted 1997, corrected 2020); each error cites
+  its paragraph:
+  - ≥ 5 strains in the recommended combination (¶13), or a stated justification;
+  - ± S9 (¶16);
+  - ≥ 5 analysable concentrations (¶20);
+  - top dose: 5 mg/plate (5 µL/plate) unless cytotoxicity or insolubility limits it (¶19,
+    S2(R1) §3.2.1), and above 5 mg/plate only for substantial mutagenic impurities (¶21);
+  - triplicate plating, duplicate only with a justification (¶29);
+  - concurrent strain-specific positive and vehicle controls (¶22);
+  - untreated controls unless waived on historical data (¶26);
+  - 37 °C for 48–72 h (¶31).
+- Results:
+  - revertants per plate, mean and SD (¶32–33);
+  - fold over the concurrent vehicle mean, **for information only**: neither TG 471 nor S2(R1)
+    contains a fold rule (full-text search);
+  - comparison with the facility's historical negative and positive ranges, which are required
+    inputs (¶14, ¶39; S2(R1) §5.1).
+- The call follows TG 471 ¶35–37: a concentration-related and/or reproducible increase, with
+  biological relevance first and statistics only as an aid. It is a Study Director determination.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond
