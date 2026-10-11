@@ -30,6 +30,7 @@ __all__ = ["Repository", "content_hash"]
 def content_hash(obj: Any) -> str:
     """Content hash excluding wall-clock timestamps (see ``hos.drivers.base.canonical_hash``)."""
     from hos.drivers.base import canonical_hash
+
     return canonical_hash(obj)
 
 
@@ -80,8 +81,9 @@ class Repository:
     def revoke_sessions(self, principal_id: str, kind: str | None = None) -> int:
         now = _now()
         with self.db.session() as s:
-            q = select(SessionRow).where(SessionRow.principal_id == principal_id,
-                                         SessionRow.revoked_at.is_(None))
+            q = select(SessionRow).where(
+                SessionRow.principal_id == principal_id, SessionRow.revoked_at.is_(None)
+            )
             if kind is not None:
                 q = q.where(SessionRow.kind == kind)
             rows = list(s.execute(q).scalars())
@@ -116,13 +118,20 @@ class Repository:
         total = s.execute(select(func.count()).select_from(q.order_by(None).subquery()))
         return list(s.execute(q.limit(limit).offset(offset)).scalars()), int(total.scalar_one())
 
-    def programs_page(self, organisation: str | None, guest_of: set[str], limit: int,
-                      offset: int) -> tuple[list[ProgramRow], int]:
+    def programs_page(
+        self, organisation: str | None, guest_of: set[str], limit: int, offset: int
+    ) -> tuple[list[ProgramRow], int]:
         """Programmes owned by ``organisation`` or shared with the caller, oldest first."""
-        owned = (ProgramRow.organisation.is_(None) if organisation is None
-                 else ProgramRow.organisation == organisation)
-        q = select(ProgramRow).where(or_(owned, ProgramRow.id.in_(guest_of))) \
+        owned = (
+            ProgramRow.organisation.is_(None)
+            if organisation is None
+            else ProgramRow.organisation == organisation
+        )
+        q = (
+            select(ProgramRow)
+            .where(or_(owned, ProgramRow.id.in_(guest_of)))
             .order_by(ProgramRow.created_at, ProgramRow.id)
+        )
         with self.db.session() as s:
             return self._page(s, q, limit, offset)
 
@@ -145,8 +154,13 @@ class Repository:
 
     def compounds(self, program_id: str) -> list[CompoundRow]:
         with self.db.session() as s:
-            return list(s.execute(select(CompoundRow).where(CompoundRow.program_id == program_id)
-                                  .order_by(CompoundRow.created_at)).scalars())
+            return list(
+                s.execute(
+                    select(CompoundRow)
+                    .where(CompoundRow.program_id == program_id)
+                    .order_by(CompoundRow.created_at)
+                ).scalars()
+            )
 
     def update_compound(self, compound_id: str, **fields: Any) -> CompoundRow:
         with self.db.session() as s:
@@ -173,10 +187,14 @@ class Repository:
                 q = q.where(StudyRow.program_id == program_id)
             return list(s.execute(q).scalars())
 
-    def studies_page(self, program_ids: set[str], limit: int,
-                     offset: int) -> tuple[list[StudyRow], int]:
-        q = select(StudyRow).where(StudyRow.program_id.in_(program_ids)) \
+    def studies_page(
+        self, program_ids: set[str], limit: int, offset: int
+    ) -> tuple[list[StudyRow], int]:
+        q = (
+            select(StudyRow)
+            .where(StudyRow.program_id.in_(program_ids))
             .order_by(StudyRow.created_at, StudyRow.id)
+        )
         with self.db.session() as s:
             return self._page(s, q, limit, offset)
 
@@ -192,17 +210,33 @@ class Repository:
 
     # -- append-only artefacts -------------------------------------------------------
 
-    def add_artifact(self, study_id: str, kind: str, content: dict[str, Any], *, actor: str,
-                     reason: str | None = None) -> ArtifactRow:
+    def add_artifact(
+        self,
+        study_id: str,
+        kind: str,
+        content: dict[str, Any],
+        *,
+        actor: str,
+        reason: str | None = None,
+    ) -> ArtifactRow:
         with self.db.session() as s:
-            prev = s.execute(select(ArtifactRow).where(ArtifactRow.study_id == study_id,
-                                                       ArtifactRow.kind == kind)
-                             .order_by(ArtifactRow.version.desc()).limit(1)).scalar_one_or_none()
-            row = ArtifactRow(study_id=study_id, kind=kind,
-                              version=(prev.version + 1) if prev else 1, content=content,
-                              content_hash=content_hash(content),
-                              supersedes=prev.id if prev else None, reason=reason,
-                              created_by=actor, created_at=_now())
+            prev = s.execute(
+                select(ArtifactRow)
+                .where(ArtifactRow.study_id == study_id, ArtifactRow.kind == kind)
+                .order_by(ArtifactRow.version.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            row = ArtifactRow(
+                study_id=study_id,
+                kind=kind,
+                version=(prev.version + 1) if prev else 1,
+                content=content,
+                content_hash=content_hash(content),
+                supersedes=prev.id if prev else None,
+                reason=reason,
+                created_by=actor,
+                created_at=_now(),
+            )
             s.add(row)
             s.flush()
             return row
@@ -214,8 +248,9 @@ class Repository:
                 q = q.where(ArtifactRow.kind == kind)
             return list(s.execute(q.order_by(ArtifactRow.id)).scalars())
 
-    def artifacts_page(self, study_id: str, kind: str | None, limit: int,
-                       offset: int) -> tuple[list[ArtifactRow], int]:
+    def artifacts_page(
+        self, study_id: str, kind: str | None, limit: int, offset: int
+    ) -> tuple[list[ArtifactRow], int]:
         q = select(ArtifactRow).where(ArtifactRow.study_id == study_id)
         if kind:
             q = q.where(ArtifactRow.kind == kind)
@@ -224,13 +259,28 @@ class Repository:
 
     # -- files ---------------------------------------------------------------------------
 
-    def store_file(self, content: bytes, *, filename: str, media_type: str, actor: str,
-                   program_id: str | None = None) -> str:
+    def store_file(
+        self,
+        content: bytes,
+        *,
+        filename: str,
+        media_type: str,
+        actor: str,
+        program_id: str | None = None,
+    ) -> str:
         sha = self.files.put(content)
         with self.db.session() as s:
             if s.get(FileRow, sha) is None:
-                s.add(FileRow(sha256=sha, filename=filename, media_type=media_type,
-                              size_bytes=len(content), uploaded_by=actor, uploaded_at=_now()))
+                s.add(
+                    FileRow(
+                        sha256=sha,
+                        filename=filename,
+                        media_type=media_type,
+                        size_bytes=len(content),
+                        uploaded_by=actor,
+                        uploaded_at=_now(),
+                    )
+                )
                 s.flush()
             if program_id is not None and s.get(FileLinkRow, (sha, program_id)) is None:
                 s.add(FileLinkRow(sha256=sha, program_id=program_id))
@@ -238,21 +288,31 @@ class Repository:
 
     def file_programs(self, sha: str) -> list[str]:
         with self.db.session() as s:
-            return list(s.execute(select(FileLinkRow.program_id)
-                                  .where(FileLinkRow.sha256 == sha)).scalars())
+            return list(
+                s.execute(select(FileLinkRow.program_id).where(FileLinkRow.sha256 == sha)).scalars()
+            )
 
     # -- programme members ---------------------------------------------------------------
 
     def members(self, program_id: str) -> list[ProgramMemberRow]:
         with self.db.session() as s:
-            return list(s.execute(select(ProgramMemberRow)
-                                  .where(ProgramMemberRow.program_id == program_id)
-                                  .order_by(ProgramMemberRow.added_at)).scalars())
+            return list(
+                s.execute(
+                    select(ProgramMemberRow)
+                    .where(ProgramMemberRow.program_id == program_id)
+                    .order_by(ProgramMemberRow.added_at)
+                ).scalars()
+            )
 
     def member_programs(self, principal_id: str) -> set[str]:
         with self.db.session() as s:
-            return set(s.execute(select(ProgramMemberRow.program_id)
-                                 .where(ProgramMemberRow.principal_id == principal_id)).scalars())
+            return set(
+                s.execute(
+                    select(ProgramMemberRow.program_id).where(
+                        ProgramMemberRow.principal_id == principal_id
+                    )
+                ).scalars()
+            )
 
     def remove_member(self, program_id: str, principal_id: str) -> None:
         with self.db.session() as s:
@@ -271,8 +331,11 @@ class Repository:
     def register_simulated(self, sha: str, study_id: str, method_id: str) -> None:
         with self.db.session() as s:
             if s.get(SimulatedFileRow, sha) is None:
-                s.add(SimulatedFileRow(sha256=sha, study_id=study_id, method_id=method_id,
-                                       created_at=_now()))
+                s.add(
+                    SimulatedFileRow(
+                        sha256=sha, study_id=study_id, method_id=method_id, created_at=_now()
+                    )
+                )
 
     def is_simulated_file(self, sha: str) -> bool:
         with self.db.session() as s:

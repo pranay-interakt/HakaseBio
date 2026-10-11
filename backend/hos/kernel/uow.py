@@ -15,6 +15,7 @@ def atomic(fn: _F) -> _F:
     """Run a kernel operation as one unit of work (``Database.transaction``): the state change,
     its artefacts and its ledger entry commit together or not at all. Works on the kernel
     (``self.db``) and on services holding it (``self.k.db``)."""
+
     @functools.wraps(fn)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         kernel = self if hasattr(self, "db") else self.k
@@ -27,4 +28,5 @@ def atomic(fn: _F) -> _F:
             # failed unit leaves the head unchanged, so this writes nothing new
             if outermost:
                 kernel.checkpoint()
+
     return cast(_F, wrapper)

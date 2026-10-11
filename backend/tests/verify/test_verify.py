@@ -24,28 +24,50 @@ def bundle(k):  # noqa: F811
     sci, pid, cid = _program(k)
     sd, qa = k.get_principal("sd"), k.get_principal("qa")
     _approved_metstab(k, sci, pid, cid)
-    rd = k.create_study(sci, program_id=pid, compound_id=cid,
-                        requirement_id="tox.repeat_dose_rodent")["id"]
+    rd = k.create_study(
+        sci, program_id=pid, compound_id=cid, requirement_id="tox.repeat_dose_rodent"
+    )["id"]
     k.design_study(sci, rd, RD_PARAMS)
     k.plan_study(sci, rd)
     k.dispatch_study(sci, rd, {"kind": "external_lab", "laboratory": "GLP CRO"})
     k.receive_data(sci, rd, _lab_file(rd))
     k.analyze_study(sci, rd)
-    k.record_determination(sd, rd, key="noael", value=30, unit="mg/kg/day",
-                           rationale="adverse liver findings at 100 mg/kg/day")
+    k.record_determination(
+        sd,
+        rd,
+        key="noael",
+        value=30,
+        unit="mg/kg/day",
+        rationale="adverse liver findings at 100 mg/kg/day",
+    )
     k.report_study(sci, rd)
-    k.sign_study(sd, rd, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL,
-                 statement="approve")
-    k.sign_study(qa, rd, role=Role.QUALITY_ASSURANCE, meaning=SignatureMeaning.QA_COMPLIANCE,
-                 statement="QA statement")
+    k.sign_study(
+        sd, rd, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL, statement="approve"
+    )
+    k.sign_study(
+        qa,
+        rd,
+        role=Role.QUALITY_ASSURANCE,
+        meaning=SignatureMeaning.QA_COMPLIANCE,
+        statement="QA statement",
+    )
     k.approve_study(sd, rd)
-    imp = k.imports.import_study(sci, program_id=pid, compound_id=cid,
-                                 requirement_id="genotox.ames", report=REPORT,
-                                 filename="ames.pdf", title="Ames", laboratory="Lab",
-                                 report_date="2026-05-01", glp=False)["id"]
+    imp = k.imports.import_study(
+        sci,
+        program_id=pid,
+        compound_id=cid,
+        requirement_id="genotox.ames",
+        report=REPORT,
+        filename="ames.pdf",
+        title="Ames",
+        laboratory="Lab",
+        report_date="2026-05-01",
+        glp=False,
+    )["id"]
     k.imports.add_import_value(sci, imp, key="overall_call", page="5", category="negative")
-    k.imports.sign_import(sci, imp, role=Role.RESPONSIBLE_SCIENTIST,
-                          meaning=SignatureMeaning.APPROVAL, statement="")
+    k.imports.sign_import(
+        sci, imp, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.APPROVAL, statement=""
+    )
     k.imports.complete_import(sci, imp)
     pkg = assemble_module4(k, sci, pid)
     return k.files.get(pkg["bundle_sha256"]), pkg
@@ -92,8 +114,9 @@ def test_altered_raw_data_is_detected_even_with_forged_manifest(bundle):
     sid = vm["studies"][0]
     s = json.loads(zipfile.ZipFile(io.BytesIO(content)).read(f"verification/studies/{sid}.json"))
     raw = f"verification/raw/{s['data_file']['sha256']}"
-    bad = _rewrite(content, {raw: lambda b: b.replace(b",yes", b",no", 1)
-                             if b",yes" in b else b[:-2] + b"9\n"})
+    bad = _rewrite(
+        content, {raw: lambda b: b.replace(b",yes", b",no", 1) if b",yes" in b else b[:-2] + b"9\n"}
+    )
     names = {c.check for c in _failed(verify_bundle(bad))}
     assert "raw data file hash" in names or "recomputation" in names
 
@@ -112,13 +135,17 @@ def _forge_chain(content: bytes, pick, edit) -> bytes:
         edit(e)
         lines[i] = json.dumps(e).encode()
         return b"\n".join(lines) + b"\n"
+
     return _rewrite(content, {"verification/ledger/chain.jsonl": forge})
 
 
 def test_rewritten_ledger_is_detected(bundle):
     content, _ = bundle
-    bad = _forge_chain(content, lambda e: "redacted" not in e and e["seq"] > 1,
-                       lambda e: e.update(actor_id="someone-else"))
+    bad = _forge_chain(
+        content,
+        lambda e: "redacted" not in e and e["seq"] > 1,
+        lambda e: e.update(actor_id="someone-else"),
+    )
     assert any(c.subject == "ledger" for c in _failed(verify_bundle(bad)))
 
 
@@ -127,17 +154,19 @@ def test_other_programmes_are_redacted_but_still_bind_the_chain(bundle, k):  # n
     z = zipfile.ZipFile(io.BytesIO(content))
     chain = [json.loads(line) for line in z.read("verification/ledger/chain.jsonl").splitlines()]
     hidden = [e for e in chain if e.get("redacted")]
-    assert hidden and all(set(e) == {"seq", "scheme", "redacted", "prev_hash",
-                                     "content_digest", "entry_hash"} for e in hidden)
+    assert hidden and all(
+        set(e) == {"seq", "scheme", "redacted", "prev_hash", "content_digest", "entry_hash"}
+        for e in hidden
+    )
     text = z.read("verification/ledger/chain.jsonl").decode()
-    assert "principal.registered" not in text            # users' records are not shown
+    assert "principal.registered" not in text  # users' records are not shown
     rep = verify_bundle(content)
     assert any("redacted" in c.check for c in rep.checks if c.subject == "ledger")
-    forged = _forge_chain(content, lambda e: e.get("redacted"),
-                          lambda e: e.update(content_digest="0" * 64))
+    forged = _forge_chain(
+        content, lambda e: e.get("redacted"), lambda e: e.update(content_digest="0" * 64)
+    )
     assert any(c.subject == "ledger" for c in _failed(verify_bundle(forged)))
-    padded = _forge_chain(content, lambda e: e.get("redacted"),
-                          lambda e: e.update(actor_id="x"))
+    padded = _forge_chain(content, lambda e: e.get("redacted"), lambda e: e.update(actor_id="x"))
     assert any(c.subject == "ledger" for c in _failed(verify_bundle(padded)))
 
 
@@ -145,8 +174,9 @@ def test_forged_signature_and_report_hash_are_detected(bundle):
     content, _ = bundle
     z = zipfile.ZipFile(io.BytesIO(content))
     vm = json.loads(z.read("verification/manifest.json"))
-    sid = next(i for i in vm["studies"]
-               if json.loads(z.read(f"verification/studies/{i}.json"))["glp"])
+    sid = next(
+        i for i in vm["studies"] if json.loads(z.read(f"verification/studies/{i}.json"))["glp"]
+    )
     path = f"verification/studies/{sid}.json"
 
     def drop_qa(b: bytes) -> bytes:
@@ -158,10 +188,15 @@ def test_forged_signature_and_report_hash_are_detected(bundle):
         s = json.loads(b)
         s["expected"]["report_hash"] = "0" * 64
         return json.dumps(s).encode()
-    assert any("signatures bind the report" in c.check
-               for c in _failed(verify_bundle(_rewrite(content, {path: drop_qa}))))
-    assert any("report regenerates" in c.check
-               for c in _failed(verify_bundle(_rewrite(content, {path: change_report_hash}))))
+
+    assert any(
+        "signatures bind the report" in c.check
+        for c in _failed(verify_bundle(_rewrite(content, {path: drop_qa})))
+    )
+    assert any(
+        "report regenerates" in c.check
+        for c in _failed(verify_bundle(_rewrite(content, {path: change_report_hash})))
+    )
 
 
 def test_tampered_import_value_is_detected(bundle):
@@ -173,8 +208,11 @@ def test_tampered_import_value_is_detected(bundle):
         s = json.loads(b)
         s["import_record"]["values"][0]["category"] = "positive"
         return json.dumps(s).encode()
-    assert any("import content hash" in c.check
-               for c in _failed(verify_bundle(_rewrite(content, {path: flip}))))
+
+    assert any(
+        "import content hash" in c.check
+        for c in _failed(verify_bundle(_rewrite(content, {path: flip})))
+    )
 
 
 def test_cli_exit_codes(bundle, tmp_path, capsys):

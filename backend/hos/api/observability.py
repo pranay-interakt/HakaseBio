@@ -29,8 +29,14 @@ from typing import Any
 
 from hos.api.limits import ASGIApp, Message, Receive, Scope, Send
 
-__all__ = ["JsonFormatter", "RequestLog", "alert", "configure_logging", "request_context",
-           "set_principal"]
+__all__ = [
+    "JsonFormatter",
+    "RequestLog",
+    "alert",
+    "configure_logging",
+    "request_context",
+    "set_principal",
+]
 
 _log = logging.getLogger("hos.request")
 _alerts = logging.getLogger("hos.alert")
@@ -57,8 +63,11 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         out: dict[str, Any] = {
             "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
-            "level": record.levelname, "logger": record.name, "msg": record.getMessage(),
-            **request_context()}
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+            **request_context(),
+        }
         out.update({k: v for k, v in vars(record).items() if k not in self._RESERVED})
         if record.exc_info:
             out["exc"] = self.formatException(record.exc_info)
@@ -86,8 +95,7 @@ def configure_logging() -> None:
     if os.environ.get("HOS_LOG_FORMAT", "json").lower() == "json":
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)s %(name)s %(message)s"))
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     root.addHandler(handler)
     root.setLevel(os.environ.get("HOS_LOG_LEVEL", "INFO").upper())
     root.propagate = False
@@ -127,19 +135,38 @@ class RequestLog:
             _errors.exception("unhandled error", extra={"path": scope["path"]})
             if status != 500 or started:
                 raise
-            body = json.dumps({"error": "InternalError", "detail": "an unexpected error "
-                               "occurred; quote the request ID to your administrator",
-                               "request_id": rid}).encode()
-            await send({"type": "http.response.start", "status": 500, "headers": [
-                (b"content-type", b"application/json"), (b"x-request-id", rid.encode()),
-                (b"content-length", str(len(body)).encode())]})
+            body = json.dumps(
+                {
+                    "error": "InternalError",
+                    "detail": "an unexpected error "
+                    "occurred; quote the request ID to your administrator",
+                    "request_id": rid,
+                }
+            ).encode()
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"x-request-id", rid.encode()),
+                        (b"content-length", str(len(body)).encode()),
+                    ],
+                }
+            )
             await send({"type": "http.response.body", "body": body})
         finally:
             client = scope.get("client")
-            _log.info("request", extra={
-                "method": scope["method"], "path": scope["path"], "status": status,
-                "duration_ms": round((time.perf_counter() - start) * 1000, 1),
-                "client": client[0] if client else None})
+            _log.info(
+                "request",
+                extra={
+                    "method": scope["method"],
+                    "path": scope["path"],
+                    "status": status,
+                    "duration_ms": round((time.perf_counter() - start) * 1000, 1),
+                    "client": client[0] if client else None,
+                },
+            )
             _context.reset(token)
 
 
@@ -159,8 +186,14 @@ def alert(event: str, detail: str, *, wait: bool = False, **fields: Any) -> None
         if time.monotonic() - _sent.get(key, -3600.0) < 3600:
             return
         _sent[key] = time.monotonic()
-    body = {"source": "hakase", "event": event, "detail": detail,
-            "at": datetime.now(UTC).isoformat(), **request_context(), **fields}
+    body = {
+        "source": "hakase",
+        "event": event,
+        "detail": detail,
+        "at": datetime.now(UTC).isoformat(),
+        **request_context(),
+        **fields,
+    }
     sender = threading.Thread(target=_post, args=(url, body), daemon=True)
     sender.start()
     if wait:
@@ -173,5 +206,6 @@ def _post(url: str, body: dict[str, Any]) -> None:
     try:
         httpx.post(url, json=body, timeout=5).raise_for_status()
     except httpx.HTTPError as exc:
-        _alerts.error("alert delivery failed", extra={"event": body["event"],
-                                                     "reason": type(exc).__name__})
+        _alerts.error(
+            "alert delivery failed", extra={"event": body["event"], "reason": type(exc).__name__}
+        )

@@ -16,10 +16,15 @@ if TYPE_CHECKING:
 __all__ = ["enrich_compound"]
 
 
-def enrich_compound(kernel: Kernel, actor: Principal, compound_id: str, *,
-                    pubchem: PubChemClient | None = None,
-                    chembl: ChEMBLClient | None = None,
-                    include_herg: bool = True) -> dict[str, Any]:
+def enrich_compound(
+    kernel: Kernel,
+    actor: Principal,
+    compound_id: str,
+    *,
+    pubchem: PubChemClient | None = None,
+    chembl: ChEMBLClient | None = None,
+    include_herg: bool = True,
+) -> dict[str, Any]:
     row = kernel.repo.compound(compound_id)
     if not row.inchikey:
         raise ValueError("compound has no InChIKey; cannot query external databases")

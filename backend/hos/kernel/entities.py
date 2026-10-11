@@ -28,8 +28,14 @@ from hos.core.sequence import (
 )
 from hos.drivers.base import CompoundInfo
 
-__all__ = ["Chain", "EngineeredMutation", "MonomerLibrary", "SequenceEntity",
-           "biologic_compound_info", "derive"]
+__all__ = [
+    "Chain",
+    "EngineeredMutation",
+    "MonomerLibrary",
+    "SequenceEntity",
+    "biologic_compound_info",
+    "derive",
+]
 
 _RESIDUES = "".join(c for c, r in ALPHABET.items() if r.defined_mass)
 
@@ -71,8 +77,10 @@ class SequenceEntity(BaseModel):
     isotype: str | None = Field(default=None, description="antibodies, e.g. IgG1")
     light_chain_type: Literal["kappa", "lambda"] | None = None
     engineered_mutations: list[EngineeredMutation] = Field(default_factory=list)
-    surrogate_for: str | None = Field(default=None, description="compound id of the clinical "
-                                      "candidate this molecule stands in for")
+    surrogate_for: str | None = Field(
+        default=None,
+        description="compound id of the clinical candidate this molecule stands in for",
+    )
     surrogate_rationale: str | None = None
 
     @model_validator(mode="after")
@@ -92,13 +100,17 @@ class SequenceEntity(BaseModel):
             if self.chains:
                 errs.append("a HELM entity carries its chains in the HELM string")
             if not self.helm or self.monomer_library is None:
-                errs.append("a HELM entity needs the HELM string and its monomer library "
-                            "(name, version, SHA-256)")
-            elif (problems := _helm_errors(self.helm)):
+                errs.append(
+                    "a HELM entity needs the HELM string and its monomer library "
+                    "(name, version, SHA-256)"
+                )
+            elif problems := _helm_errors(self.helm):
                 errs += [f"HELM: {p}" for p in problems]
             if self.engineered_mutations:
-                errs.append("engineered mutations are recorded on sequence entities; in HELM "
-                            "the modified monomers are part of the notation")
+                errs.append(
+                    "engineered mutations are recorded on sequence entities; in HELM "
+                    "the modified monomers are part of the notation"
+                )
         by_name = {c.name: c for c in self.chains}
         for m in self.engineered_mutations:
             c = by_name.get(m.chain)
@@ -106,20 +118,28 @@ class SequenceEntity(BaseModel):
                 errs.append(f"mutation {m.label or m.position}: no chain {m.chain!r}")
                 continue
             if m.from_residue not in _RESIDUES or m.to_residue not in _RESIDUES:
-                errs.append(f"mutation {m.label or m.position}: residues are one-letter codes "
-                            "with a defined residue")
+                errs.append(
+                    f"mutation {m.label or m.position}: residues are one-letter codes "
+                    "with a defined residue"
+                )
             elif m.from_residue == m.to_residue:
                 errs.append(f"mutation {m.label or m.position}: from and to are the same")
             elif m.position > len(c.sequence):
-                errs.append(f"mutation {m.label or m.position}: chain {c.name} has "
-                            f"{len(c.sequence)} residues")
+                errs.append(
+                    f"mutation {m.label or m.position}: chain {c.name} has "
+                    f"{len(c.sequence)} residues"
+                )
             elif c.sequence[m.position - 1] != m.to_residue:
-                errs.append(f"mutation {m.label or m.position}: the registered {c.name} has "
-                            f"{c.sequence[m.position - 1]} at {m.position}, not the engineered "
-                            f"{m.to_residue}")
+                errs.append(
+                    f"mutation {m.label or m.position}: the registered {c.name} has "
+                    f"{c.sequence[m.position - 1]} at {m.position}, not the engineered "
+                    f"{m.to_residue}"
+                )
         if self.surrogate_for and not (self.surrogate_rationale or "").strip():
-            errs.append("a surrogate needs its rationale (e.g. the candidate does not bind the "
-                        "toxicology species' target)")
+            errs.append(
+                "a surrogate needs its rationale (e.g. the candidate does not bind the "
+                "toxicology species' target)"
+            )
         if self.light_chain_type and not any(c.role == "light_chain" for c in self.chains):
             errs.append("a light-chain type needs a light chain")
         if errs:
@@ -140,28 +160,43 @@ def _total_mass(entity: SequenceEntity) -> tuple[list[dict[str, Any]], Quantity]
     if entity.format == "helm":
         assert entity.monomer_library is not None
         return [], Quantity.unavailable(
-            "g/mol", label="Average molecular mass",
+            "g/mol",
+            label="Average molecular mass",
             reason="a HELM molecule's mass needs the monomer structures of "
-                   f"{entity.monomer_library.name} {entity.monomer_library.version}, which "
-                   "are not read here")
+            f"{entity.monomer_library.name} {entity.monomer_library.version}, which "
+            "are not read here",
+        )
     chains = []
     masses: list[tuple[int, Quantity]] = []
     for c in entity.chains:
         q = average_chain_mass(c.sequence, label=f"Average mass, {c.name}")
         masses.append((c.copies, q))
-        chains.append({"name": c.name, "role": c.role, "copies": c.copies,
-                       "residues": len(c.sequence), "average_mass": q.to_dict()})
+        chains.append(
+            {
+                "name": c.name,
+                "role": c.role,
+                "copies": c.copies,
+                "residues": len(c.sequence),
+                "average_mass": q.to_dict(),
+            }
+        )
     if all(q.is_available for _, q in masses):
         return chains, Quantity.computed(
-            sum(n * q.require() for n, q in masses), "g/mol",
-            method=method("seq.average_mass"), inputs=[q for _, q in masses],
+            sum(n * q.require() for n, q in masses),
+            "g/mol",
+            method=method("seq.average_mass"),
+            inputs=[q for _, q in masses],
             label="Sum of polypeptide chains (no disulfide, glycan or other modification)",
-            notes=" + ".join(f"{n} x {c.name}" for (n, _), c in zip(masses, entity.chains,
-                                                                    strict=True)))
-    missing = [c.name for (_, q), c in zip(masses, entity.chains, strict=True)
-               if not q.is_available]
-    return chains, Quantity.unavailable("g/mol", label="Sum of polypeptide chains",
-                                        reason=f"no mass for {', '.join(missing)}")
+            notes=" + ".join(
+                f"{n} x {c.name}" for (n, _), c in zip(masses, entity.chains, strict=True)
+            ),
+        )
+    missing = [
+        c.name for (_, q), c in zip(masses, entity.chains, strict=True) if not q.is_available
+    ]
+    return chains, Quantity.unavailable(
+        "g/mol", label="Sum of polypeptide chains", reason=f"no mass for {', '.join(missing)}"
+    )
 
 
 def derive(entity: SequenceEntity) -> dict[str, Any]:
@@ -169,18 +204,32 @@ def derive(entity: SequenceEntity) -> dict[str, Any]:
     chains, total = _total_mass(entity)
     if entity.format == "helm":
         assert entity.helm is not None
-        return {"helm": parse_helm(entity.helm).to_dict(), "chains": [],
-                "total_mass": total.to_dict(), "amino_acid_chains": [], "classification": None}
+        return {
+            "helm": parse_helm(entity.helm).to_dict(),
+            "chains": [],
+            "total_mass": total.to_dict(),
+            "amino_acid_chains": [],
+            "classification": None,
+        }
     aa = [len(c.sequence) for c in entity.chains for _ in range(c.copies)]
-    return {"helm": None, "chains": chains, "total_mass": total.to_dict(),
-            "amino_acid_chains": aa,
-            "classification": us_protein_classification(aa, None).to_dict()}
+    return {
+        "helm": None,
+        "chains": chains,
+        "total_mass": total.to_dict(),
+        "amino_acid_chains": aa,
+        "classification": us_protein_classification(aa, None).to_dict(),
+    }
 
 
-def biologic_compound_info(compound_id: str, name: str,
-                           entity: SequenceEntity) -> CompoundInfo:
+def biologic_compound_info(compound_id: str, name: str, entity: SequenceEntity) -> CompoundInfo:
     """What drivers see for a sequence entity: no SMILES, and the average mass when one is
     defined (None otherwise, which drivers already handle)."""
     _, total = _total_mass(entity)
-    return CompoundInfo(id=compound_id, name=name, smiles=None, inchikey=None,
-                        molecular_weight=total if total.is_available else None, clogp=None)
+    return CompoundInfo(
+        id=compound_id,
+        name=name,
+        smiles=None,
+        inchikey=None,
+        molecular_weight=total if total.is_available else None,
+        clogp=None,
+    )

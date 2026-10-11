@@ -26,8 +26,7 @@ T = DataTemplate(
     ),
 )
 
-META = ("# laboratory: Lab A\n# analyst: A. Person\n# run_date: 2026-09-30\n"
-        "# study_reference: S-1\n")
+META = "# laboratory: Lab A\n# analyst: A. Person\n# run_date: 2026-09-30\n# study_reference: S-1\n"
 
 
 def _csv(body: str, meta: str = META) -> bytes:
@@ -39,7 +38,13 @@ def test_valid_file_parses_and_is_hashed():
     d = parse_return_file(raw, T)
     assert d.file_sha256 == hashlib.sha256(raw).hexdigest()
     assert d.origin is DataOrigin.MEASURED
-    assert d.records[0] == {"sample_id": "A", "time": 0.0, "conc": 1.0, "matrix": "HLM", "replicate": 1}
+    assert d.records[0] == {
+        "sample_id": "A",
+        "time": 0.0,
+        "conc": 1.0,
+        "matrix": "HLM",
+        "replicate": 1,
+    }
     assert d.records[1]["replicate"] is None
 
 
@@ -50,19 +55,22 @@ def test_units_in_header_are_converted_and_recorded():
     assert len(d.conversions) == 2
 
 
-@pytest.mark.parametrize("body,needle", [
-    ("sample_id,time [min],matrix\nA,0,HLM\n", "missing required column 'conc'"),
-    ("sample_id,time [min],conc [uM],matrix,extra\nA,0,1,HLM,x\n", "unexpected column"),
-    ("sample_id,time [min],conc [kg],matrix\nA,0,1,HLM\n", "not dimensionally compatible"),
-    ("sample_id,time [min],conc [uM],matrix\nA,0,abc,HLM\n", "is not a number"),
-    ("sample_id,time [min],conc [uM],matrix\nA,0,nan,HLM\n", "not finite"),
-    ("sample_id,time [min],conc [uM],matrix\nA,0,-1,HLM\n", "below physical minimum"),
-    ("sample_id,time [min],conc [uM],matrix\nA,0,1,MLM\n", "not one of"),
-    ("sample_id,time [min],conc [uM],matrix\nA,0,1\n", "expected 4 fields"),
-    ("sample_id,time [min],conc [uM],matrix\n,0,1,HLM\n", "required but empty"),
-    ("sample_id,time [min],conc [uM],matrix\n", "no data rows"),
-    ("sample_id,sample_id,time [min],conc [uM],matrix\nA,A,0,1,HLM\n", "duplicate column"),
-])
+@pytest.mark.parametrize(
+    "body,needle",
+    [
+        ("sample_id,time [min],matrix\nA,0,HLM\n", "missing required column 'conc'"),
+        ("sample_id,time [min],conc [uM],matrix,extra\nA,0,1,HLM,x\n", "unexpected column"),
+        ("sample_id,time [min],conc [kg],matrix\nA,0,1,HLM\n", "not dimensionally compatible"),
+        ("sample_id,time [min],conc [uM],matrix\nA,0,abc,HLM\n", "is not a number"),
+        ("sample_id,time [min],conc [uM],matrix\nA,0,nan,HLM\n", "not finite"),
+        ("sample_id,time [min],conc [uM],matrix\nA,0,-1,HLM\n", "below physical minimum"),
+        ("sample_id,time [min],conc [uM],matrix\nA,0,1,MLM\n", "not one of"),
+        ("sample_id,time [min],conc [uM],matrix\nA,0,1\n", "expected 4 fields"),
+        ("sample_id,time [min],conc [uM],matrix\n,0,1,HLM\n", "required but empty"),
+        ("sample_id,time [min],conc [uM],matrix\n", "no data rows"),
+        ("sample_id,sample_id,time [min],conc [uM],matrix\nA,A,0,1,HLM\n", "duplicate column"),
+    ],
+)
 def test_malformed_files_rejected(body, needle):
     with pytest.raises(IngestError) as e:
         parse_return_file(_csv(body), T)
@@ -92,14 +100,16 @@ def test_bad_run_date_rejected():
 
 def test_wrong_template_rejected():
     with pytest.raises(IngestError):
-        parse_return_file(_csv("sample_id,time,conc,matrix\nA,0,1,HLM\n",
-                               "# hos-template: other/1.0\n" + META), T)
+        parse_return_file(
+            _csv("sample_id,time,conc,matrix\nA,0,1,HLM\n", "# hos-template: other/1.0\n" + META), T
+        )
 
 
 def test_simulation_marker_overrides_measured_claim():
     meta = META + "# hos-simulated: true\n# hos-simulation-method: sim.first_order_depletion\n"
-    d = parse_return_file(_csv("sample_id,time,conc,matrix\nA,0,1,HLM\n", meta), T,
-                          claimed_origin=DataOrigin.MEASURED)
+    d = parse_return_file(
+        _csv("sample_id,time,conc,matrix\nA,0,1,HLM\n", meta), T, claimed_origin=DataOrigin.MEASURED
+    )
     assert d.origin is DataOrigin.SIMULATED
 
 
@@ -110,8 +120,9 @@ def test_simulation_instrument_forces_simulated():
 
 def test_simulated_without_generator_rejected():
     with pytest.raises(IngestError):
-        parse_return_file(_csv("sample_id,time,conc,matrix\nA,0,1,HLM\n"), T,
-                          claimed_origin=DataOrigin.SIMULATED)
+        parse_return_file(
+            _csv("sample_id,time,conc,matrix\nA,0,1,HLM\n"), T, claimed_origin=DataOrigin.SIMULATED
+        )
 
 
 def test_tables_refuse_bare_floats():
@@ -125,11 +136,15 @@ def test_numeric_column_must_declare_unit():
 
 
 def test_per_row_unit_column_is_validated():
-    t = DataTemplate(template_id="u/1", description="d", columns=(
-        DataColumn("endpoint", "e", kind="text"),
-        DataColumn("unit", "u", kind="text"),
-        DataColumn("value", "v", unit_column="unit"),
-    ))
+    t = DataTemplate(
+        template_id="u/1",
+        description="d",
+        columns=(
+            DataColumn("endpoint", "e", kind="text"),
+            DataColumn("unit", "u", kind="text"),
+            DataColumn("value", "v", unit_column="unit"),
+        ),
+    )
     ok = parse_return_file(_csv("endpoint,unit,value\nALT,U/L,30\nliver,g,10.2\n"), t)
     assert ok.records[0]["value"] == 30.0
     with pytest.raises(IngestError) as e:

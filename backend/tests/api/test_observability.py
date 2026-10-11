@@ -30,23 +30,28 @@ def _wait(sent, n=1):
 
 
 def _lines(capsys):
-    return [json.loads(line) for line in capsys.readouterr().err.splitlines()
-            if line.startswith("{")]
+    return [
+        json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")
+    ]
 
 
 def test_every_response_and_error_carries_the_request_id(tmp_path):
     c, _, _ = _app(tmp_path)
     r = c.get("/api/health")
     assert len(r.headers["X-Request-ID"]) == 32
-    assert c.get("/api/health", headers={"X-Request-ID": "proxy-id-12345"}
-                 ).headers["X-Request-ID"] == "proxy-id-12345"
-    forged = c.get("/api/health", headers={"X-Request-ID": "x\" injected"})
-    assert forged.headers["X-Request-ID"] != "x\" injected"
+    assert (
+        c.get("/api/health", headers={"X-Request-ID": "proxy-id-12345"}).headers["X-Request-ID"]
+        == "proxy-id-12345"
+    )
+    forged = c.get("/api/health", headers={"X-Request-ID": 'x" injected'})
+    assert forged.headers["X-Request-ID"] != 'x" injected'
     sci = _login(c, "sci")
-    for r in (c.get("/api/programs/prg_missing", headers=sci),               # 404
-              c.get("/api/programs"),                                          # 401
-              c.post("/api/programs", headers=sci, json={"name": "x"}),        # 422
-              c.post("/api/programs", headers=sci, json={"name": "x" * 3_000_000})):  # 413
+    for r in (
+        c.get("/api/programs/prg_missing", headers=sci),  # 404
+        c.get("/api/programs"),  # 401
+        c.post("/api/programs", headers=sci, json={"name": "x"}),  # 422
+        c.post("/api/programs", headers=sci, json={"name": "x" * 3_000_000}),
+    ):  # 413
         assert r.status_code in (401, 404, 413, 422)
         assert r.json()["request_id"] == r.headers["X-Request-ID"], r.text
 
@@ -62,7 +67,9 @@ def test_one_json_line_per_request_without_secrets(tmp_path, capsys):
     lines = [json.loads(x) for x in out.splitlines() if x.startswith("{")]
     req = [x for x in lines if x["msg"] == "request"]
     assert [(x["method"], x["path"], x["status"]) for x in req] == [
-        ("POST", "/api/auth/login", 200), ("GET", "/api/programs", 200)]
+        ("POST", "/api/auth/login", 200),
+        ("GET", "/api/programs", 200),
+    ]
     assert req[1]["principal_id"] == "sci" and req[0]["principal_id"] is None
     assert all(len(x["request_id"]) == 32 and x["duration_ms"] >= 0 for x in req)
 
@@ -87,15 +94,17 @@ def test_a_failed_integrity_check_alerts_once(tmp_path, alerts):
     c, k, adm = _app(tmp_path)
     sci = _login(c, "sci")
     pid = c.post("/api/programs", headers=sci, json={"name": "A", "context": CTX}).json()["id"]
-    with k.db.session() as s:                       # an edit made straight to the database
+    with k.db.session() as s:  # an edit made straight to the database
         s.execute(text("UPDATE programs SET name='edited' WHERE id=:id"), {"id": pid})
-        s.execute(text("UPDATE programs SET context=:c WHERE id=:id"),
-                  {"c": json.dumps({**CTX, "max_trial_duration_days": 999}), "id": pid})
+        s.execute(
+            text("UPDATE programs SET context=:c WHERE id=:id"),
+            {"c": json.dumps({**CTX, "max_trial_duration_days": 999}), "id": pid},
+        )
     assert not c.get("/api/ledger/verify", headers=adm).json()["valid"]
     c.get("/api/ledger/verify", headers=adm)
     sent = _wait(alerts)
     time.sleep(0.1)
-    assert len(sent) == 1                           # the repeat within the hour is not re-sent
+    assert len(sent) == 1  # the repeat within the hour is not re-sent
     body = sent[0][1]
     assert body["event"] == "ledger_integrity" and body["request_id"]
     assert "context matches the study set derived from it" in body["checks"]

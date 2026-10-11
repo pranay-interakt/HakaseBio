@@ -21,8 +21,10 @@ LOCK = Path(__file__).resolve().parents[1] / "tests" / "core" / "registry.lock.j
 
 
 def entries() -> dict[str, dict[str, str]]:
-    return {"citations": {k: content_hash(c.to_dict()) for k, c in CITATIONS.items()},
-            "methods": {k: content_hash(m.to_dict()) for k, m in METHODS.items()}}
+    return {
+        "citations": {k: content_hash(c.to_dict()) for k, c in CITATIONS.items()},
+        "methods": {k: content_hash(m.to_dict()) for k, m in METHODS.items()},
+    }
 
 
 def main() -> None:

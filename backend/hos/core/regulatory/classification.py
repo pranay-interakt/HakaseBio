@@ -53,32 +53,44 @@ class ProteinClassification:
     section: str = "21 CFR 600.3(h)(6)"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"outcome": self.outcome, "amino_acids": self.amino_acids, "counted": self.counted,
-                "statement": self.statement, "pending_fact": self.pending_fact,
-                "section": self.section, "citations": [c.to_dict() for c in self.citations]}
+        return {
+            "outcome": self.outcome,
+            "amino_acids": self.amino_acids,
+            "counted": self.counted,
+            "statement": self.statement,
+            "pending_fact": self.pending_fact,
+            "section": self.section,
+            "citations": [c.to_dict() for c in self.citations],
+        }
 
 
-def _result(outcome: Outcome, n: int | None, counted: str, pending: str | None = None
-            ) -> ProteinClassification:
+def _result(
+    outcome: Outcome, n: int | None, counted: str, pending: str | None = None
+) -> ProteinClassification:
     cites: tuple[Citation, ...] = (cite("cfr21_600_3"), cite("fda_biological_product_rule_2020"))
     if outcome == "protein":
-        statement = (f"{n} amino acids ({counted}): greater than 40, so a protein under 21 CFR "
-                     "600.3(h)(6) and therefore a biological product (21 CFR 600.3(h)); "
-                     "biologics licences are applied for under 21 CFR 601.")
+        statement = (
+            f"{n} amino acids ({counted}): greater than 40, so a protein under 21 CFR "
+            "600.3(h)(6) and therefore a biological product (21 CFR 600.3(h)); "
+            "biologics licences are applied for under 21 CFR 601."
+        )
         cites += (cite("cfr21_601_2"),)
     elif outcome == "not_protein":
-        statement = (f"{n} amino acids ({counted}): 40 or fewer, so not a protein under 21 CFR "
-                     "600.3(h)(6). FDA's draft peptide guidance (December 2023) calls such a "
-                     "polymer a peptide, regulated as a drug unless it meets another "
-                     "biological-product or device definition.")
+        statement = (
+            f"{n} amino acids ({counted}): 40 or fewer, so not a protein under 21 CFR "
+            "600.3(h)(6). FDA's draft peptide guidance (December 2023) calls such a "
+            "polymer a peptide, regulated as a drug unless it meets another "
+            "biological-product or device definition."
+        )
         cites += (cite("fda_peptide_clinpharm_draft_2023"),)
     else:
         statement = f"Classification under 21 CFR 600.3(h)(6) pending: {pending}."
     return ProteinClassification(outcome, n, counted, statement, pending, cites)
 
 
-def us_protein_classification(chains: Sequence[int],
-                              naturally_associated: bool | None) -> ProteinClassification:
+def us_protein_classification(
+    chains: Sequence[int], naturally_associated: bool | None
+) -> ProteinClassification:
     """Classify an amino-acid polymer from its residues per chain.
 
     ``naturally_associated`` is whether multiple chains are "associated with each other in a
@@ -88,25 +100,37 @@ def us_protein_classification(chains: Sequence[int],
         raise ValueError("amino acids per chain must be positive integers")
     limit = PROTEIN_THRESHOLD_AMINO_ACIDS
     if not chains:
-        return _result("pending", None, "no chains given",
-                       "the number of amino acids in each chain")
+        return _result(
+            "pending", None, "no chains given", "the number of amino acids in each chain"
+        )
     if len(chains) == 1:
         n = chains[0]
         return _result("protein" if n > limit else "not_protein", n, "one chain")
     total, longest = sum(chains), max(chains)
     parts = " + ".join(str(c) for c in chains)
     if naturally_associated:
-        return _result("protein" if total > limit else "not_protein", total,
-                       f"{parts}, chains associated as in nature, counted together")
+        return _result(
+            "protein" if total > limit else "not_protein",
+            total,
+            f"{parts}, chains associated as in nature, counted together",
+        )
     if longest > limit:
         return _result("protein", longest, f"longest chain of {parts}")
     if total <= limit:
         return _result("not_protein", total, f"{parts}, even counted together")
     if naturally_associated is None:
-        return _result("pending", None, parts,
-                       "whether the chains are associated with each other as they occur in "
-                       "nature (counted together they exceed 40, each alone does not)")
-    return _result("pending", None, parts,
-                   "FDA's reading for chains not associated as they occur in nature: 21 CFR "
-                   "600.3(h)(6) states the counting only for natural association, and each "
-                   "chain alone is 40 or fewer while together they exceed 40")
+        return _result(
+            "pending",
+            None,
+            parts,
+            "whether the chains are associated with each other as they occur in "
+            "nature (counted together they exceed 40, each alone does not)",
+        )
+    return _result(
+        "pending",
+        None,
+        parts,
+        "FDA's reading for chains not associated as they occur in nature: 21 CFR "
+        "600.3(h)(6) states the counting only for natural association, and each "
+        "chain alone is 40 or fewer while together they exceed 40",
+    )

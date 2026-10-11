@@ -6,8 +6,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-__all__ = ["AMINO_ACID_MODALITIES", "ClinicalPopulation", "Indication", "Modality", "PeptideOrigin",
-           "ProgramContext", "Route"]
+__all__ = [
+    "AMINO_ACID_MODALITIES",
+    "ClinicalPopulation",
+    "Indication",
+    "Modality",
+    "PeptideOrigin",
+    "ProgramContext",
+    "Route",
+]
 
 
 class Modality(str, Enum):
@@ -37,8 +44,11 @@ class Modality(str, Enum):
 
 
 #: Modalities that are amino-acid polymers, so 21 CFR 600.3(h)(6) can classify them.
-AMINO_ACID_MODALITIES = (Modality.PEPTIDE, Modality.RECOMBINANT_PROTEIN,
-                         Modality.MONOCLONAL_ANTIBODY)
+AMINO_ACID_MODALITIES = (
+    Modality.PEPTIDE,
+    Modality.RECOMBINANT_PROTEIN,
+    Modality.MONOCLONAL_ANTIBODY,
+)
 
 
 class PeptideOrigin(str, Enum):
@@ -51,7 +61,7 @@ class PeptideOrigin(str, Enum):
 
 
 class Indication(str, Enum):
-    ADVANCED_CANCER = "advanced_cancer"            # ICH S9 applies
+    ADVANCED_CANCER = "advanced_cancer"  # ICH S9 applies
     ONCOLOGY_NON_ADVANCED = "oncology_non_advanced"  # S9 does NOT apply (e.g. adjuvant, prevention)
     CHRONIC_NON_ONCOLOGY = "chronic_non_oncology"
     ACUTE_NON_ONCOLOGY = "acute_non_oncology"
@@ -72,8 +82,12 @@ class Route(str, Enum):
 
     @property
     def is_non_systemic_or_local(self) -> bool:
-        return self in (Route.TOPICAL_DERMAL, Route.INHALATION, Route.INTRAVITREAL,
-                        Route.INTRATHECAL)
+        return self in (
+            Route.TOPICAL_DERMAL,
+            Route.INHALATION,
+            Route.INTRAVITREAL,
+            Route.INTRATHECAL,
+        )
 
 
 class ClinicalPopulation(str, Enum):
@@ -133,16 +147,19 @@ class ProgramContext:
         if self.peptide_origin is not None and self.modality is not Modality.PEPTIDE:
             raise ValueError("peptide_origin applies to peptide programmes only")
         if self.amino_acid_chains and self.modality not in AMINO_ACID_MODALITIES:
-            raise ValueError(f"amino_acid_chains: a {self.modality.value} is not an amino-acid "
-                             "polymer")
-        if any(isinstance(c, bool) or not isinstance(c, int) or c <= 0
-               for c in self.amino_acid_chains):
+            raise ValueError(
+                f"amino_acid_chains: a {self.modality.value} is not an amino-acid polymer"
+            )
+        if any(
+            isinstance(c, bool) or not isinstance(c, int) or c <= 0 for c in self.amino_acid_chains
+        ):
             raise ValueError("amino_acid_chains: positive whole numbers of amino acids")
         if self.s6_determination is not None:
             if self.modality is not Modality.PEPTIDE:
                 raise ValueError("an S6(R1) applicability determination is for peptides only")
-            if not isinstance(self.s6_determination.get("applies"), bool) or \
-                    not self.s6_determination.get("signature"):
+            if not isinstance(
+                self.s6_determination.get("applies"), bool
+            ) or not self.s6_determination.get("signature"):
                 raise ValueError("an S6(R1) determination needs 'applies' and its signature")
 
     @property
@@ -165,11 +182,15 @@ class ProgramContext:
             route=Route(d["route"]),
             intended_clinical_duration_days=int(d["intended_clinical_duration_days"]),
             max_trial_duration_days=int(d["max_trial_duration_days"]),
-            populations=tuple(ClinicalPopulation(p) for p in d.get(
-                "populations", [ClinicalPopulation.HEALTHY_VOLUNTEERS.value])),
+            populations=tuple(
+                ClinicalPopulation(p)
+                for p in d.get("populations", [ClinicalPopulation.HEALTHY_VOLUNTEERS.value])
+            ),
             supports_marketing=bool(d.get("supports_marketing", False)),
             molar_extinction_coefficient_ge_1000=d.get("molar_extinction_coefficient_ge_1000"),
-            pharmacologically_relevant_species=tuple(d.get("pharmacologically_relevant_species", ())),
+            pharmacologically_relevant_species=tuple(
+                d.get("pharmacologically_relevant_species", ())
+            ),
             is_immunomodulatory_agonist=bool(d.get("is_immunomodulatory_agonist", False)),
             is_integrating_vector=d.get("is_integrating_vector"),
             intended_pediatric_use=bool(d.get("intended_pediatric_use", False)),

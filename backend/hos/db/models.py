@@ -46,7 +46,7 @@ class SessionRow(Base):
     __tablename__ = "sessions"
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), index=True)
-    kind: Mapped[str] = mapped_column(String(16))           # session | agent_key
+    kind: Mapped[str] = mapped_column(String(16))  # session | agent_key
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

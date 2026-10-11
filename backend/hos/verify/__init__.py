@@ -25,5 +25,6 @@ def __getattr__(name: str) -> Any:
     # loading it on first use keeps the import graph acyclic
     if name in ("VerificationReport", "verify_bundle"):
         from hos.verify import verifier
+
         return getattr(verifier, name)
     raise AttributeError(name)

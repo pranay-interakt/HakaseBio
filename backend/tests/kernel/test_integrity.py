@@ -19,8 +19,9 @@ def _world(k):  # noqa: F811
     sci, sd = k.get_principal("sci"), k.get_principal("sd")
     prog = k.create_program(sci, name="I-1", context=CTX)["id"]
     cid = k.register_compound(sci, prog, name="c", smiles="CC(=O)Nc1ccc(O)cc1")["id"]
-    sid = k.create_study(sci, program_id=prog, compound_id=cid,
-                         requirement_id="adme.metabolic_stability")["id"]
+    sid = k.create_study(
+        sci, program_id=prog, compound_id=cid, requirement_id="adme.metabolic_stability"
+    )["id"]
     k.design_study(sci, sid, PARAMS)
     k.plan_study(sci, sid)
     k.dispatch_study(sci, sid, {"kind": "external_lab", "laboratory": "CRO"})
@@ -28,25 +29,55 @@ def _world(k):  # noqa: F811
     k.set_analysis_inputs(sci, sid, FU)
     k.analyze_study(sci, sid)
     k.report_study(sci, sid)
-    k.sign_study(sci, sid, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.APPROVAL,
-                 statement="approve")
+    k.sign_study(
+        sci,
+        sid,
+        role=Role.RESPONSIBLE_SCIENTIST,
+        meaning=SignatureMeaning.APPROVAL,
+        statement="approve",
+    )
     k.approve_study(sci, sid)
-    imp = k.imports.import_study(sci, program_id=prog, compound_id=cid,
-                                 requirement_id="genotox.ames", report=REPORT,
-                                 filename="ames.pdf", title="Ames", laboratory="Lab",
-                                 report_date="2026-05-01", glp=False)["id"]
+    imp = k.imports.import_study(
+        sci,
+        program_id=prog,
+        compound_id=cid,
+        requirement_id="genotox.ames",
+        report=REPORT,
+        filename="ames.pdf",
+        title="Ames",
+        laboratory="Lab",
+        report_date="2026-05-01",
+        glp=False,
+    )["id"]
     k.imports.add_import_value(sci, imp, key="overall_call", page="5", category="negative")
-    k.imports.sign_import(sci, imp, role=Role.RESPONSIBLE_SCIENTIST,
-                          meaning=SignatureMeaning.APPROVAL, statement="")
+    k.imports.sign_import(
+        sci, imp, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.APPROVAL, statement=""
+    )
     k.imports.complete_import(sci, imp)
-    pep = k.create_program(sci, name="I-P", context=ProgramContext(
-        modality=Modality.PEPTIDE, indication=Indication.CHRONIC_NON_ONCOLOGY,
-        route=Route.SUBCUTANEOUS, intended_clinical_duration_days=365,
-        max_trial_duration_days=28, peptide_origin=PeptideOrigin.CHEMICAL_SYNTHESIS))["id"]
-    bio = k.register_biologic(sci, pep, name="p", entity={"format": "sequence", "chains": [
-        {"name": "p", "role": "peptide", "sequence": "HAEGTFTSDV", "copies": 1}]})["id"]
-    k.record_program_determination(sci, pep, key="s6_principles_apply", applies=True,
-                                   rationale="target conserved")
+    pep = k.create_program(
+        sci,
+        name="I-P",
+        context=ProgramContext(
+            modality=Modality.PEPTIDE,
+            indication=Indication.CHRONIC_NON_ONCOLOGY,
+            route=Route.SUBCUTANEOUS,
+            intended_clinical_duration_days=365,
+            max_trial_duration_days=28,
+            peptide_origin=PeptideOrigin.CHEMICAL_SYNTHESIS,
+        ),
+    )["id"]
+    bio = k.register_biologic(
+        sci,
+        pep,
+        name="p",
+        entity={
+            "format": "sequence",
+            "chains": [{"name": "p", "role": "peptide", "sequence": "HAEGTFTSDV", "copies": 1}],
+        },
+    )["id"]
+    k.record_program_determination(
+        sci, pep, key="s6_principles_apply", applies=True, rationale="target conserved"
+    )
     return {"prog": prog, "cid": cid, "sid": sid, "imp": imp, "pep": pep, "bio": bio, "sd": sd}
 
 
@@ -68,17 +99,23 @@ def test_a_genuine_record_reconciles_and_is_anchored(k):  # noqa: F811
     assert k.anchors.checkpoints()[-1]["head"] == k.ledger.head
 
 
-@pytest.mark.parametrize(("table", "edit", "check"), [
-    ("studies", "state='reported'", "state follows from its last event"),
-    ("principals", "roles='[\"admin\", \"study_director\"]'",
-     "principal matches its registration and role changes"),
-    ("compounds", "smiles='CCO'", "structure matches its registration"),
-])
+@pytest.mark.parametrize(
+    ("table", "edit", "check"),
+    [
+        ("studies", "state='reported'", "state follows from its last event"),
+        (
+            "principals",
+            'roles=\'["admin", "study_director"]\'',
+            "principal matches its registration and role changes",
+        ),
+        ("compounds", "smiles='CCO'", "structure matches its registration"),
+    ],
+)
 def test_direct_edits_to_rows_are_detected(k, table, edit, check):  # noqa: F811
     w = _world(k)
     target = {"studies": w["sid"], "principals": "sd", "compounds": w["cid"]}[table]
     _sql(k, f"UPDATE {table} SET {edit} WHERE id=:id", id=target)
-    assert k.verify_ledger() > 0                       # the chain itself still verifies
+    assert k.verify_ledger() > 0  # the chain itself still verifies
     assert check in _checks(k)
 
 
@@ -94,18 +131,23 @@ def test_edited_content_is_detected(k):  # noqa: F811
     prog = k.repo.program(w["prog"])
     k.repo.update_program(w["prog"], context={**prog.context, "max_trial_duration_days": 999})
     checks = _checks(k)
-    for c in ("rendered report matches its event", "analysis matches its event and recomputes",
-              "signatures are exactly those recorded",
-              "context matches the study set derived from it"):
+    for c in (
+        "rendered report matches its event",
+        "analysis matches its event and recomputes",
+        "signatures are exactly those recorded",
+        "context matches the study set derived from it",
+    ):
         assert c in checks, checks
 
 
 def test_an_unrecorded_guest_and_a_changed_sequence_are_detected(k):  # noqa: F811
     from hos.core.provenance import utc_now
     from hos.db.models import ProgramMemberRow
+
     w = _world(k)
-    k.repo.add(ProgramMemberRow(program_id=w["prog"], principal_id="qa", added_by="x",
-                                added_at=utc_now()))
+    k.repo.add(
+        ProgramMemberRow(program_id=w["prog"], principal_id="qa", added_by="x", added_at=utc_now())
+    )
     ent = k.repo.compound(w["bio"]).entity
     ent["spec"]["chains"][0]["sequence"] = "HAEGTFTSDA"
     k.repo.update_compound(w["bio"], entity=json.loads(json.dumps(ent)))
@@ -118,7 +160,7 @@ def test_a_deleted_ledger_tail_is_detected_by_the_anchors(k):  # noqa: F811
     _world(k)
     n = len(k.ledger.entries())
     _sql(k, "DELETE FROM ledger WHERE seq > :n", n=n - 3)
-    assert k.verify_ledger() == n - 3                  # a shorter chain is still a valid chain
+    assert k.verify_ledger() == n - 3  # a shorter chain is still a valid chain
     assert "chain reaches every checkpoint" in _checks(k)
 
 
@@ -134,15 +176,17 @@ def test_a_rewritten_chain_is_detected_by_the_anchors(k):  # noqa: F811
             if e.seq == 5:
                 body["actor_id"] = "someone-else"
             prev = LedgerEntry.hash_of(body)
-            s.execute(text("UPDATE ledger SET actor_id=:a, prev_hash=:p, entry_hash=:h "
-                           "WHERE seq=:seq"), {"a": body["actor_id"], "p": body["prev_hash"],
-                                               "h": prev, "seq": e.seq})
+            s.execute(
+                text("UPDATE ledger SET actor_id=:a, prev_hash=:p, entry_hash=:h WHERE seq=:seq"),
+                {"a": body["actor_id"], "p": body["prev_hash"], "h": prev, "seq": e.seq},
+            )
     assert k.verify_ledger() == len(entries)
     assert "chain passes through every checkpoint" in _checks(k)
 
 
 def test_checkpoints_are_authenticated_with_a_key(k, monkeypatch):  # noqa: F811
     from hos.kernel.integrity import AnchorLog
+
     k.anchors = AnchorLog(k.anchors.path.parent / "keyed.jsonl", key=b"anchor-key")
     _world(k)
     lines = k.anchors.path.read_text().splitlines()
@@ -167,11 +211,10 @@ def test_the_check_reads_one_snapshot(k):  # noqa: F811
     n = len(k.ledger.entries())
     with k.db.snapshot():
         assert len(k.ledger.entries()) == n
-        other = threading.Thread(target=lambda: k.create_program(sci, name="later",
-                                                                 context=CTX))
+        other = threading.Thread(target=lambda: k.create_program(sci, name="later", context=CTX))
         other.start()
         other.join()
-        assert len(k.ledger.entries()) == n             # committed, but after the snapshot
+        assert len(k.ledger.entries()) == n  # committed, but after the snapshot
         assert len(k.repo.programs()) == 1
         with pytest.raises(RuntimeError, match="read-only"):
             k.repo.update_program(pid, name="changed inside a snapshot")

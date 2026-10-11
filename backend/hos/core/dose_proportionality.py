@@ -36,8 +36,9 @@ from scipy import stats
 __all__ = ["PowerModelFit", "acceptance_interval", "fit_power_model"]
 
 
-def acceptance_interval(dose_ratio: float, theta_low: float, theta_high: float
-                        ) -> tuple[float, float]:
+def acceptance_interval(
+    dose_ratio: float, theta_low: float, theta_high: float
+) -> tuple[float, float]:
     """beta1 interval equivalent to Rdnm in (theta_low, theta_high) for dose ratio r."""
     if dose_ratio <= 1:
         raise ValueError("the dose ratio (highest / lowest) must exceed 1")
@@ -59,8 +60,9 @@ class PowerModelFit:
     ci: tuple[float, float] | None
 
 
-def fit_power_model(doses: Sequence[float], values: Sequence[float], *,
-                    ci_level: float) -> PowerModelFit:
+def fit_power_model(
+    doses: Sequence[float], values: Sequence[float], *, ci_level: float
+) -> PowerModelFit:
     """Fit ln(value) = ln(beta0) + beta1 ln(dose) by least squares.
 
     Doses and values must be positive (the log of zero is undefined; callers exclude control
@@ -85,9 +87,17 @@ def fit_power_model(doses: Sequence[float], values: Sequence[float], *,
     ci: tuple[float, float] | None = None
     if n > 2:
         resid = y - (ln_beta0 + beta1 * x)
-        s2 = float(np.sum(resid ** 2)) / (n - 2)
+        s2 = float(np.sum(resid**2)) / (n - 2)
         se = math.sqrt(s2 / sxx)
         t = float(stats.t.ppf(1 - (1 - ci_level) / 2, n - 2))
         ci = (beta1 - t * se, beta1 + t * se)
-    return PowerModelFit(n=n, n_doses=len(distinct), dose_ratio=distinct[-1] / distinct[0],
-                         beta1=beta1, ln_beta0=ln_beta0, se_beta1=se, ci_level=ci_level, ci=ci)
+    return PowerModelFit(
+        n=n,
+        n_doses=len(distinct),
+        dose_ratio=distinct[-1] / distinct[0],
+        beta1=beta1,
+        ln_beta0=ln_beta0,
+        se_beta1=se,
+        ci_level=ci_level,
+        ci=ci,
+    )

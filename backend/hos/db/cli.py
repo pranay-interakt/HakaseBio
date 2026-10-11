@@ -1,10 +1,10 @@
 """``hos-db``: the schema, for operators (docs/15 P2.1).
 
-    hos-db upgrade   bring the database (HOS_DATABASE_URL) to this release's schema
-    hos-db current   print the database's revision and this release's head
-    hos-db check     exit 1 if the database differs from the models
-    hos-db integrity verify the ledger, its anchors and the stored state; exit 1 and alert
-                     (HOS_ALERT_WEBHOOK) on any finding. Run it on a schedule (docs/16).
+hos-db upgrade   bring the database (HOS_DATABASE_URL) to this release's schema
+hos-db current   print the database's revision and this release's head
+hos-db check     exit 1 if the database differs from the models
+hos-db integrity verify the ledger, its anchors and the stored state; exit 1 and alert
+                 (HOS_ALERT_WEBHOOK) on any finding. Run it on a schedule (docs/16).
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ from hos.db.store import Database
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="hos-db", description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        prog="hos-db", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("command", choices=["upgrade", "current", "check", "integrity"])
     args = ap.parse_args(argv)
     if args.command == "upgrade":
@@ -59,8 +60,13 @@ def _integrity() -> int:
         return 1
     if not report["valid"]:
         checks = sorted({f["check"] for f in report["findings"]})
-        alert("ledger_integrity", "the integrity check found problems", wait=True,
-              checks=checks, source_check="hos-db integrity")
+        alert(
+            "ledger_integrity",
+            "the integrity check found problems",
+            wait=True,
+            checks=checks,
+            source_check="hos-db integrity",
+        )
         for f in report["findings"]:
             print(f"FINDING {f['subject']}: {f['check']} ({f['detail']})")
         return 1

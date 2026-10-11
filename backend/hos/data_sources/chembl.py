@@ -44,33 +44,74 @@ class ChEMBLClient:
 
     def molecule_by_inchikey(self, inchikey: str, *, refresh: bool = False) -> SourceResult:
         url = f"{CHEMBL_BASE}/molecule.json?" + urlencode(
-            {"molecule_structures__standard_inchi_key": inchikey})
+            {"molecule_structures__standard_inchi_key": inchikey}
+        )
         status, payload, at, cached, err = self.http.get_json(url, refresh=refresh)
         if status is not SourceStatus.OK:
-            return SourceResult(self.source, status, inchikey, url, at, from_cache=cached,
-                                error=err, license=LICENSE)
+            return SourceResult(
+                self.source,
+                status,
+                inchikey,
+                url,
+                at,
+                from_cache=cached,
+                error=err,
+                license=LICENSE,
+            )
         mols = (payload or {}).get("molecules")
         if mols is None:
-            return SourceResult(self.source, SourceStatus.ERROR, inchikey, url, at,
-                                from_cache=cached, error="unexpected response schema",
-                                license=LICENSE)
+            return SourceResult(
+                self.source,
+                SourceStatus.ERROR,
+                inchikey,
+                url,
+                at,
+                from_cache=cached,
+                error="unexpected response schema",
+                license=LICENSE,
+            )
         if not mols:
-            return SourceResult(self.source, SourceStatus.NOT_FOUND, inchikey, url, at,
-                                from_cache=cached, license=LICENSE)
+            return SourceResult(
+                self.source,
+                SourceStatus.NOT_FOUND,
+                inchikey,
+                url,
+                at,
+                from_cache=cached,
+                license=LICENSE,
+            )
         m = mols[0]
         cid = m.get("molecule_chembl_id")
-        rec = {"chembl_id": cid, "pref_name": m.get("pref_name"), "max_phase": m.get("max_phase"),
-               "molecule_type": m.get("molecule_type"),
-               "first_approval": m.get("first_approval"),
-               "withdrawn_flag": m.get("withdrawn_flag"),
-               "black_box_warning": m.get("black_box_warning"),
-               "report_card": f"https://www.ebi.ac.uk/chembl/compound_report_card/{cid}/"}
-        return SourceResult(self.source, SourceStatus.OK, inchikey, url, at, records=(rec,),
-                            from_cache=cached, license=LICENSE,
-                            attribution=f"ChEMBL {cid}, EMBL-EBI, CC BY-SA 3.0")
+        rec = {
+            "chembl_id": cid,
+            "pref_name": m.get("pref_name"),
+            "max_phase": m.get("max_phase"),
+            "molecule_type": m.get("molecule_type"),
+            "first_approval": m.get("first_approval"),
+            "withdrawn_flag": m.get("withdrawn_flag"),
+            "black_box_warning": m.get("black_box_warning"),
+            "report_card": f"https://www.ebi.ac.uk/chembl/compound_report_card/{cid}/",
+        }
+        return SourceResult(
+            self.source,
+            SourceStatus.OK,
+            inchikey,
+            url,
+            at,
+            records=(rec,),
+            from_cache=cached,
+            license=LICENSE,
+            attribution=f"ChEMBL {cid}, EMBL-EBI, CC BY-SA 3.0",
+        )
 
-    def activities(self, molecule_chembl_id: str, *, target_chembl_id: str | None = None,
-                   standard_types: Iterable[str] = (), refresh: bool = False) -> SourceResult:
+    def activities(
+        self,
+        molecule_chembl_id: str,
+        *,
+        target_chembl_id: str | None = None,
+        standard_types: Iterable[str] = (),
+        refresh: bool = False,
+    ) -> SourceResult:
         params: dict[str, Any] = {"molecule_chembl_id": molecule_chembl_id, "limit": 100}
         if target_chembl_id:
             params["target_chembl_id"] = target_chembl_id
@@ -90,13 +131,28 @@ class ChEMBLClient:
             first_at = first_at or at
             cached_all = cached_all and cached
             if status is not SourceStatus.OK:
-                return SourceResult(self.source, status, query, url, at, from_cache=cached,
-                                    error=err, license=LICENSE)
+                return SourceResult(
+                    self.source,
+                    status,
+                    query,
+                    url,
+                    at,
+                    from_cache=cached,
+                    error=err,
+                    license=LICENSE,
+                )
             body = payload or {}
             acts = body.get("activities")
             if acts is None:
-                return SourceResult(self.source, SourceStatus.ERROR, query, url, at,
-                                    error="unexpected response schema", license=LICENSE)
+                return SourceResult(
+                    self.source,
+                    SourceStatus.ERROR,
+                    query,
+                    url,
+                    at,
+                    error="unexpected response schema",
+                    license=LICENSE,
+                )
             for a in acts:
                 rec, qty = _activity(a, at)
                 records.append(rec)
@@ -107,17 +163,36 @@ class ChEMBLClient:
             pages += 1
         truncated = next_url is not None
         if not records:
-            return SourceResult(self.source, SourceStatus.NOT_FOUND, query, url, first_at,
-                                from_cache=cached_all, license=LICENSE)
-        return SourceResult(self.source, SourceStatus.OK, query, url, first_at,
-                            records=tuple(records), quantities=q, from_cache=cached_all,
-                            license=LICENSE,
-                            attribution="ChEMBL activities, EMBL-EBI, CC BY-SA 3.0",
-                            error=f"truncated after {_MAX_PAGES} pages" if truncated else None)
+            return SourceResult(
+                self.source,
+                SourceStatus.NOT_FOUND,
+                query,
+                url,
+                first_at,
+                from_cache=cached_all,
+                license=LICENSE,
+            )
+        return SourceResult(
+            self.source,
+            SourceStatus.OK,
+            query,
+            url,
+            first_at,
+            records=tuple(records),
+            quantities=q,
+            from_cache=cached_all,
+            license=LICENSE,
+            attribution="ChEMBL activities, EMBL-EBI, CC BY-SA 3.0",
+            error=f"truncated after {_MAX_PAGES} pages" if truncated else None,
+        )
 
     def herg_ic50(self, molecule_chembl_id: str, *, refresh: bool = False) -> SourceResult:
-        return self.activities(molecule_chembl_id, target_chembl_id=HERG_TARGET,
-                               standard_types=("IC50",), refresh=refresh)
+        return self.activities(
+            molecule_chembl_id,
+            target_chembl_id=HERG_TARGET,
+            standard_types=("IC50",),
+            refresh=refresh,
+        )
 
 
 _UNIT_MAP = {"nM": "nM", "uM": "uM", "mM": "mM", "pM": "pM", "M": "M"}
@@ -125,12 +200,27 @@ _UNIT_MAP = {"nM": "nM", "uM": "uM", "mM": "mM", "pM": "pM", "M": "M"}
 
 def _activity(a: dict[str, Any], at: str | None) -> tuple[dict[str, Any], Quantity | None]:
     doc = a.get("document_chembl_id")
-    rec = {k: a.get(k) for k in ("activity_id", "standard_type", "standard_relation",
-                                 "standard_value", "standard_units", "pchembl_value",
-                                 "assay_chembl_id", "assay_description", "assay_type",
-                                 "document_chembl_id", "document_journal", "document_year",
-                                 "data_validity_comment", "activity_comment", "target_chembl_id",
-                                 "target_pref_name")}
+    rec = {
+        k: a.get(k)
+        for k in (
+            "activity_id",
+            "standard_type",
+            "standard_relation",
+            "standard_value",
+            "standard_units",
+            "pchembl_value",
+            "assay_chembl_id",
+            "assay_description",
+            "assay_type",
+            "document_chembl_id",
+            "document_journal",
+            "document_year",
+            "data_validity_comment",
+            "activity_comment",
+            "target_chembl_id",
+            "target_pref_name",
+        )
+    }
     value, units, rel = a.get("standard_value"), a.get("standard_units"), a.get("standard_relation")
     unit = _UNIT_MAP.get(units or "")
     if value is None or unit is None or rel not in ("=", ">", ">=", "<", "<="):
@@ -144,20 +234,26 @@ def _activity(a: dict[str, Any], at: str | None) -> tuple[dict[str, Any], Quanti
     if a.get("data_validity_comment"):
         flags.append(f"chembl_validity:{a['data_validity_comment']}")
     act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity/{a.get('activity_id')}"
-    cit = Citation(key=f"chembl:{doc}",
-                   text=f"ChEMBL document {doc}" + (f", {a.get('document_journal')}"
-                                                     if a.get("document_journal") else "")
-                        + (f" ({a.get('document_year')})" if a.get("document_year") else ""),
-                   url=f"https://www.ebi.ac.uk/chembl/document_report_card/{doc}/",
-                   year=a.get("document_year"))
+    cit = Citation(
+        key=f"chembl:{doc}",
+        text=f"ChEMBL document {doc}"
+        + (f", {a.get('document_journal')}" if a.get("document_journal") else "")
+        + (f" ({a.get('document_year')})" if a.get("document_year") else ""),
+        url=f"https://www.ebi.ac.uk/chembl/document_report_card/{doc}/",
+        year=a.get("document_year"),
+    )
     prov = Provenance.literature(
-        source_name="ChEMBL", citation=cit, source_url=act_url,
+        source_name="ChEMBL",
+        citation=cit,
+        source_url=act_url,
         source_record_id=f"activity:{a.get('activity_id')}",
         retrieved_at=datetime.fromisoformat(at) if at else None,
         notes=f"{a.get('standard_type')} {rel} {value} {units}; assay {a.get('assay_chembl_id')}: "
-              f"{a.get('assay_description')}")
+        f"{a.get('assay_description')}",
+    )
     label = f"{a.get('standard_type')} ({a.get('target_pref_name') or a.get('target_chembl_id')})"
     if rel != "=":
         label += f" {rel} bound"
-    return rec, Quantity(value=float(value), unit=unit, provenance=prov, label=label,
-                         qc_flags=tuple(flags))
+    return rec, Quantity(
+        value=float(value), unit=unit, provenance=prov, label=label, qc_flags=tuple(flags)
+    )

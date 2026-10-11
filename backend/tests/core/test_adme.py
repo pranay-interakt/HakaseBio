@@ -26,8 +26,10 @@ TIMES = (0.0, 5.0, 15.0, 30.0, 45.0, 60.0)
 
 def _series(k=K, times=TIMES):
     return MeasurementSeries(
-        x=times, y=tuple(100 * math.exp(-k * t) for t in times),
-        x_unit="min", y_unit="percent",
+        x=times,
+        y=tuple(100 * math.exp(-k * t) for t in times),
+        x_unit="min",
+        y_unit="percent",
         provenance=Provenance.measured(source_name="LC-MS/MS"),
     )
 
@@ -89,11 +91,21 @@ def test_extraction_bands():
 
 
 def test_flat_series_fails_honestly_and_propagates():
-    flat = MeasurementSeries(x=(0.0, 15.0, 30.0, 60.0), y=(100.0, 100.3, 99.9, 100.2),
-                             x_unit="min", y_unit="percent",
-                             provenance=Provenance.measured(source_name="LC-MS/MS"))
-    res = ivive_from_depletion(flat, species="human", protein_concentration=PROT,
-                               fu_plasma=FUP, blood_plasma_ratio=BP, **ACC)
+    flat = MeasurementSeries(
+        x=(0.0, 15.0, 30.0, 60.0),
+        y=(100.0, 100.3, 99.9, 100.2),
+        x_unit="min",
+        y_unit="percent",
+        provenance=Provenance.measured(source_name="LC-MS/MS"),
+    )
+    res = ivive_from_depletion(
+        flat,
+        species="human",
+        protein_concentration=PROT,
+        fu_plasma=FUP,
+        blood_plasma_ratio=BP,
+        **ACC,
+    )
     assert not res.clh.is_available
     assert res.extraction_class == "undetermined"
     assert res.qc.status is QCStatus.FAIL
@@ -116,7 +128,10 @@ def test_fu_mic_correction_increases_clearance():
     clint = clint_in_vitro(fit_depletion(_series(), **ACC), PROT)
     lp = Quantity.computed(4.0, "dimensionless", method=method("descr.clogp"))
     fu = fu_mic_hallifax_houston(lp, PROT)
-    assert scale_clint_to_liver(clint, "human", fu_mic=fu).value > scale_clint_to_liver(clint, "human").value
+    assert (
+        scale_clint_to_liver(clint, "human", fu_mic=fu).value
+        > scale_clint_to_liver(clint, "human").value
+    )
 
 
 def test_species_without_verified_mppgl_is_unavailable_not_borrowed():

@@ -28,12 +28,15 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 __all__ = ["UPLOAD_PATHS", "BodyLimit"]
 
 #: Endpoints that take a raw file body.
-UPLOAD_PATHS = tuple(re.compile(p) for p in (
-    r"^/api/studies/[^/]+/data$",
-    r"^/api/programs/[^/]+/imports$",
-    r"^/api/studies/[^/]+/import/datasets$",
-    r"^/api/verify$",
-))
+UPLOAD_PATHS = tuple(
+    re.compile(p)
+    for p in (
+        r"^/api/studies/[^/]+/data$",
+        r"^/api/programs/[^/]+/imports$",
+        r"^/api/studies/[^/]+/import/datasets$",
+        r"^/api/verify$",
+    )
+)
 
 
 class _TooLarge(Exception):
@@ -41,13 +44,14 @@ class _TooLarge(Exception):
 
 
 class BodyLimit:
-    def __init__(self, app: ASGIApp, *, upload_bytes: int | None = None,
-                 json_bytes: int | None = None) -> None:
+    def __init__(
+        self, app: ASGIApp, *, upload_bytes: int | None = None, json_bytes: int | None = None
+    ) -> None:
         self.app = app
         self.upload_bytes = upload_bytes or int(
-            float(os.environ.get("HOS_MAX_UPLOAD_MB", "100")) * 1024 * 1024)
-        self.json_bytes = json_bytes or int(
-            float(os.environ.get("HOS_MAX_JSON_KB", "2048")) * 1024)
+            float(os.environ.get("HOS_MAX_UPLOAD_MB", "100")) * 1024 * 1024
+        )
+        self.json_bytes = json_bytes or int(float(os.environ.get("HOS_MAX_JSON_KB", "2048")) * 1024)
 
     def limit_for(self, path: str) -> int:
         return self.upload_bytes if any(p.match(path) for p in UPLOAD_PATHS) else self.json_bytes
@@ -95,15 +99,25 @@ class BodyLimit:
 
     @staticmethod
     async def _refuse(send: Send, limit: int) -> None:
-        size = (f"{limit / 1024 / 1024:g} MB" if limit >= 1024 * 1024
-                else f"{limit / 1024:g} KB")
+        size = f"{limit / 1024 / 1024:g} MB" if limit >= 1024 * 1024 else f"{limit / 1024:g} KB"
         from hos.api.observability import request_context
 
-        body = json.dumps({"error": "PayloadTooLarge",
-                           "detail": f"the request body is larger than this endpoint accepts "
-                                     f"({size}); nothing was stored",
-                           "request_id": request_context()["request_id"]}).encode()
-        await send({"type": "http.response.start", "status": 413,
-                    "headers": [(b"content-type", b"application/json"),
-                                (b"content-length", str(len(body)).encode())]})
+        body = json.dumps(
+            {
+                "error": "PayloadTooLarge",
+                "detail": f"the request body is larger than this endpoint accepts "
+                f"({size}); nothing was stored",
+                "request_id": request_context()["request_id"],
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
         await send({"type": "http.response.body", "body": body})

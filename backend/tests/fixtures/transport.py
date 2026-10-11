@@ -27,6 +27,8 @@ def replay_transport() -> httpx.MockTransport:
         body = f["body"].encode()
         if hashlib.sha256(body).hexdigest() != f["body_sha256"]:
             raise AssertionError(f"fixture {p.name} was modified after capture")
-        return httpx.Response(f["status_code"], content=body,
-                              headers={"content-type": "application/json"})
+        return httpx.Response(
+            f["status_code"], content=body, headers={"content-type": "application/json"}
+        )
+
     return httpx.MockTransport(handler)

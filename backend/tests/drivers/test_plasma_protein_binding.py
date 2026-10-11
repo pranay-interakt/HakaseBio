@@ -15,22 +15,49 @@ from hos.drivers.plasma_protein_binding import PlasmaProteinBindingDriver
 D = PlasmaProteinBindingDriver()
 COMPOUND = CompoundInfo(id="cmp-1", name="Test compound", smiles="CC(=O)Nc1ccc(O)cc1")
 PARAMS = dict(
-    glp=False, method="equilibrium_dialysis", device="RED device inserts (MWCO 8 kDa)",
-    membrane_mwco_da=8000, matrices={"human": "plasma (K2EDTA)", "rat": "plasma (K2EDTA)"},
-    test_concentrations=[1000, 10000], concentration_unit="ng/mL", lloq=1.0,
-    incubation_time_h=4, temperature_c=37, agitation="orbital shaking 250 rpm",
-    atmosphere="5% CO2", equilibrium_basis="time course to 6 h, report PPB-QUAL-02",
-    plasma_volume_ul=200, buffer_volume_ul=350, buffer="PBS pH 7.4", replicates=3,
+    glp=False,
+    method="equilibrium_dialysis",
+    device="RED device inserts (MWCO 8 kDa)",
+    membrane_mwco_da=8000,
+    matrices={"human": "plasma (K2EDTA)", "rat": "plasma (K2EDTA)"},
+    test_concentrations=[1000, 10000],
+    concentration_unit="ng/mL",
+    lloq=1.0,
+    incubation_time_h=4,
+    temperature_c=37,
+    agitation="orbital shaking 250 rpm",
+    atmosphere="5% CO2",
+    equilibrium_basis="time course to 6 h, report PPB-QUAL-02",
+    plasma_volume_ul=200,
+    buffer_volume_ul=350,
+    buffer="PBS pH 7.4",
+    replicates=3,
     bioanalytical_method_reference="LCMS-PPB-1",
-    positive_controls=[{"name": "warfarin", "species": "human", "qualified_mean_fu": 0.012,
-                        "qualification_reference": "PPB-QUAL-01"},
-                       {"name": "warfarin_rat", "species": "rat", "qualified_mean_fu": 0.03,
-                        "qualification_reference": "PPB-QUAL-01"}])
-SIM = dict(fu=[{"compound": "TEST", "species": "human", "fu": 0.05},
-               {"compound": "TEST", "species": "rat", "fu": 0.12},
-               {"compound": "warfarin", "species": "human", "fu": 0.012},
-               {"compound": "warfarin_rat", "species": "rat", "fu": 0.03}],
-           plasma_fraction_of_nominal=0.9, analytical_sd_log=0.0)
+    positive_controls=[
+        {
+            "name": "warfarin",
+            "species": "human",
+            "qualified_mean_fu": 0.012,
+            "qualification_reference": "PPB-QUAL-01",
+        },
+        {
+            "name": "warfarin_rat",
+            "species": "rat",
+            "qualified_mean_fu": 0.03,
+            "qualification_reference": "PPB-QUAL-01",
+        },
+    ],
+)
+SIM = dict(
+    fu=[
+        {"compound": "TEST", "species": "human", "fu": 0.05},
+        {"compound": "TEST", "species": "rat", "fu": 0.12},
+        {"compound": "warfarin", "species": "human", "fu": 0.012},
+        {"compound": "warfarin_rat", "species": "rat", "fu": 0.03},
+    ],
+    plasma_fraction_of_nominal=0.9,
+    analytical_sd_log=0.0,
+)
 
 
 def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1"):
@@ -42,8 +69,10 @@ def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1"):
         rows = edit(rows)
     t = D.data_template(p)
     buf = io.StringIO()
-    buf.write(f"# laboratory: DMPK Lab\n# analyst: D. Analyst\n# run_date: 2026-09-30\n"
-              f"# study_reference: {ref}\n")
+    buf.write(
+        f"# laboratory: DMPK Lab\n# analyst: D. Analyst\n# run_date: 2026-09-30\n"
+        f"# study_reference: {ref}\n"
+    )
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(t.header())
     for r in rows:
@@ -57,14 +86,23 @@ def _run(raw=None, params=PARAMS):
 
 
 def _with_fu(name, species, fu):
-    return dict(SIM, fu=[f if not (f["compound"] == name and f["species"] == species)
-                         else dict(f, fu=fu) for f in SIM["fu"]])
+    return dict(
+        SIM,
+        fu=[
+            f if not (f["compound"] == name and f["species"] == species) else dict(f, fu=fu)
+            for f in SIM["fu"]
+        ],
+    )
 
 
 def test_conformance_kit_passes():
-    rep = check_driver(D, compound=COMPOUND, parameters=PARAMS,
-                       simulation_parameters=dict(SIM, analytical_sd_log=0.05),
-                       measured_example=_file())
+    rep = check_driver(
+        D,
+        compound=COMPOUND,
+        parameters=PARAMS,
+        simulation_parameters=dict(SIM, analytical_sd_log=0.05),
+        measured_example=_file(),
+    )
     assert rep.passed, rep.summary()
 
 
@@ -116,6 +154,7 @@ def test_laboratory_recovery_checked_against_stated_criterion():
         for r in rows:
             r["recovery_percent"] = 55.0 if r["species"] == "rat" else 90.0
         return rows
+
     res, p = _run(_file(params, edit=recovery), params)
     assert [f for f in res.qc.findings if f.code.startswith("recovery_percent.TEST.rat")]
     assert any("di2012" in s.citation_keys for s in D.interpret(res, p).statements)
@@ -125,10 +164,11 @@ def test_laboratory_recovery_checked_against_stated_criterion():
 
 def test_strict_ingest():
     def bad(rows):
-        rows[0].update(buffer_chamber=0.5)            # below the LLOQ, reported quantified
-        rows[1].update(nominal_concentration=500)     # not a protocol concentration
-        rows.append(dict(rows[2]))                    # duplicate cell
+        rows[0].update(buffer_chamber=0.5)  # below the LLOQ, reported quantified
+        rows[1].update(nominal_concentration=500)  # not a protocol concentration
+        rows.append(dict(rows[2]))  # duplicate cell
         return rows
+
     with pytest.raises(IngestError) as exc:
         D.ingest(_file(edit=bad), D.validate_parameters(PARAMS))
     msg = " ".join(exc.value.errors)
@@ -138,8 +178,9 @@ def test_strict_ingest():
 
 def test_molecule_larger_than_the_membrane_cutoff_is_noted():
     prof = compute_profile(COMPOUND.smiles)
-    small = CompoundInfo(id="c", name="c", smiles=COMPOUND.smiles,
-                         molecular_weight=prof.molecular_weight)
+    small = CompoundInfo(
+        id="c", name="c", smiles=COMPOUND.smiles, molecular_weight=prof.molecular_weight
+    )
     proto = D.design(small, D.validate_parameters(dict(PARAMS, membrane_mwco_da=100)))
     assert any("MWCO" in n for n in proto.design["design_notes"])
 

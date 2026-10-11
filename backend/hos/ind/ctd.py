@@ -35,8 +35,10 @@ MODULE4: tuple[tuple[str, str], ...] = (
     ("4.2.3.5.1", "Fertility and early embryonic development"),
     ("4.2.3.5.2", "Embryo-fetal development"),
     ("4.2.3.5.3", "Prenatal and postnatal development, including maternal function"),
-    ("4.2.3.5.4", "Studies in which the offspring (juvenile animals) are dosed and/or further "
-                  "evaluated"),
+    (
+        "4.2.3.5.4",
+        "Studies in which the offspring (juvenile animals) are dosed and/or further evaluated",
+    ),
     ("4.2.3.6", "Local Tolerance"),
     ("4.2.3.7", "Other Toxicity Studies"),
     ("4.2.3.7.1", "Antigenicity"),

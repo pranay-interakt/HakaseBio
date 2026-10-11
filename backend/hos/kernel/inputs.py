@@ -29,20 +29,29 @@ def input_quantity(name: str, spec: Mapping[str, Any], actor_name: str | None = 
     if kind == "measured":
         if not source:
             raise KernelError(f"{name}: a measured input must name its source study/assay")
-        return Quantity.measured(value, unit, source_name=str(source), label=name,
-                                 notes=spec.get("note"))
+        return Quantity.measured(
+            value, unit, source_name=str(source), label=name, notes=spec.get("note")
+        )
     if kind == "literature":
         if not source:
             raise KernelError(f"{name}: a literature input must name its source")
-        cit = Citation(key=f"input:{name}", text=str(source), url=spec.get("url"),
-                       doi=spec.get("doi"))
-        return Quantity.literature(value, unit, source_name=str(source), citation=cit,
-                                   source_url=spec.get("url"), label=name,
-                                   notes=spec.get("note"))
+        cit = Citation(
+            key=f"input:{name}", text=str(source), url=spec.get("url"), doi=spec.get("doi")
+        )
+        return Quantity.literature(
+            value,
+            unit,
+            source_name=str(source),
+            citation=cit,
+            source_url=spec.get("url"),
+            label=name,
+            notes=spec.get("note"),
+        )
     if kind == "user_supplied":
         who = spec.get("entered_by") or actor_name
         if not who:
             raise KernelError(f"{name}: a user-supplied input must be attributable")
-        return Quantity.user_supplied(value, unit, actor=str(who), label=name,
-                                      notes=spec.get("note"))
+        return Quantity.user_supplied(
+            value, unit, actor=str(who), label=name, notes=spec.get("note")
+        )
     raise KernelError(f"{name}: unknown input kind {kind!r}")

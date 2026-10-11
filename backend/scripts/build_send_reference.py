@@ -42,33 +42,51 @@ def sendig(cache: Path) -> dict[str, Any]:
     data = _NoClasses(io.BytesIO(cache.read_bytes())).load()
     ig = data["standards/sendig/3-1-1"]
     out: dict[str, Any] = {
-        "standard": ig["name"], "label": ig.get("label"), "effectiveDate": ig["effectiveDate"],
+        "standard": ig["name"],
+        "label": ig.get("label"),
+        "effectiveDate": ig["effectiveDate"],
         "registrationStatus": ig.get("registrationStatus"),
         "model": ig["_links"]["model"]["title"],
         "provenance": {
             "access_path": "CDISC Library content cached by cdisc-org/cdisc-rules-engine "
-                           "resources/cache/standards_details.pkl",
-            "commit": CACHE_COMMIT, "sha256": CACHE_SHA, "licence": "MIT",
-            "note": "the SENDIG PDF is behind a CDISC login; re-confirm before GxP use"},
-        "datasets": {}}
+            "resources/cache/standards_details.pkl",
+            "commit": CACHE_COMMIT,
+            "sha256": CACHE_SHA,
+            "licence": "MIT",
+            "note": "the SENDIG PDF is behind a CDISC login; re-confirm before GxP use",
+        },
+        "datasets": {},
+    }
     for cls in ig["classes"]:
         for ds in cls.get("datasets", []):
             if ds["name"] not in DOMAINS:
                 continue
             variables = []
             for v in sorted(ds["datasetVariables"], key=lambda x: int(x["ordinal"])):
-                codelists = [link["href"].rsplit("/", 1)[-1]
-                             for link in v.get("_links", {}).get("codelist", [])]
-                variables.append({
-                    "name": v["name"], "label": v["label"], "type": v["simpleDatatype"],
-                    "core": v["core"], "role": v.get("role"), "ordinal": int(v["ordinal"]),
-                    "codelists": codelists,
-                    "codelist_submission_values": v.get("codelistSubmissionValues", []),
-                    "value_list": v.get("valueList", []),
-                    "format": v.get("describedValueDomain")})
+                codelists = [
+                    link["href"].rsplit("/", 1)[-1]
+                    for link in v.get("_links", {}).get("codelist", [])
+                ]
+                variables.append(
+                    {
+                        "name": v["name"],
+                        "label": v["label"],
+                        "type": v["simpleDatatype"],
+                        "core": v["core"],
+                        "role": v.get("role"),
+                        "ordinal": int(v["ordinal"]),
+                        "codelists": codelists,
+                        "codelist_submission_values": v.get("codelistSubmissionValues", []),
+                        "value_list": v.get("valueList", []),
+                        "format": v.get("describedValueDomain"),
+                    }
+                )
             out["datasets"][ds["name"]] = {
-                "label": ds["label"], "class": cls["name"],
-                "structure": ds.get("datasetStructure"), "variables": variables}
+                "label": ds["label"],
+                "class": cls["name"],
+                "structure": ds.get("datasetStructure"),
+                "variables": variables,
+            }
     missing = [d for d in DOMAINS if d not in out["datasets"]]
     if missing:
         raise SystemExit(f"domains missing from the cache: {missing}")
@@ -78,22 +96,36 @@ def sendig(cache: Path) -> dict[str, Any]:
 def terminology(path: Path) -> dict[str, Any]:
     rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines(), delimiter="\t"))
     header, body = rows[0], rows[1:]
-    if header[:5] != ["Code", "Codelist Code", "Codelist Extensible (Yes/No)", "Codelist Name",
-                      "CDISC Submission Value"]:
+    if header[:5] != [
+        "Code",
+        "Codelist Code",
+        "Codelist Extensible (Yes/No)",
+        "Codelist Name",
+        "CDISC Submission Value",
+    ]:
         raise SystemExit(f"unexpected CT header {header}")
     lists: dict[str, Any] = {}
     for r in body:
         if not r[1]:
-            lists[r[0]] = {"name": r[3], "submission_value": r[4], "extensible": r[2] == "Yes",
-                           "terms": {}}
+            lists[r[0]] = {
+                "name": r[3],
+                "submission_value": r[4],
+                "extensible": r[2] == "Yes",
+                "terms": {},
+            }
     for r in body:
         if r[1]:
             lists[r[1]]["terms"][r[4]] = r[0]
-    return {"version": "2026-09-25", "file_oid": "CDISC_CT.SEND.2026-09-25",
-            "provenance": {"source": "https://evs.nci.nih.gov/ftp1/CDISC/SEND/"
-                                     "SEND%20Terminology.txt", "sha256": CT_SHA,
-                           "publisher": "CDISC / NCI EVS"},
-            "codelists": lists}
+    return {
+        "version": "2026-09-25",
+        "file_oid": "CDISC_CT.SEND.2026-09-25",
+        "provenance": {
+            "source": "https://evs.nci.nih.gov/ftp1/CDISC/SEND/SEND%20Terminology.txt",
+            "sha256": CT_SHA,
+            "publisher": "CDISC / NCI EVS",
+        },
+        "codelists": lists,
+    }
 
 
 def main() -> None:
@@ -102,10 +134,12 @@ def main() -> None:
         if _sha(p) != want:
             raise SystemExit(f"{p}: SHA-256 {_sha(p)} is not the verified {want}")
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "sendig_3_1_1.json").write_text(json.dumps(sendig(cache), indent=1, sort_keys=True)
-                                           + "\n")
-    (OUT / "send_ct_2026_09_25.json").write_text(json.dumps(terminology(ct), sort_keys=True,
-                                                            separators=(",", ":")) + "\n")
+    (OUT / "sendig_3_1_1.json").write_text(
+        json.dumps(sendig(cache), indent=1, sort_keys=True) + "\n"
+    )
+    (OUT / "send_ct_2026_09_25.json").write_text(
+        json.dumps(terminology(ct), sort_keys=True, separators=(",", ":")) + "\n"
+    )
     print("written", sorted(p.name for p in OUT.iterdir()))
 
 

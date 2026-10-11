@@ -18,14 +18,19 @@ from hos.send.xport import (
 
 WHEN = datetime(2026, 10, 11, 9, 30, 0)
 # TS-140 testieee.c, xpt_testvals and missingvals.
-TS140 = {1.0: "4110000000000000", -1.0: "c110000000000000", 0.0: "0000000000000000",
-         2.0: "4120000000000000"}
+TS140 = {
+    1.0: "4110000000000000",
+    -1.0: "c110000000000000",
+    0.0: "0000000000000000",
+    2.0: "4120000000000000",
+}
 
 
 def _file(rows, variables=None):
-    variables = variables or [XportVariable("USUBJID", "Unique Subject Identifier", False, 12),
-                              XportVariable("BWSTRESN", "Numeric Result/Finding in Std Units",
-                                            True, 8)]
+    variables = variables or [
+        XportVariable("USUBJID", "Unique Subject Identifier", False, 12),
+        XportVariable("BWSTRESN", "Numeric Result/Finding in Std Units", True, 8),
+    ]
     return write_xport("BW", "Body Weights", variables, rows, created=WHEN, software="HOS0.1")
 
 
@@ -37,7 +42,7 @@ def test_ibm_double_matches_ts140_vectors(value, hexed):
 
 def test_missing_values_per_ts140():
     assert bytes([0x2E]) + bytes(7) == MISSING
-    for first in (0x2E, 0x5F, 0x41, 0x5A):              # ".", "._", ".A", ".Z"
+    for first in (0x2E, 0x5F, 0x41, 0x5A):  # ".", "._", ".A", ".Z"
         assert from_ibm_double(bytes([first]) + bytes(7)) is None
     assert ibm_double(None) == MISSING
 
@@ -57,16 +62,16 @@ def test_out_of_range_and_non_finite_values_are_refused():
 def test_record_layout():
     data = _file([["S-1", 287.5]])
     assert len(data) % 80 == 0
-    recs = [data[i:i + 80] for i in range(0, len(data), 80)]
+    recs = [data[i : i + 80] for i in range(0, len(data), 80)]
     assert recs[0] == b"HEADER RECORD*******LIBRARY HEADER RECORD!!!!!!!" + b"0" * 30 + b"  "
     assert recs[1].startswith(b"SAS     SAS     SASLIB  HOS0.1  ")
     assert recs[1][64:80] == b"11OCT26:09:30:00"
     assert recs[3][48:78] == b"000000000000000001600000000140"
     assert recs[5][8:16] == b"BW      "
     assert recs[6][32:72] == b"Body Weights".ljust(40)
-    assert recs[7][54:58] == b"0002"                  # variable count
-    namestr = data[8 * 80:8 * 80 + 140]
-    assert namestr[:8] == b"\x00\x02\x00\x00\x00\x0c\x00\x01"   # char, length 12, varnum 1
+    assert recs[7][54:58] == b"0002"  # variable count
+    namestr = data[8 * 80 : 8 * 80 + 140]
+    assert namestr[:8] == b"\x00\x02\x00\x00\x00\x0c\x00\x01"  # char, length 12, varnum 1
     assert namestr[8:16] == b"USUBJID "
     assert recs[12].startswith(b"HEADER RECORD*******OBS     HEADER RECORD")  # 2 x 140 -> 4 records
 
@@ -85,8 +90,10 @@ def test_reader_round_trip_including_zero_and_missing():
 
 
 def test_pandas_reads_the_file_independently():
-    variables = [XportVariable("USUBJID", "Unique Subject Identifier", False, 8),
-                 XportVariable("BWSTRESN", "Numeric Result/Finding in Std Units", True, 8)]
+    variables = [
+        XportVariable("USUBJID", "Unique Subject Identifier", False, 8),
+        XportVariable("BWSTRESN", "Numeric Result/Finding in Std Units", True, 8),
+    ]
     rows = [["SUBJ-001", 287.5], ["SUBJ-002", None], ["SUBJ-003", 312.25]]
     df = pd.read_sas(io.BytesIO(_file(rows, variables)), format="xport", encoding="ascii")
     assert list(df["USUBJID"]) == ["SUBJ-001", "SUBJ-002", "SUBJ-003"]
@@ -108,7 +115,7 @@ def test_pandas_misreads_ibm_zero():
     IBM double (TS-140's 0) into 2**-260. The file holds the TS-140 bytes."""
     data = _file([["S-1", 0.0]])
     df = pd.read_sas(io.BytesIO(data), format="xport", encoding="ascii")
-    assert df["BWSTRESN"][0] == 2.0 ** -260
+    assert df["BWSTRESN"][0] == 2.0**-260
     assert read_xport(data).rows[0][1] == 0.0
 
 

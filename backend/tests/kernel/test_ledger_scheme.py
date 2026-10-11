@@ -12,11 +12,18 @@ from hos.kernel.ledger import GENESIS_HASH, LEDGER_SCHEME, Ledger, LedgerEntry, 
 
 def _scheme1(seq: int, prev: str) -> LedgerEntry:
     """An entry exactly as releases before scheme 2 wrote it."""
-    body = {"seq": seq, "recorded_at": f"2026-10-0{seq}T00:00:00+00:00", "actor_id": "sci",
-            "actor_kind": "human", "action": "program.created", "subject_type": "program",
-            "subject_id": f"prg_{seq}",
-            "payload_sha256": hashlib.sha256(canonical_json({}).encode()).hexdigest(),
-            "prev_hash": prev, "reason": None}
+    body = {
+        "seq": seq,
+        "recorded_at": f"2026-10-0{seq}T00:00:00+00:00",
+        "actor_id": "sci",
+        "actor_kind": "human",
+        "action": "program.created",
+        "subject_type": "program",
+        "subject_id": f"prg_{seq}",
+        "payload_sha256": hashlib.sha256(canonical_json({}).encode()).hexdigest(),
+        "prev_hash": prev,
+        "reason": None,
+    }
     return LedgerEntry(payload={}, entry_hash=LedgerEntry.compute_hash(body), **body)
 
 
@@ -27,8 +34,14 @@ def _mixed() -> Ledger:
     ledger._backend.append(e1)
     ledger._backend.append(e2)
     for i in range(3):
-        ledger.record(actor_id="sci", actor_kind="human", action="study.created",
-                      subject_type="study", subject_id=f"stu_{i}", payload={"i": i})
+        ledger.record(
+            actor_id="sci",
+            actor_kind="human",
+            action="study.created",
+            subject_type="study",
+            subject_id=f"stu_{i}",
+            payload={"i": i},
+        )
     return ledger
 
 

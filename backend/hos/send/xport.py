@@ -21,8 +21,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-__all__ = ["XportDataset", "XportError", "XportVariable", "from_ibm_double", "ibm_double",
-           "read_xport", "write_xport"]
+__all__ = [
+    "XportDataset",
+    "XportError",
+    "XportVariable",
+    "from_ibm_double",
+    "ibm_double",
+    "read_xport",
+    "write_xport",
+]
 
 RECORD = 80
 MISSING = b"\x2e" + b"\x00" * 7
@@ -43,9 +50,9 @@ def ibm_double(x: float | None) -> bytes:
     if x == 0:
         return b"\x00" * 8
     sign = 0x80 if x < 0 else 0
-    m, p = math.frexp(abs(x))          # |x| = m * 2**p, 0.5 <= m < 1
-    e = -((-p) // 4)                   # ceil(p / 4): |x| = f * 16**e, 1/16 <= f < 1
-    shift = 3 + p - 4 * e              # 0..3
+    m, p = math.frexp(abs(x))  # |x| = m * 2**p, 0.5 <= m < 1
+    e = -((-p) // 4)  # ceil(p / 4): |x| = f * 16**e, 1/16 <= f < 1
+    shift = 3 + p - 4 * e  # 0..3
     mantissa = int(m * (1 << 53)) << shift
     exponent = e + 64
     if not 0 <= exponent <= 127:
@@ -105,9 +112,15 @@ def _header(kind: str, digits: str) -> bytes:
     return _pad(f"HEADER RECORD*******{kind:<8}HEADER RECORD!!!!!!!{digits}", RECORD)
 
 
-def write_xport(name: str, label: str, variables: Sequence[XportVariable],
-                rows: Sequence[Sequence[str | float | None]], *, created: datetime,
-                software: str) -> bytes:
+def write_xport(
+    name: str,
+    label: str,
+    variables: Sequence[XportVariable],
+    rows: Sequence[Sequence[str | float | None]],
+    *,
+    created: datetime,
+    software: str,
+) -> bytes:
     """One dataset in one XPORT v5 file. ``created`` fixes every header timestamp so the bytes
     are reproducible; ``software`` (<= 8 characters) fills the version field honestly rather
     than claiming a SAS release."""
@@ -120,13 +133,29 @@ def write_xport(name: str, label: str, variables: Sequence[XportVariable],
     stamp = _stamp(created)
     out = bytearray()
     out += _header("LIBRARY", "0" * 30)
-    out += _pad("SAS".ljust(8) + "SAS".ljust(8) + "SASLIB".ljust(8) + software.ljust(8)
-                + "HOS".ljust(8) + " " * 24 + stamp, RECORD)
+    out += _pad(
+        "SAS".ljust(8)
+        + "SAS".ljust(8)
+        + "SASLIB".ljust(8)
+        + software.ljust(8)
+        + "HOS".ljust(8)
+        + " " * 24
+        + stamp,
+        RECORD,
+    )
     out += _pad(stamp, RECORD)
     out += _header("MEMBER", "0" * 17 + "160" + "0" * 7 + "140")
     out += _header("DSCRPTR", "0" * 30)
-    out += _pad("SAS".ljust(8) + name.upper().ljust(8) + "SASDATA".ljust(8) + software.ljust(8)
-                + "HOS".ljust(8) + " " * 24 + stamp, RECORD)
+    out += _pad(
+        "SAS".ljust(8)
+        + name.upper().ljust(8)
+        + "SASDATA".ljust(8)
+        + software.ljust(8)
+        + "HOS".ljust(8)
+        + " " * 24
+        + stamp,
+        RECORD,
+    )
     out += _pad(stamp + " " * 16 + label.ljust(40) + "".ljust(8), RECORD)
     out += _header("NAMESTR", f"000000{len(variables):04d}" + "0" * 20)
     namestr = bytearray()
@@ -173,9 +202,10 @@ def read_xport(data: bytes) -> XportDataset:
     from that padding and is dropped, as SAS readers do."""
     if len(data) % RECORD or not data.startswith(b"HEADER RECORD*******LIBRARY HEADER RECORD"):
         raise XportError("not a SAS XPORT v5 library")
-    recs = [data[i:i + RECORD] for i in range(0, len(data), RECORD)]
-    if not recs[3].startswith(b"HEADER RECORD*******MEMBER  HEADER RECORD") or \
-            not recs[4].startswith(b"HEADER RECORD*******DSCRPTR HEADER RECORD"):
+    recs = [data[i : i + RECORD] for i in range(0, len(data), RECORD)]
+    if not recs[3].startswith(b"HEADER RECORD*******MEMBER  HEADER RECORD") or not recs[
+        4
+    ].startswith(b"HEADER RECORD*******DSCRPTR HEADER RECORD"):
         raise XportError("member header missing")
     if recs[3][75:78] != b"140":
         raise XportError("only 140-byte NAMESTR records are supported")
@@ -188,22 +218,35 @@ def read_xport(data: bytes) -> XportDataset:
     end = start + -(-count * 140 // RECORD) * RECORD
     variables: list[tuple[XportVariable, int]] = []
     for i in range(count):
-        ns = data[start + 140 * i:start + 140 * (i + 1)]
+        ns = data[start + 140 * i : start + 140 * (i + 1)]
         ntype, _, length, _ = struct.unpack(">hhhh", ns[:8])
         position = struct.unpack(">i", ns[84:88])[0]
-        variables.append((XportVariable(ns[8:16].decode("ascii").rstrip(),
-                                        ns[16:56].decode("ascii").rstrip(), ntype == 1, length),
-                          position))
-    if not data[end:end + RECORD].startswith(b"HEADER RECORD*******OBS     HEADER RECORD"):
+        variables.append(
+            (
+                XportVariable(
+                    ns[8:16].decode("ascii").rstrip(),
+                    ns[16:56].decode("ascii").rstrip(),
+                    ntype == 1,
+                    length,
+                ),
+                position,
+            )
+        )
+    if not data[end : end + RECORD].startswith(b"HEADER RECORD*******OBS     HEADER RECORD"):
         raise XportError("OBS header missing")
-    obs = data[end + RECORD:]
+    obs = data[end + RECORD :]
     width = sum(v.length for v, _ in variables)
     rows: list[tuple[str | float | None, ...]] = []
     for off in range(0, len(obs) - width + 1 if width else 0, width):
-        chunk = obs[off:off + width]
+        chunk = obs[off : off + width]
         if len(obs) - off < RECORD and chunk == b" " * width:
             break
-        rows.append(tuple(from_ibm_double(chunk[p:p + v.length]) if v.numeric
-                          else chunk[p:p + v.length].decode("ascii").rstrip()
-                          for v, p in variables))
+        rows.append(
+            tuple(
+                from_ibm_double(chunk[p : p + v.length])
+                if v.numeric
+                else chunk[p : p + v.length].decode("ascii").rstrip()
+                for v, p in variables
+            )
+        )
     return XportDataset(name, label, tuple(v for v, _ in variables), tuple(rows))

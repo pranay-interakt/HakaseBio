@@ -86,8 +86,10 @@ DoseTimeRule = Literal["zero_single_dose", "measured_predose"]
 AucMethod = Literal["linear", "linear_up_log_down"]
 
 #: The only BLQ handling this module implements; drivers record it in the protocol.
-BLQ_RULE = ("BLQ at or before the first quantifiable concentration = 0; BLQ after the first "
-            "quantifiable concentration excluded")
+BLQ_RULE = (
+    "BLQ at or before the first quantifiable concentration = 0; BLQ after the first "
+    "quantifiable concentration excluded"
+)
 
 
 def auc_segment(t1: float, c1: float, t2: float, c2: float, method: AucMethod) -> float:
@@ -106,12 +108,15 @@ def auc(times: Sequence[float], concs: Sequence[float], method: AucMethod) -> fl
     """Area under the curve over the given samples (first to last time)."""
     if len(times) != len(concs):
         raise ValueError("times and concentrations differ in length")
-    return sum(auc_segment(times[i], concs[i], times[i + 1], concs[i + 1], method)
-               for i in range(len(times) - 1))
+    return sum(
+        auc_segment(times[i], concs[i], times[i + 1], concs[i + 1], method)
+        for i in range(len(times) - 1)
+    )
 
 
-def apply_blq_rule(times: Sequence[float], concs: Sequence[float | None]
-                   ) -> tuple[list[float], list[float]]:
+def apply_blq_rule(
+    times: Sequence[float], concs: Sequence[float | None]
+) -> tuple[list[float], list[float]]:
     """Apply :data:`BLQ_RULE`. ``None`` marks a BLQ sample. Returns the samples kept."""
     first_q = next((i for i, c in enumerate(concs) if c is not None), None)
     t_out: list[float] = []
@@ -141,9 +146,14 @@ class ExposureNCA:
     reasons: dict[str, str]
 
 
-def exposure_nca(times: Sequence[float], concs: Sequence[float | None], *, method: AucMethod,
-                 tau_nominal_index: int | None = None, auc_estimable: bool = True
-                 ) -> ExposureNCA:
+def exposure_nca(
+    times: Sequence[float],
+    concs: Sequence[float | None],
+    *,
+    method: AucMethod,
+    tau_nominal_index: int | None = None,
+    auc_estimable: bool = True,
+) -> ExposureNCA:
     """Cmax, Tmax, Clast, Tlast, AUC(0-t) and, where the profile covers it, AUC(0-tau).
 
     ``times`` are actual sampling times (h) in increasing order; ``concs`` are concentrations
@@ -162,8 +172,17 @@ def exposure_nca(times: Sequence[float], concs: Sequence[float | None], *, metho
     quant = [(float(t), float(c)) for t, c in zip(times, concs, strict=True) if c is not None]
     if not quant:
         why = "no quantifiable concentration in the profile (all samples BLQ)"
-        return ExposureNCA(len(times), 0, None, None, None, None, None, None,
-                           {"cmax": why, "auc_last": why, "auc_tau": why})
+        return ExposureNCA(
+            len(times),
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            {"cmax": why, "auc_last": why, "auc_tau": why},
+        )
     cmax = max(c for _, c in quant)
     tmax = next(t for t, c in quant if c == cmax)  # first occurrence when tied
     tlast, clast = quant[-1]
@@ -172,11 +191,13 @@ def exposure_nca(times: Sequence[float], concs: Sequence[float | None], *, metho
     if not auc_estimable:
         reasons["auc_last"] = reasons["auc_tau"] = (
             "monitoring design: a small number of samples estimates C(time) or Cmax only; AUC "
-            "needs a profile (ICH S3A Note 1)")
+            "needs a profile (ICH S3A Note 1)"
+        )
     elif times[0] != 0:
         reasons["auc_last"] = reasons["auc_tau"] = (
             "no time-zero (pre-dose) sample; AUC(0-t) starts at time zero and is not "
-            "back-extrapolated")
+            "back-extrapolated"
+        )
     else:
         t_k, c_k = apply_blq_rule(times, concs)
         last = t_k.index(tlast)
@@ -184,13 +205,14 @@ def exposure_nca(times: Sequence[float], concs: Sequence[float | None], *, metho
         if tau_nominal_index is None:
             reasons["auc_tau"] = "no sample at the end of the dosing interval"
         elif concs[tau_nominal_index] is None:
-            reasons["auc_tau"] = ("the end-of-interval sample is BLQ; AUC(0-tau) would need "
-                                  "extrapolation, which is not performed")
+            reasons["auc_tau"] = (
+                "the end-of-interval sample is BLQ; AUC(0-tau) would need "
+                "extrapolation, which is not performed"
+            )
         else:
             idx = t_k.index(float(times[tau_nominal_index]))
             auc_tau = auc(t_k[: idx + 1], c_k[: idx + 1], method)
-    return ExposureNCA(len(times), len(quant), cmax, tmax, clast, tlast, auc_last, auc_tau,
-                       reasons)
+    return ExposureNCA(len(times), len(quant), cmax, tmax, clast, tlast, auc_last, auc_tau, reasons)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -212,8 +234,10 @@ def aumc_segment(t1: float, c1: float, t2: float, c2: float, method: AucMethod) 
 
 
 def aumc(times: Sequence[float], concs: Sequence[float], method: AucMethod) -> float:
-    return sum(aumc_segment(times[i], concs[i], times[i + 1], concs[i + 1], method)
-               for i in range(len(times) - 1))
+    return sum(
+        aumc_segment(times[i], concs[i], times[i + 1], concs[i + 1], method)
+        for i in range(len(times) - 1)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,11 +272,15 @@ def fit_lambda_z(times: Sequence[float], concs: Sequence[float]) -> LambdaZFit |
     return LambdaZFit(float(times[0]), float(times[-1]), n, -slope, a, r2, adj)
 
 
-def lambda_z_candidates(times: Sequence[float], concs: Sequence[float | None],
-                        tmax: float) -> list[LambdaZFit]:
+def lambda_z_candidates(
+    times: Sequence[float], concs: Sequence[float | None], tmax: float
+) -> list[LambdaZFit]:
     """Fits over the last 3, 4, ... quantifiable points after Tmax."""
-    pts = [(float(t), float(c)) for t, c in zip(times, concs, strict=True)
-           if c is not None and t > tmax]
+    pts = [
+        (float(t), float(c))
+        for t, c in zip(times, concs, strict=True)
+        if c is not None and t > tmax
+    ]
     out = []
     for k in range(3, len(pts) + 1):
         fit = fit_lambda_z([t for t, _ in pts[-k:]], [c for _, c in pts[-k:]])
@@ -267,15 +295,15 @@ def suggest_lambda_z(candidates: Sequence[LambdaZFit]) -> LambdaZFit | None:
     if not candidates:
         return None
     best = max(c.adj_r_squared for c in candidates)
-    return max((c for c in candidates if c.adj_r_squared >= best - 1e-4),
-               key=lambda c: c.n_points)
+    return max((c for c in candidates if c.adj_r_squared >= best - 1e-4), key=lambda c: c.n_points)
 
 
 def back_extrapolate_c0(times: Sequence[float], concs: Sequence[float | None]) -> float | None:
     """IV bolus C0 by log-linear regression through the first two quantifiable points; None
     when they do not decline."""
-    pts = [(float(t), float(c)) for t, c in zip(times, concs, strict=True)
-           if c is not None and c > 0][:2]
+    pts = [
+        (float(t), float(c)) for t, c in zip(times, concs, strict=True) if c is not None and c > 0
+    ][:2]
     if len(pts) < 2 or pts[1][1] >= pts[0][1]:
         return None
     (t1, c1), (t2, c2) = pts
@@ -312,10 +340,16 @@ class SingleDoseNCA:
     reasons: dict[str, str]
 
 
-def single_dose_nca(times: Sequence[float], concs: Sequence[float | None], *,
-                    administration: Administration, method: AucMethod,
-                    dose_time_rule: DoseTimeRule, terminal_start: float | None,
-                    infusion_duration: float | None = None) -> SingleDoseNCA:
+def single_dose_nca(
+    times: Sequence[float],
+    concs: Sequence[float | None],
+    *,
+    administration: Administration,
+    method: AucMethod,
+    dose_time_rule: DoseTimeRule,
+    terminal_start: float | None,
+    infusion_duration: float | None = None,
+) -> SingleDoseNCA:
     """Non-compartmental analysis of one single-dose profile (see the module docstring).
 
     ``terminal_start`` is the human-selected first time of the terminal phase; without it the
@@ -326,9 +360,27 @@ def single_dose_nca(times: Sequence[float], concs: Sequence[float | None], *,
     quant = [(float(t), float(c)) for t, c in zip(times, concs, strict=True) if c is not None]
     if not quant:
         why = "no quantifiable concentration in the profile (all samples BLQ)"
-        return SingleDoseNCA(len(times), 0, None, None, None, None, None, None, None, (), None,
-                             None, None, None, None, None, None, None,
-                             {k: why for k in ("cmax", "auc_last", "lambda_z")})
+        return SingleDoseNCA(
+            len(times),
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            (),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            {k: why for k in ("cmax", "auc_last", "lambda_z")},
+        )
     cmax = max(c for _, c in quant)
     tmax = next(t for t, c in quant if c == cmax)
     tlast, clast = quant[-1]
@@ -340,18 +392,23 @@ def single_dose_nca(times: Sequence[float], concs: Sequence[float | None], *,
         else:
             c0 = back_extrapolate_c0(times, concs)
             if c0 is None:
-                reasons["auc_last"] = ("IV bolus C0 cannot be back-extrapolated: the first two "
-                                       "quantifiable concentrations do not decline")
+                reasons["auc_last"] = (
+                    "IV bolus C0 cannot be back-extrapolated: the first two "
+                    "quantifiable concentrations do not decline"
+                )
             else:
-                t_k, c_k = [0.0, *[t for t in t_k if t > 0]], [c0, *[c for t, c in
-                                                                      zip(t_k, c_k, strict=True)
-                                                                      if t > 0]]
+                t_k, c_k = (
+                    [0.0, *[t for t in t_k if t > 0]],
+                    [c0, *[c for t, c in zip(t_k, c_k, strict=True) if t > 0]],
+                )
     elif not t_k or t_k[0] != 0:
         if dose_time_rule == "zero_single_dose":
             t_k, c_k = [0.0, *t_k], [0.0, *c_k]
         else:
-            reasons["auc_last"] = ("no pre-dose (time 0) sample; the protocol requires a "
-                                   "measured concentration at dose time")
+            reasons["auc_last"] = (
+                "no pre-dose (time 0) sample; the protocol requires a "
+                "measured concentration at dose time"
+            )
     auc_last = aumc_last = None
     if "auc_last" not in reasons:
         last = t_k.index(tlast)
@@ -366,9 +423,11 @@ def single_dose_nca(times: Sequence[float], concs: Sequence[float | None], *,
         pts = [(t, c) for t, c in quant if t >= terminal_start - 1e-9]
         terminal = fit_lambda_z([t for t, _ in pts], [c for _, c in pts])
         if terminal is None:
-            reasons["lambda_z"] = (f"the selected terminal phase (from {terminal_start:g} h) has "
-                                   f"{len(pts)} quantifiable points or does not decline; at "
-                                   "least 3 declining points are needed (FDA 2022 Appendix A)")
+            reasons["lambda_z"] = (
+                f"the selected terminal phase (from {terminal_start:g} h) has "
+                f"{len(pts)} quantifiable points or does not decline; at "
+                "least 3 declining points are needed (FDA 2022 Appendix A)"
+            )
     lz = terminal.lambda_z if terminal else None
     half = math.log(2) / lz if lz else None
     auc_inf = pct = aumc_inf = mrt = None
@@ -385,6 +444,24 @@ def single_dose_nca(times: Sequence[float], concs: Sequence[float | None], *,
         reasons["auc_inf"] = reasons.get("auc_last", "AUC(0-t) not available")
     else:
         reasons["auc_inf"] = reasons["lambda_z"]
-    return SingleDoseNCA(len(times), len(quant), cmax, tmax, clast, tlast, c0, auc_last,
-                         aumc_last, cands, suggestion, terminal, lz, half, auc_inf, pct,
-                         aumc_inf, mrt, reasons)
+    return SingleDoseNCA(
+        len(times),
+        len(quant),
+        cmax,
+        tmax,
+        clast,
+        tlast,
+        c0,
+        auc_last,
+        aumc_last,
+        cands,
+        suggestion,
+        terminal,
+        lz,
+        half,
+        auc_inf,
+        pct,
+        aumc_inf,
+        mrt,
+        reasons,
+    )

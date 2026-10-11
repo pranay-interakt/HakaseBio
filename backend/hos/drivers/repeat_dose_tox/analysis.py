@@ -43,16 +43,23 @@ class GroupComparison:
     n_significant: int = 0
 
 
-def compare_groups(records: Sequence[Mapping[str, Any]], *, endpoint_unit: Callable[[str], str],
-                   groups: Sequence[float], alpha: float | None, prov_note: str,
-                   dose_unit: str = "mg/kg/day") -> GroupComparison:
+def compare_groups(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    endpoint_unit: Callable[[str], str],
+    groups: Sequence[float],
+    alpha: float | None,
+    prov_note: str,
+    dose_unit: str = "mg/kg/day",
+) -> GroupComparison:
     """Compare each dose group with the control (dose 0) per endpoint x sex x phase x timepoint.
 
     ``alpha=None`` means the protocol states no statistical test: groups are summarised and
     compared descriptively only."""
     summ_m, dun_m = method("stats.group_summary"), method("stats.dunnett")
     cells: dict[tuple[str, str, str, str], dict[float, list[float]]] = defaultdict(
-        lambda: defaultdict(list))
+        lambda: defaultdict(list)
+    )
     for r in records:
         unit = endpoint_unit(r["endpoint"])
         v = U.convert(r["value"], r["unit"], unit) if r["unit"] != unit else r["value"]
@@ -70,51 +77,87 @@ def compare_groups(records: Sequence[Mapping[str, Any]], *, endpoint_unit: Calla
             treated = [d for d in sorted(groups_) if d > 0 and len(groups_[d]) >= 2]
             skipped = [d for d in sorted(groups_) if d > 0 and len(groups_[d]) < 2]
             if skipped:
-                out.notes.append(f"{endpoint}/{sex}/{phase}/{tp}: groups {skipped} have n < 2, "
-                                 "not tested")
+                out.notes.append(
+                    f"{endpoint}/{sex}/{phase}/{tp}: groups {skipped} have n < 2, not tested"
+                )
             if len(ctrl) < 2 or not treated:
-                out.notes.append(f"{endpoint}/{sex}/{phase}/{tp}: control n < 2 or no testable "
-                                 "group; no comparison")
+                out.notes.append(
+                    f"{endpoint}/{sex}/{phase}/{tp}: control n < 2 or no testable "
+                    "group; no comparison"
+                )
             else:
-                res = stats.dunnett(*[np.asarray(groups_[d]) for d in treated],
-                                    control=np.asarray(ctrl), alternative="two-sided",
-                                    rng=np.random.default_rng(DUNNETT_QMC_SEED))
+                res = stats.dunnett(
+                    *[np.asarray(groups_[d]) for d in treated],
+                    control=np.asarray(ctrl),
+                    alternative="two-sided",
+                    rng=np.random.default_rng(DUNNETT_QMC_SEED),
+                )
                 pvals = {d: float(pv) for d, pv in zip(treated, res.pvalue, strict=True)}
         cmean = float(np.mean(ctrl)) if ctrl else None
         label = f"{endpoint} ({sex}, {phase}, {tp})"
         for d in sorted(groups_):
             vals = groups_[d]
             mean = Quantity.computed(
-                float(np.mean(vals)), unit, method=summ_m, software=SOFTWARE,
+                float(np.mean(vals)),
+                unit,
+                method=summ_m,
+                software=SOFTWARE,
                 uncertainty=Uncertainty(kind="sd", sd=float(np.std(vals, ddof=1)), n=len(vals))
-                if len(vals) > 1 else None,
-                label=f"{label} mean at {d:g} {dose_unit}", notes=prov_note)
+                if len(vals) > 1
+                else None,
+                label=f"{label} mean at {d:g} {dose_unit}",
+                notes=prov_note,
+            )
             dose_q = Quantity.user_supplied(d, dose_unit, actor="study protocol", label="dose")
             if d == 0:
-                out.rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, "control",
-                                 "control", "control"))
+                out.rows.append(
+                    (
+                        endpoint,
+                        sex,
+                        phase,
+                        tp,
+                        dose_q,
+                        len(vals),
+                        mean,
+                        "control",
+                        "control",
+                        "control",
+                    )
+                )
                 continue
             pct: Any = "n/a"
             if cmean not in (None, 0.0):
                 assert cmean is not None
-                pct = Quantity.computed(100.0 * (mean.require() - cmean) / abs(cmean),
-                                        "percent", method=summ_m, software=SOFTWARE,
-                                        label=f"{label} % vs control at {d:g}")
+                pct = Quantity.computed(
+                    100.0 * (mean.require() - cmean) / abs(cmean),
+                    "percent",
+                    method=summ_m,
+                    software=SOFTWARE,
+                    label=f"{label} % vs control at {d:g}",
+                )
             pv = pvals.get(d)
             if pv is None:
-                out.rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, pct,
-                                 "not tested", "-"))
+                out.rows.append(
+                    (endpoint, sex, phase, tp, dose_q, len(vals), mean, pct, "not tested", "-")
+                )
                 if alpha is None and isinstance(pct, Quantity):
-                    out.quantities[f"group|{endpoint}|{sex}|{phase}|{tp}|{d:g}|pct_vs_control"] = pct
+                    out.quantities[f"group|{endpoint}|{sex}|{phase}|{tp}|{d:g}|pct_vs_control"] = (
+                        pct
+                    )
                 continue
             assert alpha is not None
-            pq = Quantity.computed(pv, "dimensionless", method=dun_m, software=SOFTWARE,
-                                   label=f"{label} Dunnett p at {d:g}",
-                                   notes=f"two-sided; {len(pvals)} groups vs control; "
-                                         f"QMC seed {DUNNETT_QMC_SEED}")
+            pq = Quantity.computed(
+                pv,
+                "dimensionless",
+                method=dun_m,
+                software=SOFTWARE,
+                label=f"{label} Dunnett p at {d:g}",
+                notes=f"two-sided; {len(pvals)} groups vs control; QMC seed {DUNNETT_QMC_SEED}",
+            )
             sig = pv < alpha
-            out.rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, pct, pq,
-                             "yes" if sig else "no"))
+            out.rows.append(
+                (endpoint, sex, phase, tp, dose_q, len(vals), mean, pct, pq, "yes" if sig else "no")
+            )
             if sig:
                 out.n_significant += 1
                 base = f"finding|{endpoint}|{sex}|{phase}|{tp}|{d:g}"

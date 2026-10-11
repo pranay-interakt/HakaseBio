@@ -34,67 +34,152 @@ DEMO_PW = "demo-only-password-not-for-real-use"
 SOP = "DEMO SOP (illustrative acceptance criteria for this demonstration only)"
 
 METSTAB = dict(
-    species=["human", "rat", "dog"], substrate_concentration_uM=1.0,
-    protein_concentration_mg_per_mL=0.5, incubation_temperature_C=37.0,
-    buffer="100 mM potassium phosphate, pH 7.4", cofactor="1 mM NADPH",
-    quench="acetonitrile with internal standard", analytical_method="LC-MS/MS",
-    timepoints_min=[0, 5, 15, 30, 45, 60], replicates=2,
-    positive_controls=[{"name": "verapamil", "acceptance_clint_low_uL_min_mg": 50,
-                        "acceptance_clint_high_uL_min_mg": 400, "acceptance_basis": SOP}],
-    acceptance_min_r2=0.9, acceptance_min_depletion_percent=20.0, acceptance_basis=SOP)
-METSTAB_SIM = dict(half_life_min={"human": 40.0, "rat": 12.0, "dog": 25.0},
-                   control_half_life_min={"PC1": {"human": 12.0, "rat": 4.0, "dog": 8.0}},
-                   minus_nadph_half_life_min=None, t0_response=1.0, analytical_cv=0.06)
+    species=["human", "rat", "dog"],
+    substrate_concentration_uM=1.0,
+    protein_concentration_mg_per_mL=0.5,
+    incubation_temperature_C=37.0,
+    buffer="100 mM potassium phosphate, pH 7.4",
+    cofactor="1 mM NADPH",
+    quench="acetonitrile with internal standard",
+    analytical_method="LC-MS/MS",
+    timepoints_min=[0, 5, 15, 30, 45, 60],
+    replicates=2,
+    positive_controls=[
+        {
+            "name": "verapamil",
+            "acceptance_clint_low_uL_min_mg": 50,
+            "acceptance_clint_high_uL_min_mg": 400,
+            "acceptance_basis": SOP,
+        }
+    ],
+    acceptance_min_r2=0.9,
+    acceptance_min_depletion_percent=20.0,
+    acceptance_basis=SOP,
+)
+METSTAB_SIM = dict(
+    half_life_min={"human": 40.0, "rat": 12.0, "dog": 25.0},
+    control_half_life_min={"PC1": {"human": 12.0, "rat": 4.0, "dog": 8.0}},
+    minus_nadph_half_life_min=None,
+    t0_response=1.0,
+    analytical_cv=0.06,
+)
 
 HERG = dict(
-    glp=True, cell_line="HEK293 stably expressing hERG", platform="manual",
-    recording_temperature_C=36.0, stimulation_frequency_Hz=0.2,
+    glp=True,
+    cell_line="HEK293 stably expressing hERG",
+    platform="manual",
+    recording_temperature_C=36.0,
+    stimulation_frequency_Hz=0.2,
     voltage_protocol="ventricular action-potential-like waveform",
-    selective_blocker="E-4031 (saturating)", vehicle="0.1% DMSO",
-    test_concentrations_uM=[1, 3, 10, 30, 100, 300], cells_per_concentration=4,
-    concentration_verification=True, positive_control="dofetilide",
+    selective_blocker="E-4031 (saturating)",
+    vehicle="0.1% DMSO",
+    test_concentrations_uM=[1, 3, 10, 30, 100, 300],
+    cells_per_concentration=4,
+    concentration_verification=True,
+    positive_control="dofetilide",
     positive_control_concentrations_uM=[0.01, 0.03],
     positive_control_expected_block=[
         {"concentration_uM": 0.01, "low_percent": 20, "high_percent": 80},
-        {"concentration_uM": 0.03, "low_percent": 30, "high_percent": 90}],
-    positive_control_basis=SOP, constrain_asymptotes_0_100=True, acceptance_min_r2=0.9,
-    acceptance_basis=SOP)
-HERG_SIM = dict(ic50_uM=60.0, hill=1.0, positive_control_ic50_uM=0.015, positive_control_hill=1.0,
-                baseline_current_pA=900.0, background_fraction=0.05,
-                inhibition_noise_sd_percent=4.0, vehicle_rundown_percent=3.0, temperature_C=36.0)
+        {"concentration_uM": 0.03, "low_percent": 30, "high_percent": 90},
+    ],
+    positive_control_basis=SOP,
+    constrain_asymptotes_0_100=True,
+    acceptance_min_r2=0.9,
+    acceptance_basis=SOP,
+)
+HERG_SIM = dict(
+    ic50_uM=60.0,
+    hill=1.0,
+    positive_control_ic50_uM=0.015,
+    positive_control_hill=1.0,
+    baseline_current_pA=900.0,
+    background_fraction=0.05,
+    inhibition_noise_sd_percent=4.0,
+    vehicle_rundown_percent=3.0,
+    temperature_C=36.0,
+)
 
 RDT = dict(
-    glp=True, species="rat", strain="Sprague-Dawley", guideline_basis="oecd_tg407",
-    route="oral gavage", vehicle="0.5% methylcellulose", dose_levels_mg_per_kg_day=[50, 150, 450],
-    animals_per_sex_per_group=5, dosing_duration_days=28, recovery=True,
-    recovery_animals_per_sex=5, recovery_duration_days=14,
+    glp=True,
+    species="rat",
+    strain="Sprague-Dawley",
+    guideline_basis="oecd_tg407",
+    route="oral gavage",
+    vehicle="0.5% methylcellulose",
+    dose_levels_mg_per_kg_day=[50, 150, 450],
+    animals_per_sex_per_group=5,
+    dosing_duration_days=28,
+    recovery=True,
+    recovery_animals_per_sex=5,
+    recovery_duration_days=14,
     endpoints=[
         {"name": "body weight", "unit": "g", "category": "body_weight"},
-        {"name": "ALT", "unit": "U/L", "category": "clinical_chemistry",
-         "checklist_item": "hepatocellular enzyme (at least two)"},
+        {
+            "name": "ALT",
+            "unit": "U/L",
+            "category": "clinical_chemistry",
+            "checklist_item": "hepatocellular enzyme (at least two)",
+        },
         {"name": "AST", "unit": "U/L", "category": "clinical_chemistry"},
-        {"name": "liver weight", "unit": "g", "category": "organ_weight", "checklist_item": "liver"},
+        {
+            "name": "liver weight",
+            "unit": "g",
+            "category": "organ_weight",
+            "checklist_item": "liver",
+        },
     ],
-    timepoints=["day 29"], alpha=0.05, statistics_basis="Study Director (demo protocol)")
-RDT_SIM = {"endpoints": {
-    "body weight": {"control_mean": 320.0, "cv": 0.05, "effect_percent_by_dose": [0, -1, -12],
-                    "recovery_effect_fraction": 0.3},
-    "ALT": {"control_mean": 38.0, "cv": 0.15, "effect_percent_by_dose": [0, 8, 180],
-            "recovery_effect_fraction": 0.1},
-    "AST": {"control_mean": 90.0, "cv": 0.15, "effect_percent_by_dose": [0, 5, 120],
-            "recovery_effect_fraction": 0.1},
-    "liver weight": {"control_mean": 12.5, "cv": 0.08, "effect_percent_by_dose": [0, 4, 28],
-                     "recovery_effect_fraction": 0.3}}}
+    timepoints=["day 29"],
+    alpha=0.05,
+    statistics_basis="Study Director (demo protocol)",
+)
+RDT_SIM = {
+    "endpoints": {
+        "body weight": {
+            "control_mean": 320.0,
+            "cv": 0.05,
+            "effect_percent_by_dose": [0, -1, -12],
+            "recovery_effect_fraction": 0.3,
+        },
+        "ALT": {
+            "control_mean": 38.0,
+            "cv": 0.15,
+            "effect_percent_by_dose": [0, 8, 180],
+            "recovery_effect_fraction": 0.1,
+        },
+        "AST": {
+            "control_mean": 90.0,
+            "cv": 0.15,
+            "effect_percent_by_dose": [0, 5, 120],
+            "recovery_effect_fraction": 0.1,
+        },
+        "liver weight": {
+            "control_mean": 12.5,
+            "cv": 0.08,
+            "effect_percent_by_dose": [0, 4, 28],
+            "recovery_effect_fraction": 0.3,
+        },
+    }
+}
 
 
 def say(msg: str) -> None:
     print(f"\n== {msg}")
 
 
-def run_study(k: Kernel, sci, pid: str, cid: str, req: str, params: dict, sim: dict,
-              seed: int, inputs: dict | None = None) -> str:
-    sid = k.create_study(sci, program_id=pid, compound_id=cid, requirement_id=req,
-                         hypothesis=f"demo of {req}")["id"]
+def run_study(
+    k: Kernel,
+    sci,
+    pid: str,
+    cid: str,
+    req: str,
+    params: dict,
+    sim: dict,
+    seed: int,
+    inputs: dict | None = None,
+) -> str:
+    sid = k.create_study(
+        sci, program_id=pid, compound_id=cid, requirement_id=req, hypothesis=f"demo of {req}"
+    )["id"]
     k.design_study(sci, sid, params)
     k.plan_study(sci, sid)
     k.dispatch_study(sci, sid, {"kind": "simulation", "simulation_parameters": sim, "seed": seed})
@@ -102,8 +187,10 @@ def run_study(k: Kernel, sci, pid: str, cid: str, req: str, params: dict, sim: d
     if inputs:
         k.set_analysis_inputs(sci, sid, inputs)
     v = k.analyze_study(sci, sid)
-    print(f"   {req}: study {sid}, QC {v['results']['qc']['status']}, "
-          f"admissible as evidence: {v['evidence_admissible']}")
+    print(
+        f"   {req}: study {sid}, QC {v['results']['qc']['status']}, "
+        f"admissible as evidence: {v['evidence_admissible']}"
+    )
     return sid
 
 
@@ -117,24 +204,47 @@ def main() -> None:
     k = Kernel(db=Database(f"sqlite:///{work / 'hos.sqlite3'}"), files=FileStore(work / "objects"))
 
     say("principals (demo credentials)")
-    admin = k.register_principal(None, principal_id="admin", name="Demo Admin",
-                                 kind=PrincipalKind.HUMAN, roles=[Role.ADMIN], password=DEMO_PW)
-    sci = k.register_principal(admin, principal_id="sci", name="Demo Scientist",
-                               kind=PrincipalKind.HUMAN,
-                               roles=[Role.SCIENTIST, Role.RESPONSIBLE_SCIENTIST], password=DEMO_PW)
-    sd = k.register_principal(admin, principal_id="sd", name="Demo Study Director",
-                              kind=PrincipalKind.HUMAN, roles=[Role.STUDY_DIRECTOR], password=DEMO_PW)
+    admin = k.register_principal(
+        None,
+        principal_id="admin",
+        name="Demo Admin",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.ADMIN],
+        password=DEMO_PW,
+    )
+    sci = k.register_principal(
+        admin,
+        principal_id="sci",
+        name="Demo Scientist",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.SCIENTIST, Role.RESPONSIBLE_SCIENTIST],
+        password=DEMO_PW,
+    )
+    sd = k.register_principal(
+        admin,
+        principal_id="sd",
+        name="Demo Study Director",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.STUDY_DIRECTOR],
+        password=DEMO_PW,
+    )
     print("   admin, sci (scientist), sd (Study Director)")
 
     say("programme and derived ICH study set")
-    ctx = ProgramContext(modality=Modality.SMALL_MOLECULE, indication=Indication.CHRONIC_NON_ONCOLOGY,
-                         route=Route.ORAL, intended_clinical_duration_days=365,
-                         max_trial_duration_days=28,
-                         populations=(ClinicalPopulation.HEALTHY_VOLUNTEERS,))
+    ctx = ProgramContext(
+        modality=Modality.SMALL_MOLECULE,
+        indication=Indication.CHRONIC_NON_ONCOLOGY,
+        route=Route.ORAL,
+        intended_clinical_duration_days=365,
+        max_trial_duration_days=28,
+        populations=(ClinicalPopulation.HEALTHY_VOLUNTEERS,),
+    )
     prog = k.create_program(sci, name="HK-DEMO", context=ctx, sponsor="Hakase demo")
     ss = prog["study_set"]
-    print(f"   {ss['summary']['required']} required, {ss['summary']['conditional']} conditional, "
-          f"{ss['summary']['not_required']} waived")
+    print(
+        f"   {ss['summary']['required']} required, {ss['summary']['conditional']} conditional, "
+        f"{ss['summary']['not_required']} waived"
+    )
     for r in ss["requirements"]:
         if r["timing"] == "before_first_in_human" and r["status"] == "required":
             print(f"   - {r['name']}  [{r['section']}]")
@@ -142,46 +252,96 @@ def main() -> None:
     say("compound registration (RDKit)")
     c = k.register_compound(sci, prog["id"], name="paracetamol", smiles="CC(=O)Nc1ccc(O)cc1")
     d = c["profile"]["descriptors"]
-    print(f"   {c['inchikey']}  MW {d['molecular_weight']['value']:.3f} g/mol "
-          f"({d['molecular_weight']['provenance']['kind']}, RDKit {c['profile']['rdkit_version']})")
+    print(
+        f"   {c['inchikey']}  MW {d['molecular_weight']['value']:.3f} g/mol "
+        f"({d['molecular_weight']['provenance']['kind']}, RDKit {c['profile']['rdkit_version']})"
+    )
 
     say("three studies through their drivers (SIMULATED execution)")
-    ms = run_study(k, sci, prog["id"], c["id"], "adme.metabolic_stability", METSTAB, METSTAB_SIM, 1,
-                   inputs={"fu_plasma.human": {"value": 0.8, "unit": "dimensionless",
-                                               "kind": "user_supplied",
-                                               "note": "demo input, not a literature value"},
-                           "blood_plasma_ratio.human": {"value": 1.0, "unit": "dimensionless",
-                                                        "kind": "user_supplied",
-                                                        "note": "demo input"}})
+    ms = run_study(
+        k,
+        sci,
+        prog["id"],
+        c["id"],
+        "adme.metabolic_stability",
+        METSTAB,
+        METSTAB_SIM,
+        1,
+        inputs={
+            "fu_plasma.human": {
+                "value": 0.8,
+                "unit": "dimensionless",
+                "kind": "user_supplied",
+                "note": "demo input, not a literature value",
+            },
+            "blood_plasma_ratio.human": {
+                "value": 1.0,
+                "unit": "dimensionless",
+                "kind": "user_supplied",
+                "note": "demo input",
+            },
+        },
+    )
     q = k.study_view(ms)["results"]["quantities"]
     for key in ("human.t_half", "human.clint_app", "human.clh", "human.eh"):
         v = q[key]
-        print(f"   {v['label']}: {v['value']:.4g} {v['unit']} [{v['provenance']['kind']}; "
-              f"flags {v['qc_flags']}]")
-    hg = run_study(k, sci, prog["id"], c["id"], "safety.herg", HERG, HERG_SIM, 2,
-                   inputs={"free_cmax_high_clinical_exposure": {
-                       "value": 0.5, "unit": "uM", "kind": "user_supplied", "note": "demo input"}})
+        print(
+            f"   {v['label']}: {v['value']:.4g} {v['unit']} [{v['provenance']['kind']}; "
+            f"flags {v['qc_flags']}]"
+        )
+    hg = run_study(
+        k,
+        sci,
+        prog["id"],
+        c["id"],
+        "safety.herg",
+        HERG,
+        HERG_SIM,
+        2,
+        inputs={
+            "free_cmax_high_clinical_exposure": {
+                "value": 0.5,
+                "unit": "uM",
+                "kind": "user_supplied",
+                "note": "demo input",
+            }
+        },
+    )
     hq = k.study_view(hg)["results"]["quantities"]
     print(f"   hERG IC50 {hq['ic50']['value']:.3g} uM, margin {hq['margin']['value']:.3g}x")
     rd = run_study(k, sci, prog["id"], c["id"], "tox.repeat_dose_rodent", RDT, RDT_SIM, 3)
-    sig = [s["statement"] for s in k.study_view(rd)["interpretation"]["statements"]
-           if s["statement"].startswith("Statistically significant")]
+    sig = [
+        s["statement"]
+        for s in k.study_view(rd)["interpretation"]["statements"]
+        if s["statement"].startswith("Statistically significant")
+    ]
     print(f"   {len(sig)} statistically significant group differences (Dunnett), e.g.:")
     for s in sig[:3]:
         print(f"     {s}")
 
     say("Study Director determines the NOAEL (the system never does)")
-    k.record_determination(sd, rd, key="noael", value=150, unit="mg/kg/day",
-                           rationale="DEMO: ALT/AST and liver weight increases at 450 mg/kg/day "
-                                     "judged adverse; changes at 150 not adverse")
+    k.record_determination(
+        sd,
+        rd,
+        key="noael",
+        value=150,
+        unit="mg/kg/day",
+        rationale="DEMO: ALT/AST and liver weight increases at 450 mg/kg/day "
+        "judged adverse; changes at 150 not adverse",
+    )
     print("   NOAEL 150 mg/kg/day recorded with Study Director signature")
 
     say("reports, signatures, approval attempt")
     for sid in (ms, hg, rd):
         v = k.report_study(sci, sid)
         (out / f"{sid}_report.md").write_text(v["report"]["markdown"])
-    k.sign_study(sd, rd, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL,
-                 statement="Demo approval signature")
+    k.sign_study(
+        sd,
+        rd,
+        role=Role.STUDY_DIRECTOR,
+        meaning=SignatureMeaning.APPROVAL,
+        statement="Demo approval signature",
+    )
     try:
         k.approve_study(sd, rd)
     except EvidenceInadmissible as exc:
@@ -190,8 +350,10 @@ def main() -> None:
     say("IND readiness (first-in-human)")
     r = readiness_report(k, prog["id"])
     s = r["summary"]
-    print(f"   done {s['done']}/{s['required_for_milestone']}; runnable in HOS "
-          f"{s['percent_runnable_in_hos']}%; by status {s['by_status']}")
+    print(
+        f"   done {s['done']}/{s['required_for_milestone']}; runnable in HOS "
+        f"{s['percent_runnable_in_hos']}%; by status {s['by_status']}"
+    )
 
     say("Module 4 assembly")
     pkg = assemble_module4(k, sci, prog["id"])

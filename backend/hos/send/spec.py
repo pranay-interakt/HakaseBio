@@ -34,30 +34,107 @@ __all__ = [
 
 #: FDA Study Data Technical Conformance Guide v6.3, Appendix C: nonclinical TS parameters
 #: marked "Y" (FDA desired) and "Conditional" (include when relevant to the design).
-TS_FDA_DESIRED = ("AGEU", "DOSDUR", "DOSENDTC", "DOSSTDTC", "EXPENDTC", "EXPSTDTC", "GLPFL",
-                  "GLPTYP", "PCLASS", "PPTCNAM", "PPTEGID", "PPTEGSYM", "PPTMDA", "ROUTE",
-                  "SDESIGN", "SEXPOP", "SNDCTVER", "SNDIGVER", "SPECIES", "SPLANSUB", "SPLRNAM",
-                  "SPREFID", "SSPONSOR", "SSTYP", "STCAT", "STDIR", "STITLE", "STRAIN",
-                  "STRPSTAT", "STSTDTC", "TFCNTRY", "TRMSAC", "TRT", "TRTCAS", "TRTUNII", "TRTV",
-                  "TSTFLOC", "TSTFNAM")
+TS_FDA_DESIRED = (
+    "AGEU",
+    "DOSDUR",
+    "DOSENDTC",
+    "DOSSTDTC",
+    "EXPENDTC",
+    "EXPSTDTC",
+    "GLPFL",
+    "GLPTYP",
+    "PCLASS",
+    "PPTCNAM",
+    "PPTEGID",
+    "PPTEGSYM",
+    "PPTMDA",
+    "ROUTE",
+    "SDESIGN",
+    "SEXPOP",
+    "SNDCTVER",
+    "SNDIGVER",
+    "SPECIES",
+    "SPLANSUB",
+    "SPLRNAM",
+    "SPREFID",
+    "SSPONSOR",
+    "SSTYP",
+    "STCAT",
+    "STDIR",
+    "STITLE",
+    "STRAIN",
+    "STRPSTAT",
+    "STSTDTC",
+    "TFCNTRY",
+    "TRMSAC",
+    "TRT",
+    "TRTCAS",
+    "TRTUNII",
+    "TRTV",
+    "TSTFLOC",
+    "TSTFNAM",
+)
 TS_FDA_CONDITIONAL = ("ASOCSTDY", "INTSAC", "PDOSFRQ", "RECSAC", "SBSTRAIN", "STENDTC")
 
 #: TS parameters HOS fills from the study record (STSTDTC and STDIR from the Study Director's
 #: protocol signature, GLPFL, SEXPOP and SPLANSUB from the design, the standards versions) and
 #: from the export facts below. They cannot be entered again as free ``values``.
-TS_DERIVED = ("AGE", "AGETXT", "AGEU", "DOSDUR", "DOSENDTC", "DOSSTDTC", "EXPENDTC", "EXPSTDTC",
-              "GLPFL", "GLPTYP", "PDOSFRQ", "RECSAC", "ROUTE", "SDESIGN", "SEXPOP", "SNDCTVER",
-              "SNDIGVER", "SPECIES", "SPLANSUB", "SPREFID", "SSPONSOR", "SSTYP", "STCAT", "STDIR",
-              "STITLE", "STRAIN", "STRPSTAT", "STSTDTC", "TFCNTRY", "TRMSAC", "TRT", "TRTV",
-              "TSTFLOC", "TSTFNAM")
+TS_DERIVED = (
+    "AGE",
+    "AGETXT",
+    "AGEU",
+    "DOSDUR",
+    "DOSENDTC",
+    "DOSSTDTC",
+    "EXPENDTC",
+    "EXPSTDTC",
+    "GLPFL",
+    "GLPTYP",
+    "PDOSFRQ",
+    "RECSAC",
+    "ROUTE",
+    "SDESIGN",
+    "SEXPOP",
+    "SNDCTVER",
+    "SNDIGVER",
+    "SPECIES",
+    "SPLANSUB",
+    "SPREFID",
+    "SSPONSOR",
+    "SSTYP",
+    "STCAT",
+    "STDIR",
+    "STITLE",
+    "STRAIN",
+    "STRPSTAT",
+    "STSTDTC",
+    "TFCNTRY",
+    "TRMSAC",
+    "TRT",
+    "TRTV",
+    "TSTFLOC",
+    "TSTFNAM",
+)
 
 #: TS parameters whose values HOS checks against a SEND CT codelist. The pairing is HOS's: the
 #: codelist's name is the parameter's subject (the SENDIG appendix that pairs them is behind a
 #: CDISC login). A miss on an extensible list is a warning; on a non-extensible one, an error.
-TS_CODELISTS = {"SPECIES": "C77808", "STRAIN": "C77530", "ROUTE": "C66729", "AGEU": "C66781",
-                "SEXPOP": "C66732", "GLPFL": "C66742", "GLPTYP": "C225357", "SSTYP": "C90003",
-                "SDESIGN": "C89967", "STRPSTAT": "C158125", "SNDIGVER": "C89982",
-                "TFCNTRY": "C66786", "STCAT": "C90002", "PDOSFRQ": "C71113"}
+TS_CODELISTS = {
+    "SPECIES": "C77808",
+    "STRAIN": "C77530",
+    "ROUTE": "C66729",
+    "AGEU": "C66781",
+    "SEXPOP": "C66732",
+    "GLPFL": "C66742",
+    "GLPTYP": "C225357",
+    "SSTYP": "C90003",
+    "SDESIGN": "C89967",
+    "STRPSTAT": "C158125",
+    "SNDIGVER": "C89982",
+    "TFCNTRY": "C66786",
+    "STCAT": "C90002",
+    "PDOSFRQ": "C71113",
+}
 
 #: ISO 21090 null flavors (TSVALNF uses the "ISO 21090 NullFlavor enumeration").
 NULL_FLAVORS = ("NI", "INV", "OTH", "UNK", "ASKU", "NAV", "NASK", "MSK", "NA", "NP")
@@ -81,10 +158,13 @@ class NullValue(BaseModel):
 class StudyFacts(BaseModel):
     """Trial Summary facts not held in the study record."""
 
-    studyid: str = Field(pattern=r"^[A-Za-z0-9_\-]{1,40}$",
-                         description="sponsor study identifier (the eCTD STF study-id)")
-    test_facility_study_id: str = Field(min_length=1, description="SPREFID; define.xml "
-                                        "ProtocolName (TCG 4.1.3)")
+    studyid: str = Field(
+        pattern=r"^[A-Za-z0-9_\-]{1,40}$",
+        description="sponsor study identifier (the eCTD STF study-id)",
+    )
+    test_facility_study_id: str = Field(
+        min_length=1, description="SPREFID; define.xml ProtocolName (TCG 4.1.3)"
+    )
     study_title: str = Field(min_length=1)
     sponsor: str = Field(min_length=1)
     test_facility: str = Field(min_length=1)
@@ -113,8 +193,10 @@ class StudyFacts(BaseModel):
     dosing_duration: str = Field(description="DOSDUR, ISO 8601 duration; excludes recovery")
     terminal_sacrifice: str = Field(description="TRMSAC, ISO 8601 duration")
     recovery_sacrifice: str | None = Field(default=None, description="RECSAC, if recovery")
-    values: dict[str, str] = Field(default_factory=dict, description="other TS parameters "
-                                   "(e.g. TRTCAS, TRTUNII, PCLASS, PPTCNAM, SPLRNAM)")
+    values: dict[str, str] = Field(
+        default_factory=dict,
+        description="other TS parameters (e.g. TRTCAS, TRTUNII, PCLASS, PPTCNAM, SPLRNAM)",
+    )
     null_values: dict[str, NullValue] = Field(default_factory=dict)
 
     @field_validator("dosing_start", "dosing_end", "experimental_start", "experimental_end")
@@ -134,16 +216,27 @@ class StudyFacts(BaseModel):
         errs = []
         if (self.age is None) == (self.age_text is None):
             errs.append("give AGE or AGETXT, not both (TCG v6.3 Appendix C)")
-        for field, code in (("species", "C77808"), ("strain", "C77530"), ("route", "C66729"),
-                            ("age_unit", "C66781"), ("test_facility_country", "C66786"),
-                            ("study_type", "C90003"), ("study_category", "C90002"),
-                            ("design", "C89967"), ("report_status", "C158125"),
-                            ("dose_form", "C66726"), ("dosing_frequency", "C71113")):
+        for field, code in (
+            ("species", "C77808"),
+            ("strain", "C77530"),
+            ("route", "C66729"),
+            ("age_unit", "C66781"),
+            ("test_facility_country", "C66786"),
+            ("study_type", "C90003"),
+            ("study_category", "C90002"),
+            ("design", "C89967"),
+            ("report_status", "C158125"),
+            ("dose_form", "C66726"),
+            ("dosing_frequency", "C71113"),
+        ):
             msg = term_check(code, getattr(self, field))
             if msg and "non-extensible" in msg:
                 errs.append(f"{field}: {msg}")
-        if self.glp_type is not None and (m := term_check("C225357", self.glp_type)) and \
-                "non-extensible" in m:
+        if (
+            self.glp_type is not None
+            and (m := term_check("C225357", self.glp_type))
+            and "non-extensible" in m
+        ):
             errs.append(f"glp_type: {m}")
         derived = sorted(set(self.values) & set(TS_DERIVED))
         if derived:
@@ -182,13 +275,14 @@ class AnimalRecord(BaseModel):
 
 class EndpointMap(BaseModel):
     domain: Literal["BW", "FW", "LB", "OM"]
-    testcd: str = Field(pattern=r"^[A-Z][A-Z0-9_]{0,7}$",
-                        description="TCG 4.1.3: at most 8 characters, not starting with a "
-                                    "number, letters, digits and underscores")
+    testcd: str = Field(
+        pattern=r"^[A-Z][A-Z0-9_]{0,7}$",
+        description="TCG 4.1.3: at most 8 characters, not starting with a "
+        "number, letters, digits and underscores",
+    )
     test: str = Field(min_length=1, max_length=40)
     unit: str = Field(description="UNIT codelist term for the reported unit")
-    category: str | None = Field(default=None, description="LBCAT (SEND Laboratory Test "
-                                 "Category)")
+    category: str | None = Field(default=None, description="LBCAT (SEND Laboratory Test Category)")
     specimen: str | None = Field(default=None, description="SPEC codelist; LB and OM")
 
     @model_validator(mode="after")
@@ -217,12 +311,15 @@ class SendExportSpec(BaseModel):
     facts: StudyFacts
     animals: list[AnimalRecord] = Field(min_length=1)
     endpoints: dict[str, EndpointMap] = Field(min_length=1)
-    timepoints: dict[str, int] = Field(min_length=1, description="timepoint label -> nominal "
-                                       "study day, dosing-phase records")
+    timepoints: dict[str, int] = Field(
+        min_length=1, description="timepoint label -> nominal study day, dosing-phase records"
+    )
     recovery_timepoints: dict[str, int] = Field(
-        default_factory=dict, description="timepoint label -> nominal study day for "
+        default_factory=dict,
+        description="timepoint label -> nominal study day for "
         "recovery-phase records (the protocol labels are shared by both phases; a recovery "
-        "animal's terminal measurement falls at the end of recovery)")
+        "animal's terminal measurement falls at the end of recovery)",
+    )
     baseline_timepoint: str | None = None
     pk: PKMap | None = None
 

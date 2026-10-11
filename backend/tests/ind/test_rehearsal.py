@@ -17,9 +17,18 @@ from tests.kernel.test_kernel import CTX, PW, k  # noqa: F401  (fixture)
 
 PLAN = {
     "adme.metabolic_stability": {"parameters": MS, "simulation_parameters": MS_SIM, "seed": 1},
-    "safety.herg": {"parameters": HG, "simulation_parameters": HG_SIM, "seed": 2,
-                    "inputs": {"free_cmax_high_clinical_exposure": {
-                        "value": 0.5, "unit": "uM", "kind": "user_supplied"}}},
+    "safety.herg": {
+        "parameters": HG,
+        "simulation_parameters": HG_SIM,
+        "seed": 2,
+        "inputs": {
+            "free_cmax_high_clinical_exposure": {
+                "value": 0.5,
+                "unit": "uM",
+                "kind": "user_supplied",
+            }
+        },
+    },
     "tox.repeat_dose_rodent": {"parameters": RD, "simulation_parameters": RD_SIM, "seed": 3},
 }
 
@@ -46,8 +55,10 @@ def test_rehearsal_runs_supplied_plans_and_names_gaps(k):  # noqa: F811
     assert items["genotox.ames"]["outcome"] == "needs_design_parameters"
     # the metabolic-stability rehearsal reports the fu inputs it was not given
     assert "fu_plasma.human" in s["missing_inputs"]["adme.metabolic_stability"]
-    assert any(u["label"].startswith("CLh") for u in items["adme.metabolic_stability"]
-               ["unavailable_results"])
+    assert any(
+        u["label"].startswith("CLh")
+        for u in items["adme.metabolic_stability"]["unavailable_results"]
+    )
     # critical path: dose range-finding (no driver, unknown duration) -> 28 d + 14 d recovery
     cp = s["critical_path"]
     assert cp["requirements"][-2:] == ["tox.dose_range_finding", "tox.repeat_dose_rodent"]
@@ -70,23 +81,34 @@ def test_missing_simulation_parameters_are_not_invented(k):  # noqa: F811
 
 def test_unassigned_determination_is_reported(tmp_path):
     k2 = Kernel(db=Database(f"sqlite:///{tmp_path / 'r.sqlite3'}"), files=FileStore(tmp_path / "o"))
-    a = k2.register_principal(None, principal_id="a", name="A", kind=PrincipalKind.HUMAN,
-                              roles=[Role.ADMIN, Role.SCIENTIST], password=PW)
+    a = k2.register_principal(
+        None,
+        principal_id="a",
+        name="A",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.ADMIN, Role.SCIENTIST],
+        password=PW,
+    )
     prog = k2.create_program(a, name="X", context=CTX)
     k2.register_compound(a, prog["id"], name="c", smiles="CCO")
     r = rehearse(k2, a, prog["id"], {"tox.repeat_dose_rodent": {"parameters": RD}})
-    assert {"requirement_id": "tox.repeat_dose_rodent", "determination": "NOAEL",
-            "role": "study_director"} in r["summary"]["unassigned_determinations"]
+    assert {
+        "requirement_id": "tox.repeat_dose_rodent",
+        "determination": "NOAEL",
+        "role": "study_director",
+    } in r["summary"]["unassigned_determinations"]
 
 
 def test_existing_study_parameters_are_used(k):  # noqa: F811
     sci, pid = _prog(k)
     cid = k.repo.compounds(pid)[0].id
-    sid = k.create_study(sci, program_id=pid, compound_id=cid,
-                         requirement_id="adme.metabolic_stability")["id"]
+    sid = k.create_study(
+        sci, program_id=pid, compound_id=cid, requirement_id="adme.metabolic_stability"
+    )["id"]
     k.design_study(sci, sid, MS)
-    r = rehearse(k, sci, pid, {"adme.metabolic_stability": {"simulation_parameters": MS_SIM,
-                                                             "seed": 5}})
+    r = rehearse(
+        k, sci, pid, {"adme.metabolic_stability": {"simulation_parameters": MS_SIM, "seed": 5}}
+    )
     i = next(x for x in r["items"] if x["requirement_id"] == "adme.metabolic_stability")
     assert i["outcome"] == "rehearsed"
 
@@ -95,25 +117,46 @@ def test_what_if_and_diff_over_http(tmp_path):
     from fastapi.testclient import TestClient
 
     from hos.api import create_app
-    kern = Kernel(db=Database(f"sqlite:///{tmp_path / 'w.sqlite3'}"), files=FileStore(tmp_path / "o"))
+
+    kern = Kernel(
+        db=Database(f"sqlite:///{tmp_path / 'w.sqlite3'}"), files=FileStore(tmp_path / "o")
+    )
     c = TestClient(create_app(kern, bootstrap_token="t"))
-    c.post("/api/setup", json={"principal_id": "admin", "name": "A", "password": PW,
-                               "setup_token": "t"})
-    h = {"Authorization": "Bearer " + c.post(
-        "/api/auth/login", json={"principal_id": "admin", "password": PW}).json()["token"]}
-    ctx = {"modality": "small_molecule", "indication": "chronic_non_oncology", "route": "oral",
-           "intended_clinical_duration_days": 365, "max_trial_duration_days": 28}
-    d = c.post("/api/regulatory/diff", headers=h,
-               json={"a": ctx, "b": {**ctx, "max_trial_duration_days": 200}})
+    c.post(
+        "/api/setup",
+        json={"principal_id": "admin", "name": "A", "password": PW, "setup_token": "t"},
+    )
+    h = {
+        "Authorization": "Bearer "
+        + c.post("/api/auth/login", json={"principal_id": "admin", "password": PW}).json()["token"]
+    }
+    ctx = {
+        "modality": "small_molecule",
+        "indication": "chronic_non_oncology",
+        "route": "oral",
+        "intended_clinical_duration_days": 365,
+        "max_trial_duration_days": 28,
+    }
+    d = c.post(
+        "/api/regulatory/diff",
+        headers=h,
+        json={"a": ctx, "b": {**ctx, "max_trial_duration_days": 200}},
+    )
     assert d.json()["summary"]["lengthened"] == 2
-    assert c.post("/api/regulatory/diff", headers=h,
-                  json={"a": ctx, "b": {"modality": "x"}}).status_code == 400
+    assert (
+        c.post(
+            "/api/regulatory/diff", headers=h, json={"a": ctx, "b": {"modality": "x"}}
+        ).status_code
+        == 400
+    )
     prog = c.post("/api/programs", headers=h, json={"name": "W", "context": ctx}).json()
-    w = c.post(f"/api/programs/{prog['id']}/what-if", headers=h,
-               json={"changes": {"populations": ["women_of_childbearing_potential"]}}).json()
+    w = c.post(
+        f"/api/programs/{prog['id']}/what-if",
+        headers=h,
+        json={"changes": {"populations": ["women_of_childbearing_potential"]}},
+    ).json()
     assert [x["requirement_id"] for x in w["changes"] if x["change"] == "retimed"] == ["dart.efd"]
-    assert c.post(f"/api/programs/{prog['id']}/what-if",
-                  json={"changes": {}}).status_code == 401
+    assert c.post(f"/api/programs/{prog['id']}/what-if", json={"changes": {}}).status_code == 401
     r = c.post(f"/api/programs/{prog['id']}/rehearsal", headers=h, json={})
     assert r.status_code == 200 and r.json()["simulated"]
 

@@ -60,13 +60,26 @@ class Residue:
 
 
 _STANDARD = {
-    "A": ("Ala", "alanine"), "C": ("Cys", "cysteine"), "D": ("Asp", "aspartic acid"),
-    "E": ("Glu", "glutamic acid"), "F": ("Phe", "phenylalanine"), "G": ("Gly", "glycine"),
-    "H": ("His", "histidine"), "I": ("Ile", "isoleucine"), "K": ("Lys", "lysine"),
-    "L": ("Leu", "leucine"), "M": ("Met", "methionine"), "N": ("Asn", "asparagine"),
-    "P": ("Pro", "proline"), "Q": ("Gln", "glutamine"), "R": ("Arg", "arginine"),
-    "S": ("Ser", "serine"), "T": ("Thr", "threonine"), "V": ("Val", "valine"),
-    "W": ("Trp", "tryptophan"), "Y": ("Tyr", "tyrosine"),
+    "A": ("Ala", "alanine"),
+    "C": ("Cys", "cysteine"),
+    "D": ("Asp", "aspartic acid"),
+    "E": ("Glu", "glutamic acid"),
+    "F": ("Phe", "phenylalanine"),
+    "G": ("Gly", "glycine"),
+    "H": ("His", "histidine"),
+    "I": ("Ile", "isoleucine"),
+    "K": ("Lys", "lysine"),
+    "L": ("Leu", "leucine"),
+    "M": ("Met", "methionine"),
+    "N": ("Asn", "asparagine"),
+    "P": ("Pro", "proline"),
+    "Q": ("Gln", "glutamine"),
+    "R": ("Arg", "arginine"),
+    "S": ("Ser", "serine"),
+    "T": ("Thr", "threonine"),
+    "V": ("Val", "valine"),
+    "W": ("Trp", "tryptophan"),
+    "Y": ("Tyr", "tyrosine"),
 }
 ALPHABET: dict[str, Residue] = {
     **{c: Residue(c, t, n, "IUPAC-IUB 1983", True) for c, (t, n) in _STANDARD.items()},
@@ -86,8 +99,10 @@ def sequence_errors(seq: str) -> list[str]:
         return ["empty sequence"]
     for i, ch in enumerate(seq, start=1):
         if ch in _FILE_CONVENTIONS:
-            errs.append(f"position {i}: '{ch}' ({_FILE_CONVENTIONS[ch]}) is a file convention, "
-                        "not a residue")
+            errs.append(
+                f"position {i}: '{ch}' ({_FILE_CONVENTIONS[ch]}) is a file convention, "
+                "not a residue"
+            )
         elif ch.islower() and ch.upper() in ALPHABET:
             errs.append(f"position {i}: lower-case '{ch}'; the one-letter codes are upper case")
         elif ch not in ALPHABET:
@@ -139,8 +154,9 @@ def parse_fasta(text: str) -> tuple[list[FastaRecord], list[str]]:
     return records, errors
 
 
-def average_chain_mass(seq: str, *, label: str,
-                       table: ReferenceTable = RESIDUE_MASS_TABLE) -> Quantity:
+def average_chain_mass(
+    seq: str, *, label: str, table: ReferenceTable = RESIDUE_MASS_TABLE
+) -> Quantity:
     """Average mass of one chain: sum of average residue masses plus one water (ExPASy)."""
     problems = sequence_errors(seq)
     if problems:
@@ -148,23 +164,31 @@ def average_chain_mass(seq: str, *, label: str,
     undefined = sorted({c for c in seq if not ALPHABET[c].defined_mass})
     if undefined:
         return Quantity.unavailable(
-            "g/mol", label=label,
+            "g/mol",
+            label=label,
             reason=f"{', '.join(undefined)} ({'; '.join(ALPHABET[c].name for c in undefined)}) "
-                   "have no defined residue mass")
+            "have no defined residue mass",
+        )
     counts = Counter(seq)
     parts = {c: table.quantity(f"residue_mass.average.{c}") for c in sorted(counts)}
     water = table.quantity("water_mass.average")
     total = sum(counts[c] * parts[c].require() for c in counts) + water.require()
     flags = ("selenocysteine_mass_uses_older_selenium_weight",) if "U" in counts else ()
     return Quantity.computed(
-        total, "g/mol", method=method("seq.average_mass"), inputs=[*parts.values(), water],
-        label=label, qc_flags=flags,
-        notes=f"{len(seq)} residues; residue-mass table {table.version}")
+        total,
+        "g/mol",
+        method=method("seq.average_mass"),
+        inputs=[*parts.values(), water],
+        label=label,
+        qc_flags=flags,
+        notes=f"{len(seq)} residues; residue-mass table {table.version}",
+    )
 
 
 # ---------------------------------------------------------------------------------------------
 # HELM 2.04
 # ---------------------------------------------------------------------------------------------
+
 
 class HelmError(ValueError):
     def __init__(self, errors: Sequence[str]) -> None:
@@ -218,11 +242,23 @@ class HelmStructure:
         return {i for p in self.polymers for m in p.monomers for i in m.ids}
 
     def to_dict(self) -> dict[str, Any]:
-        return {"polymers": [{"id": p.id, "type": p.type, "monomers": len(p.monomers),
-                              "annotation": p.annotation} for p in self.polymers],
-                "connections": len(self.connections), "groups": dict(self.groups),
-                "version": self.version, "uses_helm2_features": self.uses_helm2_features,
-                "monomer_ids": sorted(self.monomer_ids()), "warnings": list(self.warnings)}
+        return {
+            "polymers": [
+                {
+                    "id": p.id,
+                    "type": p.type,
+                    "monomers": len(p.monomers),
+                    "annotation": p.annotation,
+                }
+                for p in self.polymers
+            ],
+            "connections": len(self.connections),
+            "groups": dict(self.groups),
+            "version": self.version,
+            "uses_helm2_features": self.uses_helm2_features,
+            "monomer_ids": sorted(self.monomer_ids()),
+            "warnings": list(self.warnings),
+        }
 
 
 def _split_top(text: str, sep: str) -> list[str]:
@@ -310,7 +346,7 @@ def _monomer(token: str, where: str, errors: list[str]) -> tuple[HelmMonomer, bo
         ids = []
         for el in plus if len(plus) > 1 else excl:
             cut = _last_top_colon(el)
-            name, ratio = (el[:cut], el[cut + 1:]) if cut is not None else (el, None)
+            name, ratio = (el[:cut], el[cut + 1 :]) if cut is not None else (el, None)
             if ratio is not None and not re.fullmatch(r"[0-9]+(\.[0-9]+)?", ratio):
                 errors.append(f"{where}: ratio '{ratio}' is not a number")
             ids.append(_id(name, where, errors))
@@ -330,13 +366,15 @@ def _id(text: str, where: str, errors: list[str]) -> str:
             errors.append(f"{where}: monomer ID '{inner}' is empty or has reserved characters")
         return inner
     if len(text) != 1 or text in _RESERVED or text.isspace():
-        errors.append(f"{where}: '{text}' is not a monomer ID (multi-character IDs go in "
-                      "square brackets)")
+        errors.append(
+            f"{where}: '{text}' is not a monomer ID (multi-character IDs go in square brackets)"
+        )
     return text
 
 
-def _units(notation: str, where: str, errors: list[str],
-           ptype: str) -> tuple[list[HelmMonomer], bool]:
+def _units(
+    notation: str, where: str, errors: list[str], ptype: str
+) -> tuple[list[HelmMonomer], bool]:
     """Monomers of a simple polymer. "." separates monomer units; within a unit a backbone
     monomer may be followed by a branch monomer in parentheses (5.2.1.1, 5.2.4)."""
     monomers: list[HelmMonomer] = []
@@ -359,20 +397,27 @@ def _units(notation: str, where: str, errors: list[str],
                         break
             else:
                 i += 1
-            while i < len(unit) and unit[i] in "'\"":          # repeat or annotation suffix
+            while i < len(unit) and unit[i] in "'\"":  # repeat or annotation suffix
                 q = unit[i]
                 j = unit.find(q, i + 1)
                 i = (j + 1) if j != -1 else len(unit)
             tokens.append(unit[start:i])
         if ptype == "PEPTIDE" and len(tokens) > 1:
-            errors.append(f"{where}: '{unit}' is more than one monomer; peptide monomers are "
-                          "separated by '.' and multi-character IDs go in square brackets")
+            errors.append(
+                f"{where}: '{unit}' is more than one monomer; peptide monomers are "
+                "separated by '.' and multi-character IDs go in square brackets"
+            )
             continue
         for k, tok in enumerate(tokens):
-            branch = k > 0 and tok.startswith("(") and len(tokens) > 1 and \
-                not any(s in tok for s in "+,")
-            mono, uses = _monomer(tok[1:-1] if branch else tok, f"{where} monomer "
-                                  f"{len(monomers) + 1}", errors)
+            branch = (
+                k > 0
+                and tok.startswith("(")
+                and len(tokens) > 1
+                and not any(s in tok for s in "+,")
+            )
+            mono, uses = _monomer(
+                tok[1:-1] if branch else tok, f"{where} monomer {len(monomers) + 1}", errors
+            )
             monomers.append(mono)
             v2 = v2 or uses
     return monomers, v2
@@ -385,16 +430,16 @@ def parse_helm(text: str) -> HelmStructure:
     s = text.strip()
     sections = _sections(s)
     if len(sections) != 5:
-        raise HelmError([f"a HELM string has four sections each ending in '$' (5.3); found "
-                         f"{len(sections) - 1}"])
+        raise HelmError(
+            [f"a HELM string has four sections each ending in '$' (5.3); found {len(sections) - 1}"]
+        )
     polys_s, conns_s, groups_s, annot_s, marker = sections
     version: str | None = marker or None
     loose = _unprotected_whitespace("$".join(sections[:3]))
     if loose:
         errors.append(f"whitespace between notation elements (4.1) at {loose}")
     if version not in (None, "V2.0"):
-        errors.append(f"text after the fourth '$' must be 'V2.0' or nothing (5.4), not "
-                      f"{version!r}")
+        errors.append(f"text after the fourth '$' must be 'V2.0' or nothing (5.4), not {version!r}")
     polymers: list[HelmPolymer] = []
     v2 = False
     if not polys_s:
@@ -407,8 +452,9 @@ def parse_helm(text: str) -> HelmStructure:
         pid, body, annotation = m.group(1).upper(), m.group(2), m.group(3)
         idm = _POLYMER_ID.match(pid)
         if not idm:
-            errors.append(f"'{pid}' is not a polymer ID (PEPTIDE, RNA, CHEM or BLOB with an "
-                          "integer suffix)")
+            errors.append(
+                f"'{pid}' is not a polymer ID (PEPTIDE, RNA, CHEM or BLOB with an integer suffix)"
+            )
             continue
         ptype = idm.group(1)
         v2 = v2 or annotation is not None
@@ -422,8 +468,9 @@ def parse_helm(text: str) -> HelmStructure:
                 errors.append(f"{pid}: a CHEM simple polymer contains one monomer (5.2.2)")
             ident = body[1:-1] if body.startswith("[") and body.endswith("]") else body
             kind: Literal["id", "inline_smiles"] = "inline_smiles" if "*" in ident else "id"
-            polymers.append(HelmPolymer(pid, ptype, (HelmMonomer(body, kind, (ident,)),),
-                                        annotation))
+            polymers.append(
+                HelmPolymer(pid, ptype, (HelmMonomer(body, kind, (ident,)),), annotation)
+            )
             continue
         monomers, uses = _units(body, pid, errors, ptype)
         v2 = v2 or uses
@@ -449,8 +496,9 @@ def parse_helm(text: str) -> HelmStructure:
     connections: list[HelmConnection] = []
     sizes = {p.id: len(p.monomers) for p in polymers}
     for item in _split_top(conns_s, "|") if conns_s else []:
-        cm = re.match(r"^([A-Za-z]+[0-9]+),([A-Za-z]+[0-9]+),([^:,-]+):([^-,]+)-([^:,-]+):([^,]+)$",
-                      item)
+        cm = re.match(
+            r"^([A-Za-z]+[0-9]+),([A-Za-z]+[0-9]+),([^:,-]+):([^-,]+)-([^:,-]+):([^,]+)$", item
+        )
         if not cm:
             errors.append(f"'{item[:60]}' is not Source,Target,pos:R#-pos:R# (5.3.2)")
             continue
@@ -460,13 +508,15 @@ def parse_helm(text: str) -> HelmStructure:
             if pid not in known:
                 errors.append(f"connection {item}: '{pid}' is not a polymer or group")
             elif pos.isdigit() and pid in sizes and not 1 <= int(pos) <= sizes[pid]:
-                errors.append(f"connection {item}: {pid} has no monomer {pos} "
-                              f"({sizes[pid]} monomers)")
+                errors.append(
+                    f"connection {item}: {pid} has no monomer {pos} ({sizes[pid]} monomers)"
+                )
             if not re.fullmatch(r"R[0-9]+|\?|pair", att):
-                errors.append(f"connection {item}: '{att}' is not an attachment point "
-                              "(R#, ? or pair)")
+                errors.append(
+                    f"connection {item}: '{att}' is not an attachment point (R#, ? or pair)"
+                )
             if not (pos.isdigit() or pos == "?"):
-                v2 = True                                  # a monomer ID for an unknown position
+                v2 = True  # a monomer ID for an unknown position
         if "?" in (sa, ta, sp, tp):
             v2 = True
         connections.append(HelmConnection(src, tgt, sp, sa, tp, ta))
@@ -482,5 +532,6 @@ def parse_helm(text: str) -> HelmStructure:
         raise HelmError(errors)
     if v2 and version is None:
         warnings.append("uses HELM 2 functionality but lacks 'V2.0' after the fourth '$' (5.4)")
-    return HelmStructure(tuple(polymers), tuple(connections), groups, extended, version, v2,
-                         tuple(warnings))
+    return HelmStructure(
+        tuple(polymers), tuple(connections), groups, extended, version, v2, tuple(warnings)
+    )

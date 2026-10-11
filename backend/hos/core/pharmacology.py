@@ -164,7 +164,7 @@ def fit_hill(
                 code="potency_extrapolated",
                 status=QCStatus.WARN,
                 message=f"fitted {potency_label} lies outside the tested concentration range "
-                        f"[{lo_c:g}, {hi_c:g}]; it is an extrapolation, not a measurement",
+                f"[{lo_c:g}, {hi_c:g}]; it is an extrapolation, not a measurement",
                 observed=ic50_v,
                 threshold=[lo_c, hi_c],
             )
@@ -180,13 +180,14 @@ def fit_hill(
             )
         )
     if hill_slope_warn_range is not None and not (
-            hill_slope_warn_range[0] <= abs(hill_v) <= hill_slope_warn_range[1]):
+        hill_slope_warn_range[0] <= abs(hill_v) <= hill_slope_warn_range[1]
+    ):
         findings.append(
             QCFinding(
                 code="hill_slope_outside_stated_range",
                 status=QCStatus.WARN,
                 message="Hill slope outside the range stated for this assay; this can indicate "
-                        "a non-specific effect, solubility limitation or multi-site interaction",
+                "a non-specific effect, solubility limitation or multi-site interaction",
                 observed=round(hill_v, 3),
                 threshold=list(hill_slope_warn_range),
             )
@@ -207,19 +208,30 @@ def fit_hill(
 
     return HillFit(
         ic50=Quantity.computed(
-            ic50_v, unit, method=m, software=_SOFTWARE, uncertainty=ci,
-            label=potency_label, qc_flags=qc.flags,
+            ic50_v,
+            unit,
+            method=m,
+            software=_SOFTWARE,
+            uncertainty=ci,
+            label=potency_label,
+            qc_flags=qc.flags,
             notes=f"4PL fit over {series.n} concentrations, R^2={r2:.4f}",
         ),
         hill_slope=Quantity.computed(
-            hill_v, "dimensionless", method=m, software=_SOFTWARE,
+            hill_v,
+            "dimensionless",
+            method=m,
+            software=_SOFTWARE,
             uncertainty=Uncertainty(kind="sd", sd=hill_se, n=series.n) if hill_se else None,
-            label="Hill slope", qc_flags=qc.flags,
+            label="Hill slope",
+            qc_flags=qc.flags,
         ),
-        top=Quantity.computed(top_v, series.y_unit, method=m, software=_SOFTWARE,
-                              label="Upper asymptote"),
-        bottom=Quantity.computed(bottom_v, series.y_unit, method=m, software=_SOFTWARE,
-                                 label="Lower asymptote"),
+        top=Quantity.computed(
+            top_v, series.y_unit, method=m, software=_SOFTWARE, label="Upper asymptote"
+        ),
+        bottom=Quantity.computed(
+            bottom_v, series.y_unit, method=m, software=_SOFTWARE, label="Lower asymptote"
+        ),
         r_squared=r2,
         n_points=series.n,
         concentration_range=(lo_c, hi_c),
@@ -255,12 +267,13 @@ def herg_safety_margin(ic50: Quantity, free_cmax: Quantity) -> Quantity:
     if margin < 30.0:
         flags.append("herg_margin_below_30x_reference")
     return Quantity.computed(
-        margin, "dimensionless",
+        margin,
+        "dimensionless",
         method=method("safety.herg_margin"),
         inputs=[ic50, free_cmax],
         software=_SOFTWARE,
         label="hERG safety margin (IC50 / free Cmax)",
         qc_flags=dict.fromkeys(flags),
         notes="Redfern 2003 reports clustering of torsadogenic drugs below ~30x; "
-              "this is a screening reference point, not a pass/fail criterion",
+        "this is a screening reference point, not a pass/fail criterion",
     )

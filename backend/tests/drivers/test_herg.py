@@ -1,6 +1,5 @@
 """hERG driver: conformance, exact IC50 recovery, Q&A 1.2 margin, Q&A 2.1 controls."""
 
-
 import pytest
 from pydantic import ValidationError
 
@@ -12,38 +11,65 @@ from hos.drivers.herg import HergPatchClampDriver
 
 D = HergPatchClampDriver()
 _prof = compute_profile("CC(=O)Oc1ccccc1C(=O)O")
-COMPOUND = CompoundInfo(id="cmp-1", name="Test compound", smiles=_prof.canonical_smiles,
-                        molecular_weight=_prof.molecular_weight)
+COMPOUND = CompoundInfo(
+    id="cmp-1",
+    name="Test compound",
+    smiles=_prof.canonical_smiles,
+    molecular_weight=_prof.molecular_weight,
+)
 
 PARAMS = dict(
-    glp=True, cell_line="HEK293 stably expressing hERG", platform="manual",
-    recording_temperature_C=36.0, stimulation_frequency_Hz=0.2,
+    glp=True,
+    cell_line="HEK293 stably expressing hERG",
+    platform="manual",
+    recording_temperature_C=36.0,
+    stimulation_frequency_Hz=0.2,
     voltage_protocol="ventricular action-potential-like waveform",
-    selective_blocker="E-4031 (saturating)", vehicle="0.1% DMSO",
-    test_concentrations_uM=[0.1, 0.3, 1, 3, 10, 30], cells_per_concentration=3,
-    concentration_verification=True, positive_control="dofetilide",
+    selective_blocker="E-4031 (saturating)",
+    vehicle="0.1% DMSO",
+    test_concentrations_uM=[0.1, 0.3, 1, 3, 10, 30],
+    cells_per_concentration=3,
+    concentration_verification=True,
+    positive_control="dofetilide",
     positive_control_concentrations_uM=[0.01, 0.03],
     positive_control_expected_block=[
         {"concentration_uM": 0.01, "low_percent": 20, "high_percent": 80},
-        {"concentration_uM": 0.03, "low_percent": 30, "high_percent": 90}],
+        {"concentration_uM": 0.03, "low_percent": 30, "high_percent": 90},
+    ],
     positive_control_basis="test lab historical data, SOP-H-7",
-    constrain_asymptotes_0_100=True, acceptance_min_r2=0.9, acceptance_basis="test SOP-H-7",
+    constrain_asymptotes_0_100=True,
+    acceptance_min_r2=0.9,
+    acceptance_basis="test SOP-H-7",
 )
-SIM = dict(ic50_uM=2.0, hill=1.0, positive_control_ic50_uM=0.015, positive_control_hill=1.0,
-           baseline_current_pA=800.0, background_fraction=0.05, inhibition_noise_sd_percent=0.0,
-           vehicle_rundown_percent=2.0, temperature_C=36.0)
-INPUTS = {"cmax_total_high_clinical_exposure": Quantity.measured(0.5, "uM", source_name="FIH PK"),
-          "fu_plasma": Quantity.measured(0.004, "dimensionless", source_name="PPB")}
+SIM = dict(
+    ic50_uM=2.0,
+    hill=1.0,
+    positive_control_ic50_uM=0.015,
+    positive_control_hill=1.0,
+    baseline_current_pA=800.0,
+    background_fraction=0.05,
+    inhibition_noise_sd_percent=0.0,
+    vehicle_rundown_percent=2.0,
+    temperature_C=36.0,
+)
+INPUTS = {
+    "cmax_total_high_clinical_exposure": Quantity.measured(0.5, "uM", source_name="FIH PK"),
+    "fu_plasma": Quantity.measured(0.004, "dimensionless", source_name="PPB"),
+}
 
 
 def _measured(sim=SIM, ref="HOS-CONFORMANCE-1"):
     """Exact (noise-free) currents in the measured format, from the declared model (test input)."""
     p = D.validate_parameters(PARAMS)
-    lines = ["# laboratory: Test Lab", "# analyst: P. Clamp", "# run_date: 2026-09-30",
-             f"# study_reference: {ref}",
-             "cell_id,article,nominal_concentration [uM],measured_concentration [uM],"
-             "baseline_current [pA],drug_current [pA],background_current [pA],temperature [degC],"
-             "steady_state"]
+    lines = [
+        "# laboratory: Test Lab",
+        "# analyst: P. Clamp",
+        "# run_date: 2026-09-30",
+        f"# study_reference: {ref}",
+        "cell_id,article,nominal_concentration [uM],measured_concentration [uM],"
+        "baseline_current [pA],drug_current [pA],background_current [pA],temperature [degC],"
+        "steady_state",
+    ]
     for m in D._manifest(p):
         c = float(m["nominal_concentration_uM"])
         if m["article"] == "TA":
@@ -60,8 +86,14 @@ def _measured(sim=SIM, ref="HOS-CONFORMANCE-1"):
 
 
 def test_conformance_kit_passes():
-    rep = check_driver(D, compound=COMPOUND, parameters=PARAMS, simulation_parameters=SIM,
-                       measured_example=_measured(), analysis_inputs=INPUTS)
+    rep = check_driver(
+        D,
+        compound=COMPOUND,
+        parameters=PARAMS,
+        simulation_parameters=SIM,
+        measured_example=_measured(),
+        analysis_inputs=INPUTS,
+    )
     assert rep.passed, rep.summary()
 
 
@@ -104,16 +136,24 @@ def test_no_threshold_means_expert_judgement_not_a_verdict():
 def test_threshold_requires_basis_and_is_applied():
     with pytest.raises(ValidationError):
         D.validate_parameters(dict(PARAMS, margin_threshold=51))
-    p = D.validate_parameters(dict(PARAMS, margin_threshold=1000,
-                                   margin_threshold_basis="lab reference set, pooled upper bound"))
+    p = D.validate_parameters(
+        dict(
+            PARAMS,
+            margin_threshold=1000,
+            margin_threshold_basis="lab reference set, pooled upper bound",
+        )
+    )
     res = D.analyze(D.ingest(_measured(), p), p, COMPOUND, INPUTS)
-    assert any("not above the protocol-specific threshold" in s.statement
-               for s in D.interpret(res, p).statements)
+    assert any(
+        "not above the protocol-specific threshold" in s.statement
+        for s in D.interpret(res, p).statements
+    )
 
 
 def test_best_practice_deviation_is_reported():
-    p = D.validate_parameters(dict(PARAMS, recording_temperature_C=22.0,
-                                   stimulation_frequency_Hz=0.1))
+    p = D.validate_parameters(
+        dict(PARAMS, recording_temperature_C=22.0, stimulation_frequency_Hz=0.1)
+    )
     proto = D.design(COMPOUND, p)
     comp = proto.design["best_practice_compliance"]
     assert sum("NOT MET" in v for v in comp.values()) == 2

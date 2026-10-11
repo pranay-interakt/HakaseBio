@@ -13,8 +13,16 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-__all__ = ["CT_VERSION", "SENDIG_VERSION", "Variable", "codelist", "ct", "dataset", "sendig",
-           "term_check"]
+__all__ = [
+    "CT_VERSION",
+    "SENDIG_VERSION",
+    "Variable",
+    "codelist",
+    "ct",
+    "dataset",
+    "sendig",
+    "term_check",
+]
 
 _DIR = Path(__file__).parent / "reference"
 SENDIG_VERSION = "3.1.1"
@@ -37,8 +45,8 @@ def ct() -> dict[str, Any]:
 class Variable:
     name: str
     label: str
-    type: str          # Char | Num
-    core: str          # Req | Exp | Perm
+    type: str  # Char | Num
+    core: str  # Req | Exp | Perm
     role: str | None
     ordinal: int
     codelists: tuple[str, ...]
@@ -48,9 +56,24 @@ class Variable:
 def dataset(domain: str) -> tuple[str, str, str, tuple[Variable, ...]]:
     """(label, class, structure, variables in SENDIG order)."""
     d = sendig()["datasets"][domain]
-    return d["label"], d["class"], d["structure"], tuple(
-        Variable(v["name"], v["label"], v["type"], v["core"], v.get("role"), v["ordinal"],
-                 tuple(v["codelists"]), v.get("format")) for v in d["variables"])
+    return (
+        d["label"],
+        d["class"],
+        d["structure"],
+        tuple(
+            Variable(
+                v["name"],
+                v["label"],
+                v["type"],
+                v["core"],
+                v.get("role"),
+                v["ordinal"],
+                tuple(v["codelists"]),
+                v.get("format"),
+            )
+            for v in d["variables"]
+        ),
+    )
 
 
 def codelist(code: str) -> dict[str, Any]:
@@ -68,6 +91,8 @@ def term_check(code: str, value: str) -> str | None:
     if value in cl["terms"]:
         return None
     if cl["extensible"]:
-        return (f"{value!r} is not a term of extensible codelist {cl['submission_value']} "
-                f"({code}); a sponsor-defined term must be described in the nSDRG")
+        return (
+            f"{value!r} is not a term of extensible codelist {cl['submission_value']} "
+            f"({code}); a sponsor-defined term must be described in the nSDRG"
+        )
     return f"{value!r} is not a term of non-extensible codelist {cl['submission_value']} ({code})"

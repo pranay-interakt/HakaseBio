@@ -11,8 +11,9 @@ def test_selection_inputs_are_accepted_only_after_data_and_change_the_analysis(k
     sci = k.get_principal("sci")
     prog = k.create_program(sci, name="PK-1", context=CTX, sponsor="Example Bio")
     cmp_ = k.register_compound(sci, prog["id"], name="paracetamol", smiles="CC(=O)Nc1ccc(O)cc1")
-    sid = k.create_study(sci, program_id=prog["id"], compound_id=cmp_["id"],
-                         requirement_id="adme.in_vivo_pk")["id"]
+    sid = k.create_study(
+        sci, program_id=prog["id"], compound_id=cmp_["id"], requirement_id="adme.in_vivo_pk"
+    )["id"]
     k.design_study(sci, sid, PARAMS)
     k.plan_study(sci, sid)
     k.dispatch_study(sci, sid, {"kind": "external_lab", "laboratory": "Example CRO"})

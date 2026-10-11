@@ -154,7 +154,10 @@ class CompoundInfo:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id, "name": self.name, "smiles": self.smiles, "inchikey": self.inchikey,
+            "id": self.id,
+            "name": self.name,
+            "smiles": self.smiles,
+            "inchikey": self.inchikey,
             "molecular_weight": self.molecular_weight.to_dict() if self.molecular_weight else None,
             "clogp": self.clogp.to_dict() if self.clogp else None,
         }
@@ -185,8 +188,12 @@ class ProtocolStep:
     critical_parameters: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"number": self.number, "title": self.title, "instruction": self.instruction,
-                "critical_parameters": list(self.critical_parameters)}
+        return {
+            "number": self.number,
+            "title": self.title,
+            "instruction": self.instruction,
+            "critical_parameters": list(self.critical_parameters),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,14 +263,22 @@ class ProtocolDocument:
         return str(self.to_dict()["content_hash"])
 
     def to_markdown(self) -> str:
-        out = [f"# {self.title}", "",
-               f"*Driver:* `{self.driver_id}` v{self.driver_version}  ",
-               f"*GLP:* {'yes (21 CFR Part 58)' if self.glp else 'no'}  ",
-               f"*Protocol hash:* `{self.content_hash}`", "",
-               "## Objective", self.objective, ""]
+        out = [
+            f"# {self.title}",
+            "",
+            f"*Driver:* `{self.driver_id}` v{self.driver_version}  ",
+            f"*GLP:* {'yes (21 CFR Part 58)' if self.glp else 'no'}  ",
+            f"*Protocol hash:* `{self.content_hash}`",
+            "",
+            "## Objective",
+            self.objective,
+            "",
+        ]
         if self.hypothesis:
             out += ["## Hypothesis", self.hypothesis, ""]
-        out += ["## Test article"] + [f"- **{k}:** {v}" for k, v in self.test_article.items()] + [""]
+        out += (
+            ["## Test article"] + [f"- **{k}:** {v}" for k, v in self.test_article.items()] + [""]
+        )
         out += ["## Test system"] + [f"- **{k}:** {v}" for k, v in self.test_system.items()] + [""]
         out += ["## Design"] + [f"- **{k}:** {_fmt(v)}" for k, v in self.design.items()] + [""]
         out += ["## Procedure"]
@@ -272,13 +287,16 @@ class ProtocolDocument:
             for cp in s.critical_parameters:
                 out.append(f"   - critical: {cp}")
         out += ["", "## Acceptance criteria"]
-        out += [f"- `{a.code}`: {a.description} *(basis: {a.basis})*" for a in self.acceptance_criteria]
+        out += [
+            f"- `{a.code}`: {a.description} *(basis: {a.basis})*" for a in self.acceptance_criteria
+        ]
         out += ["", "## Materials"] + [f"- {m}" for m in self.materials]
         out += ["", "## Deliverables"] + [f"- {d}" for d in self.deliverables]
         if self.regulatory_basis:
             out += ["", "## Regulatory basis"] + [f"- {r}" for r in self.regulatory_basis]
-        out += ["", "## References"] + [f"- [{c.key}] {c.text}" + (f" doi:{c.doi}" if c.doi else "")
-                                        for c in self.references]
+        out += ["", "## References"] + [
+            f"- [{c.key}] {c.text}" + (f" doi:{c.doi}" if c.doi else "") for c in self.references
+        ]
         return "\n".join(out) + "\n"
 
 
@@ -314,7 +332,7 @@ class StudyPlan:
             "notes": list(self.notes),
             "cost": None,
             "cost_note": "obtain a quote from the executing laboratory; the system does not "
-                         "estimate cost",
+            "estimate cost",
         }
 
 
@@ -357,11 +375,18 @@ class DataColumn:
             U.parse_unit(self.unit)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "description": self.description, "kind": self.kind,
-                "unit": self.unit, "required": self.required,
-                "choices": list(self.choices) if self.choices else None,
-                "minimum": self.minimum, "maximum": self.maximum,
-                "exclusive_minimum": self.exclusive_minimum, "unit_column": self.unit_column}
+        return {
+            "name": self.name,
+            "description": self.description,
+            "kind": self.kind,
+            "unit": self.unit,
+            "required": self.required,
+            "choices": list(self.choices) if self.choices else None,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "exclusive_minimum": self.exclusive_minimum,
+            "unit_column": self.unit_column,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -422,10 +447,14 @@ class DataTemplate:
         return buf.getvalue()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"template_id": self.template_id, "description": self.description,
-                "columns": [c.to_dict() for c in self.columns],
-                "metadata": [m.to_dict() for m in self.metadata],
-                "csv_header": self.header(), "allow_extra_columns": self.allow_extra_columns}
+        return {
+            "template_id": self.template_id,
+            "description": self.description,
+            "columns": [c.to_dict() for c in self.columns],
+            "metadata": [m.to_dict() for m in self.metadata],
+            "csv_header": self.header(),
+            "allow_extra_columns": self.allow_extra_columns,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -484,9 +513,14 @@ class IngestedData:
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> IngestedData:
         return cls(
-            template_id=d["template_id"], records=tuple(d["records"]), metadata=d["metadata"],
-            origin=DataOrigin(d["origin"]), file_sha256=d["file_sha256"], filename=d["filename"],
-            conversions=tuple(d.get("conversions", ())), warnings=tuple(d.get("warnings", ())),
+            template_id=d["template_id"],
+            records=tuple(d["records"]),
+            metadata=d["metadata"],
+            origin=DataOrigin(d["origin"]),
+            file_sha256=d["file_sha256"],
+            filename=d["filename"],
+            conversions=tuple(d.get("conversions", ())),
+            warnings=tuple(d.get("warnings", ())),
         )
 
 
@@ -498,8 +532,13 @@ def _parse_header_cell(cell: str) -> tuple[str, str | None]:
     return cell, None
 
 
-def parse_return_file(content: bytes, template: DataTemplate, *, filename: str = "upload.csv",
-                      claimed_origin: DataOrigin = DataOrigin.MEASURED) -> IngestedData:
+def parse_return_file(
+    content: bytes,
+    template: DataTemplate,
+    *,
+    filename: str = "upload.csv",
+    claimed_origin: DataOrigin = DataOrigin.MEASURED,
+) -> IngestedData:
     """Strictly validate a returned CSV against ``template``.
 
     Collects every error (with line numbers) and raises :class:`IngestError` if any.
@@ -535,14 +574,16 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
 
     tid = metadata.get("hos-template")
     if tid is not None and tid != template.template_id:
-        errors.append(f"file declares template {tid!r} but this study expects "
-                      f"{template.template_id!r}")
+        errors.append(
+            f"file declares template {tid!r} but this study expects {template.template_id!r}"
+        )
     for m in template.metadata:
         if m.required and not metadata.get(m.key):
             errors.append(f"missing required metadata '# {m.key}: ...' ({m.description})")
     run_date = metadata.get("run_date")
     if run_date:
         from datetime import date
+
         try:
             date.fromisoformat(run_date)
         except ValueError:
@@ -569,8 +610,9 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
             errors.append(f"line {header_line_no}: missing required column {c.name!r}")
     unknown = [n for n in names if n not in known]
     if unknown and not template.allow_extra_columns:
-        errors.append(f"line {header_line_no}: unexpected column(s) {unknown}; "
-                      f"expected {template.header()}")
+        errors.append(
+            f"line {header_line_no}: unexpected column(s) {unknown}; expected {template.header()}"
+        )
 
     conversions: list[str] = []
     col_units: dict[str, str | None] = {}
@@ -589,8 +631,10 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
             continue
         assert col.unit is not None
         if not U.compatible(unit, col.unit):
-            errors.append(f"line {header_line_no}: column {n!r} unit {unit!r} is not "
-                          f"dimensionally compatible with {col.unit!r}")
+            errors.append(
+                f"line {header_line_no}: column {n!r} unit {unit!r} is not "
+                f"dimensionally compatible with {col.unit!r}"
+            )
             continue
         col_units[n] = unit
         if U.parse_unit(unit) != U.parse_unit(col.unit):
@@ -617,8 +661,9 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
                 continue
             if col.kind == "text":
                 if col.choices and cell not in col.choices:
-                    errors.append(f"line {line_no}: {n!r} value {cell!r} not one of "
-                                  f"{list(col.choices)}")
+                    errors.append(
+                        f"line {line_no}: {n!r} value {cell!r} not one of {list(col.choices)}"
+                    )
                 rec[n] = cell
                 continue
             if col.kind == "integer":
@@ -641,19 +686,26 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
                     src_unit = col_units.get(n) or col.unit
                     if U.parse_unit(src_unit) != U.parse_unit(col.unit):
                         v = U.convert(v, src_unit, col.unit)
-            if col.minimum is not None and (v < col.minimum or (col.exclusive_minimum and v == col.minimum)):
-                errors.append(f"line {line_no}: {n!r} value {v:g} below physical minimum "
-                              f"{'>' if col.exclusive_minimum else '>='} {col.minimum:g}")
+            if col.minimum is not None and (
+                v < col.minimum or (col.exclusive_minimum and v == col.minimum)
+            ):
+                errors.append(
+                    f"line {line_no}: {n!r} value {v:g} below physical minimum "
+                    f"{'>' if col.exclusive_minimum else '>='} {col.minimum:g}"
+                )
             if col.maximum is not None and v > col.maximum:
-                errors.append(f"line {line_no}: {n!r} value {v:g} above physical maximum "
-                              f"{col.maximum:g}")
+                errors.append(
+                    f"line {line_no}: {n!r} value {v:g} above physical maximum {col.maximum:g}"
+                )
             rec[n] = int(v) if col.kind == "integer" else v
         for col in template.columns:
             if col.unit_column and rec.get(col.name) is not None:
                 u = rec.get(col.unit_column)
                 if not u or not U.is_valid_unit(str(u)):
-                    errors.append(f"line {line_no}: {col.unit_column!r} value {u!r} is not a "
-                                  f"recognised unit for {col.name!r}")
+                    errors.append(
+                        f"line {line_no}: {col.unit_column!r} value {u!r} is not a "
+                        f"recognised unit for {col.name!r}"
+                    )
         records.append(rec)
 
     if not records and not errors:
@@ -661,15 +713,24 @@ def parse_return_file(content: bytes, template: DataTemplate, *, filename: str =
     if errors:
         raise IngestError(errors)
 
-    marked = (metadata.get(SIMULATION_MARKER, "").lower() in ("true", "yes", "1")
-              or metadata.get("instrument", "").lower().startswith("simulation:"))
-    origin = DataOrigin.SIMULATED if (marked or claimed_origin is DataOrigin.SIMULATED) \
+    marked = metadata.get(SIMULATION_MARKER, "").lower() in ("true", "yes", "1") or metadata.get(
+        "instrument", ""
+    ).lower().startswith("simulation:")
+    origin = (
+        DataOrigin.SIMULATED
+        if (marked or claimed_origin is DataOrigin.SIMULATED)
         else DataOrigin.MEASURED
+    )
     if origin is DataOrigin.SIMULATED and not metadata.get("hos-simulation-method"):
         raise IngestError(["simulated data must declare '# hos-simulation-method: <method id>'"])
     return IngestedData(
-        template_id=template.template_id, records=tuple(records), metadata=metadata,
-        origin=origin, file_sha256=sha, filename=filename, conversions=tuple(conversions),
+        template_id=template.template_id,
+        records=tuple(records),
+        metadata=metadata,
+        origin=origin,
+        file_sha256=sha,
+        filename=filename,
+        conversions=tuple(conversions),
     )
 
 
@@ -711,8 +772,14 @@ class InstructionPackage:
         files = self.files()
         manifest = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())}
         files["MANIFEST.json"] = json.dumps(
-            {"study_reference": self.study_reference, "protocol_hash": self.protocol.content_hash,
-             "files": manifest}, indent=2, sort_keys=True).encode()
+            {
+                "study_reference": self.study_reference,
+                "protocol_hash": self.protocol.content_hash,
+                "files": manifest,
+            },
+            indent=2,
+            sort_keys=True,
+        ).encode()
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             for name in sorted(files):
@@ -752,25 +819,34 @@ class Table:
     def __post_init__(self) -> None:
         for r in self.rows:
             if len(r) != len(self.columns):
-                raise DriverError(f"table {self.title!r}: row width {len(r)} != {len(self.columns)}")
+                raise DriverError(
+                    f"table {self.title!r}: row width {len(r)} != {len(self.columns)}"
+                )
             for c in r:
                 if isinstance(c, (bool, float)):
                     raise DriverError(
                         f"table {self.title!r} contains a bare float {c!r}; numeric results must "
-                        "be Quantity objects carrying provenance")
+                        "be Quantity objects carrying provenance"
+                    )
 
     def map_quantities(self, fn: Any) -> Table:
-        return replace(self, rows=tuple(tuple(fn(c) if isinstance(c, Quantity) else c for c in r)
-                                        for r in self.rows))
+        return replace(
+            self,
+            rows=tuple(
+                tuple(fn(c) if isinstance(c, Quantity) else c for c in r) for r in self.rows
+            ),
+        )
 
     def quantities(self) -> list[Quantity]:
         return [c for r in self.rows for c in r if isinstance(c, Quantity)]
 
     def to_dict(self) -> dict[str, Any]:
-        return {"title": self.title, "columns": list(self.columns),
-                "rows": [[c.to_dict() if isinstance(c, Quantity) else c for c in r]
-                         for r in self.rows],
-                "note": self.note}
+        return {
+            "title": self.title,
+            "columns": list(self.columns),
+            "rows": [[c.to_dict() if isinstance(c, Quantity) else c for c in r] for r in self.rows],
+            "note": self.note,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -811,9 +887,13 @@ class InterpretiveStatement:
     severity: str = "info"  # info | notable | concern
 
     def to_dict(self) -> dict[str, Any]:
-        return {"statement": self.statement, "basis": self.basis,
-                "citation_keys": list(self.citation_keys), "severity": self.severity,
-                "citations": [cite(k).to_dict() for k in self.citation_keys]}
+        return {
+            "statement": self.statement,
+            "basis": self.basis,
+            "citation_keys": list(self.citation_keys),
+            "severity": self.severity,
+            "citations": [cite(k).to_dict() for k in self.citation_keys],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -822,8 +902,10 @@ class Interpretation:
     requires_expert_judgement: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"statements": [s.to_dict() for s in self.statements],
-                "requires_expert_judgement": list(self.requires_expert_judgement)}
+        return {
+            "statements": [s.to_dict() for s in self.statements],
+            "requires_expert_judgement": list(self.requires_expert_judgement),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -843,16 +925,25 @@ class ExpertDetermination:
 
     def __post_init__(self) -> None:
         if self.choices and self.unit:
-            raise DriverError(f"determination {self.key!r}: categorical determinations take no unit")
+            raise DriverError(
+                f"determination {self.key!r}: categorical determinations take no unit"
+            )
 
     @property
     def categorical(self) -> bool:
         return bool(self.choices)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"key": self.key, "label": self.label, "unit": self.unit, "role": self.role.value,
-                "required_for_approval": self.required_for_approval, "guidance": self.guidance,
-                "choices": list(self.choices), "categorical": self.categorical}
+        return {
+            "key": self.key,
+            "label": self.label,
+            "unit": self.unit,
+            "role": self.role.value,
+            "required_for_approval": self.required_for_approval,
+            "guidance": self.guidance,
+            "choices": list(self.choices),
+            "categorical": self.categorical,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -862,8 +953,11 @@ class ReportSection:
     tables: tuple[Table, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"heading": self.heading, "body": self.body,
-                "tables": [t.to_dict() for t in self.tables]}
+        return {
+            "heading": self.heading,
+            "body": self.body,
+            "tables": [t.to_dict() for t in self.tables],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -875,9 +969,13 @@ class StudyReport:
     disclaimer: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        d = {"title": self.title, "ctd_section": self.ctd_section,
-             "sections": [s.to_dict() for s in self.sections],
-             "evidence_admissible": self.evidence_admissible, "disclaimer": self.disclaimer}
+        d = {
+            "title": self.title,
+            "ctd_section": self.ctd_section,
+            "sections": [s.to_dict() for s in self.sections],
+            "evidence_admissible": self.evidence_admissible,
+            "disclaimer": self.disclaimer,
+        }
         d["content_hash"] = canonical_hash(d)
         return d
 
@@ -886,15 +984,24 @@ class StudyReport:
         return str(self.to_dict()["content_hash"])
 
     def to_markdown(self) -> str:
-        out = [f"# {self.title}", "", f"*CTD section:* {self.ctd_section}  ",
-               f"*Report hash:* `{self.content_hash}`", ""]
+        out = [
+            f"# {self.title}",
+            "",
+            f"*CTD section:* {self.ctd_section}  ",
+            f"*Report hash:* `{self.content_hash}`",
+            "",
+        ]
         if self.disclaimer:
             out += [f"> **{self.disclaimer}**", ""]
         for s in self.sections:
             out += [f"## {s.heading}", "", s.body, ""]
             for t in s.tables:
-                out += [f"**{t.title}**", "", "| " + " | ".join(t.columns) + " |",
-                        "|" + "---|" * len(t.columns)]
+                out += [
+                    f"**{t.title}**",
+                    "",
+                    "| " + " | ".join(t.columns) + " |",
+                    "|" + "---|" * len(t.columns),
+                ]
                 for r in t.rows:
                     out.append("| " + " | ".join(_cell_md(c) for c in r) + " |")
                 if t.note:
@@ -927,8 +1034,11 @@ class Prerequisite:
     citation_key: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {"requirement_id": self.requirement_id, "basis": self.basis,
-                "citation_key": self.citation_key}
+        return {
+            "requirement_id": self.requirement_id,
+            "basis": self.basis,
+            "citation_key": self.citation_key,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -940,8 +1050,12 @@ class SimulatedDataset:
     seed: int
 
     def to_dict(self) -> dict[str, Any]:
-        return {"sha256": self.sha256, "method_id": self.method_id,
-                "parameters": dict(self.parameters), "seed": self.seed}
+        return {
+            "sha256": self.sha256,
+            "method_id": self.method_id,
+            "parameters": dict(self.parameters),
+            "seed": self.seed,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -983,34 +1097,48 @@ class StudyDriver(ABC):
     @classmethod
     def describe(cls) -> dict[str, Any]:
         return {
-            "id": cls.id, "name": cls.name, "version": cls.version, "abi": cls.abi,
+            "id": cls.id,
+            "name": cls.name,
+            "version": cls.version,
+            "abi": cls.abi,
             "requirement_ids": list(cls.requirement_ids),
             "modalities": sorted(m.value for m in cls.modalities),
-            "ctd_section": cls.ctd_section, "glp_capable": cls.glp_capable,
+            "ctd_section": cls.ctd_section,
+            "glp_capable": cls.glp_capable,
             "components": {k: list(v) for k, v in cls.components.items()},
             "description": cls.description,
             "references": [cite(k).to_dict() for k in cls.reference_keys],
             "parameters_schema": cls.parameters_model().model_json_schema(),
-            "simulation_parameters_schema": (sim_model.model_json_schema()
-                                             if (sim_model := cls.simulation_parameters_model())
-                                             else None),
+            "simulation_parameters_schema": (
+                sim_model.model_json_schema()
+                if (sim_model := cls.simulation_parameters_model())
+                else None
+            ),
             "can_simulate": cls.simulation_parameters_model() is not None,
         }
 
-    def probe(self, requirement: StudyRequirement,
-              context: ProgramContext | None = None) -> Support:
+    def probe(
+        self, requirement: StudyRequirement, context: ProgramContext | None = None
+    ) -> Support:
         """Whether this driver can serve ``requirement``. Drivers refine this; the default
         checks the match table and modality."""
         if requirement.id not in self.requirement_ids and requirement.driver_id != self.id:
             return Support(False, f"{self.id} does not serve requirement {requirement.id}")
         if context is not None and context.modality not in self.modalities:
             return Support(False, f"{self.id} does not support modality {context.modality.value}")
-        if requirement.components and not (set(self.components_for(requirement.id))
-                                           & set(requirement.components)):
-            return Support(False, f"{self.id} declares none of {requirement.id}'s parts "
-                                  f"{list(requirement.components)}")
-        return Support(True, "requirement matched by driver match table",
-                       prefill=self.prefill_from_requirement(requirement))
+        if requirement.components and not (
+            set(self.components_for(requirement.id)) & set(requirement.components)
+        ):
+            return Support(
+                False,
+                f"{self.id} declares none of {requirement.id}'s parts "
+                f"{list(requirement.components)}",
+            )
+        return Support(
+            True,
+            "requirement matched by driver match table",
+            prefill=self.prefill_from_requirement(requirement),
+        )
 
     def prefill_from_requirement(self, requirement: StudyRequirement) -> dict[str, Any]:
         """Design parameters implied by the requirement (e.g. species, duration)."""
@@ -1027,9 +1155,13 @@ class StudyDriver(ABC):
         return self.parameters_model().model_validate(dict(raw))
 
     @abstractmethod
-    def design(self, compound: CompoundInfo, params: BaseModel,
-               context: ProgramContext | None = None,
-               hypothesis: str | None = None) -> ProtocolDocument: ...
+    def design(
+        self,
+        compound: CompoundInfo,
+        params: BaseModel,
+        context: ProgramContext | None = None,
+        hypothesis: str | None = None,
+    ) -> ProtocolDocument: ...
 
     @abstractmethod
     def plan(self, protocol: ProtocolDocument, params: BaseModel) -> StudyPlan: ...
@@ -1037,8 +1169,9 @@ class StudyDriver(ABC):
     @abstractmethod
     def data_template(self, params: BaseModel) -> DataTemplate: ...
 
-    def sample_manifest(self, params: BaseModel,
-                        compound: CompoundInfo) -> tuple[Mapping[str, Any], ...]:
+    def sample_manifest(
+        self, params: BaseModel, compound: CompoundInfo
+    ) -> tuple[Mapping[str, Any], ...]:
         return ()
 
     def expert_determinations(self, params: BaseModel) -> tuple[ExpertDetermination, ...]:
@@ -1048,8 +1181,13 @@ class StudyDriver(ABC):
         """Requirements that must be complete first; each dependency cites its basis."""
         return ()
 
-    def instruction_package(self, study_reference: str, protocol: ProtocolDocument,
-                            params: BaseModel, compound: CompoundInfo) -> InstructionPackage:
+    def instruction_package(
+        self,
+        study_reference: str,
+        protocol: ProtocolDocument,
+        params: BaseModel,
+        compound: CompoundInfo,
+    ) -> InstructionPackage:
         template = self.data_template(params)
         return InstructionPackage(
             study_reference=study_reference,
@@ -1062,13 +1200,20 @@ class StudyDriver(ABC):
 
     # -- ingest ----------------------------------------------------------------
 
-    def ingest(self, content: bytes, params: BaseModel, *, filename: str = "upload.csv",
-               claimed_origin: DataOrigin = DataOrigin.MEASURED,
-               study_reference: str | None = None) -> IngestedData:
+    def ingest(
+        self,
+        content: bytes,
+        params: BaseModel,
+        *,
+        filename: str = "upload.csv",
+        claimed_origin: DataOrigin = DataOrigin.MEASURED,
+        study_reference: str | None = None,
+    ) -> IngestedData:
         """Strict ingest: generic template validation, then driver semantic validation."""
         template = self.data_template(params)
-        data = parse_return_file(content, template, filename=filename,
-                                 claimed_origin=claimed_origin)
+        data = parse_return_file(
+            content, template, filename=filename, claimed_origin=claimed_origin
+        )
         errors: list[str] = []
         ref = data.metadata.get("study_reference")
         if study_reference is not None and ref != study_reference:
@@ -1079,16 +1224,22 @@ class StudyDriver(ABC):
             raise IngestError(errors)
         return replace(data, warnings=tuple(warnings))
 
-    def validate_records(self, records: Sequence[Mapping[str, Any]],
-                         params: BaseModel) -> tuple[list[str], list[str]]:
+    def validate_records(
+        self, records: Sequence[Mapping[str, Any]], params: BaseModel
+    ) -> tuple[list[str], list[str]]:
         """Driver-specific semantic checks. Returns (errors, warnings)."""
         return [], []
 
     # -- analysis --------------------------------------------------------------
 
     @abstractmethod
-    def _analyze(self, data: IngestedData, params: BaseModel,
-                 compound: CompoundInfo, inputs: Mapping[str, Quantity]) -> AnalysisResult: ...
+    def _analyze(
+        self,
+        data: IngestedData,
+        params: BaseModel,
+        compound: CompoundInfo,
+        inputs: Mapping[str, Quantity],
+    ) -> AnalysisResult: ...
 
     def analysis_inputs(self, params: BaseModel) -> Mapping[str, str]:
         """Extra quantities the analysis needs from outside the return file (name -> unit),
@@ -1102,8 +1253,13 @@ class StudyDriver(ABC):
         them, and missing ones yield UNAVAILABLE results (ABI 1.1)."""
         return {}
 
-    def analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
-                inputs: Mapping[str, Quantity] | None = None) -> AnalysisResult:
+    def analyze(
+        self,
+        data: IngestedData,
+        params: BaseModel,
+        compound: CompoundInfo,
+        inputs: Mapping[str, Quantity] | None = None,
+    ) -> AnalysisResult:
         result = self._analyze(data, params, compound, dict(inputs or {}))
         if not data.is_simulated:
             return result
@@ -1119,11 +1275,13 @@ class StudyDriver(ABC):
     # -- interpretation --------------------------------------------------------
 
     @abstractmethod
-    def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: ProgramContext | None) -> Interpretation: ...
+    def _interpret(
+        self, analysis: AnalysisResult, params: BaseModel, context: ProgramContext | None
+    ) -> Interpretation: ...
 
-    def interpret(self, analysis: AnalysisResult, params: BaseModel,
-                  context: ProgramContext | None = None) -> Interpretation:
+    def interpret(
+        self, analysis: AnalysisResult, params: BaseModel, context: ProgramContext | None = None
+    ) -> Interpretation:
         interp = self._interpret(analysis, params, context)
         for s in interp.statements:
             if not s.citation_keys:
@@ -1134,19 +1292,33 @@ class StudyDriver(ABC):
             if not s.basis.strip():
                 raise DriverError(f"{self.id}: statement {s.statement!r} has no stated basis")
         dets = tuple(f"{d.label} ({d.role.value})" for d in self.expert_determinations(params))
-        return replace(interp, requires_expert_judgement=tuple(
-            dict.fromkeys((*interp.requires_expert_judgement, *dets))))
+        return replace(
+            interp,
+            requires_expert_judgement=tuple(
+                dict.fromkeys((*interp.requires_expert_judgement, *dets))
+            ),
+        )
 
     # -- report ----------------------------------------------------------------
 
     @abstractmethod
-    def _report_sections(self, protocol: ProtocolDocument, data: IngestedData,
-                         analysis: AnalysisResult, interpretation: Interpretation,
-                         determinations: Sequence[Mapping[str, Any]]) -> list[ReportSection]: ...
+    def _report_sections(
+        self,
+        protocol: ProtocolDocument,
+        data: IngestedData,
+        analysis: AnalysisResult,
+        interpretation: Interpretation,
+        determinations: Sequence[Mapping[str, Any]],
+    ) -> list[ReportSection]: ...
 
-    def report(self, protocol: ProtocolDocument, data: IngestedData, analysis: AnalysisResult,
-               interpretation: Interpretation,
-               determinations: Sequence[Mapping[str, Any]] = ()) -> StudyReport:
+    def report(
+        self,
+        protocol: ProtocolDocument,
+        data: IngestedData,
+        analysis: AnalysisResult,
+        interpretation: Interpretation,
+        determinations: Sequence[Mapping[str, Any]] = (),
+    ) -> StudyReport:
         sections = self._report_sections(protocol, data, analysis, interpretation, determinations)
         sections.append(_data_provenance_section(data))
         sections.append(_interpretation_section(interpretation, determinations))
@@ -1168,13 +1340,20 @@ class StudyDriver(ABC):
         simulate. Scientific parameters have no defaults: the user states them."""
         return None
 
-    def _simulate_rows(self, params: BaseModel, compound: CompoundInfo, sim: BaseModel,
-                       rng: np.random.Generator) -> tuple[list[dict[str, Any]], str]:
+    def _simulate_rows(
+        self, params: BaseModel, compound: CompoundInfo, sim: BaseModel, rng: np.random.Generator
+    ) -> tuple[list[dict[str, Any]], str]:
         raise DriverError(f"{self.id} does not support simulation")
 
-    def simulate(self, params: BaseModel, compound: CompoundInfo,
-                 simulation_parameters: Mapping[str, Any], *, seed: int,
-                 study_reference: str) -> SimulatedDataset:
+    def simulate(
+        self,
+        params: BaseModel,
+        compound: CompoundInfo,
+        simulation_parameters: Mapping[str, Any],
+        *,
+        seed: int,
+        study_reference: str,
+    ) -> SimulatedDataset:
         model = self.simulation_parameters_model()
         if model is None:
             raise DriverError(f"{self.id} does not support simulation")
@@ -1202,22 +1381,36 @@ class StudyDriver(ABC):
         w = csv.writer(buf, lineterminator="\n")
         w.writerow([c.name for c in template.columns])
         for r in rows:
-            w.writerow(["" if r.get(c.name) is None else
-                        (repr(float(r[c.name])) if c.kind == "number" else r[c.name])
-                        for c in template.columns])
+            w.writerow(
+                [
+                    ""
+                    if r.get(c.name) is None
+                    else (repr(float(r[c.name])) if c.kind == "number" else r[c.name])
+                    for c in template.columns
+                ]
+            )
         content = buf.getvalue().encode()
-        return SimulatedDataset(content=content, sha256=hashlib.sha256(content).hexdigest(),
-                                method_id=method_id, parameters=sim.model_dump(), seed=seed)
+        return SimulatedDataset(
+            content=content,
+            sha256=hashlib.sha256(content).hexdigest(),
+            method_id=method_id,
+            parameters=sim.model_dump(),
+            seed=seed,
+        )
 
 
 def _return_instructions(study_reference: str, template: DataTemplate) -> str:
     lines = [
-        f"# Data return instructions — study {study_reference}", "",
-        "Return results as a single UTF-8 CSV file based on `data_template.csv`.", "",
+        f"# Data return instructions — study {study_reference}",
+        "",
+        "Return results as a single UTF-8 CSV file based on `data_template.csv`.",
+        "",
         "1. Keep the `# key: value` metadata lines at the top and fill every required key:",
     ]
-    lines += [f"   - `{m.key}`{' (required)' if m.required else ''}: {m.description}"
-              for m in template.metadata]
+    lines += [
+        f"   - `{m.key}`{' (required)' if m.required else ''}: {m.description}"
+        for m in template.metadata
+    ]
     lines += [
         "2. Keep the header row. Numeric columns state their unit in brackets; you may report in "
         "another unit of the same dimension by changing the bracketed unit (values are converted "
@@ -1225,36 +1418,49 @@ def _return_instructions(study_reference: str, template: DataTemplate) -> str:
         "3. One observation per row. Leave optional cells empty rather than writing N/A.",
         "4. Do not add columns. Files that deviate from the template are rejected with a list of "
         "every problem and their line numbers.",
-        "5. The SHA-256 of the file as received is recorded in the study's audit trail.", "",
-        "## Columns", "",
-        "| column | unit | required | description |", "|---|---|---|---|",
+        "5. The SHA-256 of the file as received is recorded in the study's audit trail.",
+        "",
+        "## Columns",
+        "",
+        "| column | unit | required | description |",
+        "|---|---|---|---|",
     ]
     for c in template.columns:
         extra = f" One of: {', '.join(c.choices)}." if c.choices else ""
-        lines.append(f"| `{c.name}` | {c.unit or '—'} | {'yes' if c.required else 'no'} | "
-                     f"{c.description}{extra} |")
+        lines.append(
+            f"| `{c.name}` | {c.unit or '—'} | {'yes' if c.required else 'no'} | "
+            f"{c.description}{extra} |"
+        )
     return "\n".join(lines) + "\n"
 
 
 def _data_provenance_section(data: IngestedData) -> ReportSection:
     meta = "\n".join(f"- **{k}:** {v}" for k, v in sorted(data.metadata.items()))
-    conv = ("\n\nUnit conversions applied on receipt: " + "; ".join(data.conversions)
-            if data.conversions else "")
-    warn = ("\n\nIngest warnings: " + "; ".join(data.warnings) if data.warnings else "")
+    conv = (
+        "\n\nUnit conversions applied on receipt: " + "; ".join(data.conversions)
+        if data.conversions
+        else ""
+    )
+    warn = "\n\nIngest warnings: " + "; ".join(data.warnings) if data.warnings else ""
     return ReportSection(
         heading="Data provenance",
-        body=(f"Origin: **{data.origin.value.upper()}**. Raw file `{data.filename}`, "
-              f"SHA-256 `{data.file_sha256}`, {len(data.records)} records validated against "
-              f"template `{data.template_id}`.\n\n{meta}{conv}{warn}"),
+        body=(
+            f"Origin: **{data.origin.value.upper()}**. Raw file `{data.filename}`, "
+            f"SHA-256 `{data.file_sha256}`, {len(data.records)} records validated against "
+            f"template `{data.template_id}`.\n\n{meta}{conv}{warn}"
+        ),
     )
 
 
-def _interpretation_section(interp: Interpretation,
-                            determinations: Sequence[Mapping[str, Any]]) -> ReportSection:
+def _interpretation_section(
+    interp: Interpretation, determinations: Sequence[Mapping[str, Any]]
+) -> ReportSection:
     body = []
     for s in interp.statements:
-        body.append(f"- **[{s.severity}]** {s.statement} *Basis:* {s.basis} "
-                    f"*Refs:* {', '.join(s.citation_keys)}")
+        body.append(
+            f"- **[{s.severity}]** {s.statement} *Basis:* {s.basis} "
+            f"*Refs:* {', '.join(s.citation_keys)}"
+        )
     if interp.requires_expert_judgement:
         body.append("\n**Requires expert judgement (not decided by the system):**")
         body += [f"- {x}" for x in interp.requires_expert_judgement]
@@ -1262,12 +1468,18 @@ def _interpretation_section(interp: Interpretation,
         body.append("\n**Recorded expert determinations:**")
         for d in determinations:
             v = d.get("quantity") or {}
-            shown = (d["category"] if d.get("category") is not None
-                     else f"{v.get('value')} {v.get('unit') or ''}" if v.get("available")
-                     else "not established")
-            body.append(f"- {d.get('label')}: {shown} — "
-                        f"{d.get('signer_name')} ({d.get('role')}), {d.get('signed_at')}. "
-                        f"Rationale: {d.get('rationale')}")
+            shown = (
+                d["category"]
+                if d.get("category") is not None
+                else f"{v.get('value')} {v.get('unit') or ''}"
+                if v.get("available")
+                else "not established"
+            )
+            body.append(
+                f"- {d.get('label')}: {shown} — "
+                f"{d.get('signer_name')} ({d.get('role')}), {d.get('signed_at')}. "
+                f"Rationale: {d.get('rationale')}"
+            )
     return ReportSection(heading="Interpretation", body="\n".join(body) or "No statements.")
 
 
@@ -1282,15 +1494,20 @@ def _methods_section(analysis: AnalysisResult, protocol: ProtocolDocument) -> Re
             cites[c.key] = c
     body = ["**Methods used:**"]
     for key, m in sorted(methods.items()):
-        body.append(f"- `{key}` {m.name}." + (f" Assumptions: {'; '.join(m.assumptions)}."
-                                              if m.assumptions else "")
-                    + (f" Limits: {'; '.join(m.limits)}." if m.limits else ""))
+        body.append(
+            f"- `{key}` {m.name}."
+            + (f" Assumptions: {'; '.join(m.assumptions)}." if m.assumptions else "")
+            + (f" Limits: {'; '.join(m.limits)}." if m.limits else "")
+        )
     body.append("\n**References:**")
-    body += [f"- [{c.key}] {c.text}" + (f" doi:{c.doi}" if c.doi else "")
-             for c in sorted(cites.values(), key=lambda c: c.key)]
+    body += [
+        f"- [{c.key}] {c.text}" + (f" doi:{c.doi}" if c.doi else "")
+        for c in sorted(cites.values(), key=lambda c: c.key)
+    ]
     return ReportSection(heading="Methods and references", body="\n".join(body))
 
 
-def tabulate(title: str, columns: Iterable[str], rows: Iterable[Iterable[Cell]],
-             note: str | None = None) -> Table:
+def tabulate(
+    title: str, columns: Iterable[str], rows: Iterable[Iterable[Cell]], note: str | None = None
+) -> Table:
     return Table(title=title, columns=tuple(columns), rows=tuple(tuple(r) for r in rows), note=note)

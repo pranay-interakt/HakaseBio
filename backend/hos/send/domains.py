@@ -50,8 +50,12 @@ def _num(v: float) -> str:
 
 
 #: --TESTCD / --TEST codelist pairs per findings domain (SEND CT).
-TEST_CODELISTS = {"BW": ("C89962", "C89961"), "FW": ("C89970", "C89969"),
-                  "LB": ("C65047", "C67154"), "OM": ("C89977", "C89976")}
+TEST_CODELISTS = {
+    "BW": ("C89962", "C89961"),
+    "FW": ("C89970", "C89969"),
+    "LB": ("C65047", "C67154"),
+    "OM": ("C89977", "C89976"),
+}
 
 
 def _paired_name(code_list: str, name_list: str, term: str) -> str | None:
@@ -78,14 +82,23 @@ def _shape(domain: str, rows: list[dict[str, Any]]) -> Domain:
     unknown = sorted({k for r in rows for k in r} - {v.name for v in variables})
     if unknown:
         raise ValueError(f"{domain}: variables not in SENDIG v3.1.1: {unknown}")
-    return Domain(domain, label, klass, structure, keep,
-                  [{v.name: r.get(v.name) for v in keep} for r in rows])
+    return Domain(
+        domain, label, klass, structure, keep, [{v.name: r.get(v.name) for v in keep} for r in rows]
+    )
 
 
-def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequence[Mapping[str, Any]],
-                  glp: bool, study_start: str | None, study_director: str | None,
-                  tk_params: Any | None = None, tk_records: Sequence[Mapping[str, Any]] = (),
-                  tk_individual: Mapping[str, Any] | None = None) -> SendBuild:
+def build_domains(
+    *,
+    spec: SendExportSpec,
+    tox_params: Any,
+    tox_records: Sequence[Mapping[str, Any]],
+    glp: bool,
+    study_start: str | None,
+    study_director: str | None,
+    tk_params: Any | None = None,
+    tk_records: Sequence[Mapping[str, Any]] = (),
+    tk_individual: Mapping[str, Any] | None = None,
+) -> SendBuild:
     """Assemble every domain. ``tk_individual`` is the toxicokinetic study's stored
     "Individual exposure" table (``columns`` and ``rows``; result cells are quantity dicts),
     read by column name."""
@@ -100,38 +113,74 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
 
     # ---- trial sets ---------------------------------------------------------------------
     groups = [0.0] + list(tox_params.dose_levels_mg_per_kg_day)
-    rec_doses = ([0.0, groups[-1]] if tox_params.recovery else [])
+    rec_doses = [0.0, groups[-1]] if tox_params.recovery else []
     sets: list[dict[str, Any]] = []
     for gi, d in enumerate(groups):
         lab = "Control" if d == 0 else f"{d:g} mg/kg/day"
-        sets.append({"setcd": f"{gi + 1}", "set": lab, "dose": d, "phase": "main",
-                     "n": tox_params.animals_per_sex_per_group, "tk": False, "group": gi + 1})
+        sets.append(
+            {
+                "setcd": f"{gi + 1}",
+                "set": lab,
+                "dose": d,
+                "phase": "main",
+                "n": tox_params.animals_per_sex_per_group,
+                "tk": False,
+                "group": gi + 1,
+            }
+        )
         if any(abs(d - r) < 1e-9 for r in rec_doses):
-            sets.append({"setcd": f"{gi + 1}R", "set": f"{lab} recovery", "dose": d,
-                         "phase": "recovery", "n": tox_params.recovery_animals_per_sex,
-                         "tk": False, "group": gi + 1})
+            sets.append(
+                {
+                    "setcd": f"{gi + 1}R",
+                    "set": f"{lab} recovery",
+                    "dose": d,
+                    "phase": "recovery",
+                    "n": tox_params.recovery_animals_per_sex,
+                    "tk": False,
+                    "group": gi + 1,
+                }
+            )
     if tk_params is not None:
-        tk_groups = ([0.0] if tk_params.control_group_assayed else []) + list(
-            tk_params.dose_levels)
+        tk_groups = ([0.0] if tk_params.control_group_assayed else []) + list(tk_params.dose_levels)
         for gi, d in enumerate(tk_groups):
             lab = "TK control" if d == 0 else f"TK {d:g} {tk_params.dose_unit}"
-            sets.append({"setcd": f"TK{gi + 1}", "set": lab, "dose": d, "phase": "tk",
-                         "n": tk_params.animals_per_sex_per_group, "tk": True,
-                         "group": f"TK{gi + 1}", "sexes": tk_params.sexes})
+            sets.append(
+                {
+                    "setcd": f"TK{gi + 1}",
+                    "set": lab,
+                    "dose": d,
+                    "phase": "tk",
+                    "n": tk_params.animals_per_sex_per_group,
+                    "tk": True,
+                    "group": f"TK{gi + 1}",
+                    "sexes": tk_params.sexes,
+                }
+            )
     tx_rows: list[dict[str, Any]] = []
     for s in sets:
         sexes = s.get("sexes", ["M", "F"])
         params: list[tuple[str, str]] = [
-            ("SPGRPCD", str(s["group"])), ("GRPLBL", s["set"]),
+            ("SPGRPCD", str(s["group"])),
+            ("GRPLBL", s["set"]),
             ("PLANMSUB", str(s["n"] if "M" in sexes else 0)),
             ("PLANFSUB", str(s["n"] if "F" in sexes else 0)),
             ("TRTDOS", _num(s["dose"])),
             ("TRTDOSU", "mg/kg/day" if not s["tk"] else tk_dose_unit),
-            ("TKDESC", "TK ONLY" if s["tk"] else "NON-TK")]
+            ("TKDESC", "TK ONLY" if s["tk"] else "NON-TK"),
+        ]
         for n_seq, (code, txval) in enumerate(params, start=1):
-            tx_rows.append({"STUDYID": sid, "DOMAIN": "TX", "SETCD": s["setcd"], "SET": s["set"],
-                            "TXSEQ": n_seq, "TXPARMCD": code,
-                            "TXPARM": _paired_name("C90009", "C90007", code), "TXVAL": txval})
+            tx_rows.append(
+                {
+                    "STUDYID": sid,
+                    "DOMAIN": "TX",
+                    "SETCD": s["setcd"],
+                    "SET": s["set"],
+                    "TXSEQ": n_seq,
+                    "TXPARMCD": code,
+                    "TXPARM": _paired_name("C90009", "C90007", code),
+                    "TXVAL": txval,
+                }
+            )
     b.domains["TX"] = _shape("TX", tx_rows)
 
     # ---- subjects ------------------------------------------------------------------------
@@ -151,8 +200,7 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
         b.errors.append(f"no subject dates or disposition for {missing}")
 
     def set_of(sx: str, dose: float, phase: str) -> dict[str, Any] | None:
-        return next((s for s in sets if s["phase"] == phase and abs(s["dose"] - dose) < 1e-9),
-                    None)
+        return next((s for s in sets if s["phase"] == phase and abs(s["dose"] - dose) < 1e-9), None)
 
     dm_rows, ex_rows, ds_rows = [], [], []
     everyone: list[tuple[str, str, float, str, AnimalRecord]] = []
@@ -169,20 +217,52 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
             b.errors.append(f"{s_id}: no trial set for dose {dose:g} ({phase})")
             continue
         u = usubjid(s_id)
-        dm_rows.append({"STUDYID": sid, "DOMAIN": "DM", "USUBJID": u, "SUBJID": s_id,
-                        "RFSTDTC": a.first_dose_date, "RFENDTC": a.end_date, "AGEU": None,
-                        "SEX": sex, "ARMCD": str(st["group"]), "SETCD": st["setcd"]})
-        ex_rows.append({"STUDYID": sid, "DOMAIN": "EX", "USUBJID": u, "EXSEQ": 1,
-                        "EXTRT": f.test_article, "EXDOSE": dose,
-                        "EXDOSU": ex_unit if phase != "tk" else tk_dose_unit,
-                        "EXDOSFRM": f.dose_form, "EXDOSFRQ": f.dosing_frequency,
-                        "EXROUTE": f.route, "EXLOT": f.test_article_lot, "EXTRTV": f.vehicle,
-                        "EXSTDTC": a.first_dose_date, "EXENDTC": a.last_dose_date})
-        ds_rows.append({"STUDYID": sid, "DOMAIN": "DS", "USUBJID": u, "DSSEQ": 1,
-                        "DSTERM": a.disposition_term, "DSDECOD": a.disposition,
-                        "DSUSCHFL": "Y" if a.unscheduled else "N",
-                        "DSSTDTC": a.disposition_date, "DSNOMDY": a.disposition_nominal_day})
-    if (ex_msg := term_check("C71620", ex_unit)):
+        dm_rows.append(
+            {
+                "STUDYID": sid,
+                "DOMAIN": "DM",
+                "USUBJID": u,
+                "SUBJID": s_id,
+                "RFSTDTC": a.first_dose_date,
+                "RFENDTC": a.end_date,
+                "AGEU": None,
+                "SEX": sex,
+                "ARMCD": str(st["group"]),
+                "SETCD": st["setcd"],
+            }
+        )
+        ex_rows.append(
+            {
+                "STUDYID": sid,
+                "DOMAIN": "EX",
+                "USUBJID": u,
+                "EXSEQ": 1,
+                "EXTRT": f.test_article,
+                "EXDOSE": dose,
+                "EXDOSU": ex_unit if phase != "tk" else tk_dose_unit,
+                "EXDOSFRM": f.dose_form,
+                "EXDOSFRQ": f.dosing_frequency,
+                "EXROUTE": f.route,
+                "EXLOT": f.test_article_lot,
+                "EXTRTV": f.vehicle,
+                "EXSTDTC": a.first_dose_date,
+                "EXENDTC": a.last_dose_date,
+            }
+        )
+        ds_rows.append(
+            {
+                "STUDYID": sid,
+                "DOMAIN": "DS",
+                "USUBJID": u,
+                "DSSEQ": 1,
+                "DSTERM": a.disposition_term,
+                "DSDECOD": a.disposition,
+                "DSUSCHFL": "Y" if a.unscheduled else "N",
+                "DSSTDTC": a.disposition_date,
+                "DSNOMDY": a.disposition_nominal_day,
+            }
+        )
+    if ex_msg := term_check("C71620", ex_unit):
         b.warnings.append(f"EXDOSU: {ex_msg}")
     b.domains["DM"] = _shape("DM", dm_rows)
     b.domains["EX"] = _shape("EX", ex_rows)
@@ -202,23 +282,29 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
         if emap.category:
             checks.append(("C225371", emap.category, "LB category"))
         for code, term, what in checks:
-            if (msg := term_check(code, term)):
+            if msg := term_check(code, term):
                 b.warnings.append(f"{name} {what}: {msg}")
         codes, names = TEST_CODELISTS[emap.domain]
-        if (msg := term_check(codes, emap.testcd)):
+        if msg := term_check(codes, emap.testcd):
             b.warnings.append(f"{name} {emap.domain}TESTCD: {msg}")
         elif (paired := _paired_name(codes, names, emap.testcd)) and paired != emap.test:
-            b.errors.append(f"{name}: {emap.domain}TEST for {emap.domain}TESTCD "
-                            f"{emap.testcd} is {paired!r} in SEND CT {CT_VERSION}, not "
-                            f"{emap.test!r}")
+            b.errors.append(
+                f"{name}: {emap.domain}TEST for {emap.domain}TESTCD "
+                f"{emap.testcd} is {paired!r} in SEND CT {CT_VERSION}, not "
+                f"{emap.test!r}"
+            )
         factor = _unit_factor(spec_units[name], emap.unit)
         if factor is None:
-            b.warnings.append(f"{name}: unit term {emap.unit!r} is not machine-checkable "
-                              f"against the protocol unit {spec_units[name]!r}; state its "
-                              "equivalence in the nSDRG")
+            b.warnings.append(
+                f"{name}: unit term {emap.unit!r} is not machine-checkable "
+                f"against the protocol unit {spec_units[name]!r}; state its "
+                "equivalence in the nSDRG"
+            )
         elif abs(factor - 1) > 1e-12:
-            b.errors.append(f"{name}: unit term {emap.unit!r} is not the protocol unit "
-                            f"{spec_units[name]!r} (factor {factor:g})")
+            b.errors.append(
+                f"{name}: unit term {emap.unit!r} is not the protocol unit "
+                f"{spec_units[name]!r} (factor {factor:g})"
+            )
     unmapped = sorted({str(r["endpoint"]) for r in tox_records} - set(spec.endpoints))
     if unmapped:
         b.errors.append(f"endpoints without a SEND mapping: {unmapped}")
@@ -242,11 +328,19 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
         p, u = m.domain, usubjid(str(r["subject_id"]))
         fseq[(p, u)] += 1
         res = _num(v)
-        row: dict[str, Any] = {"STUDYID": sid, "DOMAIN": p, "USUBJID": u,
-                               f"{p}SEQ": fseq[(p, u)],
-                               f"{p}TESTCD": m.testcd, f"{p}TEST": m.test, f"{p}ORRES": res,
-                               f"{p}ORRESU": m.unit, f"{p}STRESC": res, f"{p}STRESN": v,
-                               f"{p}STRESU": m.unit}
+        row: dict[str, Any] = {
+            "STUDYID": sid,
+            "DOMAIN": p,
+            "USUBJID": u,
+            f"{p}SEQ": fseq[(p, u)],
+            f"{p}TESTCD": m.testcd,
+            f"{p}TEST": m.test,
+            f"{p}ORRES": res,
+            f"{p}ORRESU": m.unit,
+            f"{p}STRESC": res,
+            f"{p}STRESN": v,
+            f"{p}STRESU": m.unit,
+        }
         if p in ("BW", "LB"):
             row[f"{p}BLFL"] = "Y" if spec.baseline_timepoint == tp else None
         if p == "LB":
@@ -263,43 +357,65 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
     # ---- toxicokinetics ------------------------------------------------------------------
     if spec.pk is not None and tk_params is not None:
         pk = spec.pk
-        for code, val, what in (("C77529", pk.specimen, "specimen"),
-                                ("C85494", pk.concentration_unit, "concentration unit"),
-                                ("C85494", pk.auc_unit, "AUC unit"),
-                                ("C85494", pk.time_unit, "time unit")):
-            if (msg := term_check(code, val)):
+        for code, val, what in (
+            ("C77529", pk.specimen, "specimen"),
+            ("C85494", pk.concentration_unit, "concentration unit"),
+            ("C85494", pk.auc_unit, "AUC unit"),
+            ("C85494", pk.time_unit, "time unit"),
+        ):
+            if msg := term_check(code, val):
                 b.warnings.append(f"PK {what}: {msg}")
         cu = tk_params.concentration_unit
-        for hos_u, term in ((cu, pk.concentration_unit), (f"{cu}*h", pk.auc_unit),
-                            ("h", pk.time_unit)):
+        for hos_u, term in (
+            (cu, pk.concentration_unit),
+            (f"{cu}*h", pk.auc_unit),
+            ("h", pk.time_unit),
+        ):
             fac = _unit_factor(hos_u, term)
             if fac is not None and abs(fac - 1) > 1e-12:
                 b.errors.append(f"PK unit term {term!r} is not {hos_u!r} (factor {fac:g})")
         pc_rows: list[dict[str, Any]] = []
         pseq: dict[str, int] = defaultdict(int)
-        for r in sorted(tk_records, key=lambda r: (str(r["subject_id"]), int(r["day"]),
-                                                    float(r["nominal_time"]))):
+        for r in sorted(
+            tk_records,
+            key=lambda r: (str(r["subject_id"]), int(r["day"]), float(r["nominal_time"])),
+        ):
             u = usubjid(str(r["subject_id"]))
             pseq[u] += 1
             blq = r["blq"] == "yes"
             conc: float | None = None if blq else float(r["concentration"])
-            pc_rows.append({"STUDYID": sid, "DOMAIN": "PC", "USUBJID": u, "PCSEQ": pseq[u],
-                            "PCTESTCD": pk.analyte_testcd, "PCTEST": pk.analyte_test,
-                            "PCORRES": "BLQ" if blq else _num(conc or 0),
-                            "PCORRESU": None if blq else pk.concentration_unit,
-                            "PCSTRESC": "BLQ" if blq else _num(conc or 0), "PCSTRESN": conc,
-                            "PCSTRESU": None if blq else pk.concentration_unit,
-                            "PCSPEC": pk.specimen, "PCLLOQ": float(tk_params.lloq),
-                            "PCNOMDY": int(r["day"]),
-                            "PCELTM": f"PT{float(r['nominal_time']):g}H",
-                            "PCTPTREF": f"Day {int(r['day'])} dose", "PCRFTDTC": None})
+            pc_rows.append(
+                {
+                    "STUDYID": sid,
+                    "DOMAIN": "PC",
+                    "USUBJID": u,
+                    "PCSEQ": pseq[u],
+                    "PCTESTCD": pk.analyte_testcd,
+                    "PCTEST": pk.analyte_test,
+                    "PCORRES": "BLQ" if blq else _num(conc or 0),
+                    "PCORRESU": None if blq else pk.concentration_unit,
+                    "PCSTRESC": "BLQ" if blq else _num(conc or 0),
+                    "PCSTRESN": conc,
+                    "PCSTRESU": None if blq else pk.concentration_unit,
+                    "PCSPEC": pk.specimen,
+                    "PCLLOQ": float(tk_params.lloq),
+                    "PCNOMDY": int(r["day"]),
+                    "PCELTM": f"PT{float(r['nominal_time']):g}H",
+                    "PCTPTREF": f"Day {int(r['day'])} dose",
+                    "PCRFTDTC": None,
+                }
+            )
         b.domains["PC"] = _shape("PC", pc_rows)
         pp_rows: list[dict[str, Any]] = []
         ppseq: dict[str, int] = defaultdict(int)
         header = list((tk_individual or {}).get("columns", []))
-        wanted = (("CMAX", "Cmax", pk.concentration_unit), ("TMAX", "Tmax", pk.time_unit),
-                  ("TLST", "Tlast", pk.time_unit), ("AUCLST", "AUC(0-t)", pk.auc_unit),
-                  ("AUCTAU", "AUC(0-tau)", pk.auc_unit))
+        wanted = (
+            ("CMAX", "Cmax", pk.concentration_unit),
+            ("TMAX", "Tmax", pk.time_unit),
+            ("TLST", "Tlast", pk.time_unit),
+            ("AUCLST", "AUC(0-t)", pk.auc_unit),
+            ("AUCTAU", "AUC(0-tau)", pk.auc_unit),
+        )
         absent = [c for c in ("animal", "day", *(w[1] for w in wanted)) if c not in header]
         if absent:
             b.errors.append(f"toxicokinetic individual exposure table lacks columns {absent}")
@@ -314,34 +430,64 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
                 if not isinstance(q, Mapping):
                     b.errors.append(f"PP {code} {animal} day {day}: not a stored result")
                     continue
-                common = {"STUDYID": sid, "DOMAIN": "PP", "USUBJID": u, "PPTESTCD": code,
-                          "PPTEST": _paired_name("C85839", "C85493", code),
-                          "PPCAT": pk.analyte_test, "PPSPEC": pk.specimen, "PPNOMDY": day,
-                          "PPTPTREF": f"Day {day} dose", "PPRFTDTC": None}
+                common = {
+                    "STUDYID": sid,
+                    "DOMAIN": "PP",
+                    "USUBJID": u,
+                    "PPTESTCD": code,
+                    "PPTEST": _paired_name("C85839", "C85493", code),
+                    "PPCAT": pk.analyte_test,
+                    "PPSPEC": pk.specimen,
+                    "PPNOMDY": day,
+                    "PPTPTREF": f"Day {day} dose",
+                    "PPRFTDTC": None,
+                }
                 b.origins[f"PP.{code}"] = "Derived"
                 if not q.get("available"):
                     # SENDIG v3.1.1 PP: --STAT "NOT DONE" (C66789) with --REASND; the reason
                     # is the one the NCA recorded.
                     why = str((q.get("provenance") or {}).get("reason") or "")
                     if not why or len(why) > 200:
-                        b.errors.append(f"PP {code} {animal} day {day}: not estimable, and the "
-                                        "reason is missing or longer than 200 characters")
+                        b.errors.append(
+                            f"PP {code} {animal} day {day}: not estimable, and the "
+                            "reason is missing or longer than 200 characters"
+                        )
                         continue
                     ppseq[u] += 1
-                    pp_rows.append({**common, "PPSEQ": ppseq[u], "PPORRES": None,
-                                    "PPORRESU": None, "PPSTRESC": None, "PPSTRESN": None,
-                                    "PPSTRESU": None, "PPSTAT": "NOT DONE", "PPREASND": why})
+                    pp_rows.append(
+                        {
+                            **common,
+                            "PPSEQ": ppseq[u],
+                            "PPORRES": None,
+                            "PPORRESU": None,
+                            "PPSTRESC": None,
+                            "PPSTRESN": None,
+                            "PPSTRESU": None,
+                            "PPSTAT": "NOT DONE",
+                            "PPREASND": why,
+                        }
+                    )
                     continue
                 fac = _unit_factor(str(q.get("unit")), unit)
                 if fac is not None and abs(fac - 1) > 1e-12:
-                    b.errors.append(f"PP {code} {animal} day {day}: result unit "
-                                    f"{q.get('unit')!r} is not {unit!r} (factor {fac:g})")
+                    b.errors.append(
+                        f"PP {code} {animal} day {day}: result unit "
+                        f"{q.get('unit')!r} is not {unit!r} (factor {fac:g})"
+                    )
                     continue
                 ppseq[u] += 1
                 ppval = float(q["value"])
-                pp_rows.append({**common, "PPSEQ": ppseq[u], "PPORRES": _num(ppval),
-                                "PPORRESU": unit, "PPSTRESC": _num(ppval), "PPSTRESN": ppval,
-                                "PPSTRESU": unit})
+                pp_rows.append(
+                    {
+                        **common,
+                        "PPSEQ": ppseq[u],
+                        "PPORRES": _num(ppval),
+                        "PPORRESU": unit,
+                        "PPSTRESC": _num(ppval),
+                        "PPSTRESN": ppval,
+                        "PPSTRESU": unit,
+                    }
+                )
         b.domains["PP"] = _shape("PP", pp_rows)
 
     # ---- trial summary (parameters named in TS_DERIVED come from the record and facts) ---
@@ -349,17 +495,37 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
     sexpop = "BOTH" if len(sexes) == 2 else sexes[0] if sexes else None
     planned = sum(s["n"] * (len(s.get("sexes", ["M", "F"]))) for s in sets)
     ts: dict[str, str | None] = {
-        "SSPONSOR": f.sponsor, "STITLE": f.study_title, "SPREFID": f.test_facility_study_id,
-        "TSTFNAM": f.test_facility, "TSTFLOC": f.test_facility_location,
-        "TFCNTRY": f.test_facility_country, "SSTYP": f.study_type, "STCAT": f.study_category,
-        "SDESIGN": f.design, "STRPSTAT": f.report_status, "GLPFL": "Y" if glp else "N",
-        "SPECIES": f.species, "STRAIN": f.strain, "AGEU": f.age_unit, "ROUTE": f.route,
-        "TRT": f.test_article, "TRTV": f.vehicle, "SEXPOP": sexpop, "SPLANSUB": str(planned),
-        "DOSSTDTC": f.dosing_start, "DOSENDTC": f.dosing_end, "EXPSTDTC": f.experimental_start,
-        "EXPENDTC": f.experimental_end, "DOSDUR": f.dosing_duration,
-        "TRMSAC": f.terminal_sacrifice, "STSTDTC": study_start, "STDIR": study_director,
+        "SSPONSOR": f.sponsor,
+        "STITLE": f.study_title,
+        "SPREFID": f.test_facility_study_id,
+        "TSTFNAM": f.test_facility,
+        "TSTFLOC": f.test_facility_location,
+        "TFCNTRY": f.test_facility_country,
+        "SSTYP": f.study_type,
+        "STCAT": f.study_category,
+        "SDESIGN": f.design,
+        "STRPSTAT": f.report_status,
+        "GLPFL": "Y" if glp else "N",
+        "SPECIES": f.species,
+        "STRAIN": f.strain,
+        "AGEU": f.age_unit,
+        "ROUTE": f.route,
+        "TRT": f.test_article,
+        "TRTV": f.vehicle,
+        "SEXPOP": sexpop,
+        "SPLANSUB": str(planned),
+        "DOSSTDTC": f.dosing_start,
+        "DOSENDTC": f.dosing_end,
+        "EXPSTDTC": f.experimental_start,
+        "EXPENDTC": f.experimental_end,
+        "DOSDUR": f.dosing_duration,
+        "TRMSAC": f.terminal_sacrifice,
+        "STSTDTC": study_start,
+        "STDIR": study_director,
         "SNDIGVER": "SEND IMPLEMENTATION GUIDE VERSION 3.1.1",
-        "SNDCTVER": f"SEND Terminology {CT_VERSION}", "PDOSFRQ": f.dosing_frequency}
+        "SNDCTVER": f"SEND Terminology {CT_VERSION}",
+        "PDOSFRQ": f.dosing_frequency,
+    }
     if glp:
         ts["GLPTYP"] = f.glp_type
     if f.age is not None:
@@ -370,16 +536,22 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
         ts["RECSAC"] = f.recovery_sacrifice
     fixed = sorted(set(f.values) & set(ts))
     if fixed:
-        b.errors.append(f"TS parameters {fixed} come from the study record and the export "
-                        "facts; they cannot be entered as free values")
+        b.errors.append(
+            f"TS parameters {fixed} come from the study record and the export "
+            "facts; they cannot be entered as free values"
+        )
     valued = sorted(c for c in f.null_values if ts.get(c) is not None)
     if valued:
-        b.errors.append(f"TS parameters {valued} have a value; a null flavor is for a value "
-                        "that cannot be given")
+        b.errors.append(
+            f"TS parameters {valued} have a value; a null flavor is for a value "
+            "that cannot be given"
+        )
     ts.update({c: v for c, v in f.values.items() if c not in ts})
     if study_start is None:
-        b.errors.append("no Study Director protocol signature: STSTDTC is the date the Study "
-                        "Director signs the protocol (TCG v6.3 4.1.3)")
+        b.errors.append(
+            "no Study Director protocol signature: STSTDTC is the date the Study "
+            "Director signs the protocol (TCG v6.3 4.1.3)"
+        )
     ts_rows = []
     for code in sorted(set(ts) | set(f.null_values)):
         if term_check("C90009", code):
@@ -388,15 +560,29 @@ def build_domains(*, spec: SendExportSpec, tox_params: Any, tox_records: Sequenc
         nf = f.null_values.get(code)
         if tsval is None and nf is None:
             continue
-        if tsval is not None and code in TS_CODELISTS and (
-                msg := term_check(TS_CODELISTS[code], tsval)):
+        if (
+            tsval is not None
+            and code in TS_CODELISTS
+            and (msg := term_check(TS_CODELISTS[code], tsval))
+        ):
             (b.errors if "non-extensible" in msg else b.warnings).append(f"TS {code}: {msg}")
-        ts_rows.append({"STUDYID": sid, "DOMAIN": "TS", "TSSEQ": 1, "TSGRPID": None,
-                        "TSPARMCD": code, "TSPARM": _paired_name("C90009", "C90007", code) or code,
-                        "TSVAL": tsval, "TSVALNF": nf.flavor if nf and tsval is None else None})
+        ts_rows.append(
+            {
+                "STUDYID": sid,
+                "DOMAIN": "TS",
+                "TSSEQ": 1,
+                "TSGRPID": None,
+                "TSPARMCD": code,
+                "TSPARM": _paired_name("C90009", "C90007", code) or code,
+                "TSVAL": tsval,
+                "TSVALNF": nf.flavor if nf and tsval is None else None,
+            }
+        )
     absent = [c for c in TS_FDA_DESIRED if ts.get(c) is None and c not in f.null_values]
     if absent:
-        b.errors.append("FDA-desired TS parameters with neither a value nor a null flavor "
-                        f"(TCG v6.3 Appendix C): {absent}")
+        b.errors.append(
+            "FDA-desired TS parameters with neither a value nor a null flavor "
+            f"(TCG v6.3 Appendix C): {absent}"
+        )
     b.domains = {"TS": _shape("TS", ts_rows), **b.domains}
     return b

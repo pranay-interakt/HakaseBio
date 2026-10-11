@@ -41,9 +41,9 @@ class Database:
             kwargs["connect_args"] = {"check_same_thread": False}
         # statement parameters (password and token hashes among them) stay out of error
         # messages and logs (docs/15 P2.7)
-        self.engine: Engine = create_engine(self.url, future=True, hide_parameters=True,
-                                            **kwargs)
+        self.engine: Engine = create_engine(self.url, future=True, hide_parameters=True, **kwargs)
         if self.url.startswith("sqlite"):
+
             @event.listens_for(self.engine, "connect")
             def _pragmas(dbapi_conn: Any, _: Any) -> None:  # pragma: no cover - driver hook
                 cur = dbapi_conn.cursor()
@@ -52,6 +52,7 @@ class Database:
                 # wait this long for another writer (process) to finish
                 cur.execute(f"PRAGMA busy_timeout={int(self.write_wait_seconds * 1000)}")
                 cur.close()
+
         self._factory = sessionmaker(self.engine, expire_on_commit=False, future=True)
 
         @event.listens_for(self._factory, "before_flush")
@@ -78,8 +79,10 @@ class Database:
 
         current, head = current_revision(self.engine), head_revision()
         if current != head:
-            raise RuntimeError(f"the database schema is at {current or 'nothing'}, this release "
-                               f"needs {head}: run `hos-db upgrade`")
+            raise RuntimeError(
+                f"the database schema is at {current or 'nothing'}, this release "
+                f"needs {head}: run `hos-db upgrade`"
+            )
         return head
 
     @contextmanager
@@ -169,8 +172,9 @@ class Database:
             s.execute(text(f"SET LOCAL lock_timeout = '{int(self.write_wait_seconds * 1000)}ms'"))
         done = s.execute(text("UPDATE writer_lock SET writes = writes + 1 WHERE id = 1"))
         if getattr(done, "rowcount", 0) != 1:
-            raise RuntimeError("the writer_lock row is missing: the database was changed "
-                               "outside its migrations")
+            raise RuntimeError(
+                "the writer_lock row is missing: the database was changed outside its migrations"
+            )
 
 
 class CommitThenRaise(Exception):
@@ -190,7 +194,7 @@ class FileStore:
     """
 
     def __init__(self, root: Path | None = None) -> None:
-        self.root = (root or default_data_dir() / "objects")
+        self.root = root or default_data_dir() / "objects"
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, sha: str) -> Path:
@@ -226,10 +230,19 @@ class SqlLedgerBackend:
     @staticmethod
     def _to_entry(r: LedgerRow) -> LedgerEntry:
         return LedgerEntry(
-            seq=r.seq, recorded_at=r.recorded_at, actor_id=r.actor_id, actor_kind=r.actor_kind,
-            action=r.action, subject_type=r.subject_type, subject_id=r.subject_id,
-            payload=r.payload, payload_sha256=r.payload_sha256, prev_hash=r.prev_hash,
-            entry_hash=r.entry_hash, reason=r.reason, scheme=r.scheme or 1,
+            seq=r.seq,
+            recorded_at=r.recorded_at,
+            actor_id=r.actor_id,
+            actor_kind=r.actor_kind,
+            action=r.action,
+            subject_type=r.subject_type,
+            subject_id=r.subject_id,
+            payload=r.payload,
+            payload_sha256=r.payload_sha256,
+            prev_hash=r.prev_hash,
+            entry_hash=r.entry_hash,
+            reason=r.reason,
+            scheme=r.scheme or 1,
         )
 
     def append(self, entry: LedgerEntry) -> None:
@@ -237,18 +250,29 @@ class SqlLedgerBackend:
             # outside a unit of work the sequence number could be taken twice (docs/15 P2.6)
             raise RuntimeError("ledger entries are written only inside Database.transaction()")
         with self.db.session() as s:
-            s.add(LedgerRow(
-                seq=entry.seq, recorded_at=entry.recorded_at, actor_id=entry.actor_id,
-                actor_kind=entry.actor_kind, action=entry.action,
-                subject_type=entry.subject_type, subject_id=entry.subject_id,
-                payload=entry.payload, payload_sha256=entry.payload_sha256,
-                prev_hash=entry.prev_hash, entry_hash=entry.entry_hash, reason=entry.reason,
-                scheme=entry.scheme,
-            ))
+            s.add(
+                LedgerRow(
+                    seq=entry.seq,
+                    recorded_at=entry.recorded_at,
+                    actor_id=entry.actor_id,
+                    actor_kind=entry.actor_kind,
+                    action=entry.action,
+                    subject_type=entry.subject_type,
+                    subject_id=entry.subject_id,
+                    payload=entry.payload,
+                    payload_sha256=entry.payload_sha256,
+                    prev_hash=entry.prev_hash,
+                    entry_hash=entry.entry_hash,
+                    reason=entry.reason,
+                    scheme=entry.scheme,
+                )
+            )
 
     def last(self) -> LedgerEntry | None:
         with self.db.session() as s:
-            r = s.execute(select(LedgerRow).order_by(LedgerRow.seq.desc()).limit(1)).scalar_one_or_none()
+            r = s.execute(
+                select(LedgerRow).order_by(LedgerRow.seq.desc()).limit(1)
+            ).scalar_one_or_none()
             return self._to_entry(r) if r else None
 
     def iter_all(self) -> Iterator[LedgerEntry]:
@@ -256,8 +280,9 @@ class SqlLedgerBackend:
             rows = s.execute(select(LedgerRow).order_by(LedgerRow.seq)).scalars().all()
             return iter([self._to_entry(r) for r in rows])
 
-    def subject_page(self, subject_id: str, limit: int,
-                     offset: int) -> tuple[list[LedgerEntry], int]:
+    def subject_page(
+        self, subject_id: str, limit: int, offset: int
+    ) -> tuple[list[LedgerEntry], int]:
         q = select(LedgerRow).where(LedgerRow.subject_id == subject_id)
         with self.db.session() as s:
             total = s.execute(select(func.count()).select_from(q.subquery())).scalar_one()
@@ -266,7 +291,13 @@ class SqlLedgerBackend:
 
     def for_subject(self, subject_id: str) -> list[LedgerEntry]:
         with self.db.session() as s:
-            rows = s.execute(
-                select(LedgerRow).where(LedgerRow.subject_id == subject_id).order_by(LedgerRow.seq)
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(LedgerRow)
+                    .where(LedgerRow.subject_id == subject_id)
+                    .order_by(LedgerRow.seq)
+                )
+                .scalars()
+                .all()
+            )
             return [self._to_entry(r) for r in rows]

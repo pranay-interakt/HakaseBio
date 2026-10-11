@@ -15,8 +15,11 @@ UNKNOWN = "AAAAAAAAAAAAAA-UHFFFAOYSA-N"
 
 
 def _http(tmp_path=None, transport=None, retries=2):
-    return CachedHttp(client=httpx.Client(transport=transport or replay_transport()),
-                      cache_dir=tmp_path, retries=retries)
+    return CachedHttp(
+        client=httpx.Client(transport=transport or replay_transport()),
+        cache_dir=tmp_path,
+        retries=retries,
+    )
 
 
 def test_pubchem_aspirin_properties_and_provenance():
@@ -63,9 +66,10 @@ def test_chembl_censored_values_are_never_flattened():
 def test_unreachable_source_is_honest():
     def boom(request):
         raise httpx.ConnectError("network down", request=request)
+
     r = PubChemClient(_http(transport=httpx.MockTransport(boom))).compound_by_inchikey(ASPIRIN)
     assert r.status is SourceStatus.UNREACHABLE and not r.quantities
-    assert r.error == "request failed (ConnectError)"      # no raw network text to clients
+    assert r.error == "request failed (ConnectError)"  # no raw network text to clients
 
 
 def test_rate_limit_is_reported_not_retried_forever():
@@ -74,8 +78,10 @@ def test_rate_limit_is_reported_not_retried_forever():
     def limited(request):
         calls.append(1)
         return httpx.Response(429, json={"error": "slow down"})
-    r = ChEMBLClient(_http(transport=httpx.MockTransport(limited), retries=0)) \
-        .molecule_by_inchikey(ASPIRIN)
+
+    r = ChEMBLClient(_http(transport=httpx.MockTransport(limited), retries=0)).molecule_by_inchikey(
+        ASPIRIN
+    )
     assert r.status is SourceStatus.RATE_LIMITED and len(calls) == 1
 
 
@@ -91,6 +97,7 @@ def test_fixtures_carry_capture_metadata():
     import json
 
     from tests.fixtures.transport import FIXTURE_DIR
+
     for f in FIXTURE_DIR.glob("*.json"):
         d = json.loads(f.read_text())
         assert d["url"].startswith("https://") and d["captured_at"] and d["body_sha256"]
@@ -111,12 +118,27 @@ def test_enrichment_attaches_results_through_the_ledger(tmp_path):
     from hos.db.store import Database, FileStore
     from hos.kernel.attestation import PrincipalKind, Role
     from hos.kernel.kernel import Kernel
+
     k = Kernel(db=Database(f"sqlite:///{tmp_path / 'e.sqlite3'}"), files=FileStore(tmp_path / "o"))
-    a = k.register_principal(None, principal_id="a", name="A", kind=PrincipalKind.HUMAN,
-                             roles=[Role.ADMIN, Role.SCIENTIST], password="x" * 12)
-    prog = k.create_program(a, name="P", context=ProgramContext(
-        modality=Modality.SMALL_MOLECULE, indication=Indication.ACUTE_NON_ONCOLOGY,
-        route=Route.ORAL, intended_clinical_duration_days=7, max_trial_duration_days=7))
+    a = k.register_principal(
+        None,
+        principal_id="a",
+        name="A",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.ADMIN, Role.SCIENTIST],
+        password="x" * 12,
+    )
+    prog = k.create_program(
+        a,
+        name="P",
+        context=ProgramContext(
+            modality=Modality.SMALL_MOLECULE,
+            indication=Indication.ACUTE_NON_ONCOLOGY,
+            route=Route.ORAL,
+            intended_clinical_duration_days=7,
+            max_trial_duration_days=7,
+        ),
+    )
     c = k.register_compound(a, prog["id"], name="aspirin", smiles="CC(=O)Oc1ccccc1C(=O)O")
     http = _http()
     v = enrich_compound(k, a, c["id"], pubchem=PubChemClient(http), chembl=ChEMBLClient(http))

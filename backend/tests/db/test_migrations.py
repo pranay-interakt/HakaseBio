@@ -20,8 +20,8 @@ def _url(tmp_path, name="m.sqlite3"):
 def test_upgrading_an_empty_database_yields_exactly_the_models(tmp_path):
     db = Database(_url(tmp_path))
     assert db.upgrade() == (None, head_revision())
-    assert schema_drift(db.engine) == []       # a model change without its revision fails
-    assert db.upgrade() == (head_revision(), head_revision())          # idempotent
+    assert schema_drift(db.engine) == []  # a model change without its revision fails
+    assert db.upgrade() == (head_revision(), head_revision())  # idempotent
 
 
 def test_a_model_change_without_a_revision_is_drift(tmp_path):
@@ -77,16 +77,26 @@ def test_an_upgrade_of_a_database_holding_records_is_ledgered(tmp_path):
     from alembic import command
 
     from hos.db.migrate import _config
+
     url = _url(tmp_path)
     k = Kernel(db=Database(url), files=FileStore(tmp_path / "o"))
-    k.register_principal(None, principal_id="admin", name="A", kind=PrincipalKind.HUMAN,
-                         roles=[Role.ADMIN], password=PW)
-    with k.db.engine.begin() as conn:            # the database as the previous release left it
+    k.register_principal(
+        None,
+        principal_id="admin",
+        name="A",
+        kind=PrincipalKind.HUMAN,
+        roles=[Role.ADMIN],
+        password=PW,
+    )
+    with k.db.engine.begin() as conn:  # the database as the previous release left it
         command.downgrade(_config(conn), "0001")
     k2 = Kernel(db=Database(url), files=FileStore(tmp_path / "o"))
     last = k2.ledger.last()
     assert (last.action, last.actor_id, last.payload) == (
-        "system.schema_upgraded", "system", {"from": "0001", "to": head_revision()})
+        "system.schema_upgraded",
+        "system",
+        {"from": "0001", "to": head_revision()},
+    )
     assert k2.integrity()["valid"]
     assert Kernel(db=Database(url), files=FileStore(tmp_path / "o")).ledger.last() == last
 

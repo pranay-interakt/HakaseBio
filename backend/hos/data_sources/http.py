@@ -34,11 +34,17 @@ _MIN_INTERVAL_S = {"pubchem.ncbi.nlm.nih.gov": 0.25, "www.ebi.ac.uk": 0.25}
 
 
 class CachedHttp:
-    def __init__(self, client: httpx.Client | None = None, cache_dir: Path | None = None,
-                 ttl: timedelta = timedelta(days=30), retries: int = 2,
-                 timeout_s: float = 30.0) -> None:
-        self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT},
-                                             timeout=timeout_s, follow_redirects=True)
+    def __init__(
+        self,
+        client: httpx.Client | None = None,
+        cache_dir: Path | None = None,
+        ttl: timedelta = timedelta(days=30),
+        retries: int = 2,
+        timeout_s: float = 30.0,
+    ) -> None:
+        self.client = client or httpx.Client(
+            headers={"User-Agent": USER_AGENT}, timeout=timeout_s, follow_redirects=True
+        )
         self.cache_dir = cache_dir
         if cache_dir is not None:
             cache_dir.mkdir(parents=True, exist_ok=True)
@@ -61,15 +67,21 @@ class CachedHttp:
                 time.sleep(wait)
             self._last[host] = time.monotonic()
 
-    def get_json(self, url: str, *, refresh: bool = False
-                 ) -> tuple[SourceStatus, Any | None, str | None, bool, str | None]:
+    def get_json(
+        self, url: str, *, refresh: bool = False
+    ) -> tuple[SourceStatus, Any | None, str | None, bool, str | None]:
         path = self._cache_path(url)
         if path is not None and path.exists() and not refresh:
             entry = json.loads(path.read_text())
             fetched = datetime.fromisoformat(entry["retrieved_at"])
             if utc_now() - fetched <= self.ttl:
-                return (SourceStatus(entry["status"]), entry.get("payload"),
-                        entry["retrieved_at"], True, entry.get("error"))
+                return (
+                    SourceStatus(entry["status"]),
+                    entry.get("payload"),
+                    entry["retrieved_at"],
+                    True,
+                    entry.get("error"),
+                )
         status, payload, err = SourceStatus.ERROR, None, None
         for attempt in range(self.retries + 1):
             self._throttle(url)
@@ -91,17 +103,28 @@ class CachedHttp:
                 status, err = SourceStatus.NOT_FOUND, _fault(r)
                 break
             if r.status_code in (429, 503) and attempt < self.retries:
-                delay = _retry_after(r) or 2.0 ** attempt
+                delay = _retry_after(r) or 2.0**attempt
                 time.sleep(min(delay, 10.0))
                 continue
-            status = SourceStatus.RATE_LIMITED if r.status_code in (429, 503) else SourceStatus.ERROR
+            status = (
+                SourceStatus.RATE_LIMITED if r.status_code in (429, 503) else SourceStatus.ERROR
+            )
             err = f"HTTP {r.status_code}: {_fault(r)}"
             break
         retrieved = utc_now().isoformat()
         # cache definitive answers only; transient failures are retried next time
         if path is not None and status in (SourceStatus.OK, SourceStatus.NOT_FOUND):
-            path.write_text(json.dumps({"url": url, "status": status.value, "payload": payload,
-                                        "retrieved_at": retrieved, "error": err}))
+            path.write_text(
+                json.dumps(
+                    {
+                        "url": url,
+                        "status": status.value,
+                        "payload": payload,
+                        "retrieved_at": retrieved,
+                        "error": err,
+                    }
+                )
+            )
         return status, payload, retrieved, False, err
 
 

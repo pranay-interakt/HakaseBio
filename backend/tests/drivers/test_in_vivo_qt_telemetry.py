@@ -17,23 +17,49 @@ D = InVivoQTTelemetryDriver()
 COMPOUND = CompoundInfo(id="cmp-1", name="Test compound", smiles="CC(=O)Nc1ccc(O)cc1")
 TIMES = [1, 2, 4, 8]
 PARAMS = dict(
-    glp=True, species="dog", strain="beagle", sexes=["M"], animals=4,
-    design="latin_square_crossover", washout="7 days (> 5 half-lives)", route="oral capsule",
-    vehicle="empty capsule", dose_levels_mg_per_kg=[3, 10, 30], dose_selection_basis="covers "
-    "1-10x the high clinical Cmax", positive_control=None, positive_control_basis="moxifloxacin "
-    "historical data, same protocol (HCD 2024)", telemetry_system="DSI implant, Ponemah 6",
-    interval_bin="15-min means", baseline="time_matched", post_dose_times_h=TIMES,
-    qt_correction="individual", rr_reference_ms=600, correction_justification="drug lowers "
-    "heart rate in the DRF; individual correction per E14/S7B Q&A 3.3", blood_pressure=True,
-    measure_pr_qrs=False, concentration_unit="ng/mL", minimum_detectable_difference_ms=8,
-    sensitivity_basis="HCD 2024 by-time MDD, same protocol")
-SIM = dict(animals=[{"qt_intercept_ms": 150, "qt_rr_slope": 0.15},
-                    {"qt_intercept_ms": 160, "qt_rr_slope": 0.13},
-                    {"qt_intercept_ms": 145, "qt_rr_slope": 0.16},
-                    {"qt_intercept_ms": 155, "qt_rr_slope": 0.14}],
-           rr_mean_ms=600, rr_sd_ms=0, qt_noise_sd_ms=0, rr_change_by_dose_ms=[0, 30, 80],
-           qtc_change_by_dose_ms=[0, 4, 12], bp_change_by_dose_mmhg=[0, 0, -8],
-           cmax_by_dose=[200, 700, 2100], pk_sample_time_h=2)
+    glp=True,
+    species="dog",
+    strain="beagle",
+    sexes=["M"],
+    animals=4,
+    design="latin_square_crossover",
+    washout="7 days (> 5 half-lives)",
+    route="oral capsule",
+    vehicle="empty capsule",
+    dose_levels_mg_per_kg=[3, 10, 30],
+    dose_selection_basis="covers 1-10x the high clinical Cmax",
+    positive_control=None,
+    positive_control_basis="moxifloxacin historical data, same protocol (HCD 2024)",
+    telemetry_system="DSI implant, Ponemah 6",
+    interval_bin="15-min means",
+    baseline="time_matched",
+    post_dose_times_h=TIMES,
+    qt_correction="individual",
+    rr_reference_ms=600,
+    correction_justification="drug lowers "
+    "heart rate in the DRF; individual correction per E14/S7B Q&A 3.3",
+    blood_pressure=True,
+    measure_pr_qrs=False,
+    concentration_unit="ng/mL",
+    minimum_detectable_difference_ms=8,
+    sensitivity_basis="HCD 2024 by-time MDD, same protocol",
+)
+SIM = dict(
+    animals=[
+        {"qt_intercept_ms": 150, "qt_rr_slope": 0.15},
+        {"qt_intercept_ms": 160, "qt_rr_slope": 0.13},
+        {"qt_intercept_ms": 145, "qt_rr_slope": 0.16},
+        {"qt_intercept_ms": 155, "qt_rr_slope": 0.14},
+    ],
+    rr_mean_ms=600,
+    rr_sd_ms=0,
+    qt_noise_sd_ms=0,
+    rr_change_by_dose_ms=[0, 30, 80],
+    qtc_change_by_dose_ms=[0, 4, 12],
+    bp_change_by_dose_mmhg=[0, 0, -8],
+    cmax_by_dose=[200, 700, 2100],
+    pk_sample_time_h=2,
+)
 
 
 def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1", rr_sd=None):
@@ -54,8 +80,10 @@ def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1", rr_sd=None
         rows = edit(rows)
     t = D.data_template(p)
     buf = io.StringIO()
-    buf.write(f"# laboratory: CV Lab\n# analyst: C. Vasc\n# run_date: 2026-09-30\n"
-              f"# study_reference: {ref}\n")
+    buf.write(
+        f"# laboratory: CV Lab\n# analyst: C. Vasc\n# run_date: 2026-09-30\n"
+        f"# study_reference: {ref}\n"
+    )
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(t.header())
     for r in rows:
@@ -70,8 +98,13 @@ def _run(raw=None, params=PARAMS, inputs=None):
 
 def test_conformance_kit_passes():
     sim = dict(SIM, rr_sd_ms=40, qt_noise_sd_ms=3)
-    rep = check_driver(D, compound=COMPOUND, parameters=PARAMS, simulation_parameters=sim,
-                       measured_example=_file(rr_sd=40))
+    rep = check_driver(
+        D,
+        compound=COMPOUND,
+        parameters=PARAMS,
+        simulation_parameters=sim,
+        measured_example=_file(rr_sd=40),
+    )
     assert rep.passed, rep.summary()
 
 
@@ -117,16 +150,20 @@ def test_missing_pk_sample_on_pd_day_is_flagged():
             if r["animal_id"] == "A01" and r["dose"] == 10:
                 r["plasma_concentration"] = None
         return rows
+
     res, _ = _run(_file(edit=drop, rr_sd=40))
     assert any(f.code == "pk.10 mg/kg" and "Q&A 3.2" in f.message for f in res.qc.findings)
 
 
-@pytest.mark.parametrize("change,needle", [
-    (dict(rr_reference_ms=None), "reference RR"),
-    (dict(positive_control_basis=None), "positive control"),
-    (dict(sensitivity_basis=None), "minimum detectable difference"),
-    (dict(species="rat"), "species"),
-])
+@pytest.mark.parametrize(
+    "change,needle",
+    [
+        (dict(rr_reference_ms=None), "reference RR"),
+        (dict(positive_control_basis=None), "positive control"),
+        (dict(sensitivity_basis=None), "minimum detectable difference"),
+        (dict(species="rat"), "species"),
+    ],
+)
 def test_design_rules(change, needle):
     with pytest.raises(ValidationError, match=needle):
         D.validate_parameters(dict(PARAMS, **change))
@@ -135,14 +172,19 @@ def test_design_rules(change, needle):
 def test_crossover_needs_every_treatment_per_animal():
     def drop(rows):
         return [r for r in rows if not (r["animal_id"] == "A02" and r["dose"] == 30)]
+
     with pytest.raises(IngestError, match="crossover needs every treatment"):
         D.ingest(_file(edit=drop, rr_sd=40), D.validate_parameters(PARAMS))
 
 
 def test_covers_cardiovascular_part_only_with_blood_pressure():
-    ctx = ProgramContext(modality=Modality.SMALL_MOLECULE,
-                         indication=Indication.CHRONIC_NON_ONCOLOGY, route=Route.ORAL,
-                         intended_clinical_duration_days=365, max_trial_duration_days=28)
+    ctx = ProgramContext(
+        modality=Modality.SMALL_MOLECULE,
+        indication=Indication.CHRONIC_NON_ONCOLOGY,
+        route=Route.ORAL,
+        intended_clinical_duration_days=365,
+        max_trial_duration_days=28,
+    )
     req = next(r for r in derive_study_set(ctx).requirements if r.id == "safety.core_battery")
     assert D.probe(req, ctx).supported
     with_bp = D.validate_parameters(PARAMS)

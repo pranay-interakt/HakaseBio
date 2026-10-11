@@ -31,14 +31,27 @@ from typing import Literal
 import numpy as np
 from scipy import stats
 
-__all__ = ["Correction", "RRIndependence", "TSummary", "correct_qt", "individual_slope",
-           "rr_independence", "t_summary"]
+__all__ = [
+    "Correction",
+    "RRIndependence",
+    "TSummary",
+    "correct_qt",
+    "individual_slope",
+    "rr_independence",
+    "t_summary",
+]
 
 Correction = Literal["individual", "fridericia", "bazett", "van_de_water"]
 
 
-def correct_qt(qt_ms: float, rr_ms: float, method: Correction, *, slope: float | None = None,
-               rr_ref_ms: float | None = None) -> float:
+def correct_qt(
+    qt_ms: float,
+    rr_ms: float,
+    method: Correction,
+    *,
+    slope: float | None = None,
+    rr_ref_ms: float | None = None,
+) -> float:
     """QTc in ms."""
     if qt_ms <= 0 or rr_ms <= 0:
         raise ValueError("QT and RR must be positive")
@@ -64,7 +77,7 @@ def individual_slope(qt_ms: Sequence[float], rr_ms: Sequence[float]) -> float:
 @dataclass(frozen=True, slots=True)
 class RRIndependence:
     n_pairs: int
-    slope: float          # ms QTc per ms RR
+    slope: float  # ms QTc per ms RR
     slope_ci: tuple[float, float]
     r: float
     p_value: float
@@ -77,9 +90,13 @@ def rr_independence(qtc_ms: Sequence[float], rr_ms: Sequence[float]) -> RRIndepe
         raise ValueError("at least 3 matched QTc-RR pairs are needed")
     res = stats.linregress(x, y)
     t = float(stats.t.ppf(0.975, len(x) - 2))
-    return RRIndependence(len(x), float(res.slope),
-                          (float(res.slope - t * res.stderr), float(res.slope + t * res.stderr)),
-                          float(res.rvalue), float(res.pvalue))
+    return RRIndependence(
+        len(x),
+        float(res.slope),
+        (float(res.slope - t * res.stderr), float(res.slope + t * res.stderr)),
+        float(res.rvalue),
+        float(res.pvalue),
+    )
 
 
 @dataclass(frozen=True, slots=True)

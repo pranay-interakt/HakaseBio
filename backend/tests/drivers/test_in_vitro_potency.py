@@ -20,23 +20,56 @@ D = InVitroPotencyDriver()
 COMPOUND = CompoundInfo(id="cmp-1", name="Test compound", smiles="CC(=O)Nc1ccc(O)cc1")
 CONCS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30]
 PARAMS = dict(
-    glp=False, concentration_unit="uM", min_r2=0.9, fit_acceptance_basis="assay SOP PH-4",
+    glp=False,
+    concentration_unit="uM",
+    min_r2=0.9,
+    fit_acceptance_basis="assay SOP PH-4",
     assays=[
-        dict(assay_id="KIN1", target="kinase X (human)", role="primary", assay_format="enzyme "
-             "activity", species="human", conditions="ATP at Km (10 uM), 60 min",
-             readout="percent_inhibition", asymptotes="fixed_0_100", concentrations=CONCS,
-             replicates=2, reference=dict(name="staurosporine", acceptance_low=0.001,
-                                          acceptance_high=0.01, basis="lab historical range")),
-        dict(assay_id="KIN2", target="kinase Y (human)", role="off_target",
-             assay_format="enzyme activity", species="human", conditions="ATP at Km (25 uM), "
-             "60 min", readout="percent_inhibition", asymptotes="fixed_0_100",
-             concentrations=CONCS, replicates=2)])
-SIM = dict(curves=[{"assay_id": "KIN1", "compound": "TEST", "ic50": 0.05, "hill": 1.0,
-                    "noise_sd": 0.0},
-                   {"assay_id": "KIN1", "compound": "staurosporine", "ic50": 0.004, "hill": 1.0,
-                    "noise_sd": 0.0},
-                   {"assay_id": "KIN2", "compound": "TEST", "ic50": 2.0, "hill": 1.2,
-                    "noise_sd": 0.0}])
+        dict(
+            assay_id="KIN1",
+            target="kinase X (human)",
+            role="primary",
+            assay_format="enzyme activity",
+            species="human",
+            conditions="ATP at Km (10 uM), 60 min",
+            readout="percent_inhibition",
+            asymptotes="fixed_0_100",
+            concentrations=CONCS,
+            replicates=2,
+            reference=dict(
+                name="staurosporine",
+                acceptance_low=0.001,
+                acceptance_high=0.01,
+                basis="lab historical range",
+            ),
+        ),
+        dict(
+            assay_id="KIN2",
+            target="kinase Y (human)",
+            role="off_target",
+            assay_format="enzyme activity",
+            species="human",
+            conditions="ATP at Km (25 uM), 60 min",
+            readout="percent_inhibition",
+            asymptotes="fixed_0_100",
+            concentrations=CONCS,
+            replicates=2,
+        ),
+    ],
+)
+SIM = dict(
+    curves=[
+        {"assay_id": "KIN1", "compound": "TEST", "ic50": 0.05, "hill": 1.0, "noise_sd": 0.0},
+        {
+            "assay_id": "KIN1",
+            "compound": "staurosporine",
+            "ic50": 0.004,
+            "hill": 1.0,
+            "noise_sd": 0.0,
+        },
+        {"assay_id": "KIN2", "compound": "TEST", "ic50": 2.0, "hill": 1.2, "noise_sd": 0.0},
+    ]
+)
 
 
 def _file(params=PARAMS, sim=SIM, ref="HOS-CONFORMANCE-1"):
@@ -46,8 +79,10 @@ def _file(params=PARAMS, sim=SIM, ref="HOS-CONFORMANCE-1"):
     rows, _ = D._simulate_rows(p, COMPOUND, s, np.random.default_rng(0))
     t = D.data_template(p)
     buf = io.StringIO()
-    buf.write(f"# laboratory: Pharm Lab\n# analyst: P. Pharm\n# run_date: 2026-09-30\n"
-              f"# study_reference: {ref}\n")
+    buf.write(
+        f"# laboratory: Pharm Lab\n# analyst: P. Pharm\n# run_date: 2026-09-30\n"
+        f"# study_reference: {ref}\n"
+    )
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(t.header())
     for r in rows:
@@ -61,14 +96,20 @@ def _run(raw=None, params=PARAMS):
 
 
 def _curve(aid, comp, **kw):
-    return dict(SIM, curves=[dict(c, **kw) if (c["assay_id"], c["compound"]) == (aid, comp)
-                             else c for c in SIM["curves"]])
+    return dict(
+        SIM,
+        curves=[
+            dict(c, **kw) if (c["assay_id"], c["compound"]) == (aid, comp) else c
+            for c in SIM["curves"]
+        ],
+    )
 
 
 def test_conformance_kit_passes():
     sim = dict(curves=[dict(c, noise_sd=2.0) for c in SIM["curves"]])
-    rep = check_driver(D, compound=COMPOUND, parameters=PARAMS, simulation_parameters=sim,
-                       measured_example=_file())
+    rep = check_driver(
+        D, compound=COMPOUND, parameters=PARAMS, simulation_parameters=sim, measured_example=_file()
+    )
     assert rep.passed, rep.summary()
 
 
@@ -97,7 +138,7 @@ def test_delta_method_standard_error_of_a_ratio():
     off = Quantity.user_supplied(100.0, "uM", actor="t", uncertainty=Uncertainty("sd", sd=10.0))
     on = Quantity.user_supplied(10.0, "uM", actor="t", uncertainty=Uncertainty("sd", sd=1.0))
     r = relative_potency(off, on)
-    se = 10.0 * math.sqrt(0.1 ** 2 + 0.1 ** 2)
+    se = 10.0 * math.sqrt(0.1**2 + 0.1**2)
     assert r.value == pytest.approx(10.0) and r.uncertainty.sd == pytest.approx(se)
     assert r.uncertainty.lower == pytest.approx(10 - 1.96 * se)
 
@@ -119,8 +160,9 @@ def test_inactive_off_target_gives_a_lower_bound_not_a_number():
 
 
 def test_percent_activity_readout_reports_ec50():
-    params = dict(PARAMS, assays=[dict(PARAMS["assays"][0], readout="percent_activity",
-                                       reference=None)])
+    params = dict(
+        PARAMS, assays=[dict(PARAMS["assays"][0], readout="percent_activity", reference=None)]
+    )
     sim = dict(curves=[dict(SIM["curves"][0])])
     res, _ = _run(_file(params, sim), params)
     assert res.quantities["potency.KIN1.TEST"].value == pytest.approx(0.05, rel=1e-5)

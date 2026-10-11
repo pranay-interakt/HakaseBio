@@ -36,9 +36,15 @@ __all__ = ["SendPackage", "assemble"]
 
 SOFTWARE = "HOS0.1"
 #: The standards this package follows (hos/core/citations.py).
-CITATION_KEYS = ("cdisc_sendig_3_1_1", "nci_send_ct_2026_09_25", "cdisc_define_xml_2_1_schema",
-                 "sas_ts140", "fda_sdtcg_v6_3", "fda_ectd_validation_v4_6",
-                 "fda_data_standards_catalog_v11")
+CITATION_KEYS = (
+    "cdisc_sendig_3_1_1",
+    "nci_send_ct_2026_09_25",
+    "cdisc_define_xml_2_1_schema",
+    "sas_ts140",
+    "fda_sdtcg_v6_3",
+    "fda_ectd_validation_v4_6",
+    "fda_data_standards_catalog_v11",
+)
 _STYLESHEET = Path(__file__).parent / "schemas" / "define2-1.xsl"
 
 
@@ -59,14 +65,16 @@ def _lengths(build: SendBuild) -> dict[str, int]:
     for d in build.domains.values():
         for v in d.variables:
             if v.type == "Char":
-                longest = max((len(str(r[v.name])) for r in d.rows if r[v.name] is not None),
-                              default=1)
+                longest = max(
+                    (len(str(r[v.name])) for r in d.rows if r[v.name] is not None), default=1
+                )
                 out[v.name] = max(out.get(v.name, 1), longest)
     return out
 
 
-def _nsdrg(spec: SendExportSpec, build: SendBuild, checks: list[Check],
-           sources: dict[str, Any]) -> str:
+def _nsdrg(
+    spec: SendExportSpec, build: SendBuild, checks: list[Check], sources: dict[str, Any]
+) -> str:
     f = spec.facts
     lines = [
         "# Nonclinical Study Data Reviewer's Guide - DRAFT for authoring",
@@ -84,24 +92,31 @@ def _nsdrg(spec: SendExportSpec, build: SendBuild, checks: list[Check],
         "",
         "## 2. Study design",
         "Trial sets (TX):",
-        *[f"- {r['SETCD']}: {r['TXVAL']}" for r in build.domains["TX"].rows
-          if r["TXPARMCD"] == "GRPLBL"],
+        *[
+            f"- {r['SETCD']}: {r['TXVAL']}"
+            for r in build.domains["TX"].rows
+            if r["TXPARMCD"] == "GRPLBL"
+        ],
         "",
         "## 3. Standards",
         f"- SENDIG {SENDIG_VERSION} (SDTM 1.5); SEND Controlled Terminology {CT_VERSION}; "
         "Define-XML 2.1; SAS XPORT v5.",
         "",
         "## 4. Datasets",
-        *[f"- {d.name.lower()}.xpt ({d.label}): {len(d.rows)} records"
-          for d in build.domains.values()],
+        *[
+            f"- {d.name.lower()}.xpt ({d.label}): {len(d.rows)} records"
+            for d in build.domains.values()
+        ],
         "",
         "## 5. Conformance",
         *[f"- [{'pass' if c.passed else 'FAIL'}] {c.rule} ({c.source})" for c in checks],
         "",
         "## 6. Sponsor decisions",
         *([f"- {w}" for w in build.warnings] or ["- no terminology warnings"]),
-        *[f"- TS {code} not given (TSVALNF {nv.flavor}): {nv.reason}"
-          for code, nv in sorted(f.null_values.items())],
+        *[
+            f"- TS {code} not given (TSVALNF {nv.flavor}): {nv.reason}"
+            for code, nv in sorted(f.null_values.items())
+        ],
         "- Results are submitted as collected: standardized results equal original results in "
         "the protocol unit.",
         "- Study start date (STSTDTC) is the date of the Study Director's signature on the "
@@ -110,15 +125,28 @@ def _nsdrg(spec: SendExportSpec, build: SendBuild, checks: list[Check],
     return "\n".join(lines) + "\n"
 
 
-def assemble(spec: SendExportSpec, *, tox: dict[str, Any], tk: dict[str, Any] | None,
-             study_start: str | None, study_director: str | None, glp: bool,
-             exported_at: datetime) -> SendPackage:
+def assemble(
+    spec: SendExportSpec,
+    *,
+    tox: dict[str, Any],
+    tk: dict[str, Any] | None,
+    study_start: str | None,
+    study_director: str | None,
+    glp: bool,
+    exported_at: datetime,
+) -> SendPackage:
     """``tox`` and ``tk`` carry params, records and provenance of the two studies."""
     build = build_domains(
-        spec=spec, tox_params=tox["params"], tox_records=tox["records"], glp=glp,
-        study_start=study_start, study_director=study_director,
-        tk_params=tk["params"] if tk else None, tk_records=tk["records"] if tk else (),
-        tk_individual=tk["individual"] if tk else None)
+        spec=spec,
+        tox_params=tox["params"],
+        tox_records=tox["records"],
+        glp=glp,
+        study_start=study_start,
+        study_director=study_director,
+        tk_params=tk["params"] if tk else None,
+        tk_records=tk["records"] if tk else (),
+        tk_individual=tk["individual"] if tk else None,
+    )
     errors, warnings = list(build.errors), list(build.warnings)
     lengths = _lengths(build)
     too_long = sorted(k for k, n in lengths.items() if n > 200)
@@ -128,20 +156,36 @@ def assemble(spec: SendExportSpec, *, tox: dict[str, Any], tk: dict[str, Any] | 
     for name, d in build.domains.items():
         if not d.rows:
             continue
-        variables = [XportVariable(v.name, v.label, v.type == "Num",
-                                   8 if v.type == "Num" else min(lengths.get(v.name, 1), 200))
-                     for v in d.variables]
+        variables = [
+            XportVariable(
+                v.name,
+                v.label,
+                v.type == "Num",
+                8 if v.type == "Num" else min(lengths.get(v.name, 1), 200),
+            )
+            for v in d.variables
+        ]
         try:
             files[f"{name.lower()}.xpt"] = write_xport(
-                name, d.label, variables, [[r[v.name] for v in d.variables] for r in d.rows],
-                created=exported_at, software=SOFTWARE)
+                name,
+                d.label,
+                variables,
+                [[r[v.name] for v in d.variables] for r in d.rows],
+                created=exported_at,
+                software=SOFTWARE,
+            )
         except ValueError as exc:
             errors.append(f"{name}: {exc}")
     shown = {k: v for k, v in build.domains.items() if f"{k.lower()}.xpt" in files}
     define_text = build_define(
-        shown, lengths, studyid=spec.facts.studyid,
-        protocol_name=spec.facts.test_facility_study_id, description=spec.facts.study_title,
-        created=exported_at.strftime("%Y-%m-%dT%H:%M:%S"), origins=build.origins)
+        shown,
+        lengths,
+        studyid=spec.facts.studyid,
+        protocol_name=spec.facts.test_facility_study_id,
+        description=spec.facts.study_title,
+        created=exported_at.strftime("%Y-%m-%dT%H:%M:%S"),
+        origins=build.origins,
+    )
     schema_errors = validate_define(define_text)
     if schema_errors:
         errors += [f"define.xml schema: {e}" for e in schema_errors[:10]]
@@ -155,27 +199,47 @@ def assemble(spec: SendExportSpec, *, tox: dict[str, Any], tk: dict[str, Any] | 
     payload["nsdrg_draft.md"] = _nsdrg(spec, build, checks, sources).encode()
     hashes = {p: hashlib.sha256(b).hexdigest() for p, b in payload.items()}
     manifest = {
-        "format": "hos-send-package/1", "studyid": spec.facts.studyid,
-        "exported_at": exported_at.isoformat(), "standards": {
-            "SENDIG": SENDIG_VERSION, "SEND CT": CT_VERSION, "Define-XML": "2.1.0",
+        "format": "hos-send-package/1",
+        "studyid": spec.facts.studyid,
+        "exported_at": exported_at.isoformat(),
+        "standards": {
+            "SENDIG": SENDIG_VERSION,
+            "SEND CT": CT_VERSION,
+            "Define-XML": "2.1.0",
             "transport": "SAS XPORT v5 (TS-140)",
-            "sendig_metadata": sendig()["provenance"]},
+            "sendig_metadata": sendig()["provenance"],
+        },
         "citations": [cite(k).to_dict() for k in CITATION_KEYS],
-        "sources": sources, "records": {k: len(v.rows) for k, v in shown.items()},
-        "checks": [c.to_dict() for c in checks], "errors": errors, "warnings": warnings,
-        "files": hashes}
+        "sources": sources,
+        "records": {k: len(v.rows) for k, v in shown.items()},
+        "checks": [c.to_dict() for c in checks],
+        "errors": errors,
+        "warnings": warnings,
+        "files": hashes,
+    }
     ok = not errors
     content = None
     if ok:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             stamp = exported_at.timetuple()[:6]
-            for path, b in [*payload.items(), ("send_export_manifest.json",
-                                               (json.dumps(manifest, indent=1, sort_keys=True)
-                                                + "\n").encode())]:
+            for path, b in [
+                *payload.items(),
+                (
+                    "send_export_manifest.json",
+                    (json.dumps(manifest, indent=1, sort_keys=True) + "\n").encode(),
+                ),
+            ]:
                 info = zipfile.ZipInfo(path, date_time=stamp)  # type: ignore[arg-type]
                 info.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(info, b)
         content = buf.getvalue()
-    return SendPackage(ok=ok, errors=errors, warnings=warnings, checks=checks,
-                       manifest=manifest, content=content, files=hashes)
+    return SendPackage(
+        ok=ok,
+        errors=errors,
+        warnings=warnings,
+        checks=checks,
+        manifest=manifest,
+        content=content,
+        files=hashes,
+    )

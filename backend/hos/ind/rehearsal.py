@@ -34,8 +34,12 @@ _DEAD = {StudyState.CANCELLED.value, StudyState.FAILED.value, StudyState.SUPERSE
 
 def _existing_parameters(kernel: Any, program_id: str, requirement_id: str) -> dict[str, Any]:
     for s in kernel.repo.studies(program_id):
-        if (s.requirement_id == requirement_id and s.origin != "import" and s.state not in _DEAD
-                and s.protocol_hash):
+        if (
+            s.requirement_id == requirement_id
+            and s.origin != "import"
+            and s.state not in _DEAD
+            and s.protocol_hash
+        ):
             return dict(s.parameters or {})
     return {}
 
@@ -48,17 +52,22 @@ def _role_holders(kernel: Any, program_id: str) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for row in kernel.repo.principals():
         if row.kind != PrincipalKind.HUMAN.value or (
-                row.organisation != program.organisation and row.id not in members):
+            row.organisation != program.organisation and row.id not in members
+        ):
             continue
         for role in row.roles:
             out.setdefault(role, []).append(row.name)
     return out
 
 
-def rehearse(kernel: Any, actor: Principal, program_id: str,
-             plan: Mapping[str, Mapping[str, Any]] | None = None,
-             milestone: Timing = Timing.BEFORE_FIRST_IN_HUMAN,
-             compound_id: str | None = None) -> dict[str, Any]:
+def rehearse(
+    kernel: Any,
+    actor: Principal,
+    program_id: str,
+    plan: Mapping[str, Mapping[str, Any]] | None = None,
+    milestone: Timing = Timing.BEFORE_FIRST_IN_HUMAN,
+    compound_id: str | None = None,
+) -> dict[str, Any]:
     kernel._require_worker(actor)
     plan = dict(plan or {})
     program = kernel.repo.program(program_id)
@@ -76,8 +85,13 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
     for r in ss.requirements:
         if r.timing.order > milestone.order or r.status is RequirementStatus.NOT_REQUIRED:
             continue
-        item: dict[str, Any] = {"requirement_id": r.id, "name": r.name, "section": r.section,
-                                "status": r.status.value, "timing": r.timing.value}
+        item: dict[str, Any] = {
+            "requirement_id": r.id,
+            "name": r.name,
+            "section": r.section,
+            "status": r.status.value,
+            "timing": r.timing.value,
+        }
         items.append(item)
         if r.status is RequirementStatus.CONDITIONAL:
             item["outcome"] = "conditional"
@@ -93,8 +107,11 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
         wanted = entry.get("driver_id")
         driver, support = next(((d, s) for d, s in matches if d.id == wanted), matches[0])
         item["driver"] = f"{driver.id}@{driver.version}"
-        raw = {**support.prefill, **_existing_parameters(kernel, program_id, r.id),
-               **dict(entry.get("parameters", {}))}
+        raw = {
+            **support.prefill,
+            **_existing_parameters(kernel, program_id, r.id),
+            **dict(entry.get("parameters", {})),
+        }
         try:
             params = driver.validate_parameters(raw)
         except ValidationError as exc:
@@ -108,9 +125,15 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
         item["prerequisites"] = [p.to_dict() for p in driver.prerequisites(params)]
         dets = driver.expert_determinations(params)
         item["determinations"] = [
-            {"key": d.key, "label": d.label, "role": d.role.value,
-             "required_for_approval": d.required_for_approval,
-             "assigned_to": holders.get(d.role.value, [])} for d in dets]
+            {
+                "key": d.key,
+                "label": d.label,
+                "role": d.role.value,
+                "required_for_approval": d.required_for_approval,
+                "assigned_to": holders.get(d.role.value, []),
+            }
+            for d in dets
+        ]
         if compound is None:
             item["outcome"] = "needs_compound"
             item["detail"] = "register a compound first"
@@ -134,28 +157,37 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
             item["detail"] = "state the generator's true parameters and a seed to rehearse"
             continue
         try:
-            sim = driver.simulate(params, compound, sim_params, seed=int(seed),
-                                  study_reference=REHEARSAL_REFERENCE)
+            sim = driver.simulate(
+                params, compound, sim_params, seed=int(seed), study_reference=REHEARSAL_REFERENCE
+            )
             data = driver.ingest(sim.content, params, study_reference=REHEARSAL_REFERENCE)
             post = set(driver.post_data_inputs(params, data)) - set(given_inputs)
             item["missing_inputs"] = sorted({*item["missing_inputs"], *post})
-            inputs = {k: input_quantity(k, {**v, "entered_by": v.get("entered_by", actor.name)})
-                      for k, v in given_inputs.items()}
+            inputs = {
+                k: input_quantity(k, {**v, "entered_by": v.get("entered_by", actor.name)})
+                for k, v in given_inputs.items()
+            }
             res = driver.analyze(data, params, compound, inputs)
             interp = driver.interpret(res, params, ctx)
         except Exception as exc:  # noqa: BLE001 - the rehearsal reports, it does not raise
             item["outcome"] = "error"
             item["detail"] = f"{type(exc).__name__}: {exc}"
             continue
-        unavailable = [{"label": q.label, "reason": q.provenance.reason}
-                       for q in res.all_quantities() if not q.is_available]
-        item.update({
-            "outcome": "rehearsed", "qc": res.qc.status.value,
-            "qc_findings": [f.to_dict() for f in res.qc.findings],
-            "unavailable_results": unavailable,
-            "requires_expert_judgement": list(interp.requires_expert_judgement),
-            "simulated": True,
-        })
+        unavailable = [
+            {"label": q.label, "reason": q.provenance.reason}
+            for q in res.all_quantities()
+            if not q.is_available
+        ]
+        item.update(
+            {
+                "outcome": "rehearsed",
+                "qc": res.qc.status.value,
+                "qc_findings": [f.to_dict() for f in res.qc.findings],
+                "unavailable_results": unavailable,
+                "requires_expert_judgement": list(interp.requires_expert_judgement),
+                "simulated": True,
+            }
+        )
 
     # critical path over cited prerequisites and known durations
     finish: dict[str, tuple[float, list[str], list[str]]] = {}
@@ -183,31 +215,56 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
     unknown_all = sorted(rid for rid, d in durations.items() if d is None)
     summary = {
         "requirements": len(items),
-        "by_outcome": {o: sum(i.get("outcome") == o for i in items)
-                       for o in sorted({str(i.get("outcome")) for i in items})},
+        "by_outcome": {
+            o: sum(i.get("outcome") == o for i in items)
+            for o in sorted({str(i.get("outcome")) for i in items})
+        },
         "missing_drivers": [i["requirement_id"] for i in items if i.get("outcome") == "no_driver"],
-        "needs_design_parameters": [i["requirement_id"] for i in items
-                                    if i.get("outcome") == "needs_design_parameters"],
-        "needs_simulation_parameters": [i["requirement_id"] for i in items
-                                        if i.get("outcome") == "needs_simulation_parameters"],
-        "missing_inputs": {i["requirement_id"]: i["missing_inputs"] for i in items
-                           if i.get("missing_inputs")},
+        "needs_design_parameters": [
+            i["requirement_id"] for i in items if i.get("outcome") == "needs_design_parameters"
+        ],
+        "needs_simulation_parameters": [
+            i["requirement_id"] for i in items if i.get("outcome") == "needs_simulation_parameters"
+        ],
+        "missing_inputs": {
+            i["requirement_id"]: i["missing_inputs"] for i in items if i.get("missing_inputs")
+        },
         "unassigned_determinations": [
             {"requirement_id": i["requirement_id"], "determination": d["label"], "role": d["role"]}
-            for i in items for d in i.get("determinations", []) if not d["assigned_to"]],
+            for i in items
+            for d in i.get("determinations", [])
+            if not d["assigned_to"]
+        ],
         "critical_path": {
-            "requirements": crit[1], "known_duration_days": crit[0],
+            "requirements": crit[1],
+            "known_duration_days": crit[0],
             "unknown_durations_on_path": crit[2],
             "determined": bool(crit[1]),
-            "note": ("durations are the drivers' own protocol durations; studies whose duration "
-                     "is set by the laboratory are listed as unknown, not estimated"
-                     if crit[1] else "cannot be determined: no runnable study has a known "
-                     "duration yet")},
+            "note": (
+                "durations are the drivers' own protocol durations; studies whose duration "
+                "is set by the laboratory are listed as unknown, not estimated"
+                if crit[1]
+                else "cannot be determined: no runnable study has a known duration yet"
+            ),
+        },
         "unknown_durations": unknown_all,
     }
-    result = {"program_id": program_id, "milestone": milestone.value, "simulated": True,
-              "items": items, "summary": summary}
-    kernel.record_event(actor, "program.rehearsed", "program", program_id,
-                        {"milestone": milestone.value, "result_hash": canonical_hash(result),
-                         "by_outcome": summary["by_outcome"]})
+    result = {
+        "program_id": program_id,
+        "milestone": milestone.value,
+        "simulated": True,
+        "items": items,
+        "summary": summary,
+    }
+    kernel.record_event(
+        actor,
+        "program.rehearsed",
+        "program",
+        program_id,
+        {
+            "milestone": milestone.value,
+            "result_hash": canonical_hash(result),
+            "by_outcome": summary["by_outcome"],
+        },
+    )
     return result

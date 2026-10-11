@@ -52,8 +52,9 @@ class ConformanceReport:
         return all(c.passed for c in self.checks)
 
     def summary(self) -> str:
-        return "\n".join(f"[{'PASS' if c.passed else 'FAIL'}] {c.name}: {c.detail}"
-                         for c in self.checks)
+        return "\n".join(
+            f"[{'PASS' if c.passed else 'FAIL'}] {c.name}: {c.detail}" for c in self.checks
+        )
 
 
 def check_driver(
@@ -85,6 +86,7 @@ def check_driver(
         json.dumps(driver.describe())
         assert driver.requirement_ids and driver.modalities and driver.ctd_section
         return f"{driver.id} v{driver.version}"
+
     check("identity and describe()", identity)
 
     params = check("parameters validate", lambda: driver.validate_parameters(parameters))
@@ -99,6 +101,7 @@ def check_driver(
         assert p1.driver_id == driver.id
         p1.to_markdown()
         return p1
+
     protocol = check("design() deterministic and cited", design)
     if protocol is None:
         return rep
@@ -108,6 +111,7 @@ def check_driver(
         assert d["cost"] is None, "plan must not estimate cost"
         assert d["duration_basis"], "plan duration must state its basis"
         return f"{d['execution_duration_days']} days; {d['sample_count']} samples"
+
     check("plan() has no cost and states its basis", plan)
 
     template = driver.data_template(params)
@@ -121,6 +125,7 @@ def check_driver(
             for name, sha in manifest["files"].items():
                 assert hashlib.sha256(z.read(name)).hexdigest() == sha, f"{name} hash mismatch"
         return f"{len(manifest['files'])} files"
+
     check("instruction bundle deterministic with valid manifest", bundle)
 
     def rejects(content: bytes, label: str) -> None:
@@ -131,27 +136,36 @@ def check_driver(
         raise AssertionError(f"ingest accepted {label}")
 
     check("ingest rejects empty file", lambda: rejects(b"", "an empty file"))
-    check("ingest rejects header-only template",
-          lambda: rejects(template.blank_csv(study_reference).encode(), "a file with no data"))
+    check(
+        "ingest rejects header-only template",
+        lambda: rejects(template.blank_csv(study_reference).encode(), "a file with no data"),
+    )
     check("ingest rejects non-UTF-8", lambda: rejects(b"\xff\xfe\x00bad", "non-UTF-8 bytes"))
 
     if simulation_parameters is not None:
+
         def simulate() -> Any:
-            a = driver.simulate(params, compound, simulation_parameters, seed=7,
-                                study_reference=study_reference)
-            b = driver.simulate(params, compound, simulation_parameters, seed=7,
-                                study_reference=study_reference)
-            c = driver.simulate(params, compound, simulation_parameters, seed=8,
-                                study_reference=study_reference)
+            a = driver.simulate(
+                params, compound, simulation_parameters, seed=7, study_reference=study_reference
+            )
+            b = driver.simulate(
+                params, compound, simulation_parameters, seed=7, study_reference=study_reference
+            )
+            c = driver.simulate(
+                params, compound, simulation_parameters, seed=8, study_reference=study_reference
+            )
             assert a.content == b.content, "same seed gave different data"
             assert a.content != c.content, "different seed gave identical data"
             return a
+
         sim = check("simulate() seeded and reproducible", simulate)
         if sim is not None:
+
             def sim_cannot_launder() -> Any:
                 data = driver.ingest(sim.content, params, claimed_origin=DataOrigin.MEASURED)
                 assert data.origin is DataOrigin.SIMULATED, "simulated file ingested as measured"
                 return data
+
             data = check("simulated data cannot be claimed as measured", sim_cannot_launder)
 
             def malformed_number() -> None:
@@ -164,20 +178,26 @@ def check_driver(
                 cells[num_cols[0]] = "not-a-number"
                 lines[hdr + 1] = ",".join(cells)
                 rejects("\n".join(lines).encode(), "a non-numeric value in a numeric column")
+
             check("ingest rejects non-numeric value", malformed_number)
 
             if data is not None:
+
                 def sim_analysis() -> Any:
                     res = driver.analyze(data, params, compound, analysis_inputs)
                     assert not res.evidence_admissible, "simulated analysis marked admissible"
                     for q in res.all_quantities():
                         assert SIMULATION_TAINT in q.qc_flags, f"untainted value {q.label}"
                     return res
+
                 res = check("analysis of simulated data is tainted and inadmissible", sim_analysis)
                 if res is not None:
-                    interp = check("interpret() statements are all cited",
-                                   lambda: driver.interpret(res, params))
+                    interp = check(
+                        "interpret() statements are all cited",
+                        lambda: driver.interpret(res, params),
+                    )
                     if interp is not None:
+
                         def sim_report() -> str:
                             r = driver.report(protocol, data, res, interp)
                             assert r.disclaimer == SIMULATION_DISCLAIMER
@@ -185,13 +205,16 @@ def check_driver(
                             md = r.to_markdown()
                             assert "SIMULATED" in md
                             summary = r.sections[0].body.lower()
-                            assert " measured" not in summary.replace("(not measured)", ""), \
+                            assert " measured" not in summary.replace("(not measured)", ""), (
                                 "simulated report summary describes the data as measured"
+                            )
                             json.dumps(r.to_dict())
                             return f"{len(r.sections)} sections"
+
                         check("report of simulated data carries the disclaimer", sim_report)
 
     if measured_example is not None:
+
         def measured() -> str:
             data = driver.ingest(measured_example, params)
             assert data.origin is DataOrigin.MEASURED
@@ -201,5 +224,6 @@ def check_driver(
             r = driver.report(protocol, data, res, interp)
             assert r.disclaimer is None and r.evidence_admissible
             return f"{len(data.records)} records"
+
         check("measured data flows through analysis and report", measured)
     return rep

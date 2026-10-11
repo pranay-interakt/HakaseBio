@@ -100,15 +100,18 @@ class LedgerEntry:
     @staticmethod
     def content_digest_of(body: dict[str, Any]) -> str:
         """Scheme 2: SHA-256 of the body without ``prev_hash``."""
-        return hashlib.sha256(canonical_json(
-            {k: v for k, v in body.items() if k != "prev_hash"}).encode()).hexdigest()
+        return hashlib.sha256(
+            canonical_json({k: v for k, v in body.items() if k != "prev_hash"}).encode()
+        ).hexdigest()
 
     @staticmethod
     def chain_hash(prev_hash: str, content_digest: str) -> str:
         """Scheme 2: the entry hash from the previous hash and the content digest."""
-        return hashlib.sha256(canonical_json({"scheme": 2, "prev_hash": prev_hash,
-                                              "content_digest": content_digest}).encode()
-                              ).hexdigest()
+        return hashlib.sha256(
+            canonical_json(
+                {"scheme": 2, "prev_hash": prev_hash, "content_digest": content_digest}
+            ).encode()
+        ).hexdigest()
 
     @staticmethod
     def hash_of(body: dict[str, Any]) -> str:
@@ -132,8 +135,9 @@ class LedgerBackend(Protocol):
     def last(self) -> LedgerEntry | None: ...
     def iter_all(self) -> Iterator[LedgerEntry]: ...
     def for_subject(self, subject_id: str) -> list[LedgerEntry]: ...
-    def subject_page(self, subject_id: str, limit: int,
-                     offset: int) -> tuple[list[LedgerEntry], int]: ...
+    def subject_page(
+        self, subject_id: str, limit: int, offset: int
+    ) -> tuple[list[LedgerEntry], int]: ...
 
 
 class MemoryLedgerBackend:
@@ -154,17 +158,19 @@ class MemoryLedgerBackend:
     def for_subject(self, subject_id: str) -> list[LedgerEntry]:
         return [e for e in self._entries if e.subject_id == subject_id]
 
-    def subject_page(self, subject_id: str, limit: int,
-                     offset: int) -> tuple[list[LedgerEntry], int]:
+    def subject_page(
+        self, subject_id: str, limit: int, offset: int
+    ) -> tuple[list[LedgerEntry], int]:
         mine = self.for_subject(subject_id)
-        return mine[offset:offset + limit], len(mine)
+        return mine[offset : offset + limit], len(mine)
 
 
 class Ledger:
     """Append-only hash-chained ledger over a pluggable backend."""
 
-    def __init__(self, backend: LedgerBackend | None = None,
-                 clock: Callable[[], datetime] = utc_now) -> None:
+    def __init__(
+        self, backend: LedgerBackend | None = None, clock: Callable[[], datetime] = utc_now
+    ) -> None:
         self._backend: LedgerBackend = backend or MemoryLedgerBackend()
         self._clock = clock
         self._lock = threading.Lock()
@@ -230,8 +236,9 @@ class Ledger:
     def history(self, subject_id: str) -> list[LedgerEntry]:
         return self._backend.for_subject(subject_id)
 
-    def history_page(self, subject_id: str, limit: int,
-                     offset: int) -> tuple[list[LedgerEntry], int]:
+    def history_page(
+        self, subject_id: str, limit: int, offset: int
+    ) -> tuple[list[LedgerEntry], int]:
         return self._backend.subject_page(subject_id, limit, offset)
 
     def entries(self) -> list[LedgerEntry]:

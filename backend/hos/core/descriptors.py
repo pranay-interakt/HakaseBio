@@ -155,19 +155,28 @@ def compute_profile(smiles: str) -> MolecularProfile:
         hbd=_q(hbd, "dimensionless", "descr.hbd", "H-bond donors"),
         hba=_q(hba, "dimensionless", "descr.hba", "H-bond acceptors"),
         rotatable_bonds=_q(rotb, "dimensionless", "descr.rotb", "Rotatable bonds"),
-        molar_refractivity=_q(Crippen.MolMR(mol), "dimensionless", "descr.mr",
-                              "Molar refractivity"),
+        molar_refractivity=_q(
+            Crippen.MolMR(mol), "dimensionless", "descr.mr", "Molar refractivity"
+        ),
         qed=_q(QED.qed(mol), "dimensionless", "descr.qed", "QED drug-likeness"),
-        fraction_csp3=_q(rdMolDescriptors.CalcFractionCSP3(mol), "dimensionless",
-                         "descr.fsp3", "Fraction Csp3"),
-        ring_count=_q(rdMolDescriptors.CalcNumRings(mol), "dimensionless",
-                      "descr.rings", "Ring count"),
-        aromatic_ring_count=_q(rdMolDescriptors.CalcNumAromaticRings(mol), "dimensionless",
-                               "descr.aromatic_rings", "Aromatic rings"),
-        heavy_atom_count=_q(mol.GetNumHeavyAtoms(), "dimensionless",
-                            "descr.heavy_atoms", "Heavy atoms"),
-        lipinski_violations=_q(violations, "dimensionless", "rule.lipinski_ro5",
-                               "Lipinski Ro5 violations"),
+        fraction_csp3=_q(
+            rdMolDescriptors.CalcFractionCSP3(mol), "dimensionless", "descr.fsp3", "Fraction Csp3"
+        ),
+        ring_count=_q(
+            rdMolDescriptors.CalcNumRings(mol), "dimensionless", "descr.rings", "Ring count"
+        ),
+        aromatic_ring_count=_q(
+            rdMolDescriptors.CalcNumAromaticRings(mol),
+            "dimensionless",
+            "descr.aromatic_rings",
+            "Aromatic rings",
+        ),
+        heavy_atom_count=_q(
+            mol.GetNumHeavyAtoms(), "dimensionless", "descr.heavy_atoms", "Heavy atoms"
+        ),
+        lipinski_violations=_q(
+            violations, "dimensionless", "rule.lipinski_ro5", "Lipinski Ro5 violations"
+        ),
         lipinski_pass=bool(violations <= 1),
         veber_pass=veber_pass,
     )

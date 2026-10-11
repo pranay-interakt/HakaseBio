@@ -28,8 +28,14 @@ from sqlalchemy.sql.schema import ScalarElementColumnDefault
 
 from hos.db.models import Base
 
-__all__ = ["BASELINE", "add_missing_columns", "current_revision", "head_revision",
-           "schema_drift", "upgrade"]
+__all__ = [
+    "BASELINE",
+    "add_missing_columns",
+    "current_revision",
+    "head_revision",
+    "schema_drift",
+    "upgrade",
+]
 
 BASELINE = "0001"
 _SCRIPTS = Path(__file__).with_name("migrations")
@@ -69,17 +75,24 @@ def add_missing_columns(engine: Engine, metadata: MetaData) -> list[str]:
             for col in table.columns:
                 if col.name in present:
                     continue
-                default = (col.default.arg if isinstance(col.default, ScalarElementColumnDefault)
-                           else None)
+                default = (
+                    col.default.arg if isinstance(col.default, ScalarElementColumnDefault) else None
+                )
                 if not col.nullable and default is None:
-                    raise RuntimeError(f"database is older than the schema: {table.name}."
-                                       f"{col.name} cannot be added automatically")
+                    raise RuntimeError(
+                        f"database is older than the schema: {table.name}."
+                        f"{col.name} cannot be added automatically"
+                    )
                 col_type = col.type.compile(dialect=engine.dialect)
                 ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}"
                 if default is not None:
-                    lit = (("1" if default else "0") if isinstance(default, bool)
-                           else repr(default) if isinstance(default, (int, float))
-                           else "'" + str(default).replace("'", "''") + "'")
+                    lit = (
+                        ("1" if default else "0")
+                        if isinstance(default, bool)
+                        else repr(default)
+                        if isinstance(default, (int, float))
+                        else "'" + str(default).replace("'", "''") + "'"
+                    )
                     ddl += f" DEFAULT {lit}"
                 conn.execute(text(ddl))
                 added.append(f"{table.name}.{col.name}")
@@ -94,7 +107,7 @@ def _adopt_unversioned(engine: Engine) -> bool:
     tables = set(inspect(engine).get_table_names())
     if "alembic_version" in tables or not tables & set(baseline.tables):
         return False
-    baseline.create_all(engine)              # tables added since the database was created
+    baseline.create_all(engine)  # tables added since the database was created
     add_missing_columns(engine, baseline)
     with engine.begin() as conn:
         command.stamp(_config(conn), BASELINE)

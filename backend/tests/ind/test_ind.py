@@ -25,16 +25,22 @@ def _program(k):  # noqa: F811
 
 
 def _approved_metstab(k, sci, pid, cid):  # noqa: F811
-    sid = k.create_study(sci, program_id=pid, compound_id=cid,
-                         requirement_id="adme.metabolic_stability")["id"]
+    sid = k.create_study(
+        sci, program_id=pid, compound_id=cid, requirement_id="adme.metabolic_stability"
+    )["id"]
     k.design_study(sci, sid, MS_PARAMS)
     k.plan_study(sci, sid)
     k.dispatch_study(sci, sid, {"kind": "external_lab", "laboratory": "CRO"})
     k.receive_data(sci, sid, _measured_csv(HL, ref=sid))
     k.analyze_study(sci, sid)
     k.report_study(sci, sid)
-    k.sign_study(sci, sid, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.APPROVAL,
-                 statement="approve")
+    k.sign_study(
+        sci,
+        sid,
+        role=Role.RESPONSIBLE_SCIENTIST,
+        meaning=SignatureMeaning.APPROVAL,
+        statement="approve",
+    )
     k.approve_study(sci, sid)
     return sid
 
@@ -61,16 +67,16 @@ def test_readiness_on_a_new_programme(k):  # noqa: F811
 def test_readiness_progress_and_simulation_never_counts(k):  # noqa: F811
     sci, pid, cid = _program(k)
     _approved_metstab(k, sci, pid, cid)
-    k.create_study(sci, program_id=pid, compound_id=cid,
-                         requirement_id="safety.herg")["id"]
+    k.create_study(sci, program_id=pid, compound_id=cid, requirement_id="safety.herg")["id"]
     r = readiness_report(k, pid)
     st = {i["requirement_id"]: i["status"] for i in r["items"]}
     assert st["adme.metabolic_stability"] == "done"
     assert st["safety.herg"] == "in_progress"
     # a programme whose only metabolic-stability study is simulated
     sci2, pid2, cid2 = _program_named(k, "IND-2")
-    sid = k.create_study(sci2, program_id=pid2, compound_id=cid2,
-                         requirement_id="adme.metabolic_stability")["id"]
+    sid = k.create_study(
+        sci2, program_id=pid2, compound_id=cid2, requirement_id="adme.metabolic_stability"
+    )["id"]
     k.design_study(sci2, sid, MS_PARAMS)
     k.plan_study(sci2, sid)
     k.dispatch_study(sci2, sid, {"kind": "simulation", "simulation_parameters": MS_SIM, "seed": 1})
@@ -91,27 +97,42 @@ def test_module4_assembly_with_noael_dose_projection(k):  # noqa: F811
     sci, pid, cid = _program(k)
     sd, qa = k.get_principal("sd"), k.get_principal("qa")
     ms = _approved_metstab(k, sci, pid, cid)
-    rd = k.create_study(sci, program_id=pid, compound_id=cid,
-                        requirement_id="tox.repeat_dose_rodent")["id"]
+    rd = k.create_study(
+        sci, program_id=pid, compound_id=cid, requirement_id="tox.repeat_dose_rodent"
+    )["id"]
     k.design_study(sci, rd, RD_PARAMS)
     k.plan_study(sci, rd)
     k.dispatch_study(sci, rd, {"kind": "external_lab", "laboratory": "GLP CRO"})
     k.receive_data(sci, rd, _lab_file(rd))
     k.analyze_study(sci, rd)
-    k.record_determination(sd, rd, key="noael", value=30, unit="mg/kg/day",
-                           rationale="adverse liver findings at 100 mg/kg/day")
+    k.record_determination(
+        sd,
+        rd,
+        key="noael",
+        value=30,
+        unit="mg/kg/day",
+        rationale="adverse liver findings at 100 mg/kg/day",
+    )
     k.report_study(sci, rd)
-    k.sign_study(sd, rd, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL,
-                 statement="approve")
-    k.sign_study(qa, rd, role=Role.QUALITY_ASSURANCE, meaning=SignatureMeaning.QA_COMPLIANCE,
-                 statement="QA statement")
+    k.sign_study(
+        sd, rd, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL, statement="approve"
+    )
+    k.sign_study(
+        qa,
+        rd,
+        role=Role.QUALITY_ASSURANCE,
+        meaning=SignatureMeaning.QA_COMPLIANCE,
+        statement="QA statement",
+    )
     k.approve_study(sd, rd)
     pkg = assemble_module4(k, sci, pid)
     secs = {t["section"]: t["reports"] for t in pkg["toc"]}
     assert [r["study_id"] for r in secs["4.2.2.4"]] == [ms]
     assert [r["study_id"] for r in secs["4.2.3.2"]] == [rd]
-    assert {s["role"] for s in secs["4.2.3.2"][0]["signatures"]} == {"study_director",
-                                                                     "quality_assurance"}
+    assert {s["role"] for s in secs["4.2.3.2"][0]["signatures"]} == {
+        "study_director",
+        "quality_assurance",
+    }
     # FDA 2005: rat NOAEL 30 -> HED 30*6/37 -> MRSD /10
     mrsd = pkg["dose_projection"]["projection"]["mrsd_per_kg"]["value"]
     assert mrsd == pytest.approx(30 * 6 / 37 / 10)
@@ -125,30 +146,53 @@ def test_module4_assembly_with_noael_dose_projection(k):  # noqa: F811
 
 def test_assembler_refuses_simulated_content():
     from hos.ind.assembler import _check_no_simulation
+
     with pytest.raises(EvidenceInadmissible):
-        _check_no_simulation({"sections": [{"tables": [{"rows": [[{"provenance":
-                              {"kind": "simulated"}}]]}]}]})
+        _check_no_simulation(
+            {"sections": [{"tables": [{"rows": [[{"provenance": {"kind": "simulated"}}]]}]}]}
+        )
     with pytest.raises(EvidenceInadmissible):
         _check_no_simulation({"q": {"qc_flags": ["derived_from_simulated_data"]}})
 
 
 def _imported_core_battery(k, sci, pid, cid, components):  # noqa: F811
     sid = k.imports.import_study(
-        sci, program_id=pid, compound_id=cid, requirement_id="safety.core_battery",
-        report=b"%PDF-1.4 core battery report", filename="sp.pdf", title="Safety pharmacology",
-        laboratory="CRO", report_date="2026-06-30", glp=False, components=components)["id"]
-    k.imports.add_import_value(sci, sid, key="overall_conclusion", page="5",
-                               category="no_effect_identified")
-    k.imports.sign_import(sci, sid, role=Role.RESPONSIBLE_SCIENTIST,
-                          meaning=SignatureMeaning.APPROVAL, statement="Reviewed.")
+        sci,
+        program_id=pid,
+        compound_id=cid,
+        requirement_id="safety.core_battery",
+        report=b"%PDF-1.4 core battery report",
+        filename="sp.pdf",
+        title="Safety pharmacology",
+        laboratory="CRO",
+        report_date="2026-06-30",
+        glp=False,
+        components=components,
+    )["id"]
+    k.imports.add_import_value(
+        sci, sid, key="overall_conclusion", page="5", category="no_effect_identified"
+    )
+    k.imports.sign_import(
+        sci,
+        sid,
+        role=Role.RESPONSIBLE_SCIENTIST,
+        meaning=SignatureMeaning.APPROVAL,
+        statement="Reviewed.",
+    )
     k.imports.complete_import(sci, sid)
     return sid
 
 
 def test_core_battery_is_done_only_when_every_s7a_part_is_covered(k):  # noqa: F811
     sci, pid, cid = _program(k)
-    item = lambda: next(i for i in readiness_report(k, pid)["items"]  # noqa: E731
-                        if i["requirement_id"] == "safety.core_battery")
+
+    def item():
+        return next(
+            i
+            for i in readiness_report(k, pid)["items"]
+            if i["requirement_id"] == "safety.core_battery"
+        )
+
     assert item()["status"] == "missing"
     assert item()["components"]["missing"] == ["cns", "cardiovascular", "respiratory"]
     _imported_core_battery(k, sci, pid, cid, ["cns"])
@@ -161,15 +205,34 @@ def test_core_battery_is_done_only_when_every_s7a_part_is_covered(k):  # noqa: F
 
 def test_core_battery_import_must_name_its_parts(k):  # noqa: F811
     from hos.kernel.errors import KernelError
+
     sci, pid, cid = _program(k)
     for bad in (None, [], ["renal"]):
         with pytest.raises(KernelError, match="parts"):
             k.imports.import_study(
-                sci, program_id=pid, compound_id=cid, requirement_id="safety.core_battery",
-                report=b"%PDF", filename="sp.pdf", title="SP", laboratory="CRO",
-                report_date="2026-06-30", glp=False, components=bad)
+                sci,
+                program_id=pid,
+                compound_id=cid,
+                requirement_id="safety.core_battery",
+                report=b"%PDF",
+                filename="sp.pdf",
+                title="SP",
+                laboratory="CRO",
+                report_date="2026-06-30",
+                glp=False,
+                components=bad,
+            )
     with pytest.raises(KernelError, match="no parts"):
         k.imports.import_study(
-            sci, program_id=pid, compound_id=cid, requirement_id="safety.herg",
-            report=b"%PDF", filename="h.pdf", title="hERG", laboratory="CRO",
-            report_date="2026-06-30", glp=False, components=["cns"])
+            sci,
+            program_id=pid,
+            compound_id=cid,
+            requirement_id="safety.herg",
+            report=b"%PDF",
+            filename="h.pdf",
+            title="hERG",
+            laboratory="CRO",
+            report_date="2026-06-30",
+            glp=False,
+            components=["cns"],
+        )

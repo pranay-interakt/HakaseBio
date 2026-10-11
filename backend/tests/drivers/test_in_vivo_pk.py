@@ -30,19 +30,53 @@ def po(t):  # linear rise to 5000 ng/mL at 1 h, then mono-exponential decline
 
 
 PARAMS = dict(
-    glp=False, species="rat", strain="Sprague-Dawley", analyte="test compound", matrix="plasma",
-    bioanalytical_technique="chromatographic", bioanalytical_method_reference="BMV-001",
-    concentration_unit="ng/mL", lloq=1.0, dose_unit="mg/kg",
-    groups=[dict(group_id="IV", administration="iv_bolus", route="intravenous", dose=DOSE_IV,
-                 formulation="solution in saline", sex="M", animals=3, sampling_times_h=T_IV),
-            dict(group_id="PO", administration="extravascular", route="oral gavage", dose=DOSE_PO,
-                 formulation="suspension in 0.5% MC", sex="M", animals=3, sampling_times_h=T_PO)],
-    crossover=False, dose_time_rule="zero_single_dose", auc_method="linear_up_log_down",
-    auc_method_basis="PK SOP-3", blq_rule="leading_zero_then_excluded",
-    auc_inf_basis="observed_clast")
-SIM = dict(profiles=[{"group_id": "IV", "concentrations": [iv(t) for t in T_IV]},
-                     {"group_id": "PO", "concentrations": [po(t) for t in T_PO]}],
-           between_animal_sd_log=0.0, residual_sd_log=0.0)
+    glp=False,
+    species="rat",
+    strain="Sprague-Dawley",
+    analyte="test compound",
+    matrix="plasma",
+    bioanalytical_technique="chromatographic",
+    bioanalytical_method_reference="BMV-001",
+    concentration_unit="ng/mL",
+    lloq=1.0,
+    dose_unit="mg/kg",
+    groups=[
+        dict(
+            group_id="IV",
+            administration="iv_bolus",
+            route="intravenous",
+            dose=DOSE_IV,
+            formulation="solution in saline",
+            sex="M",
+            animals=3,
+            sampling_times_h=T_IV,
+        ),
+        dict(
+            group_id="PO",
+            administration="extravascular",
+            route="oral gavage",
+            dose=DOSE_PO,
+            formulation="suspension in 0.5% MC",
+            sex="M",
+            animals=3,
+            sampling_times_h=T_PO,
+        ),
+    ],
+    crossover=False,
+    dose_time_rule="zero_single_dose",
+    auc_method="linear_up_log_down",
+    auc_method_basis="PK SOP-3",
+    blq_rule="leading_zero_then_excluded",
+    auc_inf_basis="observed_clast",
+)
+SIM = dict(
+    profiles=[
+        {"group_id": "IV", "concentrations": [iv(t) for t in T_IV]},
+        {"group_id": "PO", "concentrations": [po(t) for t in T_PO]},
+    ],
+    between_animal_sd_log=0.0,
+    residual_sd_log=0.0,
+)
 
 
 def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1"):
@@ -54,8 +88,10 @@ def _file(params=PARAMS, sim=SIM, edit=None, ref="HOS-CONFORMANCE-1"):
         rows = edit(rows)
     t = D.data_template(p)
     buf = io.StringIO()
-    buf.write(f"# laboratory: PK Lab\n# analyst: P. Analyst\n# run_date: 2026-09-30\n"
-              f"# study_reference: {ref}\n")
+    buf.write(
+        f"# laboratory: PK Lab\n# analyst: P. Analyst\n# run_date: 2026-09-30\n"
+        f"# study_reference: {ref}\n"
+    )
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(t.header())
     for r in rows:
@@ -78,10 +114,13 @@ def _run(raw=None, inputs=None, params=PARAMS):
 
 
 def test_conformance_kit_passes():
-    rep = check_driver(D, compound=COMPOUND, parameters=PARAMS,
-                       simulation_parameters=dict(SIM, between_animal_sd_log=0.2,
-                                                  residual_sd_log=0.05),
-                       measured_example=_file())
+    rep = check_driver(
+        D,
+        compound=COMPOUND,
+        parameters=PARAMS,
+        simulation_parameters=dict(SIM, between_animal_sd_log=0.2, residual_sd_log=0.05),
+        measured_example=_file(),
+    )
     assert rep.passed, rep.summary()
 
 
@@ -107,7 +146,8 @@ def test_absolute_bioavailability_from_constructed_profiles():
     assert f.value == pytest.approx(auc_po * DOSE_IV / (auc_iv * DOSE_PO), rel=1e-10)
     assert "assumes linear PK" in f.provenance.notes
     assert res.quantities["mean.cl.PO"].magnitude_in("L/h/kg") == pytest.approx(
-        DOSE_PO / auc_po * 1000, rel=1e-10)
+        DOSE_PO / auc_po * 1000, rel=1e-10
+    )
     assert "mean.vss.PO" not in res.quantities  # Vss only after intravenous dosing
 
 
@@ -151,8 +191,12 @@ def test_extravascular_selection_through_tmax_is_flagged():
 def test_declared_limits_need_a_basis_and_are_checked():
     with pytest.raises(ValidationError, match="basis"):
         D.validate_parameters(dict(PARAMS, max_extrapolated_percent=20))
-    params = dict(PARAMS, max_extrapolated_percent=0.5, min_adjusted_r2=0.9,
-                  acceptance_basis="sponsor PK SOP-3 section 5")
+    params = dict(
+        PARAMS,
+        max_extrapolated_percent=0.5,
+        min_adjusted_r2=0.9,
+        acceptance_basis="sponsor PK SOP-3 section 5",
+    )
     res, _ = _run(params=params)
     assert any(f.code.startswith("extrap.") for f in res.qc.findings)
 
@@ -163,6 +207,7 @@ def test_iv_bolus_c0_unavailable_when_first_points_rise():
             if r["group_id"] == "IV" and r["nominal_time"] == 0.25:
                 r["concentration"] = iv(0.5) / 2
         return rows
+
     res, _ = _run(raw=_file(edit=rising))
     ind = next(t for t in res.tables if t.title == "Individual pharmacokinetic parameters")
     row = next(r for r in ind.rows if r[0].startswith("IV/"))
@@ -180,6 +225,7 @@ def test_strict_ingest():
         rows[1].update(concentration=0.5, blq="no")
         rows.append(dict(rows[2]))
         return rows
+
     with pytest.raises(IngestError) as exc:
         D.ingest(_file(edit=bad), D.validate_parameters(PARAMS))
     msg = " ".join(exc.value.errors)
@@ -192,6 +238,7 @@ def test_parallel_design_rejects_an_animal_in_two_groups():
             if r["group_id"] == "PO" and r["subject_id"] == "M201":
                 r["subject_id"] = "M101"
         return rows
+
     with pytest.raises(IngestError, match="parallel"):
         D.ingest(_file(edit=reuse), D.validate_parameters(PARAMS))
 

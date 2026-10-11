@@ -23,7 +23,7 @@ def test_acceptance_interval_reproduces_shang_2022_rats():
 
 def test_exact_recovery_of_the_power_exponent():
     doses = [10, 10, 30, 30, 100, 100]
-    fit = fit_power_model(doses, [3.0 * d ** 0.8 for d in doses], ci_level=0.9)
+    fit = fit_power_model(doses, [3.0 * d**0.8 for d in doses], ci_level=0.9)
     assert fit.beta1 == pytest.approx(0.8, abs=1e-12)
     assert fit.ln_beta0 == pytest.approx(np.log(3.0), abs=1e-12)
     assert fit.se_beta1 == pytest.approx(0.0, abs=1e-12)
@@ -33,7 +33,7 @@ def test_exact_recovery_of_the_power_exponent():
 def test_slope_and_interval_match_an_independent_regression():
     rng = np.random.default_rng(1)
     doses = np.repeat([5.0, 15.0, 50.0], 6)
-    vals = 2.0 * doses ** 1.1 * np.exp(rng.normal(0, 0.2, doses.size))
+    vals = 2.0 * doses**1.1 * np.exp(rng.normal(0, 0.2, doses.size))
     fit = fit_power_model(doses.tolist(), vals.tolist(), ci_level=0.9)
     ref = stats.linregress(np.log(doses), np.log(vals))
     t = stats.t.ppf(0.95, doses.size - 2)

@@ -73,11 +73,14 @@ class Assay(BaseModel):
     assay_id: str = Field(min_length=1, pattern=r"^[A-Za-z0-9_\-]+$")
     target: str = Field(min_length=1)
     role: Literal["primary", "off_target"]
-    assay_format: str = Field(min_length=1, description="e.g. radioligand binding, enzyme "
-                              "activity, cell-based functional")
+    assay_format: str = Field(
+        min_length=1, description="e.g. radioligand binding, enzyme activity, cell-based functional"
+    )
     species: str = Field(min_length=1)
-    conditions: str = Field(min_length=1, description="substrate / ligand / agonist and its "
-                            "concentration, cell line, incubation")
+    conditions: str = Field(
+        min_length=1,
+        description="substrate / ligand / agonist and its concentration, cell line, incubation",
+    )
     readout: Literal["percent_inhibition", "percent_activity"]
     asymptotes: Literal["fitted", "fixed_0_100"]
     concentrations: list[float] = Field(min_length=4)
@@ -163,9 +166,14 @@ def relative_potency(off: Quantity, on: Quantity) -> Quantity:
     if ua is not None and ub is not None and ua.sd is not None and ub.sd is not None:
         se = r * math.sqrt((ua.sd / a) ** 2 + (ub.sd / b) ** 2)
         unc = Uncertainty(kind="ci95", lower=max(r - 1.96 * se, 0.0), upper=r + 1.96 * se, sd=se)
-    return Quantity.computed(r, "dimensionless", method=method("pharm.relative_potency"),
-                             inputs=[off, on], uncertainty=unc,
-                             label=f"relative potency {off.label} / {on.label}")
+    return Quantity.computed(
+        r,
+        "dimensionless",
+        method=method("pharm.relative_potency"),
+        inputs=[off, on],
+        uncertainty=unc,
+        label=f"relative potency {off.label} / {on.label}",
+    )
 
 
 class InVitroPotencyDriver(StudyDriver):
@@ -173,12 +181,15 @@ class InVitroPotencyDriver(StudyDriver):
     name = "In vitro potency and selectivity (4PL)"
     version = "1.0.0"
     requirement_ids = ("pharm.primary",)
-    modalities = frozenset({Modality.SMALL_MOLECULE, Modality.PEPTIDE,
-                            Modality.MONOCLONAL_ANTIBODY})
+    modalities = frozenset(
+        {Modality.SMALL_MOLECULE, Modality.PEPTIDE, Modality.MONOCLONAL_ANTIBODY}
+    )
     ctd_section = "4.2.1.1"
     glp_capable = False
-    description = ("Concentration-response potency at the primary target and off-targets by "
-                   "4PL, with reference-compound checks and relative potency.")
+    description = (
+        "Concentration-response potency at the primary target and off-targets by "
+        "4PL, with reference-compound checks and relative potency."
+    )
     reference_keys = ("ich_m3r2", "ich_s7a", "delean1978", "ritz2015")
 
     @classmethod
@@ -194,56 +205,86 @@ class InVitroPotencyDriver(StudyDriver):
 
     # -- design ----------------------------------------------------------------------
 
-    def design(self, compound: CompoundInfo, params: BaseModel,
-               context: ProgramContext | None = None,
-               hypothesis: str | None = None) -> ProtocolDocument:
+    def design(
+        self,
+        compound: CompoundInfo,
+        params: BaseModel,
+        context: ProgramContext | None = None,
+        hypothesis: str | None = None,
+    ) -> ProtocolDocument:
         p = _p(params)
         u = p.concentration_unit
-        assays = [f"{a.assay_id} ({a.role}): {a.target}, {a.assay_format}, {a.species}; "
-                  f"{a.conditions}; {a.readout.replace('_', ' ')}, asymptotes "
-                  f"{a.asymptotes.replace('_', ' ')}; {len(a.concentrations)} concentrations "
-                  f"{a.concentrations[0]:g}-{a.concentrations[-1]:g} {u} x {a.replicates}"
-                  + (f"; reference {a.reference.name} accepted at {a.reference.acceptance_low:g}-"
-                     f"{a.reference.acceptance_high:g} {u} ({a.reference.basis})"
-                     if a.reference else "") for a in p.assays]
+        assays = [
+            f"{a.assay_id} ({a.role}): {a.target}, {a.assay_format}, {a.species}; "
+            f"{a.conditions}; {a.readout.replace('_', ' ')}, asymptotes "
+            f"{a.asymptotes.replace('_', ' ')}; {len(a.concentrations)} concentrations "
+            f"{a.concentrations[0]:g}-{a.concentrations[-1]:g} {u} x {a.replicates}"
+            + (
+                f"; reference {a.reference.name} accepted at {a.reference.acceptance_low:g}-"
+                f"{a.reference.acceptance_high:g} {u} ({a.reference.basis})"
+                if a.reference
+                else ""
+            )
+            for a in p.assays
+        ]
         conds = {a.conditions for a in p.assays}
         notes = []
         if len(conds) > 1 and any(a.role == "off_target" for a in p.assays):
-            notes.append("assay conditions differ between assays: IC50 ratios are relative "
-                         "potencies under those conditions, not affinity ratios (no Ki "
-                         "conversion is applied)")
-        design: dict[str, Any] = {"assays": assays,
-                                  "curve_fit": f"4PL; R-squared >= {p.min_r2:g} "
-                                               f"({p.fit_acceptance_basis})",
-                                  "relative_potency": "off-target / primary 50% effective "
-                                                      "concentration, delta-method 95% CI "
-                                                      "(Ritz et al. 2015); no threshold"}
+            notes.append(
+                "assay conditions differ between assays: IC50 ratios are relative "
+                "potencies under those conditions, not affinity ratios (no Ki "
+                "conversion is applied)"
+            )
+        design: dict[str, Any] = {
+            "assays": assays,
+            "curve_fit": f"4PL; R-squared >= {p.min_r2:g} ({p.fit_acceptance_basis})",
+            "relative_potency": "off-target / primary 50% effective "
+            "concentration, delta-method 95% CI "
+            "(Ritz et al. 2015); no threshold",
+        }
         if notes:
             design["design_notes"] = notes
-        crit = tuple(AcceptanceCriterion(f"reference.{a.assay_id}",
-                                         f"{a.reference.name} {a.potency_label} within "
-                                         f"{a.reference.acceptance_low:g}-"
-                                         f"{a.reference.acceptance_high:g} {u}", a.reference.basis)
-                     for a in p.assays if a.reference)
+        crit = tuple(
+            AcceptanceCriterion(
+                f"reference.{a.assay_id}",
+                f"{a.reference.name} {a.potency_label} within "
+                f"{a.reference.acceptance_low:g}-"
+                f"{a.reference.acceptance_high:g} {u}",
+                a.reference.basis,
+            )
+            for a in p.assays
+            if a.reference
+        )
         return ProtocolDocument(
-            driver_id=self.id, driver_version=self.version,
+            driver_id=self.id,
+            driver_version=self.version,
             title=f"In vitro potency and selectivity of {compound.name}",
             objective="Characterise activity at the intended target and at off-targets (ICH "
-                      "M3(R2) 2; primary and secondary pharmacodynamics, ICH S7A Note 2).",
+            "M3(R2) 2; primary and secondary pharmacodynamics, ICH S7A Note 2).",
             hypothesis=hypothesis,
             test_article={"name": compound.name, "id": compound.id},
             test_system={"targets": [a.target for a in p.assays]},
             design=design,
             steps=(
-                ProtocolStep(1, "Concentration-response", "Test each compound at each assay's "
-                             "concentrations in the stated replicates.", ()),
-                ProtocolStep(2, "Normalisation", "Express responses as percent inhibition or "
-                             "percent activity against the assay's controls.", ()),
+                ProtocolStep(
+                    1,
+                    "Concentration-response",
+                    "Test each compound at each assay's concentrations in the stated replicates.",
+                    (),
+                ),
+                ProtocolStep(
+                    2,
+                    "Normalisation",
+                    "Express responses as percent inhibition or "
+                    "percent activity against the assay's controls.",
+                    (),
+                ),
                 ProtocolStep(3, "Return data", "One row per well per data_template.csv.", ()),
             ),
             acceptance_criteria=crit,
-            materials=tuple(f"reference {a.reference.name} ({a.assay_id})" for a in p.assays
-                            if a.reference),
+            materials=tuple(
+                f"reference {a.reference.name} ({a.assay_id})" for a in p.assays if a.reference
+            ),
             deliverables=("data CSV per template", "pharmacology report"),
             glp=p.glp,
             references=(cite("ich_m3r2"), cite("ich_s7a"), cite("delean1978"), cite("ritz2015")),
@@ -253,26 +294,33 @@ class InVitroPotencyDriver(StudyDriver):
 
     def plan(self, protocol: ProtocolDocument, params: BaseModel) -> StudyPlan:
         p = _p(params)
-        n = sum(len(a.concentrations) * a.replicates * (2 if a.reference else 1)
-                for a in p.assays)
+        n = sum(len(a.concentrations) * a.replicates * (2 if a.reference else 1) for a in p.assays)
         return StudyPlan(
             execution_duration_days=None,
             duration_basis="set by the laboratory per assay",
-            sample_count=n, sample_count_basis="wells: concentrations x replicates per assay "
-                                               "and compound",
+            sample_count=n,
+            sample_count_basis="wells: concentrations x replicates per assay and compound",
             dependencies=("assay validation with the reference compounds",),
             material_requirements=tuple(protocol.materials),
         )
 
-    def sample_manifest(self, params: BaseModel,
-                        compound: CompoundInfo) -> tuple[Mapping[str, Any], ...]:
+    def sample_manifest(
+        self, params: BaseModel, compound: CompoundInfo
+    ) -> tuple[Mapping[str, Any], ...]:
         p = _p(params)
         rows: list[dict[str, Any]] = []
         for a in p.assays:
             for comp in [TEST] + ([a.reference.name] if a.reference else []):
-                rows += [{"assay_id": a.assay_id, "compound": comp, "concentration": f"{c:g}",
-                          "unit": p.concentration_unit, "replicates": a.replicates}
-                         for c in a.concentrations]
+                rows += [
+                    {
+                        "assay_id": a.assay_id,
+                        "compound": comp,
+                        "concentration": f"{c:g}",
+                        "unit": p.concentration_unit,
+                        "replicates": a.replicates,
+                    }
+                    for c in a.concentrations
+                ]
         return tuple(rows)
 
     def data_template(self, params: BaseModel) -> DataTemplate:
@@ -280,22 +328,36 @@ class InVitroPotencyDriver(StudyDriver):
         return DataTemplate(
             template_id=f"{self.id}/{self.version}",
             description="One row per well: assay, compound (TEST or the assay's reference), "
-                        "concentration, replicate and the normalised response in percent.",
+            "concentration, replicate and the normalised response in percent.",
             columns=(
-                DataColumn("assay_id", "assay", kind="text",
-                           choices=tuple(a.assay_id for a in p.assays)),
-                DataColumn("compound", "TEST or reference compound", kind="text",
-                           choices=tuple(p.compounds())),
-                DataColumn("concentration", "concentration", unit=p.concentration_unit,
-                           exclusive_minimum=True, minimum=0),
+                DataColumn(
+                    "assay_id", "assay", kind="text", choices=tuple(a.assay_id for a in p.assays)
+                ),
+                DataColumn(
+                    "compound",
+                    "TEST or reference compound",
+                    kind="text",
+                    choices=tuple(p.compounds()),
+                ),
+                DataColumn(
+                    "concentration",
+                    "concentration",
+                    unit=p.concentration_unit,
+                    exclusive_minimum=True,
+                    minimum=0,
+                ),
                 DataColumn("replicate", "replicate", kind="integer", minimum=1),
-                DataColumn("response", "percent inhibition or percent activity per the assay",
-                           unit="percent"),
+                DataColumn(
+                    "response",
+                    "percent inhibition or percent activity per the assay",
+                    unit="percent",
+                ),
             ),
         )
 
-    def validate_records(self, records: Sequence[Mapping[str, Any]],
-                         params: BaseModel) -> tuple[list[str], list[str]]:
+    def validate_records(
+        self, records: Sequence[Mapping[str, Any]], params: BaseModel
+    ) -> tuple[list[str], list[str]]:
         p = _p(params)
         errors: list[str] = []
         seen: set[tuple[str, str, float, int]] = set()
@@ -305,8 +367,9 @@ class InVitroPotencyDriver(StudyDriver):
             if comp != TEST and (a.reference is None or a.reference.name != comp):
                 errors.append(f"row {i}: {comp} is not the reference compound of {a.assay_id}")
             if not any(abs(float(r["concentration"]) - c) <= 1e-9 * c for c in a.concentrations):
-                errors.append(f"row {i}: {r['concentration']:g} is not a concentration of "
-                              f"{a.assay_id}")
+                errors.append(
+                    f"row {i}: {r['concentration']:g} is not a concentration of {a.assay_id}"
+                )
             key = (a.assay_id, comp, float(r["concentration"]), int(r["replicate"]))
             if key in seen:
                 errors.append(f"row {i}: duplicate well {key}")
@@ -315,15 +378,21 @@ class InVitroPotencyDriver(StudyDriver):
 
     # -- analysis ------------------------------------------------------------------------
 
-    def _analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
-                 inputs: Mapping[str, Quantity]) -> AnalysisResult:
+    def _analyze(
+        self,
+        data: IngestedData,
+        params: BaseModel,
+        compound: CompoundInfo,
+        inputs: Mapping[str, Quantity],
+    ) -> AnalysisResult:
         p = _p(params)
         u = p.concentration_unit
         prov = data.provenance()
         series: dict[tuple[str, str], list[tuple[float, float]]] = defaultdict(list)
         for r in data.records:
             series[(str(r["assay_id"]), str(r["compound"]))].append(
-                (float(r["concentration"]), float(r["response"])))
+                (float(r["concentration"]), float(r["response"]))
+            )
         fits: dict[tuple[str, str], HillFit] = {}
         q: dict[str, Quantity] = {}
         findings: list[QCFinding] = []
@@ -333,40 +402,86 @@ class InVitroPotencyDriver(StudyDriver):
             fb, ft = a.fixed()
             tag = f"{a.potency_label} {comp} at {a.target}"
             try:
-                fit = fit_hill(MeasurementSeries(x=tuple(c for c, _ in pts),
-                                                 y=tuple(v for _, v in pts), x_unit=u,
-                                                 y_unit="percent", provenance=prov,
-                                                 x_label="concentration", y_label="response"),
-                               min_r2=p.min_r2, potency_label=tag, fix_bottom=fb, fix_top=ft)
+                fit = fit_hill(
+                    MeasurementSeries(
+                        x=tuple(c for c, _ in pts),
+                        y=tuple(v for _, v in pts),
+                        x_unit=u,
+                        y_unit="percent",
+                        provenance=prov,
+                        x_label="concentration",
+                        y_label="response",
+                    ),
+                    min_r2=p.min_r2,
+                    potency_label=tag,
+                    fix_bottom=fb,
+                    fix_top=ft,
+                )
             except QuantityError as exc:
-                findings.append(QCFinding(f"fit.{aid}.{comp}", QCStatus.WARN,
-                                          f"{tag}: no fit ({exc})"))
-                rows.append((aid, a.role, comp, Quantity.unavailable(u, label=tag,
-                                                                     reason=str(exc)),
-                             None, "-", "no fit"))
+                findings.append(
+                    QCFinding(f"fit.{aid}.{comp}", QCStatus.WARN, f"{tag}: no fit ({exc})")
+                )
+                rows.append(
+                    (
+                        aid,
+                        a.role,
+                        comp,
+                        Quantity.unavailable(u, label=tag, reason=str(exc)),
+                        None,
+                        "-",
+                        "no fit",
+                    )
+                )
                 continue
             fits[(aid, comp)] = fit
             q[f"potency.{aid}.{comp}"] = fit.ic50
             q[f"hill.{aid}.{comp}"] = fit.hill_slope
             for f in fit.qc.findings:
-                findings.append(QCFinding(f"{f.code}.{aid}.{comp}", f.status,
-                                          f"{tag}: {f.message}"))
+                findings.append(
+                    QCFinding(f"{f.code}.{aid}.{comp}", f.status, f"{tag}: {f.message}")
+                )
             verdict = ""
             if comp != TEST and a.reference is not None:
                 ok = a.reference.acceptance_low <= fit.ic50.require() <= a.reference.acceptance_high
                 verdict = "within acceptance" if ok else "OUTSIDE acceptance"
                 if not ok:
-                    findings.append(QCFinding(
-                        f"reference.{aid}", QCStatus.FAIL,
-                        f"{tag} {fit.ic50.require():.3g} {u} outside "
-                        f"{a.reference.acceptance_low:g}-{a.reference.acceptance_high:g} "
-                        f"({a.reference.basis}); the {aid} run is not valid"))
-            rows.append((aid, a.role, comp, fit.ic50, fit.hill_slope, f"{fit.r_squared:.4f}",
-                         ("extrapolated; " if fit.extrapolated else "") + verdict))
-        tables = [tabulate("Potency (4PL)", ("assay", "role", "compound", "IC50/EC50 (95% CI)",
-                                             "Hill slope", "R-squared", "note"), rows,
-                           note="four-parameter logistic fit; an IC50 outside the tested range "
-                                "is an extrapolation")]
+                    findings.append(
+                        QCFinding(
+                            f"reference.{aid}",
+                            QCStatus.FAIL,
+                            f"{tag} {fit.ic50.require():.3g} {u} outside "
+                            f"{a.reference.acceptance_low:g}-{a.reference.acceptance_high:g} "
+                            f"({a.reference.basis}); the {aid} run is not valid",
+                        )
+                    )
+            rows.append(
+                (
+                    aid,
+                    a.role,
+                    comp,
+                    fit.ic50,
+                    fit.hill_slope,
+                    f"{fit.r_squared:.4f}",
+                    ("extrapolated; " if fit.extrapolated else "") + verdict,
+                )
+            )
+        tables = [
+            tabulate(
+                "Potency (4PL)",
+                (
+                    "assay",
+                    "role",
+                    "compound",
+                    "IC50/EC50 (95% CI)",
+                    "Hill slope",
+                    "R-squared",
+                    "note",
+                ),
+                rows,
+                note="four-parameter logistic fit; an IC50 outside the tested range "
+                "is an extrapolation",
+            )
+        ]
 
         # relative potency of the test article
         invalid = {f.code.split(".", 1)[1] for f in findings if f.code.startswith("reference.")}
@@ -384,68 +499,114 @@ class InVitroPotencyDriver(StudyDriver):
                 elif fo is None:
                     reason = "off-target curve could not be fitted"
                 elif fo.extrapolated and fo.ic50.require() > fo.concentration_range[1]:
-                    reason = (f"off-target {off.potency_label} above the top concentration "
-                              f"{fo.concentration_range[1]:g} {u}; relative potency > "
-                              f"{fo.concentration_range[1] / fn.ic50.require():.3g}")
+                    reason = (
+                        f"off-target {off.potency_label} above the top concentration "
+                        f"{fo.concentration_range[1]:g} {u}; relative potency > "
+                        f"{fo.concentration_range[1] / fn.ic50.require():.3g}"
+                    )
                 elif fo.extrapolated:
                     reason = "off-target potency extrapolated below the tested range"
                 if reason or fo is None or fn is None:
-                    rq = Quantity.unavailable("dimensionless", label=f"relative potency {lab}",
-                                              reason=reason or "not determined")
+                    rq = Quantity.unavailable(
+                        "dimensionless",
+                        label=f"relative potency {lab}",
+                        reason=reason or "not determined",
+                    )
                     rp_rows.append((off.target, on.target, rq, "-", "-"))
                     continue
                 rq = relative_potency(fo.ic50, fn.ic50)
                 q[f"relative_potency.{off.assay_id}.{on.assay_id}"] = rq
                 rp_rows.append((off.target, on.target, rq, fo.hill_slope, fn.hill_slope))
         if rp_rows:
-            tables.append(tabulate(
-                "Relative potency of the test article", ("off-target", "primary target",
-                                                         "off / primary (95% CI)",
-                                                         "Hill slope off", "Hill slope primary"),
-                rp_rows, note="ratio of 50% effective concentrations (Ritz et al. 2015); with "
-                              "different Hill slopes it applies at the 50% level only; no "
-                              "threshold is applied"))
-        return AnalysisResult(quantities=q, tables=tuple(tables), qc=QCVerdict.of(findings),
-                              evidence_admissible=True)
+            tables.append(
+                tabulate(
+                    "Relative potency of the test article",
+                    (
+                        "off-target",
+                        "primary target",
+                        "off / primary (95% CI)",
+                        "Hill slope off",
+                        "Hill slope primary",
+                    ),
+                    rp_rows,
+                    note="ratio of 50% effective concentrations (Ritz et al. 2015); with "
+                    "different Hill slopes it applies at the 50% level only; no "
+                    "threshold is applied",
+                )
+            )
+        return AnalysisResult(
+            quantities=q, tables=tuple(tables), qc=QCVerdict.of(findings), evidence_admissible=True
+        )
 
     # -- interpretation ------------------------------------------------------------------
 
-    def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: ProgramContext | None) -> Interpretation:
+    def _interpret(
+        self, analysis: AnalysisResult, params: BaseModel, context: ProgramContext | None
+    ) -> Interpretation:
         out: list[InterpretiveStatement] = []
         for k, v in analysis.quantities.items():
             if k.startswith("relative_potency.") and v.is_available:
-                out.append(InterpretiveStatement(
-                    f"{v.label}: {v.require():.3g}-fold at the 50% effect level.",
-                    "ratio of fitted 50% effective concentrations", ("ritz2015",), "info"))
-        out.append(InterpretiveStatement(
-            "No regulatory threshold for selectivity exists in ICH M3(R2), S7A or S7B; ICH S7A "
-            "2.4.1 compares doses eliciting adverse effects with those eliciting the primary "
-            "effect in the safety pharmacology studies.", "ICH S7A 2.4.1", ("ich_s7a",), "info"))
+                out.append(
+                    InterpretiveStatement(
+                        f"{v.label}: {v.require():.3g}-fold at the 50% effect level.",
+                        "ratio of fitted 50% effective concentrations",
+                        ("ritz2015",),
+                        "info",
+                    )
+                )
+        out.append(
+            InterpretiveStatement(
+                "No regulatory threshold for selectivity exists in ICH M3(R2), S7A or S7B; ICH S7A "
+                "2.4.1 compares doses eliciting adverse effects with those eliciting the primary "
+                "effect in the safety pharmacology studies.",
+                "ICH S7A 2.4.1",
+                ("ich_s7a",),
+                "info",
+            )
+        )
         for f in analysis.qc.findings:
-            out.append(InterpretiveStatement(
-                f.message, "4PL curve fit and assay acceptance", ("delean1978",),
-                "concern" if f.status is QCStatus.FAIL else "notable"))
-        return Interpretation(statements=tuple(out), requires_expert_judgement=(
-            "Pharmacological relevance of off-target activity at anticipated exposures",))
+            out.append(
+                InterpretiveStatement(
+                    f.message,
+                    "4PL curve fit and assay acceptance",
+                    ("delean1978",),
+                    "concern" if f.status is QCStatus.FAIL else "notable",
+                )
+            )
+        return Interpretation(
+            statements=tuple(out),
+            requires_expert_judgement=(
+                "Pharmacological relevance of off-target activity at anticipated exposures",
+            ),
+        )
 
     # -- report ------------------------------------------------------------------------
 
-    def _report_sections(self, protocol: ProtocolDocument, data: IngestedData,
-                         analysis: AnalysisResult, interpretation: Interpretation,
-                         determinations: Sequence[Mapping[str, Any]]) -> list[ReportSection]:
+    def _report_sections(
+        self,
+        protocol: ProtocolDocument,
+        data: IngestedData,
+        analysis: AnalysisResult,
+        interpretation: Interpretation,
+        determinations: Sequence[Mapping[str, Any]],
+    ) -> list[ReportSection]:
         return [
-            ReportSection("Summary", f"{protocol.title}. Data are "
-                          + ("SIMULATED (not measured)." if data.is_simulated else "measured.")),
-            ReportSection("Design", "\n".join(f"- **{k}:** {v}"
-                                              for k, v in protocol.design.items())),
+            ReportSection(
+                "Summary",
+                f"{protocol.title}. Data are "
+                + ("SIMULATED (not measured)." if data.is_simulated else "measured."),
+            ),
+            ReportSection(
+                "Design", "\n".join(f"- **{k}:** {v}" for k, v in protocol.design.items())
+            ),
             ReportSection("Results", "Concentration-response analysis.", tables=analysis.tables),
         ]
 
     # -- simulation ----------------------------------------------------------------------
 
-    def _simulate_rows(self, params: BaseModel, compound: CompoundInfo, sim: BaseModel,
-                       rng: np.random.Generator) -> tuple[list[dict[str, Any]], str]:
+    def _simulate_rows(
+        self, params: BaseModel, compound: CompoundInfo, sim: BaseModel, rng: np.random.Generator
+    ) -> tuple[list[dict[str, Any]], str]:
         p = _p(params)
         s = sim
         assert isinstance(s, PotencySimulation)
@@ -461,6 +622,13 @@ class InVitroPotencyDriver(StudyDriver):
                     mean = lo + (hi - lo) / (1.0 + (t.ic50 / c) ** t.hill)
                     for k in range(a.replicates):
                         v = mean + (float(rng.normal(0.0, t.noise_sd)) if t.noise_sd else 0.0)
-                        rows.append({"assay_id": a.assay_id, "compound": comp,
-                                     "concentration": c, "replicate": k + 1, "response": v})
+                        rows.append(
+                            {
+                                "assay_id": a.assay_id,
+                                "compound": comp,
+                                "concentration": c,
+                                "replicate": k + 1,
+                                "response": v,
+                            }
+                        )
         return rows, "sim.four_parameter_logistic"

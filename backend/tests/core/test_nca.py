@@ -27,7 +27,9 @@ def test_log_down_is_exact_for_exponential_decline():
 
 
 def test_log_segment_formula_and_fallbacks():
-    assert auc_segment(2, 8, 4, 4, "linear_up_log_down") == pytest.approx(8 / math.log(2), rel=1e-12)
+    assert auc_segment(2, 8, 4, 4, "linear_up_log_down") == pytest.approx(
+        8 / math.log(2), rel=1e-12
+    )
     # rising, equal, or falling to zero: linear trapezoid
     assert auc_segment(0, 0, 1, 10, "linear_up_log_down") == 5
     assert auc_segment(0, 5, 1, 5, "linear_up_log_down") == 5
@@ -44,8 +46,12 @@ def test_blq_rule_leading_zero_then_excluded():
 
 
 def test_exposure_parameters_from_a_profile_with_blq():
-    r = exposure_nca([0, 0.5, 1, 2, 4, 8, 24], [None, None, 5, 10, 6, None, None],
-                     method="linear", tau_nominal_index=6)
+    r = exposure_nca(
+        [0, 0.5, 1, 2, 4, 8, 24],
+        [None, None, 5, 10, 6, None, None],
+        method="linear",
+        tau_nominal_index=6,
+    )
     assert (r.cmax, r.tmax, r.clast, r.tlast) == (10, 2, 6, 4)
     assert r.auc_last == pytest.approx(0 + 1.25 + 7.5 + 16)
     assert r.auc_tau is None and "BLQ" in r.reasons["auc_tau"]
@@ -112,8 +118,8 @@ def test_lambda_z_fit_and_adjusted_r2():
     noisy = fit_lambda_z(t, [20.0, 9.0, 5.0, 2.0])
     r2 = noisy.r_squared
     assert noisy.adj_r_squared == pytest.approx(1 - (1 - r2) * 3 / 2)
-    assert fit_lambda_z([1, 2], [2, 1]) is None          # fewer than 3 points
-    assert fit_lambda_z([1, 2, 3], [1, 2, 3]) is None    # no decline
+    assert fit_lambda_z([1, 2], [2, 1]) is None  # fewer than 3 points
+    assert fit_lambda_z([1, 2, 3], [1, 2, 3]) is None  # no decline
 
 
 def test_candidates_start_after_tmax_and_vendor_suggestion_prefers_more_points():
@@ -133,16 +139,35 @@ def test_iv_bolus_c0_back_extrapolation():
 def test_infusion_mrt_subtracts_half_the_infusion_time():
     t = [0, 1, 2, 4, 6, 8]
     c = [0, 10.0, 8.0, 4.0, 2.0, 1.0]
-    r = single_dose_nca(t, c, administration="iv_infusion", method="linear_up_log_down",
-                        dose_time_rule="measured_predose", terminal_start=2, infusion_duration=1)
+    r = single_dose_nca(
+        t,
+        c,
+        administration="iv_infusion",
+        method="linear_up_log_down",
+        dose_time_rule="measured_predose",
+        terminal_start=2,
+        infusion_duration=1,
+    )
     assert r.mrt_inf == pytest.approx(r.aumc_inf / r.auc_inf - 0.5)
     assert r.auc_pct_extrap == pytest.approx(100 * (r.auc_inf - r.auc_last) / r.auc_inf)
 
 
 def test_measured_predose_rule_requires_a_time_zero_sample():
-    r = single_dose_nca([0.5, 1, 2, 4], [5.0, 10, 5, 2.5], administration="extravascular",
-                        method="linear", dose_time_rule="measured_predose", terminal_start=1)
+    r = single_dose_nca(
+        [0.5, 1, 2, 4],
+        [5.0, 10, 5, 2.5],
+        administration="extravascular",
+        method="linear",
+        dose_time_rule="measured_predose",
+        terminal_start=1,
+    )
     assert r.auc_last is None and "pre-dose" in r.reasons["auc_last"]
-    z = single_dose_nca([0.5, 1, 2, 4], [5.0, 10, 5, 2.5], administration="extravascular",
-                        method="linear", dose_time_rule="zero_single_dose", terminal_start=1)
+    z = single_dose_nca(
+        [0.5, 1, 2, 4],
+        [5.0, 10, 5, 2.5],
+        administration="extravascular",
+        method="linear",
+        dose_time_rule="zero_single_dose",
+        terminal_start=1,
+    )
     assert z.auc_last == pytest.approx(0.5 * 5 / 2 + 0.5 * 15 / 2 + 1 * 15 / 2 + 2 * 7.5 / 2)

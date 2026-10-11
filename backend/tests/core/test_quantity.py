@@ -73,7 +73,9 @@ def test_incompatible_conversion_raises():
 
 def test_predicted_out_of_domain_is_flagged():
     q = Quantity.predicted(
-        0.5, "dimensionless", method=M,
+        0.5,
+        "dimensionless",
+        method=M,
         applicability=ApplicabilityCheck(in_domain=False, reason="outside range"),
     )
     assert "out_of_applicability_domain" in q.qc_flags
@@ -89,15 +91,23 @@ def test_ids_are_deterministic_and_input_linked():
 
 def test_series_validation():
     with pytest.raises(QuantityError):
-        MeasurementSeries(x=(0.0, 1.0), y=(1.0,), x_unit="min", y_unit="percent",
-                          provenance=Provenance.measured(source_name="s"))
+        MeasurementSeries(
+            x=(0.0, 1.0),
+            y=(1.0,),
+            x_unit="min",
+            y_unit="percent",
+            provenance=Provenance.measured(source_name="s"),
+        )
 
 
 def test_simulated_requires_parameters_and_is_never_evidence():
     from hos.core.methods import method
+
     with pytest.raises(ValueError):
         Provenance(kind=ProvenanceKind.SIMULATED, method=method("sim.first_order_depletion"))
-    p = Provenance.simulated(method=method("sim.first_order_depletion"), parameters="t1/2=20 min", seed=1)
+    p = Provenance.simulated(
+        method=method("sim.first_order_depletion"), parameters="t1/2=20 min", seed=1
+    )
     q = Quantity(value=1.0, unit="percent", provenance=p)
     assert q.is_simulated and not q.admissible_as_evidence
     assert "not a measurement" in q.provenance.notes
@@ -105,6 +115,7 @@ def test_simulated_requires_parameters_and_is_never_evidence():
 
 def test_values_derived_from_simulation_are_inadmissible():
     from hos.core.quantity import SIMULATION_TAINT
+
     q = Quantity.computed(2.0, "mg", method=M)
     assert q.admissible_as_evidence
     tq = q.tainted_by_simulation()

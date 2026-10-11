@@ -14,8 +14,11 @@ CONC = np.array([0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0])
 
 def _curve(ic50, conc=CONC):
     return MeasurementSeries(
-        x=tuple(conc), y=tuple(four_parameter_logistic(conc, 0.0, 100.0, ic50, 1.0)),
-        x_unit="uM", y_unit="percent", provenance=Provenance.measured(source_name="QPatch"),
+        x=tuple(conc),
+        y=tuple(four_parameter_logistic(conc, 0.0, 100.0, ic50, 1.0)),
+        x_unit="uM",
+        y_unit="percent",
+        provenance=Provenance.measured(source_name="QPatch"),
     )
 
 
@@ -50,10 +53,12 @@ def test_hed_matches_fda_table():
 
 
 def test_mrsd_selects_most_sensitive_species():
-    p = project_starting_dose({
-        "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
-        "dog": Quantity.measured(10.0, "mg/kg", source_name="d"),
-    })
+    p = project_starting_dose(
+        {
+            "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
+            "dog": Quantity.measured(10.0, "mg/kg", source_name="d"),
+        }
+    )
     assert p.most_sensitive_species == "dog"
     assert p.mrsd_per_kg.value == pytest.approx(10 * 20 / 37 / 10)
     assert p.mrsd_total.value == pytest.approx(10 * 20 / 37 / 10 * 60)
@@ -80,13 +85,15 @@ def test_pad_above_mrsd_not_flagged():
 
 def test_reference_values_match_fda_2005():
     from hos.core.reference_params import get_parameter
-    assert get_parameter("bw.minipig").value == 40.0      # Table 3: mini-pig 40 kg
-    assert get_parameter("bw.micropig").value == 20.0     # Table 3: micro-pig 20 kg
-    assert get_parameter("km.rat").unit == "kg/m**2"      # Appendix D: kg/m2
+
+    assert get_parameter("bw.minipig").value == 40.0  # Table 3: mini-pig 40 kg
+    assert get_parameter("bw.micropig").value == 20.0  # Table 3: micro-pig 20 kg
+    assert get_parameter("km.rat").unit == "kg/m**2"  # Appendix D: kg/m2
 
 
 def test_reference_values_match_davies_morris_1993():
     from hos.core.reference_params import get_parameter
+
     assert get_parameter("qh.mouse").value == pytest.approx(1.8 / 0.02)
     assert get_parameter("qh.rabbit").value == pytest.approx(177 / 2.5)
     assert get_parameter("liver_weight.rat").value == pytest.approx(10.0 / 0.25)
@@ -95,8 +102,9 @@ def test_reference_values_match_davies_morris_1993():
 
 def test_reduced_safety_factor_requires_justification():
     with pytest.raises(QuantityError):
-        project_starting_dose({"rat": Quantity.measured(100.0, "mg/kg", source_name="r")},
-                              safety_factor=5.0)
+        project_starting_dose(
+            {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")}, safety_factor=5.0
+        )
 
 
 def test_missing_noael_yields_unavailable_mrsd():

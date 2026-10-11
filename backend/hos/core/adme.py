@@ -48,7 +48,6 @@ __all__ = [
 _SOFTWARE = {"numpy": np.__version__, "scipy": scipy.__version__}
 
 
-
 @dataclass(frozen=True, slots=True)
 class DepletionFit:
     """Result of fitting first-order substrate depletion."""
@@ -126,7 +125,7 @@ def fit_depletion(
                 code="poor_depletion_fit",
                 status=QCStatus.WARN,
                 message="ln-linear regression quality below threshold; "
-                        "the first-order assumption may not hold over this range",
+                "the first-order assumption may not hold over this range",
                 observed=round(r2, 4),
                 threshold=min_r2,
             )
@@ -137,7 +136,7 @@ def fit_depletion(
                 code="insufficient_depletion",
                 status=QCStatus.WARN,
                 message="total depletion is low, so the rate constant is poorly determined; "
-                        "the compound should be reported as below the assay's resolving power",
+                "the compound should be reported as below the assay's resolving power",
                 observed=round(depletion_pct, 1),
                 threshold=min_depletion_pct,
             )
@@ -156,17 +155,26 @@ def fit_depletion(
     qc = QCVerdict.of(findings)
     if not qc.passed:
         unavailable_reason = "; ".join(f.message for f in findings if f.status is QCStatus.FAIL)
-        k_q = Quantity.unavailable("1/min", reason=unavailable_reason, label="Elimination rate constant")
-        t_half_q = Quantity.unavailable("min", reason=unavailable_reason, label="In vitro half-life")
+        k_q = Quantity.unavailable(
+            "1/min", reason=unavailable_reason, label="Elimination rate constant"
+        )
+        t_half_q = Quantity.unavailable(
+            "min", reason=unavailable_reason, label="In vitro half-life"
+        )
         return DepletionFit(
-            k=k_q, half_life=t_half_q, r_squared=r2, n_points=series.n,
-            depletion_percent=depletion_pct, intercept_fraction=float(math.exp(reg.intercept)),
+            k=k_q,
+            half_life=t_half_q,
+            r_squared=r2,
+            n_points=series.n,
+            depletion_percent=depletion_pct,
+            intercept_fraction=float(math.exp(reg.intercept)),
             qc=qc,
         )
 
     k_se = float(reg.stderr) if reg.stderr is not None else None
     k_q = Quantity.computed(
-        k_val, "1/min",
+        k_val,
+        "1/min",
         method=method("adme.depletion_fit"),
         software=_SOFTWARE,
         uncertainty=Uncertainty(kind="sd", sd=k_se, n=series.n) if k_se else None,
@@ -176,7 +184,8 @@ def fit_depletion(
     )
     t_half = math.log(2.0) / k_val
     t_half_q = Quantity.computed(
-        t_half, "min",
+        t_half,
+        "min",
         method=method("adme.depletion_fit"),
         inputs=[k_q],
         software=_SOFTWARE,
@@ -214,7 +223,8 @@ def clint_in_vitro(fit: DepletionFit, protein_concentration: Quantity) -> Quanti
         raise QuantityError("microsomal protein concentration must be positive")
     clint = k * 1000.0 / c_prot  # (1/min) / (mg/uL) -> uL/min/mg
     return Quantity.computed(
-        clint, "uL/min/mg",
+        clint,
+        "uL/min/mg",
         method=method("adme.clint_invitro"),
         inputs=[fit.k, protein_concentration],
         software=_SOFTWARE,
@@ -262,7 +272,9 @@ def fu_mic_hallifax_houston(
     applicability = ApplicabilityCheck(
         in_domain=in_domain,
         descriptor_ranges_checked=("logP/logD", "microsomal protein concentration"),
-        reason=None if in_domain else (
+        reason=None
+        if in_domain
+        else (
             f"lipophilicity {x:.2f} at {c:g} mg/mL protein is outside the range [{lo:g}, {hi:g}) "
             "in which Gertz et al. (2008) found the equation reliable; measure fu,inc "
             "experimentally (e.g. equilibrium dialysis)"
@@ -273,7 +285,8 @@ def fu_mic_hallifax_houston(
     ratio = c * (10.0 ** (_HH_A * x * x + _HH_B * x + _HH_C))
     fu = 1.0 / (1.0 + ratio)
     return Quantity.predicted(
-        fu, "dimensionless",
+        fu,
+        "dimensionless",
         method=method("adme.fu_mic_predicted"),
         applicability=applicability,
         inputs=[lipophilicity, protein_concentration],
@@ -300,7 +313,8 @@ def scale_clint_to_liver(
     params = params or ReferenceParameterSet()
     if not clint_app.is_available:
         return Quantity.unavailable(
-            "mL/min/kg", reason=f"no in vitro CLint: {clint_app.provenance.reason}",
+            "mL/min/kg",
+            reason=f"no in vitro CLint: {clint_app.provenance.reason}",
             label="CLint,in vivo",
         )
     sp = species.lower()
@@ -309,7 +323,7 @@ def scale_clint_to_liver(
             return Quantity.unavailable(
                 "mL/min/kg",
                 reason=f"no verified reference value {pid!r} in registry {params.version}; "
-                       "a value from another species is not substituted",
+                "a value from another species is not substituted",
                 label=f"CLint,in vivo ({species})",
             )
     mppgl = params.for_species("mppgl", species)
@@ -329,15 +343,19 @@ def scale_clint_to_liver(
 
     scaled = clint * mppgl.magnitude_in("mg/g") * liver_wt.magnitude_in("g/kg") / 1000.0
     return Quantity.computed(
-        scaled, "mL/min/kg",
+        scaled,
+        "mL/min/kg",
         method=method("adme.clint_invivo"),
         inputs=inputs,
         software=_SOFTWARE,
         parameter_set_version=params.version,
         label=f"CLint,in vivo ({species})",
         qc_flags=dict.fromkeys(flags),
-        notes=("corrected for microsomal binding" if fu_mic is not None and fu_mic.is_available
-               else "uncorrected for microsomal binding"),
+        notes=(
+            "corrected for microsomal binding"
+            if fu_mic is not None and fu_mic.is_available
+            else "uncorrected for microsomal binding"
+        ),
     )
 
 
@@ -358,7 +376,8 @@ def fu_blood_from_plasma(fu_plasma: Quantity, blood_plasma_ratio: Quantity) -> Q
     if fub > 1.0:
         flags.append("fu_blood_exceeds_unity")
     return Quantity.computed(
-        fub, "dimensionless",
+        fub,
+        "dimensionless",
         method=method("adme.fu_blood"),
         inputs=[fu_plasma, blood_plasma_ratio],
         software=_SOFTWARE,
@@ -388,7 +407,8 @@ def hepatic_clearance_well_stirred(
         )
     if not params.has(f"qh.{species.lower()}"):
         return Quantity.unavailable(
-            "mL/min/kg", reason=f"no verified hepatic blood flow for {species}", label="CLh")
+            "mL/min/kg", reason=f"no verified hepatic blood flow for {species}", label="CLh"
+        )
     qh_q = params.for_species("qh", species)
     qh = qh_q.magnitude_in("mL/min/kg")
     clint = clint_in_vivo.magnitude_in("mL/min/kg")
@@ -397,7 +417,8 @@ def hepatic_clearance_well_stirred(
     clh = (qh * fub * clint) / (qh + fub * clint)
     flags = list(clint_in_vivo.qc_flags) + list(fu_blood.qc_flags) + list(qh_q.qc_flags)
     return Quantity.computed(
-        clh, "mL/min/kg",
+        clh,
+        "mL/min/kg",
         method=method("adme.clh_well_stirred"),
         inputs=[clint_in_vivo, fu_blood, qh_q],
         software=_SOFTWARE,
@@ -417,13 +438,15 @@ def extraction_ratio(
     params = params or ReferenceParameterSet()
     if not clh.is_available:
         return Quantity.unavailable(
-            "dimensionless", reason=f"no hepatic clearance: {clh.provenance.reason}",
+            "dimensionless",
+            reason=f"no hepatic clearance: {clh.provenance.reason}",
             label="Eh",
         )
     qh_q = params.for_species("qh", species)
     e = clh.magnitude_in("mL/min/kg") / qh_q.magnitude_in("mL/min/kg")
     return Quantity.computed(
-        e, "dimensionless",
+        e,
+        "dimensionless",
         method=method("adme.extraction_ratio"),
         inputs=[clh, qh_q],
         software=_SOFTWARE,
@@ -515,7 +538,8 @@ def ivive_from_depletion(
 
     if e.is_available:
         fh = Quantity.computed(
-            1.0 - e.require(), "dimensionless",
+            1.0 - e.require(),
+            "dimensionless",
             method=method("adme.extraction_ratio"),
             inputs=[e],
             software=_SOFTWARE,
@@ -526,7 +550,8 @@ def ivive_from_depletion(
         )
     else:
         fh = Quantity.unavailable(
-            "dimensionless", reason=e.provenance.reason or "extraction ratio unavailable",
+            "dimensionless",
+            reason=e.provenance.reason or "extraction ratio unavailable",
             label="Fh, predicted hepatic availability",
         )
 

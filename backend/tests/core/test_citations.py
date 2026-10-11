@@ -9,10 +9,25 @@ from hos.core.regulatory import Indication, Modality, ProgramContext, Route, der
 from hos.core.regulatory.engine import RequirementStatus
 
 JOURNAL_KEYS = (
-    "wildman1999", "ertl2000", "lipinski2001", "veber2002", "bickerton2012", "obach1999",
-    "wilkinson1975", "houston1994", "hallifax2006", "riley2005", "davies1993", "barter2007",
-    "delean1978", "redfern2003", "dunnett1955", "gertz2008",
-    "hakooz2006", "smith2008", "barter2008",
+    "wildman1999",
+    "ertl2000",
+    "lipinski2001",
+    "veber2002",
+    "bickerton2012",
+    "obach1999",
+    "wilkinson1975",
+    "houston1994",
+    "hallifax2006",
+    "riley2005",
+    "davies1993",
+    "barter2007",
+    "delean1978",
+    "redfern2003",
+    "dunnett1955",
+    "gertz2008",
+    "hakooz2006",
+    "smith2008",
+    "barter2008",
 )
 
 
@@ -47,22 +62,29 @@ def _sections(ctx: ProgramContext) -> dict[str, str]:
     return {r.id: r.section for r in derive_study_set(ctx).requirements}
 
 
-SM = ProgramContext(modality=Modality.SMALL_MOLECULE, indication=Indication.CHRONIC_NON_ONCOLOGY,
-                    route=Route.ORAL, intended_clinical_duration_days=365,
-                    max_trial_duration_days=28)
+SM = ProgramContext(
+    modality=Modality.SMALL_MOLECULE,
+    indication=Indication.CHRONIC_NON_ONCOLOGY,
+    route=Route.ORAL,
+    intended_clinical_duration_days=365,
+    max_trial_duration_days=28,
+)
 
 
-@pytest.mark.parametrize("req_id,expected", [
-    ("safety.core_battery", "S7A sections 2.7, 2.10.1"),
-    ("safety.herg", "S7B sections 2.3.1, 3.1.2"),
-    ("safety.in_vivo_qt", "S7B sections 2.3.2, 3.1.3"),
-    ("tox.repeat_dose_rodent", "M3(R2) section 5.1, Table 1"),
-    ("genotox.ames", "M3(R2) section 9"),
-    ("dart.fertility", "M3(R2) sections 11.1, 11.3"),
-    ("tox.local_tolerance", None),  # oral route: not emitted
-    ("photo.assessment", "S10 sections 2, 5.1.1"),
-    ("immunotox.weight_of_evidence", "S8 sections 2.1, 2.2"),
-])
+@pytest.mark.parametrize(
+    "req_id,expected",
+    [
+        ("safety.core_battery", "S7A sections 2.7, 2.10.1"),
+        ("safety.herg", "S7B sections 2.3.1, 3.1.2"),
+        ("safety.in_vivo_qt", "S7B sections 2.3.2, 3.1.3"),
+        ("tox.repeat_dose_rodent", "M3(R2) section 5.1, Table 1"),
+        ("genotox.ames", "M3(R2) section 9"),
+        ("dart.fertility", "M3(R2) sections 11.1, 11.3"),
+        ("tox.local_tolerance", None),  # oral route: not emitted
+        ("photo.assessment", "S10 sections 2, 5.1.1"),
+        ("immunotox.weight_of_evidence", "S8 sections 2.1, 2.2"),
+    ],
+)
 def test_small_molecule_sections_match_verified_text(req_id, expected):
     got = _sections(SM).get(req_id)
     assert got == expected
@@ -76,9 +98,15 @@ def test_carcinogenicity_trigger_is_attributed_to_s1a():
 
 
 def test_s9_sections_match_verified_text():
-    s = _sections(ProgramContext(modality=Modality.SMALL_MOLECULE,
-                                 indication=Indication.ADVANCED_CANCER, route=Route.ORAL,
-                                 intended_clinical_duration_days=90, max_trial_duration_days=28))
+    s = _sections(
+        ProgramContext(
+            modality=Modality.SMALL_MOLECULE,
+            indication=Indication.ADVANCED_CANCER,
+            route=Route.ORAL,
+            intended_clinical_duration_days=90,
+            max_trial_duration_days=28,
+        )
+    )
     assert s["safety.core_battery"] == "S9 section 2.2"
     assert s["tox.repeat_dose"] == "S9 sections 2.4, 3.3"
     assert s["dart.efd"] == "S9 section 2.5"
@@ -89,12 +117,16 @@ def test_in_vivo_adme_pk_is_due_before_phase_3_per_m3r2_section_3():
     # M3(R2) section 3: before human trials, in vitro metabolism, plasma protein binding and
     # systemic exposure (S3A) in the tox species; further ADME PK "generally before Phase III"
     from hos.core.regulatory import Timing
+
     ss = derive_study_set(SM)
     pk = next(r for r in ss.requirements if r.id == "adme.in_vivo_pk")
     assert pk.timing is Timing.BEFORE_PHASE_3
     fih = {r.id for r in ss.due_by(Timing.BEFORE_FIRST_IN_HUMAN)}
-    assert {"adme.metabolic_stability", "adme.plasma_protein_binding",
-            "tox.toxicokinetics"} <= fih and "adme.in_vivo_pk" not in fih
+    assert {
+        "adme.metabolic_stability",
+        "adme.plasma_protein_binding",
+        "tox.toxicokinetics",
+    } <= fih and "adme.in_vivo_pk" not in fih
 
 
 def test_toxicokinetics_is_filed_with_the_repeat_dose_study_per_m4s():

@@ -56,20 +56,26 @@ from hos.drivers.repeat_dose_tox.analysis import compare_groups, dose_eq
 from hos.kernel.attestation import Role
 
 #: ICH S7A 2.7.1: the five CNS domains of the core battery
-S7A_CNS_DOMAINS = ("motor_activity", "behaviour", "coordination", "sensory_motor_reflex",
-                   "body_temperature")
+S7A_CNS_DOMAINS = (
+    "motor_activity",
+    "behaviour",
+    "coordination",
+    "sensory_motor_reflex",
+    "body_temperature",
+)
 GROUPS = ("vehicle", "test", "positive")
-METHOD_CITATION = {"fob": "mattsson1996", "modified_irwin": "irwin1968",
-                   "other": "haggerty1991"}
+METHOD_CITATION = {"fob": "mattsson1996", "modified_irwin": "irwin1968", "other": "haggerty1991"}
 
 
 class Observation(BaseModel):
     name: str = Field(min_length=1, pattern=r"^[A-Za-z0-9_\- ]+$")
-    domain: Literal["motor_activity", "behaviour", "coordination", "sensory_motor_reflex",
-                    "body_temperature"]
+    domain: Literal[
+        "motor_activity", "behaviour", "coordination", "sensory_motor_reflex", "body_temperature"
+    ]
     scale: Literal["binary", "ordinal", "continuous"]
-    normal_score: int | None = Field(default=None, description="binary/ordinal: the score "
-                                     "meaning no finding")
+    normal_score: int | None = Field(
+        default=None, description="binary/ordinal: the score meaning no finding"
+    )
     score_min: int | None = None
     score_max: int | None = None
     unit: str | None = Field(default=None, description="continuous measures")
@@ -108,11 +114,16 @@ class CNSParams(BaseModel):
     method: Literal["fob", "modified_irwin", "other"]
     method_reference: str = Field(min_length=1, description="the laboratory's procedure")
     dose_levels_mg_per_kg: list[float] = Field(min_length=1)
-    dose_selection_basis: str = Field(min_length=1, description="S7A 2.4.1: include and exceed "
-                                      "the primary pharmacodynamic or therapeutic range")
+    dose_selection_basis: str = Field(
+        min_length=1,
+        description="S7A 2.4.1: include and exceed "
+        "the primary pharmacodynamic or therapeutic range",
+    )
     animals_per_sex_per_group: int = Field(ge=1)
-    group_size_basis: str = Field(min_length=1, description="S7A 2.3.3.1: adequate to show or "
-                                  "rule out a biologically significant effect")
+    group_size_basis: str = Field(
+        min_length=1,
+        description="S7A 2.3.3.1: adequate to show or rule out a biologically significant effect",
+    )
     positive_control: str | None = Field(default=None, description="substance and dose")
     positive_control_omission_justification: str | None = None
     timepoints: list[str] = Field(min_length=1)
@@ -140,11 +151,15 @@ class CNSParams(BaseModel):
         names = [o.name for o in self.observations]
         if len(set(names)) != len(names):
             errs.append("observation names must be unique")
-        if not self.positive_control and not (
-                self.positive_control_omission_justification or "").strip():
-            errs.append("include a positive control or justify its omission (S7A 2.3.3.1: "
-                        "positive controls may not be necessary in well-characterized in vivo "
-                        "test systems)")
+        if (
+            not self.positive_control
+            and not (self.positive_control_omission_justification or "").strip()
+        ):
+            errs.append(
+                "include a positive control or justify its omission (S7A 2.3.3.1: "
+                "positive controls may not be necessary in well-characterized in vivo "
+                "test systems)"
+            )
         if self.baseline_timepoint and self.baseline_timepoint not in self.timepoints:
             errs.append("the baseline timepoint must be one of the timepoints")
         if self.statistics == "dunnett":
@@ -168,14 +183,16 @@ class CNSParams(BaseModel):
 
 class ObservationTruth(BaseModel):
     observation: str
-    incidence_by_dose: list[float] | None = Field(default=None, description="binary/ordinal: "
-                                                  "fraction of animals with a finding per dose")
+    incidence_by_dose: list[float] | None = Field(
+        default=None, description="binary/ordinal: fraction of animals with a finding per dose"
+    )
     finding_score: int | None = None
     positive_control_incidence: float | None = Field(default=None, ge=0, le=1)
     control_mean: float | None = None
     sd: float | None = Field(default=None, ge=0)
-    effect_by_dose: list[float] | None = Field(default=None, description="continuous: change "
-                                               "from control mean per dose (absolute)")
+    effect_by_dose: list[float] | None = Field(
+        default=None, description="continuous: change from control mean per dose (absolute)"
+    )
     positive_control_effect: float | None = None
 
 
@@ -197,13 +214,16 @@ class SafetyPharmCNSDriver(StudyDriver):
     version = "1.0.0"
     requirement_ids = ("safety.core_battery",)
     components = MappingProxyType({"safety.core_battery": ("cns",)})
-    modalities = frozenset({Modality.SMALL_MOLECULE, Modality.PEPTIDE,
-                            Modality.MONOCLONAL_ANTIBODY})
+    modalities = frozenset(
+        {Modality.SMALL_MOLECULE, Modality.PEPTIDE, Modality.MONOCLONAL_ANTIBODY}
+    )
     ctd_section = "4.2.1.3"
     glp_capable = True
-    description = ("Functional observation battery / modified Irwin covering the five S7A "
-                   "2.7.1 domains; incidence by dose, sex and time; adverse CNS effect by the "
-                   "Study Director.")
+    description = (
+        "Functional observation battery / modified Irwin covering the five S7A "
+        "2.7.1 domains; incidence by dose, sex and time; adverse CNS effect by the "
+        "Study Director."
+    )
     reference_keys = ("ich_s7a", "mattsson1996", "irwin1968", "haggerty1991")
 
     @classmethod
@@ -222,46 +242,75 @@ class SafetyPharmCNSDriver(StudyDriver):
 
     # -- design ----------------------------------------------------------------------
 
-    def design(self, compound: CompoundInfo, params: BaseModel,
-               context: ProgramContext | None = None,
-               hypothesis: str | None = None) -> ProtocolDocument:
+    def design(
+        self,
+        compound: CompoundInfo,
+        params: BaseModel,
+        context: ProgramContext | None = None,
+        hypothesis: str | None = None,
+    ) -> ProtocolDocument:
         p = _p(params)
         design: dict[str, Any] = {
             "test_system": f"{p.species} ({p.strain}), sexes {', '.join(p.sexes)}, conscious",
             "method": f"{p.method.replace('_', ' ')} ({p.method_reference})",
             "groups": f"vehicle ({p.vehicle}), "
-                      + ", ".join(f"{d:g}" for d in p.dose_levels_mg_per_kg) + " mg/kg"
-                      + (f", positive control {p.positive_control}" if p.positive_control
-                         else f"; no positive control: {p.positive_control_omission_justification}"),
+            + ", ".join(f"{d:g}" for d in p.dose_levels_mg_per_kg)
+            + " mg/kg"
+            + (
+                f", positive control {p.positive_control}"
+                if p.positive_control
+                else f"; no positive control: {p.positive_control_omission_justification}"
+            ),
             "animals": f"{p.animals_per_sex_per_group} per sex per group ({p.group_size_basis})",
             "dosing": f"single dose, {p.route} (S7A 2.5)",
             "dose_selection": p.dose_selection_basis,
             "timepoints": ", ".join(p.timepoints) + f" ({p.timepoint_basis})",
-            "observations": [f"{o.name} [{o.domain.replace('_', ' ')}; {o.scale}"
-                             + (f", {o.unit}" if o.unit else
-                                f", scale {o.bounds()[0]}-{o.bounds()[1]}, normal "
-                                f"{o.normal_score}") + "]" for o in p.observations],
+            "observations": [
+                f"{o.name} [{o.domain.replace('_', ' ')}; {o.scale}"
+                + (
+                    f", {o.unit}"
+                    if o.unit
+                    else f", scale {o.bounds()[0]}-{o.bounds()[1]}, normal {o.normal_score}"
+                )
+                + "]"
+                for o in p.observations
+            ],
             "analysis": "incidence of findings per group and timepoint; continuous measures "
-                        + ("by Dunnett vs vehicle" if p.statistics == "dunnett"
-                           else "descriptively vs vehicle") + f" ({p.statistics_basis})",
+            + ("by Dunnett vs vehicle" if p.statistics == "dunnett" else "descriptively vs vehicle")
+            + f" ({p.statistics_basis})",
         }
         return ProtocolDocument(
-            driver_id=self.id, driver_version=self.version,
+            driver_id=self.id,
+            driver_version=self.version,
             title=f"Central nervous system safety pharmacology of {compound.name} in the "
-                  f"{p.species}",
+            f"{p.species}",
             objective="Evaluate motor activity, behavioural changes, coordination, sensory/motor "
-                      "reflex responses and body temperature (ICH S7A 2.7.1).",
+            "reflex responses and body temperature (ICH S7A 2.7.1).",
             hypothesis=hypothesis,
             test_article={"name": compound.name, "id": compound.id},
             test_system={"species": p.species, "strain": p.strain},
             design=design,
             steps=(
-                ProtocolStep(1, "Dosing", f"Single dose by {p.route}; vehicle and positive "
-                             "control groups dosed alongside.", ()),
-                ProtocolStep(2, "Observations", "Score every observation at every timepoint "
-                             "blind to treatment where feasible; record body temperature.", ()),
-                ProtocolStep(3, "Return data", "One row per animal x observation x timepoint "
-                             "per data_template.csv.", ()),
+                ProtocolStep(
+                    1,
+                    "Dosing",
+                    f"Single dose by {p.route}; vehicle and positive "
+                    "control groups dosed alongside.",
+                    (),
+                ),
+                ProtocolStep(
+                    2,
+                    "Observations",
+                    "Score every observation at every timepoint "
+                    "blind to treatment where feasible; record body temperature.",
+                    (),
+                ),
+                ProtocolStep(
+                    3,
+                    "Return data",
+                    "One row per animal x observation x timepoint per data_template.csv.",
+                    (),
+                ),
             ),
             acceptance_criteria=(),
             materials=tuple(x for x in (p.vehicle, p.positive_control) if x),
@@ -278,43 +327,61 @@ class SafetyPharmCNSDriver(StudyDriver):
         return StudyPlan(
             execution_duration_days=1.0,
             duration_basis="single dose with observations over the stated timepoints (S7A 2.5); "
-                           "scheduling and reporting are set by the laboratory",
-            sample_count=n, sample_count_basis="animals: groups x sexes x animals",
+            "scheduling and reporting are set by the laboratory",
+            sample_count=n,
+            sample_count_basis="animals: groups x sexes x animals",
             dependencies=("dose formulation method",),
             material_requirements=tuple(protocol.materials),
         )
 
-    def sample_manifest(self, params: BaseModel,
-                        compound: CompoundInfo) -> tuple[Mapping[str, Any], ...]:
+    def sample_manifest(
+        self, params: BaseModel, compound: CompoundInfo
+    ) -> tuple[Mapping[str, Any], ...]:
         p = _p(params)
-        return tuple({"group": g, "dose_mg_per_kg": "" if d < 0 else f"{d:g}", "sex": s,
-                      "animals": p.animals_per_sex_per_group}
-                     for g, d in p.groups() for s in p.sexes)
+        return tuple(
+            {
+                "group": g,
+                "dose_mg_per_kg": "" if d < 0 else f"{d:g}",
+                "sex": s,
+                "animals": p.animals_per_sex_per_group,
+            }
+            for g, d in p.groups()
+            for s in p.sexes
+        )
 
     def data_template(self, params: BaseModel) -> DataTemplate:
         p = _p(params)
         return DataTemplate(
             template_id=f"{self.id}/{self.version}",
             description="One row per animal x observation x timepoint. group is vehicle, test or "
-                        "positive; dose is the test-article dose (0 for vehicle, empty for the "
-                        "positive control). result is the score, or the measured value with its "
-                        "unit for continuous measures.",
+            "positive; dose is the test-article dose (0 for vehicle, empty for the "
+            "positive control). result is the score, or the measured value with its "
+            "unit for continuous measures.",
             columns=(
                 DataColumn("subject_id", "laboratory animal id", kind="text"),
                 DataColumn("sex", "M or F", kind="text", choices=tuple(p.sexes)),
-                DataColumn("group", "vehicle, test or positive", kind="text",
-                           choices=GROUPS if p.positive_control else GROUPS[:2]),
+                DataColumn(
+                    "group",
+                    "vehicle, test or positive",
+                    kind="text",
+                    choices=GROUPS if p.positive_control else GROUPS[:2],
+                ),
                 DataColumn("dose", "test-article dose", unit="mg/kg", required=False, minimum=0),
-                DataColumn("observation", "observation name", kind="text",
-                           choices=tuple(o.name for o in p.observations)),
+                DataColumn(
+                    "observation",
+                    "observation name",
+                    kind="text",
+                    choices=tuple(o.name for o in p.observations),
+                ),
                 DataColumn("timepoint", "timepoint", kind="text", choices=tuple(p.timepoints)),
                 DataColumn("unit", "unit of result (dimensionless for scores)", kind="text"),
                 DataColumn("result", "score or measured value", unit_column="unit"),
             ),
         )
 
-    def validate_records(self, records: Sequence[Mapping[str, Any]],
-                         params: BaseModel) -> tuple[list[str], list[str]]:
+    def validate_records(
+        self, records: Sequence[Mapping[str, Any]], params: BaseModel
+    ) -> tuple[list[str], list[str]]:
         p = _p(params)
         errors: list[str] = []
         seen: set[tuple[str, str, str]] = set()
@@ -323,8 +390,9 @@ class SafetyPharmCNSDriver(StudyDriver):
             g, dose = r["group"], r.get("dose")
             if g == "vehicle" and dose not in (None, 0):
                 errors.append(f"row {i}: vehicle animals have dose 0")
-            if g == "test" and (dose is None or not any(dose_eq(dose, d)
-                                                        for d in p.dose_levels_mg_per_kg)):
+            if g == "test" and (
+                dose is None or not any(dose_eq(dose, d) for d in p.dose_levels_mg_per_kg)
+            ):
                 errors.append(f"row {i}: test dose must be a protocol dose level")
             if g == "positive" and dose is not None:
                 errors.append(f"row {i}: positive-control rows have no test-article dose")
@@ -354,8 +422,13 @@ class SafetyPharmCNSDriver(StudyDriver):
             return "positive control"
         return f"{float(r.get('dose') or 0):g} mg/kg"
 
-    def _analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
-                 inputs: Mapping[str, Quantity]) -> AnalysisResult:
+    def _analyze(
+        self,
+        data: IngestedData,
+        params: BaseModel,
+        compound: CompoundInfo,
+        inputs: Mapping[str, Quantity],
+    ) -> AnalysisResult:
         p = _p(params)
         m_inc = method("safety.observation_incidence")
         q: dict[str, Quantity] = {}
@@ -373,140 +446,253 @@ class SafetyPharmCNSDriver(StudyDriver):
             animals[key].add(str(r["subject_id"]))
             if int(r["result"]) != o.normal_score:
                 found[key].add(str(r["subject_id"]))
-        order = {lab: i for i, lab in enumerate(
-            ["0 mg/kg", *[f"{d:g} mg/kg" for d in p.dose_levels_mg_per_kg], "positive control"])}
+        order = {
+            lab: i
+            for i, lab in enumerate(
+                ["0 mg/kg", *[f"{d:g} mg/kg" for d in p.dose_levels_mg_per_kg], "positive control"]
+            )
+        }
         tp_order = {t: i for i, t in enumerate(p.timepoints)}
         inc_rows = []
-        for key in sorted(animals, key=lambda k: (k[0], order.get(k[1], 99), k[2],
-                                                  tp_order.get(k[3], 99))):
+        for key in sorted(
+            animals, key=lambda k: (k[0], order.get(k[1], 99), k[2], tp_order.get(k[3], 99))
+        ):
             name, grp, sex, tp = key
             n, k = len(animals[key]), len(found[key])
-            inc_rows.append((name, p.observation(name).domain.replace("_", " "), grp, sex, tp,
-                             f"{k}/{n}"))
+            inc_rows.append(
+                (name, p.observation(name).domain.replace("_", " "), grp, sex, tp, f"{k}/{n}")
+            )
             if k and grp not in ("0 mg/kg", "positive control"):
                 q[f"incidence|{name}|{grp}|{sex}|{tp}"] = Quantity.computed(
-                    float(k), "dimensionless", method=m_inc,
-                    label=f"{name}: animals with findings, {grp} {sex} {tp} (of {n})")
+                    float(k),
+                    "dimensionless",
+                    method=m_inc,
+                    label=f"{name}: animals with findings, {grp} {sex} {tp} (of {n})",
+                )
         if inc_rows:
-            tables.append(tabulate("Incidence of findings", ("observation", "S7A domain",
-                                                             "group", "sex", "timepoint",
-                                                             "animals with finding"), inc_rows,
-                                   note="a finding is any score other than the protocol's "
-                                        "normal score; no incidence statistic is applied"))
+            tables.append(
+                tabulate(
+                    "Incidence of findings",
+                    (
+                        "observation",
+                        "S7A domain",
+                        "group",
+                        "sex",
+                        "timepoint",
+                        "animals with finding",
+                    ),
+                    inc_rows,
+                    note="a finding is any score other than the protocol's "
+                    "normal score; no incidence statistic is applied",
+                )
+            )
 
         # continuous measures vs vehicle (positive control reported separately)
         cont = [o for o in p.observations if o.scale == "continuous"]
         if cont:
-            recs = [{"endpoint": r["observation"], "sex": r["sex"], "phase": "main",
-                     "timepoint": r["timepoint"], "dose": float(r.get("dose") or 0),
-                     "unit": r["unit"], "value": float(r["result"])}
-                    for r in data.records if r["group"] != "positive"
-                    and p.observation(r["observation"]).scale == "continuous"]
-            cmp_ = compare_groups(recs, endpoint_unit=lambda e: p.observation(e).unit or "",
-                                  groups=[0.0, *p.dose_levels_mg_per_kg],
-                                  alpha=p.alpha if p.statistics == "dunnett" else None,
-                                  prov_note=f"file sha256 {data.file_sha256[:16]}",
-                                  dose_unit="mg/kg")
+            recs = [
+                {
+                    "endpoint": r["observation"],
+                    "sex": r["sex"],
+                    "phase": "main",
+                    "timepoint": r["timepoint"],
+                    "dose": float(r.get("dose") or 0),
+                    "unit": r["unit"],
+                    "value": float(r["result"]),
+                }
+                for r in data.records
+                if r["group"] != "positive"
+                and p.observation(r["observation"]).scale == "continuous"
+            ]
+            cmp_ = compare_groups(
+                recs,
+                endpoint_unit=lambda e: p.observation(e).unit or "",
+                groups=[0.0, *p.dose_levels_mg_per_kg],
+                alpha=p.alpha if p.statistics == "dunnett" else None,
+                prov_note=f"file sha256 {data.file_sha256[:16]}",
+                dose_unit="mg/kg",
+            )
             q.update(cmp_.quantities)
-            tables.append(tabulate(
-                "Continuous measures vs vehicle", ("measure", "sex", "phase", "timepoint", "dose",
-                                                   "n", "mean (SD)", "% vs vehicle", "p (Dunnett)",
-                                                   "significant"), cmp_.rows,
-                note=("descriptive only: " + p.statistics_basis) if p.statistics == "none"
-                else "Statistical significance is not adversity."))
+            tables.append(
+                tabulate(
+                    "Continuous measures vs vehicle",
+                    (
+                        "measure",
+                        "sex",
+                        "phase",
+                        "timepoint",
+                        "dose",
+                        "n",
+                        "mean (SD)",
+                        "% vs vehicle",
+                        "p (Dunnett)",
+                        "significant",
+                    ),
+                    cmp_.rows,
+                    note=("descriptive only: " + p.statistics_basis)
+                    if p.statistics == "none"
+                    else "Statistical significance is not adversity.",
+                )
+            )
         if p.positive_control:
             pos = [r for r in data.records if r["group"] == "positive"]
             if not pos:
-                findings.append(QCFinding("positive.missing", QCStatus.FAIL,
-                                          "the protocol's positive control returned no data "
-                                          "(S7A 2.3.3.1)"))
+                findings.append(
+                    QCFinding(
+                        "positive.missing",
+                        QCStatus.FAIL,
+                        "the protocol's positive control returned no data (S7A 2.3.3.1)",
+                    )
+                )
         for g, d in p.groups():
             for sex in p.sexes:
-                ids = {str(r["subject_id"]) for r in data.records if r["sex"] == sex and
-                       r["group"] == g and (g == "positive" or
-                                            dose_eq(float(r.get("dose") or 0), max(d, 0)))}
+                ids = {
+                    str(r["subject_id"])
+                    for r in data.records
+                    if r["sex"] == sex
+                    and r["group"] == g
+                    and (g == "positive" or dose_eq(float(r.get("dose") or 0), max(d, 0)))
+                }
                 if len(ids) < p.animals_per_sex_per_group:
                     lab = "positive control" if g == "positive" else f"{max(d, 0):g} mg/kg"
-                    findings.append(QCFinding(f"animals.{lab}.{sex}", QCStatus.WARN,
-                                              f"{lab} {sex}: {len(ids)} of "
-                                              f"{p.animals_per_sex_per_group} animals returned"))
-        return AnalysisResult(quantities=q, tables=tuple(tables), qc=QCVerdict.of(findings),
-                              evidence_admissible=True)
+                    findings.append(
+                        QCFinding(
+                            f"animals.{lab}.{sex}",
+                            QCStatus.WARN,
+                            f"{lab} {sex}: {len(ids)} of "
+                            f"{p.animals_per_sex_per_group} animals returned",
+                        )
+                    )
+        return AnalysisResult(
+            quantities=q, tables=tuple(tables), qc=QCVerdict.of(findings), evidence_admissible=True
+        )
 
     # -- interpretation ------------------------------------------------------------------
 
-    def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: ProgramContext | None) -> Interpretation:
+    def _interpret(
+        self, analysis: AnalysisResult, params: BaseModel, context: ProgramContext | None
+    ) -> Interpretation:
         p = _p(params)
         out: list[InterpretiveStatement] = []
         inc = {k: v for k, v in analysis.quantities.items() if k.startswith("incidence|")}
         if inc:
             obs = sorted({k.split("|")[1] for k in inc})
-            out.append(InterpretiveStatement(
-                f"Findings in test-article groups for: {', '.join(obs)}. S7A 2.4.1 asks for the "
-                "dose-response relationship and time course (onset, duration) of an adverse "
-                "effect; both are in the incidence table.", "ICH S7A 2.4.1", ("ich_s7a",),
-                "notable"))
+            out.append(
+                InterpretiveStatement(
+                    f"Findings in test-article groups for: {', '.join(obs)}. S7A 2.4.1 asks for the "
+                    "dose-response relationship and time course (onset, duration) of an adverse "
+                    "effect; both are in the incidence table.",
+                    "ICH S7A 2.4.1",
+                    ("ich_s7a",),
+                    "notable",
+                )
+            )
         else:
-            out.append(InterpretiveStatement(
-                "No scored finding in any test-article group at any timepoint.",
-                "ICH S7A 2.7.1", ("ich_s7a",), "info"))
+            out.append(
+                InterpretiveStatement(
+                    "No scored finding in any test-article group at any timepoint.",
+                    "ICH S7A 2.7.1",
+                    ("ich_s7a",),
+                    "info",
+                )
+            )
         for k, v in analysis.quantities.items():
             if k.endswith("|p"):
                 _, measure, sex, _, tp, dose = k[:-2].split("|")
-                out.append(InterpretiveStatement(
-                    f"Statistically significant difference in {measure} ({sex}, {tp}) at {dose} "
-                    f"mg/kg versus vehicle (Dunnett p = {v.require():.3g}).",
-                    f"Dunnett two-sided, alpha {p.alpha:g}", ("dunnett1955",), "notable"))
+                out.append(
+                    InterpretiveStatement(
+                        f"Statistically significant difference in {measure} ({sex}, {tp}) at {dose} "
+                        f"mg/kg versus vehicle (Dunnett p = {v.require():.3g}).",
+                        f"Dunnett two-sided, alpha {p.alpha:g}",
+                        ("dunnett1955",),
+                        "notable",
+                    )
+                )
         top = p.dose_levels_mg_per_kg[-1]
         if not inc and not any(k.endswith("|p") for k in analysis.quantities):
-            out.append(InterpretiveStatement(
-                f"With no effect observed, S7A 2.4.1 expects the highest dose ({top:g} mg/kg) to "
-                "produce moderate adverse effects in this or similar studies; whether it does is "
-                "for the Study Director to establish.", "ICH S7A 2.4.1", ("ich_s7a",), "info"))
+            out.append(
+                InterpretiveStatement(
+                    f"With no effect observed, S7A 2.4.1 expects the highest dose ({top:g} mg/kg) to "
+                    "produce moderate adverse effects in this or similar studies; whether it does is "
+                    "for the Study Director to establish.",
+                    "ICH S7A 2.4.1",
+                    ("ich_s7a",),
+                    "info",
+                )
+            )
         for f in analysis.qc.findings:
-            out.append(InterpretiveStatement(f.message, "ICH S7A 2.3.3.1", ("ich_s7a",),
-                                             "concern" if f.status is QCStatus.FAIL
-                                             else "notable"))
-        return Interpretation(statements=tuple(out), requires_expert_judgement=(
-            "Whether the findings constitute an adverse CNS effect, and at which doses",))
+            out.append(
+                InterpretiveStatement(
+                    f.message,
+                    "ICH S7A 2.3.3.1",
+                    ("ich_s7a",),
+                    "concern" if f.status is QCStatus.FAIL else "notable",
+                )
+            )
+        return Interpretation(
+            statements=tuple(out),
+            requires_expert_judgement=(
+                "Whether the findings constitute an adverse CNS effect, and at which doses",
+            ),
+        )
 
     def expert_determinations(self, params: BaseModel) -> tuple[ExpertDetermination, ...]:
         return (
             ExpertDetermination(
-                "overall_conclusion", "Adverse CNS effect", None, Role.STUDY_DIRECTOR, True,
+                "overall_conclusion",
+                "Adverse CNS effect",
+                None,
+                Role.STUDY_DIRECTOR,
+                True,
                 "Whether the test article produced an adverse effect on CNS function (S7A "
                 "2.7.1), considering dose-response, time course and the positive control.",
-                choices=("no_effect_identified", "effect_identified")),
+                choices=("no_effect_identified", "effect_identified"),
+            ),
             ExpertDetermination(
-                "no_effect_dose", "Highest dose without an adverse CNS effect", "mg/kg",
-                Role.STUDY_DIRECTOR, False,
-                "Optional; record 'not established' if an effect occurred at every dose."),
+                "no_effect_dose",
+                "Highest dose without an adverse CNS effect",
+                "mg/kg",
+                Role.STUDY_DIRECTOR,
+                False,
+                "Optional; record 'not established' if an effect occurred at every dose.",
+            ),
         )
 
     # -- report ------------------------------------------------------------------------
 
-    def _report_sections(self, protocol: ProtocolDocument, data: IngestedData,
-                         analysis: AnalysisResult, interpretation: Interpretation,
-                         determinations: Sequence[Mapping[str, Any]]) -> list[ReportSection]:
+    def _report_sections(
+        self,
+        protocol: ProtocolDocument,
+        data: IngestedData,
+        analysis: AnalysisResult,
+        interpretation: Interpretation,
+        determinations: Sequence[Mapping[str, Any]],
+    ) -> list[ReportSection]:
         det = next((d for d in determinations if d["key"] == "overall_conclusion"), None)
-        concl = (f"Conclusion: {det['category'].replace('_', ' ')} ({det['signer_name']}, "
-                 f"{det['role']}). Rationale: {det['rationale']}" if det else
-                 "Conclusion not yet recorded by the Study Director.")
+        concl = (
+            f"Conclusion: {det['category'].replace('_', ' ')} ({det['signer_name']}, "
+            f"{det['role']}). Rationale: {det['rationale']}"
+            if det
+            else "Conclusion not yet recorded by the Study Director."
+        )
         return [
-            ReportSection("Summary", f"{protocol.title}. Data are "
-                          + ("SIMULATED (not measured). " if data.is_simulated else "measured. ")
-                          + concl),
-            ReportSection("Design", "\n".join(f"- **{k}:** {v}"
-                                              for k, v in protocol.design.items())),
-            ReportSection("Results", "Incidence and continuous measures.",
-                          tables=analysis.tables),
+            ReportSection(
+                "Summary",
+                f"{protocol.title}. Data are "
+                + ("SIMULATED (not measured). " if data.is_simulated else "measured. ")
+                + concl,
+            ),
+            ReportSection(
+                "Design", "\n".join(f"- **{k}:** {v}" for k, v in protocol.design.items())
+            ),
+            ReportSection("Results", "Incidence and continuous measures.", tables=analysis.tables),
         ]
 
     # -- simulation ----------------------------------------------------------------------
 
-    def _simulate_rows(self, params: BaseModel, compound: CompoundInfo, sim: BaseModel,
-                       rng: np.random.Generator) -> tuple[list[dict[str, Any]], str]:
+    def _simulate_rows(
+        self, params: BaseModel, compound: CompoundInfo, sim: BaseModel, rng: np.random.Generator
+    ) -> tuple[list[dict[str, Any]], str]:
         p = _p(params)
         s = sim
         assert isinstance(s, CNSSimulation)
@@ -526,26 +712,58 @@ class SafetyPharmCNSDriver(StudyDriver):
                             base = tp == p.baseline_timepoint
                             if o.scale == "continuous":
                                 if t.control_mean is None or t.effect_by_dose is None:
-                                    raise ValueError(f"{o.name}: control_mean and "
-                                                     "effect_by_dose are needed")
-                                eff = 0.0 if base else (t.effect_by_dose[di] if di is not None
-                                                        else (t.positive_control_effect or 0.0)
-                                                        if g == "positive" else 0.0)
-                                v = t.control_mean + eff + (float(rng.normal(0, t.sd))
-                                                            if t.sd else 0.0)
+                                    raise ValueError(
+                                        f"{o.name}: control_mean and effect_by_dose are needed"
+                                    )
+                                eff = (
+                                    0.0
+                                    if base
+                                    else (
+                                        t.effect_by_dose[di]
+                                        if di is not None
+                                        else (t.positive_control_effect or 0.0)
+                                        if g == "positive"
+                                        else 0.0
+                                    )
+                                )
+                                v = (
+                                    t.control_mean
+                                    + eff
+                                    + (float(rng.normal(0, t.sd)) if t.sd else 0.0)
+                                )
                                 unit = o.unit
                             else:
                                 if t.incidence_by_dose is None or t.finding_score is None:
-                                    raise ValueError(f"{o.name}: incidence_by_dose and "
-                                                     "finding_score are needed")
-                                frac = 0.0 if base else (t.incidence_by_dose[di] if di is not None
-                                                         else (t.positive_control_incidence or 0)
-                                                         if g == "positive" else 0.0)
-                                v = float(t.finding_score if k < math.ceil(frac * n)
-                                          else o.normal_score or 0)
+                                    raise ValueError(
+                                        f"{o.name}: incidence_by_dose and finding_score are needed"
+                                    )
+                                frac = (
+                                    0.0
+                                    if base
+                                    else (
+                                        t.incidence_by_dose[di]
+                                        if di is not None
+                                        else (t.positive_control_incidence or 0)
+                                        if g == "positive"
+                                        else 0.0
+                                    )
+                                )
+                                v = float(
+                                    t.finding_score
+                                    if k < math.ceil(frac * n)
+                                    else o.normal_score or 0
+                                )
                                 unit = "dimensionless"
-                            rows.append({"subject_id": sid, "sex": sex, "group": g,
-                                         "dose": None if g == "positive" else d,
-                                         "observation": o.name, "timepoint": tp, "unit": unit,
-                                         "result": v})
+                            rows.append(
+                                {
+                                    "subject_id": sid,
+                                    "sex": sex,
+                                    "group": g,
+                                    "dose": None if g == "positive" else d,
+                                    "observation": o.name,
+                                    "timepoint": tp,
+                                    "unit": unit,
+                                    "result": v,
+                                }
+                            )
         return rows, "sim.cns_declared"

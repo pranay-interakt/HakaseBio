@@ -40,9 +40,15 @@ class SourceResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "source": self.source, "status": self.status.value, "query": self.query,
-            "url": self.url, "retrieved_at": self.retrieved_at, "from_cache": self.from_cache,
+            "source": self.source,
+            "status": self.status.value,
+            "query": self.query,
+            "url": self.url,
+            "retrieved_at": self.retrieved_at,
+            "from_cache": self.from_cache,
             "records": [dict(r) for r in self.records],
             "quantities": {k: q.to_dict() for k, q in self.quantities.items()},
-            "license": self.license, "attribution": self.attribution, "error": self.error,
+            "license": self.license,
+            "attribution": self.attribution,
+            "error": self.error,
         }

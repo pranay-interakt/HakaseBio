@@ -61,10 +61,10 @@ from hos.kernel.attestation import Role
 
 OBSERVATIONS = ("clinical_sign", "mortality")
 #: ICH M3(R2) section 1.5 statements used as facts, each quoted in the interpretation
-M3R2_MARGIN_ACCEPTABLE = 50.0   # "a 50-fold margin of exposure ... generally ... acceptable"
-M3R2_MARGIN_EXCEPTION = 10.0    # "does not result in a mean exposure margin of 10-fold"
+M3R2_MARGIN_ACCEPTABLE = 50.0  # "a 50-fold margin of exposure ... generally ... acceptable"
+M3R2_MARGIN_EXCEPTION = 10.0  # "does not result in a mean exposure margin of 10-fold"
 M3R2_CLINICAL_DOSE_G_DAY = 1.0  # "and the clinical dose exceeds 1 g per day"
-M3R2_EXCEPTION_DOSE = 2000.0    # "or a dose of 2000 mg/kg/day or the MFD, whichever is lower"
+M3R2_EXCEPTION_DOSE = 2000.0  # "or a dose of 2000 mg/kg/day or the MFD, whichever is lower"
 
 
 class DRFParams(BaseModel):
@@ -83,11 +83,15 @@ class DRFParams(BaseModel):
     statistics: Literal["none", "dunnett"]
     alpha: float | None = Field(default=None, gt=0, lt=0.5)
     statistics_basis: str = Field(min_length=1, description="why this analysis (or none)")
-    mtd_criteria: str = Field(min_length=1, description="the protocol's MTD criteria and their "
-                              "basis (ICH M3(R2) does not define the MTD)")
+    mtd_criteria: str = Field(
+        min_length=1,
+        description="the protocol's MTD criteria and their "
+        "basis (ICH M3(R2) does not define the MTD)",
+    )
     exposure_metric: Literal["AUC", "Cmax"] = Field(
         description="for exposure margins; M3(R2) Note 1: generally group-mean AUC, Cmax for "
-                    "acute cardiovascular or CNS effects")
+        "acute cardiovascular or CNS effects"
+    )
     concentration_unit: str = Field(min_length=1, description="for exposure inputs")
 
     @field_validator("dose_levels_mg_per_kg_day")
@@ -132,8 +136,11 @@ class DRFParams(BaseModel):
         return next(e for e in self.endpoints if e.name == name)
 
     def exposure_unit(self) -> str:
-        return f"{self.concentration_unit}*h" if self.exposure_metric == "AUC" \
+        return (
+            f"{self.concentration_unit}*h"
+            if self.exposure_metric == "AUC"
             else self.concentration_unit
+        )
 
 
 class EndpointEffect(BaseModel):
@@ -176,13 +183,16 @@ class DoseRangeFindingDriver(StudyDriver):
     name = "Dose range-finding / MTD study"
     version = "1.0.0"
     requirement_ids = ("tox.dose_range_finding",)
-    modalities = frozenset({Modality.SMALL_MOLECULE, Modality.PEPTIDE,
-                            Modality.MONOCLONAL_ANTIBODY})
+    modalities = frozenset(
+        {Modality.SMALL_MOLECULE, Modality.PEPTIDE, Modality.MONOCLONAL_ANTIBODY}
+    )
     ctd_section = "4.2.3.2"
     glp_capable = True
-    description = ("Short parallel-group study for dose selection: group comparisons, "
-                   "clinical-sign and mortality incidence, M3(R2) 1.5 high-dose facts; MTD and "
-                   "recommended doses by the Study Director.")
+    description = (
+        "Short parallel-group study for dose selection: group comparisons, "
+        "clinical-sign and mortality incidence, M3(R2) 1.5 high-dose facts; MTD and "
+        "recommended doses by the Study Director."
+    )
     reference_keys = ("ich_m3r2", "oecd_tg407")
 
     @classmethod
@@ -201,56 +211,78 @@ class DoseRangeFindingDriver(StudyDriver):
 
     # -- design ----------------------------------------------------------------------
 
-    def design(self, compound: CompoundInfo, params: BaseModel,
-               context: ProgramContext | None = None,
-               hypothesis: str | None = None) -> ProtocolDocument:
+    def design(
+        self,
+        compound: CompoundInfo,
+        params: BaseModel,
+        context: ProgramContext | None = None,
+        hypothesis: str | None = None,
+    ) -> ProtocolDocument:
         p = _p(params)
         top = p.dose_levels_mg_per_kg_day[-1]
         notes = []
         if top > M3R2_LIMIT_DOSE_MG_KG_DAY:
-            notes.append(f"top dose {top:g} mg/kg/day exceeds the 1000 mg/kg/day limit dose; "
-                         "M3(R2) 1.5 allows more only when 1000 mg/kg/day gives under a 10-fold "
-                         "margin and the clinical dose exceeds 1 g/day")
+            notes.append(
+                f"top dose {top:g} mg/kg/day exceeds the 1000 mg/kg/day limit dose; "
+                "M3(R2) 1.5 allows more only when 1000 mg/kg/day gives under a 10-fold "
+                "margin and the clinical dose exceeds 1 g/day"
+            )
         design: dict[str, Any] = {
             "test_system": f"{p.species} ({p.strain}), sexes {', '.join(p.sexes)}",
             "route": f"{p.route}; vehicle {p.vehicle}",
             "groups": ("control, " if p.include_control else "no concurrent control, ")
-                      + ", ".join(f"{d:g}" for d in p.dose_levels_mg_per_kg_day)
-                      + f" mg/kg/day; {p.animals_per_sex_per_group} per sex per group",
+            + ", ".join(f"{d:g}" for d in p.dose_levels_mg_per_kg_day)
+            + f" mg/kg/day; {p.animals_per_sex_per_group} per sex per group",
             "duration": f"{p.dosing_duration_days} days of dosing",
-            "endpoints": [f"{e.name} [{e.unit}]" for e in p.endpoints] + [
-                "clinical signs", "mortality"],
+            "endpoints": [f"{e.name} [{e.unit}]" for e in p.endpoints]
+            + ["clinical signs", "mortality"],
             "timepoints": ", ".join(p.timepoints),
-            "statistics": (f"Dunnett two-sided vs control, alpha {p.alpha:g}"
-                           if p.statistics == "dunnett" else "descriptive only")
-                          + f" ({p.statistics_basis})",
+            "statistics": (
+                f"Dunnett two-sided vs control, alpha {p.alpha:g}"
+                if p.statistics == "dunnett"
+                else "descriptive only"
+            )
+            + f" ({p.statistics_basis})",
             "mtd_criteria": p.mtd_criteria,
             "high_dose_rules": "M3(R2) 1.5: MTD, saturation of exposure, MFD, 50-fold exposure "
-                               "margin or the 1000 mg/kg/day limit dose; lethality is not an "
-                               "intended endpoint (M3(R2) 4)",
+            "margin or the 1000 mg/kg/day limit dose; lethality is not an "
+            "intended endpoint (M3(R2) 4)",
         }
         if notes:
             design["design_notes"] = notes
         return ProtocolDocument(
-            driver_id=self.id, driver_version=self.version,
+            driver_id=self.id,
+            driver_version=self.version,
             title=f"Dose range-finding study of {compound.name} in the {p.species}",
             objective="Characterise tolerability over a dose range to select doses for the "
-                      "pivotal repeat-dose studies (ICH M3(R2) 1.5) and, where an MTD is "
-                      "defined, provide acute toxicity information (M3(R2) 4).",
+            "pivotal repeat-dose studies (ICH M3(R2) 1.5) and, where an MTD is "
+            "defined, provide acute toxicity information (M3(R2) 4).",
             hypothesis=hypothesis,
             test_article={"name": compound.name, "id": compound.id},
             test_system={"species": p.species, "strain": p.strain},
             design=design,
             steps=(
-                ProtocolStep(1, "Dosing", f"Dose daily for {p.dosing_duration_days} days by "
-                             f"{p.route}.", ()),
-                ProtocolStep(2, "Observations", "Record clinical signs and any unscheduled "
-                             "death or euthanasia with its time; lethality is not an intended "
-                             "endpoint (M3(R2) 4).", ()),
-                ProtocolStep(3, "Measurements", "Record each declared endpoint at each "
-                             "timepoint.", ()),
-                ProtocolStep(4, "Return data", "One row per animal x endpoint (or observation) "
-                             "x timepoint per data_template.csv.", ()),
+                ProtocolStep(
+                    1, "Dosing", f"Dose daily for {p.dosing_duration_days} days by {p.route}.", ()
+                ),
+                ProtocolStep(
+                    2,
+                    "Observations",
+                    "Record clinical signs and any unscheduled "
+                    "death or euthanasia with its time; lethality is not an intended "
+                    "endpoint (M3(R2) 4).",
+                    (),
+                ),
+                ProtocolStep(
+                    3, "Measurements", "Record each declared endpoint at each timepoint.", ()
+                ),
+                ProtocolStep(
+                    4,
+                    "Return data",
+                    "One row per animal x endpoint (or observation) "
+                    "x timepoint per data_template.csv.",
+                    (),
+                ),
             ),
             acceptance_criteria=(),
             materials=(f"test article and vehicle ({p.vehicle})",),
@@ -267,44 +299,66 @@ class DoseRangeFindingDriver(StudyDriver):
         return StudyPlan(
             execution_duration_days=float(p.dosing_duration_days),
             duration_basis="dosing period per protocol; acclimatisation, necropsy and reporting "
-                           "are scheduled by the laboratory",
-            sample_count=n, sample_count_basis="animals: groups x sexes x animals per group",
+            "are scheduled by the laboratory",
+            sample_count=n,
+            sample_count_basis="animals: groups x sexes x animals per group",
             dependencies=("dose formulation method",),
             material_requirements=tuple(protocol.materials),
         )
 
-    def sample_manifest(self, params: BaseModel,
-                        compound: CompoundInfo) -> tuple[Mapping[str, Any], ...]:
+    def sample_manifest(
+        self, params: BaseModel, compound: CompoundInfo
+    ) -> tuple[Mapping[str, Any], ...]:
         p = _p(params)
-        return tuple({"group": i + 1, "dose_mg_per_kg_day": f"{d:g}", "sex": s,
-                      "animals": p.animals_per_sex_per_group}
-                     for i, d in enumerate(p.groups()) for s in p.sexes)
+        return tuple(
+            {
+                "group": i + 1,
+                "dose_mg_per_kg_day": f"{d:g}",
+                "sex": s,
+                "animals": p.animals_per_sex_per_group,
+            }
+            for i, d in enumerate(p.groups())
+            for s in p.sexes
+        )
 
     def data_template(self, params: BaseModel) -> DataTemplate:
         p = _p(params)
         return DataTemplate(
             template_id=f"{self.id}/{self.version}",
             description="Long format. Numeric endpoints: one row per animal x endpoint x "
-                        "timepoint with unit and value. Observations: endpoint clinical_sign "
-                        "(observation = the sign) or mortality (observation = found dead / "
-                        "euthanised moribund, with the timepoint), no value.",
+            "timepoint with unit and value. Observations: endpoint clinical_sign "
+            "(observation = the sign) or mortality (observation = found dead / "
+            "euthanised moribund, with the timepoint), no value.",
             columns=(
                 DataColumn("subject_id", "laboratory animal id", kind="text"),
                 DataColumn("sex", "M or F", kind="text", choices=tuple(p.sexes)),
                 DataColumn("dose", "dose group", unit="mg/kg/day", minimum=0),
-                DataColumn("endpoint", "endpoint name, clinical_sign or mortality", kind="text",
-                           choices=(*[e.name for e in p.endpoints], *OBSERVATIONS)),
-                DataColumn("timepoint", "protocol timepoint for numeric endpoints; the day "
-                           "observed for clinical signs and deaths", kind="text"),
+                DataColumn(
+                    "endpoint",
+                    "endpoint name, clinical_sign or mortality",
+                    kind="text",
+                    choices=(*[e.name for e in p.endpoints], *OBSERVATIONS),
+                ),
+                DataColumn(
+                    "timepoint",
+                    "protocol timepoint for numeric endpoints; the day "
+                    "observed for clinical signs and deaths",
+                    kind="text",
+                ),
                 DataColumn("unit", "unit of value", kind="text", required=False),
                 DataColumn("value", "observed value", unit_column="unit", required=False),
-                DataColumn("observation", "clinical sign or mortality description",
-                           kind="text", required=False),
+                DataColumn(
+                    "observation",
+                    "clinical sign or mortality description",
+                    kind="text",
+                    required=False,
+                ),
             ),
         )
 
-    def validate_records(self, records: Sequence[Mapping[str, Any]],
-                         params: BaseModel) -> tuple[list[str], list[str]]:
+    def validate_records(
+        self, records: Sequence[Mapping[str, Any]], params: BaseModel
+    ) -> tuple[list[str], list[str]]:
         p = _p(params)
         errors: list[str] = []
         subj: dict[str, tuple[str, float]] = {}
@@ -319,18 +373,18 @@ class DoseRangeFindingDriver(StudyDriver):
                 errors.append(f"row {i}: subject {r['subject_id']} changes sex or dose")
             if r["endpoint"] in OBSERVATIONS:
                 if not r.get("observation") or r.get("value") is not None:
-                    errors.append(f"row {i}: {r['endpoint']} rows give an observation and no "
-                                  "value")
+                    errors.append(f"row {i}: {r['endpoint']} rows give an observation and no value")
                 key = (r["subject_id"], r["endpoint"], r["timepoint"], str(r.get("observation")))
             else:
                 if r["timepoint"] not in p.timepoints:
-                    errors.append(f"row {i}: timepoint {r['timepoint']!r} is not in the protocol "
-                                  f"{p.timepoints}")
+                    errors.append(
+                        f"row {i}: timepoint {r['timepoint']!r} is not in the protocol "
+                        f"{p.timepoints}"
+                    )
                 if r.get("value") is None or not r.get("unit"):
                     errors.append(f"row {i}: {r['endpoint']} needs a value and unit")
                 elif not U.compatible(r["unit"], p.endpoint(r["endpoint"]).unit):
-                    errors.append(f"row {i}: unit {r['unit']!r} incompatible with "
-                                  f"{r['endpoint']}")
+                    errors.append(f"row {i}: unit {r['unit']!r} incompatible with {r['endpoint']}")
                 key = (r["subject_id"], r["endpoint"], r["timepoint"], "")
             if key in seen:
                 errors.append(f"row {i}: duplicate row {key}")
@@ -341,27 +395,52 @@ class DoseRangeFindingDriver(StudyDriver):
 
     def analysis_inputs(self, params: BaseModel) -> Mapping[str, str]:
         u = _p(params).exposure_unit()
-        return {"animal_exposure_at_top_dose": u, "clinical_exposure": u,
-                "clinical_dose_per_day": "g/day"}
+        return {
+            "animal_exposure_at_top_dose": u,
+            "clinical_exposure": u,
+            "clinical_dose_per_day": "g/day",
+        }
 
-    def _analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
-                 inputs: Mapping[str, Quantity]) -> AnalysisResult:
+    def _analyze(
+        self,
+        data: IngestedData,
+        params: BaseModel,
+        compound: CompoundInfo,
+        inputs: Mapping[str, Quantity],
+    ) -> AnalysisResult:
         p = _p(params)
-        numeric = [dict(r, phase="main") for r in data.records
-                   if r["endpoint"] not in OBSERVATIONS]
-        cmp_ = compare_groups(numeric, endpoint_unit=lambda e: p.endpoint(e).unit,
-                              groups=p.groups(),
-                              alpha=p.alpha if p.statistics == "dunnett" else None,
-                              prov_note=f"file sha256 {data.file_sha256[:16]}")
+        numeric = [dict(r, phase="main") for r in data.records if r["endpoint"] not in OBSERVATIONS]
+        cmp_ = compare_groups(
+            numeric,
+            endpoint_unit=lambda e: p.endpoint(e).unit,
+            groups=p.groups(),
+            alpha=p.alpha if p.statistics == "dunnett" else None,
+            prov_note=f"file sha256 {data.file_sha256[:16]}",
+        )
         tables = []
         if cmp_.rows:
-            tables.append(tabulate(
-                "Dose-group comparisons with control" + (" (Dunnett, two-sided)"
-                                                         if p.statistics == "dunnett" else ""),
-                ("endpoint", "sex", "phase", "timepoint", "dose", "n", "mean (SD)",
-                 "% vs control", "p (Dunnett)", "significant"), cmp_.rows,
-                note=("descriptive only: " + p.statistics_basis) if p.statistics == "none"
-                else "Statistical significance is not adversity."))
+            tables.append(
+                tabulate(
+                    "Dose-group comparisons with control"
+                    + (" (Dunnett, two-sided)" if p.statistics == "dunnett" else ""),
+                    (
+                        "endpoint",
+                        "sex",
+                        "phase",
+                        "timepoint",
+                        "dose",
+                        "n",
+                        "mean (SD)",
+                        "% vs control",
+                        "p (Dunnett)",
+                        "significant",
+                    ),
+                    cmp_.rows,
+                    note=("descriptive only: " + p.statistics_basis)
+                    if p.statistics == "none"
+                    else "Statistical significance is not adversity.",
+                )
+            )
         q = dict(cmp_.quantities)
 
         # incidence (OECD TG 407 paragraph 50 format)
@@ -373,38 +452,71 @@ class DoseRangeFindingDriver(StudyDriver):
             d = next(g for g in p.groups() if dose_eq(g, r["dose"]))
             animals[(d, r["sex"])].add(str(r["subject_id"]))
             if r["endpoint"] == "mortality":
-                deaths[(d, r["sex"])].append(f"{r['subject_id']} ({r['timepoint']}: "
-                                             f"{r['observation']})")
+                deaths[(d, r["sex"])].append(
+                    f"{r['subject_id']} ({r['timepoint']}: {r['observation']})"
+                )
             elif r["endpoint"] == "clinical_sign":
                 signs[(d, r["sex"], str(r["observation"]))].add(str(r["subject_id"]))
         inc_rows = []
         for (d, sex), ids in sorted(animals.items()):
-            inc_rows.append((f"{d:g}", sex, len(ids), len(deaths[(d, sex)]),
-                             "; ".join(deaths[(d, sex)]) or "-",
-                             len({a for (dd, ss, _), v in signs.items()
-                                  if dd == d and ss == sex for a in v})))
-        tables.append(tabulate("Group incidence", ("dose (mg/kg/day)", "sex", "animals",
-                                                   "unscheduled deaths", "deaths (time)",
-                                                   "animals with signs"), inc_rows,
-                               note="OECD TG 407 paragraph 50 format"))
-        sign_rows = [(f"{d:g}", sex, sign, f"{len(ids)}/{len(animals[(d, sex)])}")
-                     for (d, sex, sign), ids in sorted(signs.items())]
+            inc_rows.append(
+                (
+                    f"{d:g}",
+                    sex,
+                    len(ids),
+                    len(deaths[(d, sex)]),
+                    "; ".join(deaths[(d, sex)]) or "-",
+                    len(
+                        {a for (dd, ss, _), v in signs.items() if dd == d and ss == sex for a in v}
+                    ),
+                )
+            )
+        tables.append(
+            tabulate(
+                "Group incidence",
+                (
+                    "dose (mg/kg/day)",
+                    "sex",
+                    "animals",
+                    "unscheduled deaths",
+                    "deaths (time)",
+                    "animals with signs",
+                ),
+                inc_rows,
+                note="OECD TG 407 paragraph 50 format",
+            )
+        )
+        sign_rows = [
+            (f"{d:g}", sex, sign, f"{len(ids)}/{len(animals[(d, sex)])}")
+            for (d, sex, sign), ids in sorted(signs.items())
+        ]
         if sign_rows:
-            tables.append(tabulate("Clinical signs", ("dose (mg/kg/day)", "sex", "sign",
-                                                      "animals affected"), sign_rows))
+            tables.append(
+                tabulate(
+                    "Clinical signs",
+                    ("dose (mg/kg/day)", "sex", "sign", "animals affected"),
+                    sign_rows,
+                )
+            )
         total_deaths = sum(len(v) for v in deaths.values())
-        q["deaths.unscheduled"] = Quantity.computed(float(total_deaths), "dimensionless",
-                                                    method=m_inc,
-                                                    label="unscheduled deaths, all groups")
+        q["deaths.unscheduled"] = Quantity.computed(
+            float(total_deaths),
+            "dimensionless",
+            method=m_inc,
+            label="unscheduled deaths, all groups",
+        )
 
         # M3(R2) 1.5 high-dose facts
         a, c = inputs.get("animal_exposure_at_top_dose"), inputs.get("clinical_exposure")
         if a is not None and c is not None:
             u = p.exposure_unit()
             q["margin.top_dose"] = Quantity.computed(
-                a.magnitude_in(u) / c.magnitude_in(u), "dimensionless",
-                method=method("tox.exposure_margin_m3r2"), inputs=[a, c],
-                label=f"exposure margin at the top dose ({p.exposure_metric})")
+                a.magnitude_in(u) / c.magnitude_in(u),
+                "dimensionless",
+                method=method("tox.exposure_margin_m3r2"),
+                inputs=[a, c],
+                label=f"exposure margin at the top dose ({p.exposure_metric})",
+            )
         cd = inputs.get("clinical_dose_per_day")
         if cd is not None:
             q["clinical_dose_g_per_day"] = cd
@@ -413,131 +525,230 @@ class DoseRangeFindingDriver(StudyDriver):
             findings.append(QCFinding("no_data", QCStatus.FAIL, "no analysable data"))
         for (d, sex), ids in sorted(animals.items()):
             if len(ids) < p.animals_per_sex_per_group:
-                findings.append(QCFinding(f"animals.{d:g}.{sex}", QCStatus.WARN,
-                                          f"{d:g} mg/kg/day {sex}: {len(ids)} of "
-                                          f"{p.animals_per_sex_per_group} animals returned"))
-        return AnalysisResult(quantities=q, tables=tuple(tables), qc=QCVerdict.of(findings),
-                              evidence_admissible=True,
-                              notes=tuple(cmp_.notes) + tuple(
-                                  f"unscheduled death at {d:g} mg/kg/day ({sex}): {x}"
-                                  for (d, sex), v in sorted(deaths.items()) for x in v))
+                findings.append(
+                    QCFinding(
+                        f"animals.{d:g}.{sex}",
+                        QCStatus.WARN,
+                        f"{d:g} mg/kg/day {sex}: {len(ids)} of "
+                        f"{p.animals_per_sex_per_group} animals returned",
+                    )
+                )
+        return AnalysisResult(
+            quantities=q,
+            tables=tuple(tables),
+            qc=QCVerdict.of(findings),
+            evidence_admissible=True,
+            notes=tuple(cmp_.notes)
+            + tuple(
+                f"unscheduled death at {d:g} mg/kg/day ({sex}): {x}"
+                for (d, sex), v in sorted(deaths.items())
+                for x in v
+            ),
+        )
 
     # -- interpretation ------------------------------------------------------------------
 
-    def _interpret(self, analysis: AnalysisResult, params: BaseModel,
-                   context: ProgramContext | None) -> Interpretation:
+    def _interpret(
+        self, analysis: AnalysisResult, params: BaseModel, context: ProgramContext | None
+    ) -> Interpretation:
         p = _p(params)
         out: list[InterpretiveStatement] = []
         top = p.dose_levels_mg_per_kg_day[-1]
         if top >= M3R2_LIMIT_DOSE_MG_KG_DAY:
-            out.append(InterpretiveStatement(
-                f"The top dose ({top:g} mg/kg/day) reaches the 1000 mg/kg/day limit dose that "
-                "M3(R2) 1.5 considers appropriate for rodents and non-rodents, except where it "
-                "gives under a 10-fold exposure margin and the clinical dose exceeds 1 g/day.",
-                "ICH M3(R2) 1.5 limit dose", ("ich_m3r2",), "info"))
+            out.append(
+                InterpretiveStatement(
+                    f"The top dose ({top:g} mg/kg/day) reaches the 1000 mg/kg/day limit dose that "
+                    "M3(R2) 1.5 considers appropriate for rodents and non-rodents, except where it "
+                    "gives under a 10-fold exposure margin and the clinical dose exceeds 1 g/day.",
+                    "ICH M3(R2) 1.5 limit dose",
+                    ("ich_m3r2",),
+                    "info",
+                )
+            )
         mq = analysis.quantities.get("margin.top_dose")
         cd = analysis.quantities.get("clinical_dose_g_per_day")
         if mq is not None:
             m = mq.require()
-            out.append(InterpretiveStatement(
-                f"Exposure margin at the top dose: {m:.3g}-fold ({p.exposure_metric}).",
-                "ICH M3(R2) 1.5 and Note 1", ("ich_m3r2",), "info"))
+            out.append(
+                InterpretiveStatement(
+                    f"Exposure margin at the top dose: {m:.3g}-fold ({p.exposure_metric}).",
+                    "ICH M3(R2) 1.5 and Note 1",
+                    ("ich_m3r2",),
+                    "info",
+                )
+            )
             if m >= M3R2_MARGIN_ACCEPTABLE:
-                out.append(InterpretiveStatement(
-                    "The top dose provides at least a 50-fold exposure margin, which M3(R2) 1.5 "
-                    "generally considers acceptable as the maximum dose; to support US Phase III, "
-                    "dose-limiting toxicity generally should be identified in at least one "
-                    "species when this margin is the limit.", "ICH M3(R2) 1.5 50-fold margin",
-                    ("ich_m3r2",), "notable"))
-            if (cd is not None and top >= M3R2_LIMIT_DOSE_MG_KG_DAY
-                    and m < M3R2_MARGIN_EXCEPTION
-                    and cd.magnitude_in("g/day") > M3R2_CLINICAL_DOSE_G_DAY):
-                out.append(InterpretiveStatement(
-                    "1000 mg/kg/day gives under a 10-fold margin and the clinical dose exceeds "
-                    "1 g/day: M3(R2) 1.5 limits doses by a 10-fold exposure margin, 2000 "
-                    "mg/kg/day or the MFD, whichever is lower.", "ICH M3(R2) 1.5 exception",
-                    ("ich_m3r2",), "notable"))
-        deaths = [n.split(": ", 1)[1] for n in analysis.notes
-                  if n.startswith("unscheduled death")]
+                out.append(
+                    InterpretiveStatement(
+                        "The top dose provides at least a 50-fold exposure margin, which M3(R2) 1.5 "
+                        "generally considers acceptable as the maximum dose; to support US Phase III, "
+                        "dose-limiting toxicity generally should be identified in at least one "
+                        "species when this margin is the limit.",
+                        "ICH M3(R2) 1.5 50-fold margin",
+                        ("ich_m3r2",),
+                        "notable",
+                    )
+                )
+            if (
+                cd is not None
+                and top >= M3R2_LIMIT_DOSE_MG_KG_DAY
+                and m < M3R2_MARGIN_EXCEPTION
+                and cd.magnitude_in("g/day") > M3R2_CLINICAL_DOSE_G_DAY
+            ):
+                out.append(
+                    InterpretiveStatement(
+                        "1000 mg/kg/day gives under a 10-fold margin and the clinical dose exceeds "
+                        "1 g/day: M3(R2) 1.5 limits doses by a 10-fold exposure margin, 2000 "
+                        "mg/kg/day or the MFD, whichever is lower.",
+                        "ICH M3(R2) 1.5 exception",
+                        ("ich_m3r2",),
+                        "notable",
+                    )
+                )
+        deaths = [n.split(": ", 1)[1] for n in analysis.notes if n.startswith("unscheduled death")]
         if deaths:
-            out.append(InterpretiveStatement(
-                f"{len(deaths)} unscheduled deaths occurred. M3(R2) 4: lethality should not be an "
-                "intended endpoint in studies assessing acute toxicity.", "ICH M3(R2) 4",
-                ("ich_m3r2",), "concern"))
+            out.append(
+                InterpretiveStatement(
+                    f"{len(deaths)} unscheduled deaths occurred. M3(R2) 4: lethality should not be an "
+                    "intended endpoint in studies assessing acute toxicity.",
+                    "ICH M3(R2) 4",
+                    ("ich_m3r2",),
+                    "concern",
+                )
+            )
         for k, v in analysis.quantities.items():
             if k.endswith("|p"):
                 _, endpoint, sex, _, tp, dose = k[:-2].split("|")
-                out.append(InterpretiveStatement(
-                    f"Statistically significant difference in {endpoint} ({sex}, {tp}) at {dose} "
-                    f"mg/kg/day versus control (Dunnett p = {v.require():.3g}).",
-                    f"Dunnett two-sided, alpha {p.alpha:g}", ("dunnett1955",), "notable"))
+                out.append(
+                    InterpretiveStatement(
+                        f"Statistically significant difference in {endpoint} ({sex}, {tp}) at {dose} "
+                        f"mg/kg/day versus control (Dunnett p = {v.require():.3g}).",
+                        f"Dunnett two-sided, alpha {p.alpha:g}",
+                        ("dunnett1955",),
+                        "notable",
+                    )
+                )
         if not out:
-            out.append(InterpretiveStatement(
-                "Group results are tabulated for the Study Director's MTD assessment against the "
-                "protocol's criteria.", "ICH M3(R2) 1.5, 4", ("ich_m3r2",), "info"))
-        return Interpretation(statements=tuple(out), requires_expert_judgement=(
-            f"MTD against the protocol criteria ({p.mtd_criteria})",
-            "Basis and value of the pivotal-study high dose (M3(R2) 1.5)",))
+            out.append(
+                InterpretiveStatement(
+                    "Group results are tabulated for the Study Director's MTD assessment against the "
+                    "protocol's criteria.",
+                    "ICH M3(R2) 1.5, 4",
+                    ("ich_m3r2",),
+                    "info",
+                )
+            )
+        return Interpretation(
+            statements=tuple(out),
+            requires_expert_judgement=(
+                f"MTD against the protocol criteria ({p.mtd_criteria})",
+                "Basis and value of the pivotal-study high dose (M3(R2) 1.5)",
+            ),
+        )
 
     def expert_determinations(self, params: BaseModel) -> tuple[ExpertDetermination, ...]:
         return (
             ExpertDetermination(
-                "mtd", "Maximum tolerated dose", "mg/kg/day", Role.STUDY_DIRECTOR, True,
+                "mtd",
+                "Maximum tolerated dose",
+                "mg/kg/day",
+                Role.STUDY_DIRECTOR,
+                True,
                 "The MTD against the protocol's stated criteria (M3(R2) does not define them); "
-                "record 'not established' if the top dose was tolerated."),
+                "record 'not established' if the top dose was tolerated.",
+            ),
             ExpertDetermination(
-                "high_dose_basis", "Basis for the pivotal-study high dose", None,
-                Role.STUDY_DIRECTOR, True,
+                "high_dose_basis",
+                "Basis for the pivotal-study high dose",
+                None,
+                Role.STUDY_DIRECTOR,
+                True,
                 "Which M3(R2) 1.5 basis governs the high dose of the pivotal studies.",
-                choices=("mtd", "limit_dose", "exposure_saturation", "maximum_feasible_dose",
-                         "exposure_margin_50x")),
+                choices=(
+                    "mtd",
+                    "limit_dose",
+                    "exposure_saturation",
+                    "maximum_feasible_dose",
+                    "exposure_margin_50x",
+                ),
+            ),
             ExpertDetermination(
-                "recommended_high_dose", "Recommended pivotal high dose", "mg/kg/day",
-                Role.STUDY_DIRECTOR, True, "High dose recommended for the pivotal studies."),
+                "recommended_high_dose",
+                "Recommended pivotal high dose",
+                "mg/kg/day",
+                Role.STUDY_DIRECTOR,
+                True,
+                "High dose recommended for the pivotal studies.",
+            ),
             ExpertDetermination(
-                "recommended_mid_dose", "Recommended pivotal mid dose", "mg/kg/day",
-                Role.STUDY_DIRECTOR, False, "Optional."),
+                "recommended_mid_dose",
+                "Recommended pivotal mid dose",
+                "mg/kg/day",
+                Role.STUDY_DIRECTOR,
+                False,
+                "Optional.",
+            ),
             ExpertDetermination(
-                "recommended_low_dose", "Recommended pivotal low dose", "mg/kg/day",
-                Role.STUDY_DIRECTOR, False, "Optional."),
+                "recommended_low_dose",
+                "Recommended pivotal low dose",
+                "mg/kg/day",
+                Role.STUDY_DIRECTOR,
+                False,
+                "Optional.",
+            ),
         )
 
     # -- report ------------------------------------------------------------------------
 
-    def _report_sections(self, protocol: ProtocolDocument, data: IngestedData,
-                         analysis: AnalysisResult, interpretation: Interpretation,
-                         determinations: Sequence[Mapping[str, Any]]) -> list[ReportSection]:
+    def _report_sections(
+        self,
+        protocol: ProtocolDocument,
+        data: IngestedData,
+        analysis: AnalysisResult,
+        interpretation: Interpretation,
+        determinations: Sequence[Mapping[str, Any]],
+    ) -> list[ReportSection]:
         lines = []
         for d in determinations:
             val = d.get("category")
             if val is None:
                 qd = d.get("quantity") or {}
-                val = (f"{qd.get('value'):g} {qd.get('unit')}" if qd.get("available")
-                       else "not established")
-            lines.append(f"{d['label']}: {val} "
-                         f"({d['signer_name']}, {d['role']})")
+                val = (
+                    f"{qd.get('value'):g} {qd.get('unit')}"
+                    if qd.get("available")
+                    else "not established"
+                )
+            lines.append(f"{d['label']}: {val} ({d['signer_name']}, {d['role']})")
         return [
-            ReportSection("Summary", f"{protocol.title}. Data are "
-                          + ("SIMULATED (not measured). " if data.is_simulated else "measured. ")
-                          + (" ".join(lines) if lines else
-                             "MTD and recommended doses not yet determined by the Study "
-                             "Director.")),
-            ReportSection("Design", "\n".join(f"- **{k}:** {v}"
-                                              for k, v in protocol.design.items())),
+            ReportSection(
+                "Summary",
+                f"{protocol.title}. Data are "
+                + ("SIMULATED (not measured). " if data.is_simulated else "measured. ")
+                + (
+                    " ".join(lines)
+                    if lines
+                    else "MTD and recommended doses not yet determined by the Study Director."
+                ),
+            ),
+            ReportSection(
+                "Design", "\n".join(f"- **{k}:** {v}" for k, v in protocol.design.items())
+            ),
             ReportSection("Results", "Group comparisons and incidence.", tables=analysis.tables),
         ]
 
     # -- simulation ----------------------------------------------------------------------
 
-    def _simulate_rows(self, params: BaseModel, compound: CompoundInfo, sim: BaseModel,
-                       rng: np.random.Generator) -> tuple[list[dict[str, Any]], str]:
+    def _simulate_rows(
+        self, params: BaseModel, compound: CompoundInfo, sim: BaseModel, rng: np.random.Generator
+    ) -> tuple[list[dict[str, Any]], str]:
         p = _p(params)
         s = sim
         assert isinstance(s, DRFSimulation)
         eff = {e.endpoint: e for e in s.endpoints}
         for e in p.endpoints:
             if e.name not in eff or len(eff[e.name].effect_percent_by_dose) != len(
-                    p.dose_levels_mg_per_kg_day):
+                p.dose_levels_mg_per_kg_day
+            ):
                 raise ValueError(f"simulation needs {e.name!r} with one effect per dose level")
         rows: list[dict[str, Any]] = []
         for gi, d in enumerate(p.groups()):
@@ -549,21 +760,49 @@ class DoseRangeFindingDriver(StudyDriver):
                 for k, sid in enumerate(ids):
                     for e in p.endpoints:
                         t = eff[e.name]
-                        mu = t.control_mean * (1 + (0.0 if di is None
-                                                    else t.effect_percent_by_dose[di]) / 100.0)
+                        mu = t.control_mean * (
+                            1 + (0.0 if di is None else t.effect_percent_by_dose[di]) / 100.0
+                        )
                         for tp in p.timepoints:
                             v = float(rng.normal(mu, t.cv * abs(mu))) if t.cv else mu
-                            rows.append({"subject_id": sid, "sex": sex, "dose": d,
-                                         "endpoint": e.name, "timepoint": tp, "unit": e.unit,
-                                         "value": v, "observation": None})
+                            rows.append(
+                                {
+                                    "subject_id": sid,
+                                    "sex": sex,
+                                    "dose": d,
+                                    "endpoint": e.name,
+                                    "timepoint": tp,
+                                    "unit": e.unit,
+                                    "value": v,
+                                    "observation": None,
+                                }
+                            )
                     for sg in s.clinical_signs:
                         if d >= sg.from_dose and k < math.ceil(sg.fraction * n):
-                            rows.append({"subject_id": sid, "sex": sex, "dose": d,
-                                         "endpoint": "clinical_sign", "timepoint": sg.timepoint,
-                                         "unit": None, "value": None, "observation": sg.sign})
+                            rows.append(
+                                {
+                                    "subject_id": sid,
+                                    "sex": sex,
+                                    "dose": d,
+                                    "endpoint": "clinical_sign",
+                                    "timepoint": sg.timepoint,
+                                    "unit": None,
+                                    "value": None,
+                                    "observation": sg.sign,
+                                }
+                            )
                     for tp, x in dead.items():
                         if k < x.count:
-                            rows.append({"subject_id": sid, "sex": sex, "dose": d,
-                                         "endpoint": "mortality", "timepoint": tp, "unit": None,
-                                         "value": None, "observation": x.description})
+                            rows.append(
+                                {
+                                    "subject_id": sid,
+                                    "sex": sex,
+                                    "dose": d,
+                                    "endpoint": "mortality",
+                                    "timepoint": tp,
+                                    "unit": None,
+                                    "value": None,
+                                    "observation": x.description,
+                                }
+                            )
         return rows, "sim.drf_declared_effects"

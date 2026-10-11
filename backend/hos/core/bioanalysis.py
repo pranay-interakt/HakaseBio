@@ -53,65 +53,171 @@ class M10Criterion:
 
 #: Acceptance criteria for chromatographic methods, transcribed from ICH M10 (verified
 #: against the official PDF, database.ich.org M10_Guideline_Step4_2022_0524.pdf).
-M10_CHROMATOGRAPHIC: dict[str, M10Criterion] = {c.key: c for c in (
-    M10Criterion("cal_min_levels", 6, "levels", "3.2.4",
-                 "at least 6 concentration levels of calibration standards, including the LLOQ "
-                 "and the ULOQ"),
-    M10Criterion("cal_accuracy", 15, "percent", "3.2.4",
-                 "back-calculated concentrations within ±15% of nominal (±20% at the LLOQ)"),
-    M10Criterion("cal_accuracy_lloq", 20, "percent", "3.2.4", "±20% at the LLOQ"),
-    M10Criterion("cal_fraction_passing", 75, "percent", "3.2.4",
-                 "at least 75% of the calibration standards with a minimum of 6 calibration "
-                 "standard levels should meet the above criteria"),
-    M10Criterion("qc_accuracy", 15, "percent", "3.2.5.2",
-                 "accuracy within ±15% of nominal, except at the LLOQ (±20%)"),
-    M10Criterion("qc_accuracy_lloq", 20, "percent", "3.2.5.2", "±20% at the LLOQ"),
-    M10Criterion("qc_cv", 15, "percent", "3.2.5.2",
-                 "precision (%CV) not exceeding 15%, except at the LLOQ (20%)"),
-    M10Criterion("qc_cv_lloq", 20, "percent", "3.2.5.2", "%CV not exceeding 20% at the LLOQ"),
-    M10Criterion("ap_min_runs", 3, "runs", "3.2.5.2",
-                 "each QC level in at least 3 analytical runs over at least two days"),
-    M10Criterion("ap_min_replicates", 5, "replicates", "3.2.5.2",
-                 "at least 5 replicates at each QC concentration level in each analytical run"),
-    M10Criterion("interference_analyte", 20, "percent", "3.2.1",
-                 "not more than 20% of the analyte response at the LLOQ"),
-    M10Criterion("interference_is", 5, "percent", "3.2.1",
-                 "not more than 5% of the IS response in the LLOQ sample"),
-    M10Criterion("selectivity_min_sources", 6, "sources", "3.2.1",
-                 "blank samples from at least 6 individual sources/lots"),
-    M10Criterion("matrix_min_sources", 6, "sources", "3.2.3",
-                 "low and high QCs, each prepared using matrix from at least 6 different "
-                 "sources/lots"),
-    M10Criterion("matrix_min_replicates", 3, "replicates", "3.2.3",
-                 "at least 3 replicates of low and high QCs"),
-    M10Criterion("matrix_accuracy", 15, "percent", "3.2.3",
-                 "for each matrix source/lot accuracy within ±15% of nominal"),
-    M10Criterion("matrix_cv", 15, "percent", "3.2.3", "precision (%CV) not greater than 15%"),
-    M10Criterion("carryover_analyte", 20, "percent", "3.2.6",
-                 "carry-over not greater than 20% of the analyte response at the LLOQ"),
-    M10Criterion("carryover_is", 5, "percent", "3.2.6", "and 5% of the response for the IS"),
-    M10Criterion("dilution_min_replicates", 5, "replicates", "3.2.7",
-                 "at least 5 replicates per dilution factor"),
-    M10Criterion("dilution_accuracy", 15, "percent", "3.2.7",
-                 "mean accuracy of the dilution QCs within ±15% of nominal"),
-    M10Criterion("dilution_cv", 15, "percent", "3.2.7", "precision (%CV) not exceeding 15%"),
-    M10Criterion("stability_min_aliquots", 3, "aliquots", "3.2.8",
-                 "the bulk sample divided into a minimum of 3 aliquots"),
-    M10Criterion("stability_accuracy", 15, "percent", "3.2.8",
-                 "mean concentration at each QC level within ±15% of nominal"),
-    M10Criterion("freeze_thaw_min_cycles", 3, "cycles", "3.2.8",
-                 "a minimum of three cycles should be conducted"),
-    M10Criterion("isr_limit", 20, "percent", "5",
-                 "for chromatographic methods, the percent difference should be within ±20% "
-                 "for at least 2/3 of the repeats"),
-    M10Criterion("isr_fraction", 2 / 3, "dimensionless", "5", "at least 2/3 of the repeats"),
-)}
+M10_CHROMATOGRAPHIC: dict[str, M10Criterion] = {
+    c.key: c
+    for c in (
+        M10Criterion(
+            "cal_min_levels",
+            6,
+            "levels",
+            "3.2.4",
+            "at least 6 concentration levels of calibration standards, including the LLOQ "
+            "and the ULOQ",
+        ),
+        M10Criterion(
+            "cal_accuracy",
+            15,
+            "percent",
+            "3.2.4",
+            "back-calculated concentrations within ±15% of nominal (±20% at the LLOQ)",
+        ),
+        M10Criterion("cal_accuracy_lloq", 20, "percent", "3.2.4", "±20% at the LLOQ"),
+        M10Criterion(
+            "cal_fraction_passing",
+            75,
+            "percent",
+            "3.2.4",
+            "at least 75% of the calibration standards with a minimum of 6 calibration "
+            "standard levels should meet the above criteria",
+        ),
+        M10Criterion(
+            "qc_accuracy",
+            15,
+            "percent",
+            "3.2.5.2",
+            "accuracy within ±15% of nominal, except at the LLOQ (±20%)",
+        ),
+        M10Criterion("qc_accuracy_lloq", 20, "percent", "3.2.5.2", "±20% at the LLOQ"),
+        M10Criterion(
+            "qc_cv",
+            15,
+            "percent",
+            "3.2.5.2",
+            "precision (%CV) not exceeding 15%, except at the LLOQ (20%)",
+        ),
+        M10Criterion("qc_cv_lloq", 20, "percent", "3.2.5.2", "%CV not exceeding 20% at the LLOQ"),
+        M10Criterion(
+            "ap_min_runs",
+            3,
+            "runs",
+            "3.2.5.2",
+            "each QC level in at least 3 analytical runs over at least two days",
+        ),
+        M10Criterion(
+            "ap_min_replicates",
+            5,
+            "replicates",
+            "3.2.5.2",
+            "at least 5 replicates at each QC concentration level in each analytical run",
+        ),
+        M10Criterion(
+            "interference_analyte",
+            20,
+            "percent",
+            "3.2.1",
+            "not more than 20% of the analyte response at the LLOQ",
+        ),
+        M10Criterion(
+            "interference_is",
+            5,
+            "percent",
+            "3.2.1",
+            "not more than 5% of the IS response in the LLOQ sample",
+        ),
+        M10Criterion(
+            "selectivity_min_sources",
+            6,
+            "sources",
+            "3.2.1",
+            "blank samples from at least 6 individual sources/lots",
+        ),
+        M10Criterion(
+            "matrix_min_sources",
+            6,
+            "sources",
+            "3.2.3",
+            "low and high QCs, each prepared using matrix from at least 6 different sources/lots",
+        ),
+        M10Criterion(
+            "matrix_min_replicates",
+            3,
+            "replicates",
+            "3.2.3",
+            "at least 3 replicates of low and high QCs",
+        ),
+        M10Criterion(
+            "matrix_accuracy",
+            15,
+            "percent",
+            "3.2.3",
+            "for each matrix source/lot accuracy within ±15% of nominal",
+        ),
+        M10Criterion("matrix_cv", 15, "percent", "3.2.3", "precision (%CV) not greater than 15%"),
+        M10Criterion(
+            "carryover_analyte",
+            20,
+            "percent",
+            "3.2.6",
+            "carry-over not greater than 20% of the analyte response at the LLOQ",
+        ),
+        M10Criterion("carryover_is", 5, "percent", "3.2.6", "and 5% of the response for the IS"),
+        M10Criterion(
+            "dilution_min_replicates",
+            5,
+            "replicates",
+            "3.2.7",
+            "at least 5 replicates per dilution factor",
+        ),
+        M10Criterion(
+            "dilution_accuracy",
+            15,
+            "percent",
+            "3.2.7",
+            "mean accuracy of the dilution QCs within ±15% of nominal",
+        ),
+        M10Criterion("dilution_cv", 15, "percent", "3.2.7", "precision (%CV) not exceeding 15%"),
+        M10Criterion(
+            "stability_min_aliquots",
+            3,
+            "aliquots",
+            "3.2.8",
+            "the bulk sample divided into a minimum of 3 aliquots",
+        ),
+        M10Criterion(
+            "stability_accuracy",
+            15,
+            "percent",
+            "3.2.8",
+            "mean concentration at each QC level within ±15% of nominal",
+        ),
+        M10Criterion(
+            "freeze_thaw_min_cycles",
+            3,
+            "cycles",
+            "3.2.8",
+            "a minimum of three cycles should be conducted",
+        ),
+        M10Criterion(
+            "isr_limit",
+            20,
+            "percent",
+            "5",
+            "for chromatographic methods, the percent difference should be within ±20% "
+            "for at least 2/3 of the repeats",
+        ),
+        M10Criterion("isr_fraction", 2 / 3, "dimensionless", "5", "at least 2/3 of the repeats"),
+    )
+}
 
 #: ISR limit for ligand binding assays (M10 section 5: "For LBAs, the percent difference
 #: should be within ±30% for at least 2/3 of the repeats").
 M10_LIGAND_BINDING_ISR = M10Criterion(
-    "isr_limit", 30, "percent", "5",
-    "for LBAs, the percent difference should be within ±30% for at least 2/3 of the repeats")
+    "isr_limit",
+    30,
+    "percent",
+    "5",
+    "for LBAs, the percent difference should be within ±30% for at least 2/3 of the repeats",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,9 +248,13 @@ class CalibrationFit:
         return min(pos) if pos else None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"model": self.model, "weighting": self.weighting,
-                "coefficients": list(self.coefficients), "n_points": self.n_points,
-                "r_squared": self.r_squared}
+        return {
+            "model": self.model,
+            "weighting": self.weighting,
+            "coefficients": list(self.coefficients),
+            "n_points": self.n_points,
+            "r_squared": self.r_squared,
+        }
 
 
 def _weights(x: np.ndarray, weighting: Weighting) -> np.ndarray:
@@ -155,8 +265,9 @@ def _weights(x: np.ndarray, weighting: Weighting) -> np.ndarray:
     return 1.0 / x if weighting == "1/x" else 1.0 / (x * x)
 
 
-def fit_calibration(nominal: Sequence[float], response: Sequence[float], *, model: Model,
-                    weighting: Weighting) -> CalibrationFit:
+def fit_calibration(
+    nominal: Sequence[float], response: Sequence[float], *, model: Model, weighting: Weighting
+) -> CalibrationFit:
     """Weighted least-squares fit of response on nominal concentration.
 
     Minimises sum(w_i * (y_i - f(x_i))^2) with w_i = 1, 1/x_i or 1/x_i^2 as stated by the
@@ -175,9 +286,13 @@ def fit_calibration(nominal: Sequence[float], response: Sequence[float], *, mode
     ss_res = float(np.sum(w * (y - fitted) ** 2))
     ss_tot = float(np.sum(w * (y - ybar) ** 2))
     r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else float("nan")
-    return CalibrationFit(model=model, weighting=weighting,
-                          coefficients=tuple(float(c) for c in coef), n_points=len(x),
-                          r_squared=r2)
+    return CalibrationFit(
+        model=model,
+        weighting=weighting,
+        coefficients=tuple(float(c) for c in coef),
+        n_points=len(x),
+        r_squared=r2,
+    )
 
 
 def accuracy_percent(measured: float, nominal: float) -> float:

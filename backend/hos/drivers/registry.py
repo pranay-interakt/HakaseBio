@@ -62,12 +62,15 @@ class DriverRegistry:
             if not getattr(driver_cls, a, None):
                 raise DriverError(f"driver {driver_cls.__name__} is missing class attribute {a!r}")
         if _abi_major(driver_cls.abi) != _abi_major(DRIVER_ABI):
-            raise DriverError(f"driver {driver_cls.id} targets ABI {driver_cls.abi}; kernel "
-                              f"provides {DRIVER_ABI}")
+            raise DriverError(
+                f"driver {driver_cls.id} targets ABI {driver_cls.abi}; kernel provides {DRIVER_ABI}"
+            )
         existing = self._drivers.get(driver_cls.id)
         if existing is not None and type(existing) is not driver_cls:
-            raise DriverError(f"driver id {driver_cls.id!r} is already registered by "
-                              f"{type(existing).__module__}.{type(existing).__name__}")
+            raise DriverError(
+                f"driver id {driver_cls.id!r} is already registered by "
+                f"{type(existing).__module__}.{type(existing).__name__}"
+            )
         inst = driver_cls()
         self._drivers[driver_cls.id] = inst
         return inst
@@ -102,8 +105,9 @@ class DriverRegistry:
     def ids(self) -> list[str]:
         return sorted(self._drivers)
 
-    def match(self, requirement: StudyRequirement,
-              context: ProgramContext | None = None) -> list[tuple[StudyDriver, Support]]:
+    def match(
+        self, requirement: StudyRequirement, context: ProgramContext | None = None
+    ) -> list[tuple[StudyDriver, Support]]:
         """Every registered driver that supports ``requirement``, with its probe result."""
         out = []
         for d in self:

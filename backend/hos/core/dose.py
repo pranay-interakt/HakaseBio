@@ -45,11 +45,11 @@ __all__ = [
 class DoseBasis(str, Enum):
     """Which regulatory route produced the starting dose."""
 
-    NOAEL_BSA = "noael_bsa"          # FDA 2005 default route
+    NOAEL_BSA = "noael_bsa"  # FDA 2005 default route
     PAD = "pharmacologically_active_dose"
-    MABEL = "mabel"                  # EMA FIH guideline, biologics/immune agonists
-    ICH_S9_STD10 = "ich_s9_std10"    # oncology, rodent
-    ICH_S9_HNSTD = "ich_s9_hnstd"    # oncology, non-rodent
+    MABEL = "mabel"  # EMA FIH guideline, biologics/immune agonists
+    ICH_S9_STD10 = "ich_s9_std10"  # oncology, rodent
+    ICH_S9_HNSTD = "ich_s9_hnstd"  # oncology, non-rodent
 
 
 #: FDA 2005 Section VII.A (pp. 10-11): considerations that "might warrant increasing the
@@ -114,7 +114,8 @@ def human_equivalent_dose(
             km_animal=km_a,
             km_human=km_h,
             hed=Quantity.unavailable(
-                "mg/kg", reason=f"no NOAEL for {species}: {noael.provenance.reason}",
+                "mg/kg",
+                reason=f"no NOAEL for {species}: {noael.provenance.reason}",
                 label=f"HED from {species}",
             ),
         )
@@ -130,7 +131,7 @@ def human_equivalent_dose(
         label=f"HED from {species}",
         qc_flags=tuple(dict.fromkeys(list(noael.qc_flags) + list(km_a.qc_flags))),
         notes=f"BSA scaling: {noael_mgkg:g} mg/kg x ({km_a.require():g}/{km_h.require():g})"
-              f" = {noael_mgkg*factor:.4g} mg/kg",
+        f" = {noael_mgkg * factor:.4g} mg/kg",
     )
     return SpeciesHED(species=species, noael=noael, km_animal=km_a, km_human=km_h, hed=hed)
 
@@ -245,8 +246,14 @@ def project_starting_dose(
             pad_below_mrsd=False,
             safety_factor_justification=tuple(safety_factor_justification),
             qc=QCVerdict.of(
-                [QCFinding(code="no_usable_noael", status=QCStatus.FAIL,
-                           message="no species produced a usable HED", observed=reason)]
+                [
+                    QCFinding(
+                        code="no_usable_noael",
+                        status=QCStatus.FAIL,
+                        message="no species produced a usable HED",
+                        observed=reason,
+                    )
+                ]
             ),
         )
 
@@ -256,7 +263,7 @@ def project_starting_dose(
                 code="single_species_only",
                 status=QCStatus.WARN,
                 message="only one species contributed a NOAEL; ICH M3(R2) expects a rodent "
-                        "and a non-rodent species for most small-molecule programmes",
+                "and a non-rodent species for most small-molecule programmes",
                 observed=usable[0].species,
             )
         )
@@ -297,12 +304,14 @@ def project_starting_dose(
                     code="increased_safety_factor_unjustified",
                     status=QCStatus.WARN,
                     message="an increased safety factor was applied without recording which "
-                            "FDA 2005 trigger prompted it",
+                    "FDA 2005 trigger prompted it",
                     observed=safety_factor,
                 )
             )
         sf_q = Quantity.user_supplied(
-            safety_factor, "dimensionless", actor="study_director",
+            safety_factor,
+            "dimensionless",
+            actor="study_director",
             label="Safety factor",
             notes="; ".join(safety_factor_justification) or None,
         )
@@ -327,8 +336,8 @@ def project_starting_dose(
                     code="pad_below_mrsd",
                     status=QCStatus.WARN,
                     message="the HED derived from the pharmacologically active dose is below the "
-                            "MRSD; FDA 2005 Section VIII: it may be appropriate to decrease the "
-                            "clinical starting dose",
+                    "MRSD; FDA 2005 Section VIII: it may be appropriate to decrease the "
+                    "clinical starting dose",
                     observed=pad_mgkg,
                     threshold=mrsd_per_kg.require(),
                 )

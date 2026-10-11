@@ -23,7 +23,7 @@ def test_aspirin_reference_values():
     "smiles,inchikey",
     [
         ("Cn1cnc2c1c(=O)n(C)c(=O)n2C", "RYYVLZVUVIJVGH-UHFFFAOYSA-N"),  # caffeine
-        ("CN(C)C(=N)NC(=N)N", "XZWYZXLIPXDOLR-UHFFFAOYSA-N"),          # metformin
+        ("CN(C)C(=N)NC(=N)N", "XZWYZXLIPXDOLR-UHFFFAOYSA-N"),  # metformin
     ],
 )
 def test_public_identifiers_match(smiles, inchikey):
@@ -31,11 +31,10 @@ def test_public_identifiers_match(smiles, inchikey):
 
 
 def test_atorvastatin_breaks_ro5_twice():
-    smi = ("CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CC[C@@H](O)"
-           "C[C@@H](O)CC(=O)O")
+    smi = "CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CC[C@@H](O)C[C@@H](O)CC(=O)O"
     p = compute_profile(smi)
     assert p.lipinski_violations.value == 2  # MW > 500 and cLogP > 5
-    assert p.veber_pass is False             # 12 rotatable bonds
+    assert p.veber_pass is False  # 12 rotatable bonds
 
 
 def test_every_descriptor_is_computed_with_citation_and_software():
