@@ -252,6 +252,8 @@ export interface Study extends StudySummary {
   };
   driver?: { id: string; name: string; version: string; ctd_section: string };
   expected_inputs?: Record<string, string>;
+  /** Inputs that are human selections made after the data (always user-supplied). */
+  selection_inputs?: string[];
   expert_determinations?: ExpertDeterminationSpec[];
 }
 

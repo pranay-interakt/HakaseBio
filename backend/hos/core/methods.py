@@ -174,6 +174,48 @@ METHODS: Final[dict[str, Method]] = dict(
         _m("nca.auc_tau", "AUC over the dosing interval, from a quantifiable end-of-interval "
            "sample", ("fda_ba_2022", "certara_phoenix_nca", "cdisc_pk_terms"),
            limits=("not reported when the end-of-interval sample is BLQ (no extrapolation)",)),
+        _m("nca.c0_back_extrapolation",
+           "IV bolus concentration at dose time by log-linear back-extrapolation of the first two "
+           "quantifiable points", ("certara_phoenix_nca",),
+           limits=("unavailable when the first two points do not decline (no substitution)",)),
+        _m("nca.lambda_z",
+           "Terminal rate constant by least squares of ln C on t over the selected terminal points",
+           ("fda_ba_2022", "ich_m13a", "certara_phoenix_nca"),
+           assumptions=("the terminal phase is selected by the scientist (start time); at least "
+                        "three declining points (FDA 2022 Appendix A; ICH M13A 2.1.8)",),
+           limits=("the vendor 'best fit' (largest adjusted R-squared) is shown as a "
+                   "suggestion only",)),
+        _m("nca.half_life", "Terminal half-life ln2/lambda_z", ("certara_phoenix_nca",
+                                                                "cdisc_pk_terms")),
+        _m("nca.auc_inf", "AUC extrapolated to infinity, AUC(0-t) + Clast/lambda_z (observed "
+           "Clast)", ("fda_ba_2022", "cdisc_pk_terms"),
+           limits=("depends on the selected terminal phase",)),
+        _m("nca.auc_pct_extrap", "Percentage of AUCinf extrapolated beyond Tlast",
+           ("ema_be_2010", "certara_phoenix_nca")),
+        _m("nca.moments",
+           "AUMC by the stated trapezoidal rule, AUMCinf and MRTinf (minus half the infusion time "
+           "for an infusion)", ("certara_phoenix_nca", "benet2012"),
+           assumptions=("linear disposition",)),
+        _m("nca.clearance", "Clearance Dose/AUCinf (CL/F after extravascular dosing)",
+           ("certara_phoenix_nca", "benet2012", "cdisc_pk_terms"),
+           assumptions=("linear disposition; complete dose delivered",),
+           limits=("after extravascular dosing this is apparent clearance CL/F",)),
+        _m("nca.volume_z", "Terminal-phase volume Dose/(lambda_z AUCinf) (Vz/F extravascular)",
+           ("certara_phoenix_nca",)),
+        _m("nca.vss", "Steady-state volume CL x MRTinf, intravenous dosing only",
+           ("certara_phoenix_nca", "benet2012"),
+           assumptions=("linear disposition with elimination from the sampled compartment "
+                        "(Benet 2012)",),
+           limits=("not computed after extravascular dosing: MRT then includes absorption",)),
+        _m("nca.bioavailability",
+           "Absolute bioavailability from dose-normalised group mean AUCinf, extravascular / "
+           "intravenous", ("shang2022", "cdisc_pk_terms"),
+           assumptions=("linear pharmacokinetics between the two doses when they differ",)),
+        _m("sim.pk_declared_profile",
+           "Simulated single-dose concentrations from declared true group profiles with "
+           "log-normal between-animal and residual variability", ("fda_ba_2022",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

@@ -182,3 +182,30 @@ formulas, except that CLO/CLFO are "calculated using the AUCINF".
 9. Shang H, Dai X, Li M, Kai Y, Liu Z, Wang M, Li Q, Gu Y, Liu C, Si D. Absolute bioavailability, dose proportionality, and tissue distribution of rotundic acid in rats based on validated LC-QqQ-MS/MS method. *J Pharm Anal.* 2022;12(2):278–286. DOI: 10.1016/j.jpha.2021.03.008. PMC9091740. *(secondary — F formula)*
 10. Purves RD. Optimum numerical integration methods for estimation of area-under-the-curve (AUC) and area-under-the-moment-curve (AUMC). *J Pharmacokinet Biopharm.* 1992;20(3):211–226. DOI: 10.1007/BF01062525. PMID 1522479. *(abstract only)*
 11. Yamaoka K, Nakagawa T, Uno T. Statistical moments in pharmacokinetics. *J Pharmacokinet Biopharm.* 1978;6(6):547–558. DOI: 10.1007/BF01062109. PMID 731417. *(abstract only)*
+
+## Implementation record (driver `in_vivo_pk` v1.0.0, 2026-10-11)
+
+Additional sources read while building the driver:
+
+| Item | Source read | Used for |
+|---|---|---|
+| AUMC segment formulas | Certara Phoenix 8.3 "Partial area calculation", equation images `ncacomprules00476.png` (linear: δt·(t1·C1 + t2·C2)/2) and `ncacomprules00480.png` (log: δt·(t2·C2 − t1·C1)/ln(C2/C1) − δt²·(C2 − C1)/ln(C2/C1)²), downloaded from `onlinehelp.certara.com/phoenix/8.3/assets/` | AUMC; independently checked against the exact integral of t·C0·e^(−kt) |
+| Concentration at dose time; IV bolus C0 | Certara Phoenix 8.3 "NCA computation rules": "Extravascular and Infusion data: For single dose data, a concentration of zero is used"; "IV Bolus data: Phoenix performs a log-linear regression of first two data points to back-extrapolate C0." Fallback: "If the regression yields a slope >= 0 ... then the first observed y-value is used as an estimate for C0." | zero at dose time only when the protocol declares a drug-naive single dose; C0 back-extrapolation; **the fallback substitution is not adopted** (C0 is unavailable instead) |
+| C0, Vss, CL, Vz, %extrap definitions | Certara Phoenix 8.3 "NCA parameter formulas": C0 "equal to the first observed concentration value if that value occurs at the dose time"; Vss "= (MRTINF)(CL)", "Computed for IV Bolus and Infusion dosing only"; CL "= Dose/AUCINF"; Vz "= Dose/[Lambda_z(AUCINF)]"; AUC_%Extrap "= 100[(AUCINF– AUClast)/AUCINF]" | equations as listed |
+| Benet 2012 | Crossref record for DOI 10.1208/s12248-012-9326-9 (AAPS J 14(2):164–167) | citation registered |
+
+Decisions:
+
+- **Terminal phase is a human selection.**
+  - It is entered after the data as a user-supplied start time per profile. A new driver hook,
+    ABI 1.1 `post_data_inputs`, declares these inputs.
+  - Inputs of any other provenance kind are refused.
+  - The selections are bound by the responsible scientist's signed determination.
+- **The vendor best fit is shown, not applied.**
+- **Limits apply only when the protocol states them.** No %extrapolated or adjusted-R² limit is
+  applied unless the protocol states one with its basis (M13A's 80% is a BE criterion).
+- **Not built.**
+  - Multiple-dose PK (that is A2 `toxicokinetics`).
+  - AUCinf from predicted Clast (CDISC AUCIFP).
+  - Urine/excretion parameters.
+  - Sparse-sampling NCA.

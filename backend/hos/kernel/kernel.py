@@ -436,6 +436,13 @@ class Kernel:
                       "conversions": list(data.conversions)}, reason=reason)
         return self.study_view(study_id)
 
+    @staticmethod
+    def _declared_inputs(driver: StudyDriver, params: BaseModel, row: Any) -> dict[str, str]:
+        declared = dict(driver.analysis_inputs(params))
+        if row.data:
+            declared.update(driver.post_data_inputs(params, IngestedData.from_dict(row.data)))
+        return declared
+
     def set_analysis_inputs(self, actor: Principal, study_id: str,
                             inputs: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
         """Supply quantities the analysis needs from outside the return file.
@@ -449,7 +456,7 @@ class Kernel:
             raise KernelError(f"inputs cannot change in state {row.state}")
         driver = self._driver(row)
         params = self._validate(driver, row.parameters)
-        declared = driver.analysis_inputs(params)
+        declared = self._declared_inputs(driver, params, row)
         merged = dict(row.analysis_inputs or {})
         for name, spec in inputs.items():
             if name not in declared:
@@ -716,7 +723,9 @@ class Kernel:
             view["driver"] = {"id": driver.id, "name": driver.name, "version": driver.version,
                               "ctd_section": driver.ctd_section}
             if params is not None:
-                view["expected_inputs"] = dict(driver.analysis_inputs(params))
+                view["expected_inputs"] = self._declared_inputs(driver, params, s)
+                view["selection_inputs"] = (sorted(driver.post_data_inputs(
+                    params, IngestedData.from_dict(s.data))) if s.data else [])
                 view["expert_determinations"] = [d.to_dict() for d in
                                                  driver.expert_determinations(params)]
         return view

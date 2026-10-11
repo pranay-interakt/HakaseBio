@@ -127,10 +127,21 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            url="https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"),
         _c("certara_phoenix_nca",
            "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial "
-           "area calculation. 2020. (Vendor documentation; a secondary source for the "
-           "trapezoidal equations.)",
+           "area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. "
+           "2020. (Vendor documentation; a secondary source for the NCA equations.)",
            year=2020,
            url="https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"),
+        _c("ema_be_2010",
+           "European Medicines Agency, CHMP. Guideline on the Investigation of Bioequivalence. "
+           "CPMP/EWP/QWP/1401/98 Rev. 1/Corr**. 20 January 2010.",
+           year=2010,
+           url="https://www.ema.europa.eu/en/documents/scientific-guideline/guideline-"
+               "investigation-bioequivalence-rev1_en.pdf"),
+        _c("benet2012",
+           "Benet LZ. Benet LZ and Galeazzi RL: noncompartmental determination of the "
+           "steady-state volume of distribution, J Pharm Sci 68, 1071-1074, 1979 - the "
+           "backstory. AAPS J. 2012;14(2):164-167.",
+           year=2012, doi="10.1208/s12248-012-9326-9"),
         _c("purves1992",
            "Purves RD. Optimum numerical integration methods for estimation of "
            "area-under-the-curve (AUC) and area-under-the-moment-curve (AUMC). "

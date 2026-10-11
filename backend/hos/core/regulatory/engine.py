@@ -238,7 +238,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
                   "numbers of human subjects or treating for long duration (generally before "
                   "Phase III); exposure in the tox species before first-in-human is covered by "
                   "toxicokinetics (ICH S3A)",
-        glp=False, species=("rat", "dog"), ctd_section="4.2.2.2",
+        glp=False, species=("rat", "dog"), ctd_section="4.2.2.2", driver_id="in_vivo_pk",
     ))
     out.append(_req(
         id="adme.metabolite_profiling", name="Metabolite profiling and human metabolite comparison",

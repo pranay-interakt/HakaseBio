@@ -132,6 +132,8 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
             sim = driver.simulate(params, compound, sim_params, seed=int(seed),
                                   study_reference=REHEARSAL_REFERENCE)
             data = driver.ingest(sim.content, params, study_reference=REHEARSAL_REFERENCE)
+            post = set(driver.post_data_inputs(params, data)) - set(given_inputs)
+            item["missing_inputs"] = sorted({*item["missing_inputs"], *post})
             inputs = {k: input_quantity(k, {**v, "entered_by": v.get("entered_by", actor.name)})
                       for k, v in given_inputs.items()}
             res = driver.analyze(data, params, compound, inputs)

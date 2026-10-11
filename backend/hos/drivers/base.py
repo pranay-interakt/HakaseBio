@@ -85,7 +85,7 @@ __all__ = [
 ]
 
 #: Version of the driver ABI. The registry refuses drivers built for a different major.
-DRIVER_ABI = "1.0"
+DRIVER_ABI = "1.1"  # 1.1 adds post_data_inputs (backward compatible)
 
 #: Metadata key written into every simulated file. Ingest forces SIMULATED origin when present.
 SIMULATION_MARKER = "hos-simulated"
@@ -1075,6 +1075,13 @@ class StudyDriver(ABC):
     def analysis_inputs(self, params: BaseModel) -> Mapping[str, str]:
         """Extra quantities the analysis needs from outside the return file (name -> unit),
         e.g. a free Cmax for a safety margin. Missing ones yield UNAVAILABLE results."""
+        return {}
+
+    def post_data_inputs(self, params: BaseModel, data: IngestedData) -> Mapping[str, str]:
+        """Inputs that only exist once the data are in (name -> unit): human selections the
+        analysis consumes, e.g. the start of the terminal phase of each profile for lambda_z.
+        They are supplied like :meth:`analysis_inputs`, recorded with the actor who entered
+        them, and missing ones yield UNAVAILABLE results (ABI 1.1)."""
         return {}
 
     def analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,

@@ -244,6 +244,34 @@ is a new registry version; it never silently alters past results.
   - expected at least once per species for nonclinical studies.
 - Quantifiable analyte in control or day-1 pre-dose samples is flagged, because ICH M10 §3.3.4 and
   §4.3.4 list it as a reason for reanalysis.
+- Single-dose terminal parameters (`in_vivo_pk`):
+  - **λz.** Least squares of ln C on t over the terminal points (FDA 2022 Appendix A §B: "three
+    or more samples during the terminal log-linear phase … from linear regression"; ICH M13A
+    §2.1.8). The terminal phase is the scientist's selection, entered as a start time per profile.
+    Candidate fits over the last 3, 4, … points after Tmax are shown, with the vendor "best fit"
+    (largest adjusted R², within 0.0001 preferring more points) marked as a suggestion.
+    Adjusted R² = 1 − (1 − R²)(n − 1)/(n − 2).
+  - **AUCinf** = AUC(0-t) + Clast/λz (FDA 2022 §III.A.9.b; observed Clast, CDISC AUCIFO).
+  - **%extrapolated** = 100(AUCinf − AUC(0-t))/AUCinf (EMA BE guideline, "residual area").
+  - **Other parameters:** t½ = ln2/λz; AUMC by the stated trapezoidal rule (linear
+    δt(t1C1 + t2C2)/2 or logarithmic δt(t2C2 − t1C1)/ln(C2/C1) − δt²(C2 − C1)/ln(C2/C1)²);
+    AUMCinf = AUMC(0-t) + tlast·Clast/λz + Clast/λz²; MRTinf = AUMCinf/AUCinf (minus Tinf/2 for
+    an infusion); CL = Dose/AUCinf (CL/F extravascular); Vz = Dose/(λz·AUCinf); Vss = CL·MRTinf
+    for intravenous dosing only.
+
+    These come from Certara Phoenix 8.3 documentation, a secondary source; the AUMC images were
+    checked against the exact integral of a mono-exponential. The CL–Vss–MRT relation is from
+    Benet 2012 (AAPS J 14:164). All are exact for a one-compartment profile, which is the
+    known-value test.
+  - **IV bolus C0.** The observation at dose time, or log-linear back-extrapolation through the
+    first two quantifiable points (Certara "NCA computation rules"). When those points do not
+    decline, C0 is unavailable; the vendor's substitution of the first observation is not used.
+  - **Concentration at dose time.** For extravascular and infusion dosing it is zero for a
+    drug-naive single dose (declared), or a measured pre-dose sample.
+  - **F.** F = (mean AUCinf_ev·Dose_iv)/(mean AUCinf_iv·Dose_ev). This assumes linear PK when the
+    doses differ, and the report says so.
+  - **Limits.** %extrapolated and adjusted-R² limits are optional inputs with a stated basis. The
+    80% coverage rule of ICH M13A is a bioequivalence criterion, so it is not applied by default.
 
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 

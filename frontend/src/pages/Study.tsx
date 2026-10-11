@@ -403,73 +403,120 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
 }
 
 function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }) {
-  const names = Object.keys(s.expected_inputs ?? {});
-  const [vals, setVals] = useState<Record<string, Record<string, string>>>(() => {
-    const o: Record<string, Record<string, string>> = {};
-    for (const n of names) {
-      const cur = s.analysis_inputs[n] ?? {};
-      o[n] = {
-        value: cur.value === undefined ? "" : String(cur.value),
-        unit: String(cur.unit ?? s.expected_inputs![n]),
-        kind: String(cur.kind ?? "measured"),
-        source: String(cur.source ?? ""),
-      };
-    }
-    return o;
-  });
+  const expected = s.expected_inputs ?? {};
+  const selections = new Set(s.selection_inputs ?? []);
+  const names = Object.keys(expected).filter((n) => !selections.has(n));
+  const selNames = Object.keys(expected).filter((n) => selections.has(n));
+  const init = (n: string): Record<string, string> => {
+    const cur = s.analysis_inputs[n] ?? {};
+    return {
+      value: cur.value === undefined ? "" : String(cur.value),
+      unit: String(cur.unit ?? expected[n]),
+      kind: selections.has(n) ? "user_supplied" : String(cur.kind ?? "measured"),
+      source: String(cur.source ?? cur.note ?? ""),
+    };
+  };
+  // the form keeps only what the user edited; anything else is read from the study
+  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
+  const val = (n: string) => edits[n] ?? init(n);
   function save() {
     const inputs: Record<string, Record<string, unknown>> = {};
-    for (const n of names) {
-      const v = vals[n];
-      if (v.value.trim() === "") continue;
-      inputs[n] = { value: Number(v.value), unit: v.unit, kind: v.kind, source: v.source || null };
+    for (const n of [...names, ...selNames]) {
+      const v = val(n);
+      if (v.value.trim() === "" || !(n in edits)) continue;
+      inputs[n] = selections.has(n)
+        ? { value: Number(v.value), unit: v.unit, kind: "user_supplied", note: v.source || null }
+        : { value: Number(v.value), unit: v.unit, kind: v.kind, source: v.source || null };
     }
+    if (Object.keys(inputs).length === 0) return;
     run(() => api.put(`/studies/${s.id}/inputs`, { inputs }));
+    setEdits({});
   }
-  const upd = (n: string, k: string, v: string) => setVals((o) => ({ ...o, [n]: { ...o[n], [k]: v } }));
+  const upd = (n: string, k: string, v: string) => setEdits((o) => ({ ...o, [n]: { ...val(n), [k]: v } }));
   return (
-    <Section title="Analysis inputs from outside this study">
-      <p className="muted small">
-        Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured
-        (name the study/assay), literature (name the source) or user-supplied. Missing inputs make the dependent
-        results unavailable, never assumed.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Input</th>
-            <th>Value</th>
-            <th>Unit</th>
-            <th>Kind</th>
-            <th>Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {names.map((n) => (
-            <tr key={n}>
-              <td>
-                <code>{n}</code>
-              </td>
-              <td>
-                <input type="number" step="any" value={vals[n].value} onChange={(e) => upd(n, "value", e.target.value)} />
-              </td>
-              <td>
-                <input value={vals[n].unit} onChange={(e) => upd(n, "unit", e.target.value)} />
-              </td>
-              <td>
-                <select value={vals[n].kind} onChange={(e) => upd(n, "kind", e.target.value)}>
-                  <option>measured</option>
-                  <option>literature</option>
-                  <option>user_supplied</option>
-                </select>
-              </td>
-              <td>
-                <input value={vals[n].source} onChange={(e) => upd(n, "source", e.target.value)} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <Section title="Analysis inputs">
+      {names.length > 0 && (
+        <>
+          <p className="muted small">
+            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured
+            (name the study/assay), literature (name the source) or user-supplied. Missing inputs make the dependent
+            results unavailable, never assumed.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Input</th>
+                <th>Value</th>
+                <th>Unit</th>
+                <th>Kind</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {names.map((n) => (
+                <tr key={n}>
+                  <td>
+                    <code>{n}</code>
+                  </td>
+                  <td>
+                    <input type="number" step="any" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                  </td>
+                  <td>
+                    <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
+                  </td>
+                  <td>
+                    <select value={val(n).kind} onChange={(e) => upd(n, "kind", e.target.value)}>
+                      <option>measured</option>
+                      <option>literature</option>
+                      <option>user_supplied</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {selNames.length > 0 && (
+        <>
+          <p className="muted small">
+            Selections only you can make after seeing the data (for example the start of each profile&apos;s terminal
+            phase; see the candidate table in the results). Each is recorded as user-supplied under your name, and the
+            analysis uses it on the next re-analysis.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Selection</th>
+                <th>Value</th>
+                <th>Unit</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selNames.map((n) => (
+                <tr key={n}>
+                  <td>
+                    <code>{n}</code>
+                  </td>
+                  <td>
+                    <input type="number" step="any" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                  </td>
+                  <td>
+                    <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
+                  </td>
+                  <td>
+                    <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
       <button disabled={busy} onClick={save}>
         Save inputs
       </button>

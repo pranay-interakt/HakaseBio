@@ -1,6 +1,6 @@
 # 08 — Driver Specification & Catalogue
 
-> Status: implemented in `backend/hos/drivers/`. ABI version **1.0**.
+> Status: implemented in `backend/hos/drivers/`. ABI version **1.1** (1.1 adds `post_data_inputs`; drivers written for 1.0 load unchanged).
 
 ## 8.1 Model
 
@@ -30,6 +30,7 @@ sample_manifest(params, compound)                  ids the lab labels samples wi
 instruction_package(ref, protocol, params, compound) -> InstructionPackage -> .to_bundle() zip
 ingest(bytes, params, claimed_origin, study_reference) -> IngestedData
 analysis_inputs(params) -> {name: unit}            values needed from outside the file
+post_data_inputs(params, data) -> {name: unit}     human selections made after the data (ABI 1.1)
 analyze(data, params, compound, inputs) -> AnalysisResult
 interpret(analysis, params, context) -> Interpretation
 expert_determinations(params) -> [ExpertDetermination]
@@ -224,6 +225,44 @@ The kit checks:
   - The published acceptance intervals of Braeckman 2022 and Shang 2022.
   - β1 and its standard error against `scipy.stats.linregress`.
   - Exact recovery of declared exposure, β1 and day ratios from a noise-free generator.
+
+### `in_vivo_pk` v1.0.0 — single-dose pharmacokinetics (ICH M3(R2) section 3)
+
+- **Serves.** `adme.in_vivo_pk`, due before Phase III (M3(R2) §3), CTD 4.2.2.2. GLP-capable.
+- **Modalities.** Small molecules, peptides and monoclonal antibodies.
+- **Research note.** `docs/research/drivers/in_vivo_pk.md`.
+- **Design.** Required inputs:
+  - species and strain;
+  - analyte, matrix, bioanalytical method and LLOQ;
+  - dose unit;
+  - groups, each with administration (IV bolus, IV infusion with duration, or extravascular),
+    route, dose, formulation, sex, animals and sampling times;
+  - parallel or crossover design (crossover needs a washout justification);
+  - the dose-time rule (zero for a drug-naive single dose, or a measured pre-dose sample);
+  - the trapezoidal rule with its basis, the declared BLQ rule, and AUCinf from the observed Clast;
+  - optionally, %extrapolated and adjusted-R² limits with their basis.
+- **Return data.** One row per sample: animal, group, nominal and actual time, concentration or
+  BLQ.
+- **Analysis.**
+  - Per profile: Cmax, Tmax, C0 (IV bolus) and AUC(0-t).
+  - Every candidate terminal-phase fit, with the vendor best fit marked as a suggestion.
+  - Once the scientist has entered `terminal_phase_start.<group>.<animal>` (ABI 1.1
+    `post_data_inputs`; it must be user-supplied, and it is recorded under the scientist's
+    name): λz, t½, AUCinf, %extrapolated, MRTinf, CL (CL/F), Vz (Vz/F) and Vss (IV only).
+  - Group means, reported only when every profile has the value.
+  - Absolute F from the dose-normalised group mean AUCinf.
+- **QC flags.**
+  - A terminal phase starting at or before Tmax after extravascular dosing.
+  - Fits or extrapolation outside the stated limits.
+  - Quantifiable pre-dose samples (M10 §3.3.4).
+  - Profiles without a selection.
+- **Determination.** "Terminal-phase selections appropriate" (accepted / not accepted), signed by
+  the responsible scientist. The signature binds the analysis that includes every selection.
+- **Known-value tests.**
+  - A one-compartment IV bolus is recovered exactly: C0, t½, AUCinf, CL = kV, Vz = Vss = V.
+  - A constructed oral profile gives the exact AUCinf, CL/F and F.
+  - The exact log-trapezoid AUMC.
+  - Adjusted R², the vendor best-fit rule, and C0 back-extrapolation.
 
 ## 8.4 Writing a new driver
 
