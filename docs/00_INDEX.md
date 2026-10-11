@@ -45,3 +45,8 @@ See `13_glossary.md` for terminology.
 
 `14_master_build_plan.md` is the ordered plan for making small molecules, peptides and
 antibodies end to end: platform work first (study import), then driver waves A, P and C.
+
+## Audit
+
+`15_org_grade_audit.md` is the organisation-grade review of HEAD a1bcbed and the hardening
+work (P0–P3) that comes before further driver waves.
