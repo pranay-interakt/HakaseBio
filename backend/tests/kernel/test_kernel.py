@@ -144,6 +144,7 @@ def test_signature_on_superseded_report_does_not_count(k):
     k.report_study(sci, sid)
     k.sign_study(sci, sid, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.APPROVAL,
                  statement="approve v1")
+    k.analyze_study(sci, sid, reason="re-analysis after review")
     k.set_analysis_inputs(sci, sid, FU)
     k.analyze_study(sci, sid, reason="inputs supplied")
     v = k.report_study(sci, sid)
