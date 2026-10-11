@@ -27,9 +27,11 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from hos.core import units as U
 from hos.core.descriptors import compute_profile
@@ -1213,6 +1215,24 @@ class Kernel:
 
     def verify_ledger(self) -> int:
         return self.ledger.verify()
+
+    def readiness(self) -> dict[str, bool]:
+        """Can this process serve requests? (docs/15 P2.3)."""
+        from hos.db.migrate import current_revision, head_revision
+
+        try:
+            schema = current_revision(self.db.engine) == head_revision()
+            database = True
+        except SQLAlchemyError:
+            database = schema = False
+
+        def writable(d: Path) -> bool:
+            # no probe file: on write-once anchor storage it could never be deleted
+            return d.is_dir() and os.access(d, os.W_OK)
+
+        self.anchors.path.parent.mkdir(parents=True, exist_ok=True)
+        return {"database": database, "schema": schema, "file_store": writable(self.files.root),
+                "anchors": writable(self.anchors.path.parent)}
 
     def checkpoint(self) -> None:
         """Anchor the current ledger head outside the database (after each unit of work)."""

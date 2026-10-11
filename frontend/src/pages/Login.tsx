@@ -13,7 +13,7 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
 
   useEffect(() => {
     api
-      .get<{ initialised: boolean }>("/health")
+      .get<{ initialised: boolean }>("/setup")
       .then((h) => setInitialised(h.initialised))
       .catch(setErr);
   }, []);

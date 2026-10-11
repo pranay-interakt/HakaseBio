@@ -135,6 +135,17 @@ cd frontend && npm install && npm run dev
 
 Open <http://localhost:5173>. `/api` is proxied to port 8000.
 
+### Deploy (containers)
+
+```bash
+cp .env.example .env    # fill in the secrets
+docker compose up -d --build
+```
+
+PostgreSQL, a one-shot migration, the API and the web app. Only the web app is published on port
+8080; put TLS in front of it. Configuration, health checks, upgrades and backups:
+[docs/16](docs/16_operations.md).
+
 ### Running a real study
 
 1. Create a programme. Its context drives the ICH-derived study set.
@@ -158,11 +169,12 @@ backend/hos/drivers     driver ABI, registry, conformance kit, three drivers
 backend/hos/data_sources ChEMBL, PubChem, enrichment
 backend/hos/ind         readiness, Module 4
 backend/hos/api         FastAPI app
-backend/hos/db          SQLAlchemy models, repository, content-addressed file store
+backend/hos/db          SQLAlchemy models, Alembic migrations, repository, content-addressed file store
 backend/tests           unit, driver, kernel, API, data-source and demo tests; recorded fixtures
-backend/scripts         demo, fixture capture, dev seed
+backend/scripts         demo, deployment smoke test, fixture capture, dev seed
 frontend/               React + TypeScript (Vite)
-docs/                   specification (00-13) and research records
+docker-compose.yml      single-host deployment (docs/16)
+docs/                   specification (00-13), build plan (14), audit (15), operations (16), research records
 ```
 
 ## Known limits (tracked, not hidden)
@@ -174,8 +186,8 @@ docs/                   specification (00-13) and research records
   conditions, so the driver offers no defaults.
 - **Pending re-verification.** The OECD TG 409 parameters were read from a mirrored copy and are
   marked for re-verification.
-- **Deployment hardening in progress.** Schema migrations and database sessions are in place;
-  the PostgreSQL CI job, container images, a locked dependency set and observability
+- **Deployment hardening in progress.** Migrations, PostgreSQL CI, container images and
+  serialised writers are in place; a locked dependency set, request limits and observability
   (docs/15 P2) are being added.
 - **Not yet built.** SEND clinical-observation and pathology domains (CL, MA, MI) and the
   SENDIG-SP/DART domains, peptide and antibody drivers, and histopathology incidence statistics.

@@ -1,0 +1,12 @@
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+tests
+demo-out
+scripts/dev_principals.local.json
+*.sqlite3
+**/.DS_Store

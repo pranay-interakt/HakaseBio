@@ -51,7 +51,7 @@ def main() -> None:
 
     admin = accounts[0]
     c = httpx.Client(timeout=30)
-    if not c.get(f"{base}/health").json()["initialised"]:
+    if not c.get(f"{base}/setup").json()["initialised"]:
         token = os.environ.get("HOS_BOOTSTRAP_TOKEN") or (sys.argv[2] if len(sys.argv) > 2
                                                           else "")
         if not token:

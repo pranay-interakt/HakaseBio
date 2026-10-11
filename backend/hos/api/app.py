@@ -419,9 +419,23 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
     # -- system -------------------------------------------------------------------------
     @app.get("/api/health")
-    def health(k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+    def health() -> dict[str, Any]:
+        """Liveness: the process answers. Touches nothing else, so a database outage does
+        not get the API restarted."""
+        return {"status": "ok"}
+
+    @app.get("/api/ready")
+    def ready(k: Kernel = Depends(get_kernel)) -> JSONResponse:
+        """Readiness: the database answers at this release's schema and the file store and
+        anchor log are writable. Public, so it names checks only, never their errors."""
+        checks = k.readiness()
+        return JSONResponse(status_code=200 if all(checks.values()) else 503,
+                            content={"ready": all(checks.values()), "checks": checks})
+
+    @app.get("/api/setup")
+    def setup_status(k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         """Public: only what the sign-in page needs."""
-        return {"status": "ok", "initialised": bool(k.repo.principals())}
+        return {"initialised": bool(k.repo.principals())}
 
     @app.get("/api/system")
     def system(actor: Principal = Depends(current),

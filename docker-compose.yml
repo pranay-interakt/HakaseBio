@@ -1,0 +1,72 @@
+# Hakase on one host: PostgreSQL, a one-shot schema migration, the API, and the web app
+# (docs/15 P2.3, docs/16). Copy .env.example to .env and fill it in first. Only the web
+# container is published; put TLS in front of it.
+name: hakase
+
+x-api: &api
+  build: ./backend
+  image: hakase-api:${HOS_IMAGE_TAG:-local}
+  environment: &api-env
+    HOS_DATABASE_URL: postgresql+psycopg://hos:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/hos
+    HOS_BOOTSTRAP_TOKEN: ${HOS_BOOTSTRAP_TOKEN:?set HOS_BOOTSTRAP_TOKEN in .env}
+    HOS_ANCHOR_KEY: ${HOS_ANCHOR_KEY:?set HOS_ANCHOR_KEY in .env}
+    HOS_DB_AUTO_UPGRADE: "0"            # migrations run in the migrate service only
+  volumes:
+    - data:/var/lib/hos
+    - anchors:/var/lib/hos-anchors      # production: write-once storage
+
+services:
+  db:
+    image: postgres:16-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    environment:
+      POSTGRES_USER: hos
+      POSTGRES_DB: hos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hos", "-d", "hos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *api
+    command: ["hos-db", "upgrade"]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *api
+    environment:
+      <<: *api-env
+      # only the web container reaches the API, so its X-Forwarded-For is trusted
+      FORWARDED_ALLOW_IPS: "*"
+      HOS_CORS_ORIGINS: ""
+    command: ["uvicorn", "hos.api.app:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--workers", "${HOS_API_WORKERS:-2}"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    image: hakase-web:${HOS_IMAGE_TAG:-local}
+    ports:
+      - "${HOS_HTTP_PORT:-8080}:8080"
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  db:
+  data:
+  anchors:

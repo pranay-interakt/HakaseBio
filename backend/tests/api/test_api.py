@@ -19,7 +19,11 @@ def api(tmp_path):
     k = Kernel(db=Database(f"sqlite:///{tmp_path / 'api.sqlite3'}"),
                files=FileStore(tmp_path / "objects"))
     c = TestClient(create_app(k, bootstrap_token=SETUP))
-    assert c.get("/api/health").json() == {"status": "ok", "initialised": False}
+    assert c.get("/api/health").json() == {"status": "ok"}
+    assert c.get("/api/setup").json() == {"initialised": False}
+    r = c.get("/api/ready")
+    assert r.status_code == 200 and r.json() == {"ready": True, "checks": {
+        "database": True, "schema": True, "file_store": True, "anchors": True}}
     assert c.post("/api/setup", json={"principal_id": "admin", "name": "Ada Admin",
                                       "password": PW, "setup_token": "guess"}).status_code == 403
     assert c.post("/api/setup", json={"principal_id": "admin", "name": "Ada Admin",

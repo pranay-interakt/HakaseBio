@@ -179,7 +179,10 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
    Every test runs on SQLite. Add a CI job that runs the suite on
    PostgreSQL 16 through a service container, including the P0.1 concurrency test across
    processes.
-3. **Packaging.**
+3. **Packaging — fixed.** *`backend/Dockerfile` and `frontend/Dockerfile` (non-root, bases pinned
+   by digest), `docker-compose.yml` (PostgreSQL, one-shot migration, API, nginx web with
+   security headers), `/api/health` (liveness, no database) and `/api/ready`, all settings in
+   docs/16. A CI job builds the stack and smoke-tests it through the web container.*
    - A `Dockerfile` (non-root, pinned base) and a `docker-compose.yml` (API, PostgreSQL,
      frontend static).
    - Documented environment configuration.
