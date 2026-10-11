@@ -31,7 +31,9 @@ These are kernel and product features that several drivers need. **P1 is the sin
 important item in this plan**, because it makes end-to-end use possible before the driver library
 is complete.
 
-### P1. Study import (external and legacy studies)
+### P1. Study import (external and legacy studies) — **built**
+
+*Implemented in `hos/kernel/imports.py` (`kernel.imports`), `hos/kernel/import_specs.py` (what each requirement must transcribe), readiness/Module 4 in `hos/ind/assembler.py`, API `/api/programs/{id}/imports` and `/api/studies/{id}/import/*`, frontend Import page and import workspace. Tests: `tests/kernel/test_imports.py`.*
 
 A study run outside HOS (at a CRO, before the customer adopted HOS, or of a type with no driver yet)
 enters the system as an **imported study**.

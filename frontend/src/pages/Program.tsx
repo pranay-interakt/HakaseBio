@@ -139,7 +139,10 @@ function StudySet({ p, go, onErr }: { p: ProgramT; go: (h: string) => void; onEr
                   {r.driver_id && r.status !== "not_required" && compound && (
                     <button onClick={() => start(r)}>Start study</button>
                   )}
-                  {!r.driver_id && r.status !== "not_required" && <span className="muted small">no driver</span>}
+                  {!r.driver_id && r.status !== "not_required" && <div className="muted small">no driver</div>}
+                  {r.status !== "not_required" && compound && (
+                    <button onClick={() => go(`#/import/${p.id}/${r.id}`)}>Import report</button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -312,8 +315,12 @@ function ReadinessView({ id }: { id: string }) {
             <div className="stat-l">required studies done</div>
           </div>
           <div className="stat">
-            <div className="stat-v">{s.percent_done ?? "—"}%</div>
-            <div className="stat-l">complete</div>
+            <div className="stat-v">{s.imported}</div>
+            <div className="stat-l">imported from reports</div>
+          </div>
+          <div className="stat">
+            <div className="stat-v">{s.percent_covered ?? "—"}%</div>
+            <div className="stat-l">covered (done + imported)</div>
           </div>
           <div className="stat">
             <div className="stat-v">{s.percent_runnable_in_hos ?? "—"}%</div>

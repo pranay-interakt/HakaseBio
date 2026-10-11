@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, getToken, setToken } from "./api";
 import { Login } from "./pages/Login";
 import { Program } from "./pages/Program";
+import { ImportNew } from "./pages/ImportNew";
 import { Programs } from "./pages/Programs";
 import { Study } from "./pages/Study";
 import type { Principal } from "./types";
@@ -57,6 +58,7 @@ export function App() {
   let page;
   if (parts[0] === "program" && parts[1]) page = <Program id={parts[1]} go={go} />;
   else if (parts[0] === "study" && parts[1]) page = <Study id={parts[1]} me={me} />;
+  else if (parts[0] === "import" && parts[1] && parts[2]) page = <ImportNew programId={parts[1]} requirementId={parts[2]} go={go} />;
   else page = <Programs go={go} />;
 
   return (

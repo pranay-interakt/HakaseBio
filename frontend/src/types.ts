@@ -110,6 +110,7 @@ export interface StudySummary {
   title: string;
   state: string;
   driver_id: string;
+  origin: "driver" | "import";
   requirement_id: string | null;
   compound_id: string;
   glp: boolean;
@@ -238,6 +239,14 @@ export interface Study extends StudySummary {
   }[];
   allowed_transitions: string[];
   approval_missing?: string[];
+  import_record?: ImportRecord | null;
+  import?: {
+    fields: ImportFieldSpec[];
+    missing: string[];
+    import_hash: string;
+    signatures_missing: string[];
+    attestation_sentence: string;
+  };
   driver?: { id: string; name: string; version: string; ctd_section: string };
   expected_inputs?: Record<string, string>;
   expert_determinations?: ExpertDeterminationSpec[];
@@ -307,6 +316,9 @@ export interface Readiness {
     required_for_milestone: number;
     done: number;
     percent_done: number | null;
+    imported: number;
+    covered: number;
+    percent_covered: number | null;
     runnable_in_hos: number;
     percent_runnable_in_hos: number | null;
     by_status: Record<string, number>;
@@ -314,4 +326,68 @@ export interface Readiness {
   };
   items: ReadinessItem[];
   notes: string[];
+}
+
+export interface ImportFieldSpec {
+  key: string;
+  label: string;
+  value_type: "quantity" | "categorical";
+  unit: string | null;
+  choices: string[];
+  required: boolean;
+  needs_species: boolean;
+  note: string;
+}
+
+export interface ImportValue {
+  id: string;
+  key: string;
+  label: string;
+  value_type: "quantity" | "categorical";
+  quantity?: Quantity;
+  category?: string;
+  page: string;
+  table: string | null;
+  species: string | null;
+  sex: string | null;
+  entered_by_name: string;
+  entered_at: string;
+  origin: string;
+  withdrawn?: { by: string; at: string; reason: string };
+}
+
+export interface ImportProposal {
+  id: string;
+  key: string;
+  label: string | null;
+  value: number | null;
+  unit: string | null;
+  category: string | null;
+  page: string;
+  table: string | null;
+  species: string | null;
+  sex: string | null;
+  excerpt: string | null;
+  proposed_by: string;
+  proposed_by_kind: string;
+  status: "proposed" | "confirmed" | "rejected";
+  reason?: string;
+}
+
+export interface ImportRecord {
+  report: {
+    sha256: string;
+    filename: string;
+    size_bytes: number;
+    title: string;
+    laboratory: string;
+    report_date: string;
+    lab_study_number: string | null;
+  };
+  ctd_section: string;
+  requirement: { id: string; name: string; section: string; citation: Citation };
+  datasets: { sha256: string; filename: string; description: string; size_bytes: number }[];
+  values: ImportValue[];
+  proposals: ImportProposal[];
+  superseded_by?: { study_id: string; reason: string; at: string };
 }

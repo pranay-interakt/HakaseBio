@@ -11,6 +11,9 @@ PROPOSED -> DESIGNED -> PLANNED -> DISPATCHED -> DATA_RECEIVED -> ANALYZED -> RE
                 +-- amend --+-----------+              +-- new data --+            |
    any non-terminal state ------------------------------------------------> CANCELLED
    DISPATCHED / DATA_RECEIVED / ANALYZED ---------------------------------> FAILED
+
+Imported studies (run outside HOS, entered from their final report):
+IMPORT_DRAFT -> IMPORTED -> SUPERSEDED (by a driver-run study for the same requirement)
 ```
 """
 
@@ -35,6 +38,10 @@ class StudyState(str, Enum):
     APPROVED = "approved"
     CANCELLED = "cancelled"
     FAILED = "failed"
+    # studies run outside HOS and imported from their final report (docs/14 P1)
+    IMPORT_DRAFT = "import_draft"
+    IMPORTED = "imported"
+    SUPERSEDED = "superseded"
 
 
 S = StudyState
@@ -49,6 +56,9 @@ TRANSITIONS: Final[dict[StudyState, frozenset[StudyState]]] = {
     S.APPROVED: frozenset(),
     S.CANCELLED: frozenset(),
     S.FAILED: frozenset(),
+    S.IMPORT_DRAFT: frozenset({S.IMPORTED, S.CANCELLED}),
+    S.IMPORTED: frozenset({S.SUPERSEDED}),
+    S.SUPERSEDED: frozenset(),
 }
 
 

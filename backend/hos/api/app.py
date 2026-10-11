@@ -159,6 +159,47 @@ class ApproveBody(BaseModel):
     password: str
 
 
+class ImportValueBody(BaseModel):
+    key: str
+    page: str
+    value: float | None = None
+    unit: str | None = None
+    category: str | None = None
+    label: str | None = None
+    table: str | None = None
+    species: str | None = None
+    sex: str | None = None
+    kind: str = "measured"
+    citation_text: str | None = None
+    note: str | None = None
+
+
+class ImportProposalBody(BaseModel):
+    key: str
+    page: str
+    value: float | None = None
+    unit: str | None = None
+    category: str | None = None
+    label: str | None = None
+    table: str | None = None
+    species: str | None = None
+    sex: str | None = None
+    excerpt: str | None = None
+
+
+class ConfirmProposalBody(BaseModel):
+    page: str | None = None
+
+
+class ReasonRequiredBody(BaseModel):
+    reason: str
+
+
+class SupersedeBody(BaseModel):
+    by_study_id: str
+    reason: str
+
+
 class CancelBody(BaseModel):
     reason: str
 
@@ -473,6 +514,90 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
                         headers={"Content-Disposition": f'attachment; filename="{meta.filename}"'})
 
     # -- audit ----------------------------------------------------------------------------
+    # -- study import (docs/14 P1) ---------------------------------------------------------
+    @app.post("/api/programs/{program_id}/imports")
+    async def create_import(program_id: str, request: Request, compound_id: str = Query(...),
+                            requirement_id: str = Query(...), filename: str = Query(...),
+                            title: str = Query(...), laboratory: str = Query(...),
+                            report_date: str = Query(...), glp: bool = Query(...),
+                            lab_study_number: str | None = Query(None),
+                            ctd_section: str | None = Query(None),
+                            actor: Principal = Depends(current),
+                            k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        report = await request.body()
+        return k.imports.import_study(
+            actor, program_id=program_id, compound_id=compound_id,
+            requirement_id=requirement_id, report=report, filename=filename, title=title,
+            laboratory=laboratory, report_date=report_date, glp=glp,
+            lab_study_number=lab_study_number, ctd_section=ctd_section)
+
+    @app.post("/api/studies/{study_id}/import/datasets")
+    async def import_dataset(study_id: str, request: Request, filename: str = Query(...),
+                             description: str = Query(""), actor: Principal = Depends(current),
+                             k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.add_import_dataset(actor, study_id, await request.body(),
+                                            filename=filename, description=description)
+
+    @app.post("/api/studies/{study_id}/import/values")
+    def import_value(study_id: str, body: ImportValueBody, actor: Principal = Depends(current),
+                     k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.add_import_value(actor, study_id, **body.model_dump())
+
+    @app.post("/api/studies/{study_id}/import/values/{value_id}/withdraw")
+    def withdraw_value(study_id: str, value_id: str, body: ReasonRequiredBody,
+                       actor: Principal = Depends(current),
+                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.withdraw_import_value(actor, study_id, value_id, reason=body.reason)
+
+    @app.post("/api/studies/{study_id}/import/proposals")
+    def propose_value(study_id: str, body: ImportProposalBody,
+                      actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.propose_import_value(actor, study_id, **body.model_dump())
+
+    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/confirm")
+    def confirm_proposal(study_id: str, proposal_id: str, body: ConfirmProposalBody,
+                         actor: Principal = Depends(current),
+                         k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.confirm_import_proposal(actor, study_id, proposal_id, page=body.page)
+
+    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/reject")
+    def reject_proposal(study_id: str, proposal_id: str, body: ReasonRequiredBody,
+                        actor: Principal = Depends(current),
+                        k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.reject_import_proposal(actor, study_id, proposal_id,
+                                                reason=body.reason)
+
+    @app.post("/api/studies/{study_id}/import/sign")
+    def sign_import(study_id: str, body: SignBody, actor: Principal = Depends(current),
+                    k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        signer = reauth(k, actor, body.password)
+        return k.imports.sign_import(signer, study_id, role=body.role, meaning=body.meaning,
+                                     statement=body.statement)
+
+    @app.post("/api/studies/{study_id}/import/complete")
+    def complete_import(study_id: str, body: ApproveBody, actor: Principal = Depends(current),
+                        k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.complete_import(reauth(k, actor, body.password), study_id)
+
+    @app.post("/api/studies/{study_id}/import/supersede")
+    def supersede_import(study_id: str, body: SupersedeBody, actor: Principal = Depends(current),
+                         k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.imports.supersede_import(actor, study_id, by_study_id=body.by_study_id,
+                                          reason=body.reason)
+
+    @app.get("/api/studies/{study_id}/import/report")
+    def import_report(study_id: str, actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> Response:
+        content, filename, media = k.imports.import_report_file(study_id)
+        return Response(content, media_type=media,
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+    @app.get("/api/requirements/{requirement_id}/import-fields")
+    def import_fields_for(requirement_id: str) -> list[dict[str, Any]]:
+        from hos.kernel.import_specs import import_fields
+        return [f.to_dict() for f in import_fields(requirement_id)]
+
     @app.get("/api/ledger/verify")
     def verify(actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:

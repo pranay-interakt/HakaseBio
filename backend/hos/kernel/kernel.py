@@ -63,6 +63,7 @@ from hos.kernel.errors import (
     PermissionDenied,
 )
 from hos.kernel.execution import TargetKind, target_from_spec
+from hos.kernel.imports import ImportService
 from hos.kernel.ledger import Ledger
 from hos.kernel.lifecycle import TRANSITIONS, StudyState, assert_transition
 
@@ -116,6 +117,7 @@ class Kernel:
         self.repo = Repository(self.db, self.files)
         self.registry = registry or default_registry()
         self.ledger = Ledger(SqlLedgerBackend(self.db))
+        self.imports = ImportService(self)
 
     # ======================================================================
     # principals
@@ -660,6 +662,7 @@ class Kernel:
 
     def _study_summary(self, s: StudyRow) -> dict[str, Any]:
         return {"id": s.id, "title": s.title, "state": s.state, "driver_id": s.driver_id,
+                "origin": s.origin or "driver",
                 "requirement_id": s.requirement_id, "compound_id": s.compound_id,
                 "glp": s.glp, "evidence_admissible": s.evidence_admissible,
                 "simulated": any(f["origin"] == "simulated" for f in s.raw_files or []),
@@ -689,6 +692,9 @@ class Kernel:
         }
         if s.state == StudyState.REPORTED.value:
             view["approval_missing"] = self._missing_signatures(s)
+        if s.origin == "import":
+            view["import_record"] = s.import_record
+            view["import"] = self.imports.import_view(s)
         if driver is not None:
             view["driver"] = {"id": driver.id, "name": driver.name, "version": driver.version,
                               "ctd_section": driver.ctd_section}

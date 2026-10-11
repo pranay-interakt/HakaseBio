@@ -9,9 +9,10 @@ import {
   Section,
   StateTag,
 } from "../components/common";
+import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
 import { SchemaForm } from "../components/SchemaForm";
-import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT } from "../types";
+import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
 
 const DESIGNABLE = ["proposed", "designed", "planned", "dispatched"];
 const RECEIVABLE = ["dispatched", "data_received", "analyzed"];
@@ -19,13 +20,15 @@ const RECEIVABLE = ["dispatched", "data_received", "analyzed"];
 export function Study({ id, me }: { id: string; me: Principal }) {
   const [s, setS] = useState<StudyT | null>(null);
   const [driver, setDriver] = useState<Driver | null>(null);
+  const [siblings, setSiblings] = useState<StudySummary[]>([]);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try {
       const st = await api.get<StudyT>(`/studies/${id}`);
       setS(st);
-      setDriver(await api.get<Driver>(`/drivers/${st.driver_id}`));
+      if (st.origin === "import") setSiblings(await api.get<StudySummary[]>(`/studies?program_id=${st.program_id}`));
+      else setDriver(await api.get<Driver>(`/drivers/${st.driver_id}`));
     } catch (e) {
       setErr(e);
     }
@@ -48,6 +51,27 @@ export function Study({ id, me }: { id: string; me: Principal }) {
     }
   }
 
+  if (s && s.origin === "import") {
+    return (
+      <div className="page">
+        <div className="crumbs">
+          <a href="#/">Programmes</a> / <a href={`#/program/${s.program_id}`}>programme</a> / imported study
+        </div>
+        <h2>{s.title}</h2>
+        <div className="row">
+          <StateTag state={s.state} />
+          <span className="muted small">
+            imported study · requirement <code>{s.requirement_id}</code> · {s.glp ? "GLP" : "non-GLP"}
+          </span>
+        </div>
+        <Lifecycle state={s.state} />
+        <ErrorBox error={err} />
+        <ImportWorkspace s={s} me={me} siblings={siblings} busy={busy} run={run} />
+        <AuditTrail id={id} key={s.state + s.updated_at} />
+        {s.state === "import_draft" && <CancelSection id={id} run={run} />}
+      </div>
+    );
+  }
   if (!s || !driver) return <ErrorBox error={err} />;
   const amending = s.state !== "proposed";
   return (

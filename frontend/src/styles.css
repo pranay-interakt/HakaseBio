@@ -159,3 +159,5 @@ details.card summary { cursor: pointer; color: var(--muted); }
   main { padding: 10px 16px; }
   .topbar { padding: 8px 16px; }
 }
+.tag-imported, .tag-import_draft { color: var(--literature); }
+.tag-superseded { color: var(--muted); }

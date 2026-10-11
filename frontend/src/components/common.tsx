@@ -96,7 +96,22 @@ export const LIFECYCLE = [
   "approved",
 ];
 
+export const IMPORT_LIFECYCLE = ["import_draft", "imported"];
+
 export function Lifecycle({ state }: { state: string }) {
+  if (IMPORT_LIFECYCLE.includes(state) || state === "superseded") {
+    const i = IMPORT_LIFECYCLE.indexOf(state);
+    return (
+      <ol className="lifecycle">
+        {IMPORT_LIFECYCLE.map((x, j) => (
+          <li key={x} className={state === "superseded" || j < i ? "done" : j === i ? "current" : ""}>
+            {x.replace("_", " ")}
+          </li>
+        ))}
+        {state === "superseded" && <li className="current">superseded</li>}
+      </ol>
+    );
+  }
   const idx = LIFECYCLE.indexOf(state);
   return (
     <ol className="lifecycle">
