@@ -114,7 +114,9 @@ GxP validation effort.
 and ledger head; a standalone `hos-verify` that recomputes every driver-run figure from raw files
 offline and checks every hash. Imported values are checked for report hash and signature only.
 
-### P10. Regulatory compiler diff and programme rehearsal
+### P10. Regulatory compiler diff and programme rehearsal — **built**
+
+*`hos/core/regulatory/diff.py` (added/removed/lengthened/shortened/re-timed/status/species/GLP, each with its section); `hos/ind/rehearsal.py` (simulated, in memory, parameters only from the user's plan or designed studies; reports missing drivers, design and simulation parameters, inputs, unassigned determinations and the critical path over cited driver prerequisites with unknown durations listed). API `/api/regulatory/diff`, `/api/programs/{id}/what-if`, `/api/programs/{id}/rehearsal`; What-if and Rehearsal tabs.*
 
 (Strategy innovations 2 and 3.) Compare two programme contexts and list added, removed, lengthened
 and re-timed studies with guideline sections; run every runnable requirement simulated and report

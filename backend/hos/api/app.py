@@ -200,6 +200,21 @@ class SupersedeBody(BaseModel):
     reason: str
 
 
+class WhatIfBody(BaseModel):
+    changes: dict[str, Any]
+
+
+class DiffBody(BaseModel):
+    a: dict[str, Any]
+    b: dict[str, Any]
+
+
+class RehearsalBody(BaseModel):
+    plan: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    milestone: Timing = Timing.BEFORE_FIRST_IN_HUMAN
+    compound_id: str | None = None
+
+
 class CancelBody(BaseModel):
     reason: str
 
@@ -597,6 +612,34 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
     def import_fields_for(requirement_id: str) -> list[dict[str, Any]]:
         from hos.kernel.import_specs import import_fields
         return [f.to_dict() for f in import_fields(requirement_id)]
+
+    # -- regulatory compiler diff and rehearsal (docs/14 P10) --------------------------------
+    @app.post("/api/regulatory/diff")
+    def regulatory_diff(body: DiffBody) -> dict[str, Any]:
+        from hos.core.regulatory.diff import diff_contexts
+        try:
+            a, b = ProgramContext.from_dict(body.a), ProgramContext.from_dict(body.b)
+        except (KeyError, ValueError) as exc:
+            raise ValueError(f"invalid programme context: {exc}") from None
+        return diff_contexts(a, b).to_dict()
+
+    @app.post("/api/programs/{program_id}/what-if")
+    def what_if(program_id: str, body: WhatIfBody, actor: Principal = Depends(current),
+                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        from hos.core.regulatory.diff import diff_contexts
+        cur = k.repo.program(program_id).context
+        try:
+            a = ProgramContext.from_dict(cur)
+            b = ProgramContext.from_dict({**cur, **body.changes})
+        except (KeyError, ValueError) as exc:
+            raise ValueError(f"invalid programme context: {exc}") from None
+        return diff_contexts(a, b).to_dict()
+
+    @app.post("/api/programs/{program_id}/rehearsal")
+    def rehearsal(program_id: str, body: RehearsalBody, actor: Principal = Depends(current),
+                  k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        from hos.ind.rehearsal import rehearse
+        return rehearse(k, actor, program_id, body.plan, body.milestone, body.compound_id)
 
     # -- verification bundle (docs/14 P9) ----------------------------------------------------
     @app.post("/api/verify")

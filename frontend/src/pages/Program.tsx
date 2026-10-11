@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { Citations, ErrorBox, Section, StateTag } from "../components/common";
 import { QuantityView } from "../components/QuantityView";
+import { RehearsalView, WhatIf } from "./ProgramPlanning";
 import type { Compound, Program as ProgramT, Readiness, Requirement, Study } from "../types";
 
-type Tab = "studyset" | "compounds" | "studies" | "readiness" | "module4";
+type Tab = "studyset" | "compounds" | "studies" | "readiness" | "module4" | "whatif" | "rehearsal";
 
 const TIMING_ORDER = [
   "before_first_in_human",
@@ -42,6 +43,8 @@ export function Program({ id, go }: { id: string; go: (hash: string) => void }) 
             ["studies", `Studies (${p.studies.length})`],
             ["readiness", "IND readiness"],
             ["module4", "Module 4"],
+            ["whatif", "What-if"],
+            ["rehearsal", "Rehearsal"],
           ] as [Tab, string][]
         ).map(([t, l]) => (
           <button key={t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>
@@ -55,6 +58,8 @@ export function Program({ id, go }: { id: string; go: (hash: string) => void }) 
       {tab === "studies" && <Studies p={p} />}
       {tab === "readiness" && <ReadinessView id={id} />}
       {tab === "module4" && <Module4 id={id} />}
+      {tab === "whatif" && <WhatIf p={p} />}
+      {tab === "rehearsal" && <RehearsalView p={p} />}
     </div>
   );
 }

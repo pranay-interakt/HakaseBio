@@ -70,6 +70,7 @@ __all__ = [
     "Interpretation",
     "InterpretiveStatement",
     "MetadataField",
+    "Prerequisite",
     "ProtocolDocument",
     "ProtocolStep",
     "ReportSection",
@@ -903,6 +904,20 @@ def _cell_md(c: Cell) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class Prerequisite:
+    """Another requirement whose study must be complete before this one can start, with the
+    cited basis for the dependency (used for programme critical-path planning)."""
+
+    requirement_id: str
+    basis: str
+    citation_key: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"requirement_id": self.requirement_id, "basis": self.basis,
+                "citation_key": self.citation_key}
+
+
+@dataclass(frozen=True, slots=True)
 class SimulatedDataset:
     content: bytes
     sha256: str
@@ -997,6 +1012,10 @@ class StudyDriver(ABC):
         return ()
 
     def expert_determinations(self, params: BaseModel) -> tuple[ExpertDetermination, ...]:
+        return ()
+
+    def prerequisites(self, params: BaseModel) -> tuple[Prerequisite, ...]:
+        """Requirements that must be complete first; each dependency cites its basis."""
         return ()
 
     def instruction_package(self, study_reference: str, protocol: ProtocolDocument,

@@ -48,6 +48,7 @@ from hos.drivers.base import (
     IngestedData,
     Interpretation,
     InterpretiveStatement,
+    Prerequisite,
     ProtocolDocument,
     ProtocolStep,
     ReportSection,
@@ -559,6 +560,14 @@ class RepeatDoseToxicityDriver(StudyDriver):
             "non-significant changes (FDA 2005 glossary)",
             "Integration of histopathology, clinical observations and toxicokinetics",
         ))
+
+    def prerequisites(self, params: BaseModel) -> tuple[Prerequisite, ...]:
+        # ICH M3(R2) section 1.5 bases high-dose selection for the pivotal studies on the
+        # MTD / limit dose / exposure margins, which the dose range-finding studies establish
+        # (the study-set engine cites the same sections for tox.dose_range_finding).
+        return (Prerequisite("tox.dose_range_finding",
+                             "dose selection for the pivotal study (M3(R2) sections 1.5, 4)",
+                             "ich_m3r2"),)
 
     def expert_determinations(self, params: BaseModel) -> tuple[ExpertDetermination, ...]:
         return (
