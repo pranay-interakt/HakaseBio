@@ -33,6 +33,41 @@ function kindOf(s: JsonSchema): string {
   return s.type ?? "json";
 }
 
+function typeLabel(s: JsonSchema, root: JsonSchema): string {
+  const { schema: r, optional } = unwrapOptional(s, root);
+  const base = r.enum
+    ? r.enum.join(" | ")
+    : r.type === "array"
+      ? `list of ${r.items ? typeLabel(r.items, root) : "values"}`
+      : r.properties
+        ? "object"
+        : (r.type ?? "value");
+  return optional ? `${base}, optional` : base;
+}
+
+/** The keys a JSON field expects, read from the schema, so nested lists are not guesswork. */
+function StructureHint({ s, root }: { s: JsonSchema; root: JsonSchema }) {
+  const target = resolve(s.type === "array" && s.items ? s.items : s, root);
+  if (!target.properties) return null;
+  const req = new Set(target.required ?? []);
+  return (
+    <details className="small">
+      <summary className="muted">
+        Expected structure: {s.type === "array" ? "a list of objects" : "an object"} with these keys
+      </summary>
+      <ul className="list">
+        {Object.entries(target.properties).map(([key, ps]) => (
+          <li key={key}>
+            <code>{key}</code>
+            {req.has(key) && <span className="req"> *</span>} <span className="muted">({typeLabel(ps, root)})</span>
+            {ps.description && <> — {ps.description}</>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function SchemaForm({
   schema,
   initial,
@@ -167,12 +202,15 @@ export function SchemaForm({
           );
         } else if (kind === "json") {
           input = (
-            <textarea
-              rows={4}
-              placeholder="JSON"
-              value={text[k] ?? ""}
-              onChange={(e) => setText((t) => ({ ...t, [k]: e.target.value }))}
-            />
+            <>
+              <textarea
+                rows={4}
+                placeholder="JSON"
+                value={text[k] ?? ""}
+                onChange={(e) => setText((t) => ({ ...t, [k]: e.target.value }))}
+              />
+              <StructureHint s={s} root={schema} />
+            </>
           );
         } else {
           input = (

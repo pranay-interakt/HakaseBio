@@ -427,6 +427,31 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "Peptide Drug Products. Draft guidance for industry, December 2023 (not for "
            "implementation).",
            year=2023, url="https://www.fda.gov/media/171901/download"),
+        # -- peptide stability (docs/research/drivers/peptide_stability.md; read 2026-10-11) --
+        _c("bottger2017",
+           "Böttger R, Hoffmann R, Knappe D. Differential stability of therapeutic peptides "
+           "with different proteolytic cleavage sites in blood, plasma and serum. PLoS One. "
+           "2017;12(6):e0178943.",
+           year=2017, doi="10.1371/journal.pone.0178943"),
+        _c("cavaco2021",
+           "Cavaco M, Valle J, Flores I, Andreu D, Castanho MARB. Estimating peptide half-life "
+           "in serum from tunable, sequence-related physicochemical properties. Clin Transl "
+           "Sci. 2021;14(4):1349-1358.",
+           year=2021, doi="10.1111/cts.12985"),
+        _c("nguyen2010",
+           "Nguyen LT, Chau JK, Perry NA, de Boer L, Zaat SAJ, Vogel HJ. Serum stabilities of "
+           "short tryptophan- and arginine-rich antimicrobial peptide analogs. PLoS One. "
+           "2010;5(9):e12684.",
+           year=2010, doi="10.1371/journal.pone.0012684"),
+        _c("di2015",
+           "Di L. Strategic approaches to optimizing peptide ADME properties. AAPS J. "
+           "2015;17(1):134-143.",
+           year=2015, doi="10.1208/s12248-014-9687-3"),
+        _c("graphpad_one_phase_decay",
+           "GraphPad Software. Equation: One phase decay. GraphPad Prism 11 Curve Fitting Guide "
+           "(vendor documentation; equation form and half-life = ln(2)/K).",
+           url="https://www.graphpad.com/guides/prism/latest/curve-fitting/"
+               "reg_exponential_decay_1phase.htm"),
         # -- SEND export (docs/research/send_export.md; files read 2026-10-11, SHA-256 there) --
         _c("fda_data_standards_catalog_v11",
            "U.S. Food and Drug Administration. FDA Data Standards Catalog, version 11.0. "

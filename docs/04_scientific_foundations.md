@@ -486,6 +486,30 @@ Two facts, kept separate because no source links them
     signature re-authenticates and is ledgered.
   - **Unknown origin:** every required study is conditional on the origin.
 
+## 4.24 Peptide stability in blood, serum or plasma  [`peptide.*`]
+
+- **Normalisation.** Intact peptide is expressed as a percentage of the time-zero sample of the
+  same replicate, by peak integration (Böttger 2017; Cavaco 2021; Nguyen 2010). A sample below
+  the quantitation limit is excluded, not imputed.
+- **First order** (`peptide.first_order_decay`).
+  - ln(% remaining) = a − k·t by least squares; t1/2 = ln 2 / k (Obach 1999).
+  - The 95% interval for k is the slope's t-interval with n − 2 degrees of freedom (Student
+    1908). Because ln 2 / k is monotone, the t1/2 interval is [ln 2 / k_upper,
+    ln 2 / k_lower].
+- **One-phase decay** (`peptide.one_phase_decay`).
+  - Y = (Y0 − Plateau)·exp(−K·t) + Plateau and t1/2 = ln 2 / K. Both equations are from the
+    GraphPad Prism 11 guide, a vendor source; Cavaco 2021 used this model.
+  - Fitted by nonlinear least squares. Intervals are asymptotic, with t on n − 3 degrees of
+    freedom.
+  - Under the first-order model this fit is a check. A plateau whose 95% interval lies above
+    zero means the peptide is not fully degraded.
+- **Censoring.** A half-life longer than the last sample is not reported. The percentage
+  remaining at the last sample is reported instead.
+- **Matrix facts.** Each condition must state its matrix facts (§8.3), because the matrix
+  changes both the rate and the rank order of peptides (Böttger 2017).
+- **No defaults.** Concentration, matrix %, temperature, sampling, quench and the acceptance
+  criteria are all stated by the protocol. No source fixes them.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

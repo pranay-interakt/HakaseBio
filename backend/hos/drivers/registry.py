@@ -41,6 +41,7 @@ BUILTIN_DRIVERS: tuple[str, ...] = (
     "hos.drivers.safety_pharm_cns:SafetyPharmCNSDriver",
     "hos.drivers.safety_pharm_respiratory:SafetyPharmRespiratoryDriver",
     "hos.drivers.in_vivo_qt_telemetry:InVivoQTTelemetryDriver",
+    "hos.drivers.peptide_stability:PeptideStabilityDriver",
 )
 
 _REQUIRED_ATTRS = ("id", "name", "version", "requirement_ids", "modalities", "ctd_section")

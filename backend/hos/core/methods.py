@@ -400,6 +400,36 @@ METHODS: Final[dict[str, Method]] = dict(
                "not applicable where the FDA guidance directs mg/kg or exposure-based "
                "scaling, nor to biologics dosed on a MABEL basis",
            )),
+        # ---- peptide stability (docs/research/drivers/peptide_stability.md) -----
+        _m("peptide.percent_of_time_zero",
+           "Intact peptide remaining as a percentage of the time-zero sample of the same "
+           "replicate", ("bottger2017", "cavaco2021", "nguyen2010"),
+           assumptions=("the parent response is proportional to the amount of intact peptide",),
+           limits=("a sample below the quantitation limit is excluded, not imputed",)),
+        _m("peptide.first_order_decay",
+           "First-order depletion of intact peptide: ln-linear regression of percent remaining "
+           "on time; k = -slope, t1/2 = ln(2)/k, 95% interval from the slope's t-interval "
+           "(n - 2 degrees of freedom), transformed monotonically",
+           ("obach1999", "cavaco2021", "student1908"),
+           assumptions=("complete first-order loss (plateau zero)",
+                        "replicates pooled after normalising each to its own time zero",),
+           limits=("a half-life longer than the last sampling time is an extrapolation and is "
+                   "not reported (censored)",
+                   "incomplete degradation biases k; checked with the one-phase decay model",)),
+        _m("peptide.one_phase_decay",
+           "One-phase exponential decay with a plateau, Y = (Y0 - Plateau) exp(-K t) + "
+           "Plateau, by nonlinear least squares; t1/2 = ln(2)/K; 95% intervals from the "
+           "asymptotic covariance with the t distribution on n - 3 degrees of freedom",
+           ("graphpad_one_phase_decay", "cavaco2021", "student1908"),
+           assumptions=("independent, equally weighted residuals on the percent scale",),
+           limits=("needs at least four observations; the intervals are asymptotic (Wald)",
+                   "a plateau above zero means part of the peptide is not degraded and the "
+                   "half-life describes only the degrading part",)),
+        _m("sim.peptide_decay_declared",
+           "Simulated intact-peptide responses from declared true half-life and plateau per "
+           "condition, with proportional log-normal noise", ("graphpad_one_phase_decay",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("dose.mrsd", "Maximum recommended starting dose from the most sensitive species",
            ("fda_mrsd_2005", "ema_fih_2017"),
            assumptions=("the NOAEL-derived HED of the most sensitive relevant species governs",),

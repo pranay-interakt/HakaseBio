@@ -230,13 +230,20 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
                   "dose and to interpret toxicity",
         glp=False, ctd_section="4.2.1.1", driver_id="in_vitro_potency",
     ))
+    peptide = ctx.modality is Modality.PEPTIDE
     out.append(_req(
-        id="adme.metabolic_stability", name="In vitro metabolic stability (liver microsomes)",
+        id="adme.metabolic_stability",
+        name="In vitro metabolic stability (" + ("proteolysis in blood, serum or plasma"
+                                                 if peptide else "liver microsomes") + ")",
         category=StudyCategory.PHARMACOKINETICS, status=RequirementStatus.REQUIRED,
         timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 3",
         rationale="In vitro metabolic data across species are expected before human exposure "
-                  "to support species selection and human clearance prediction",
-        glp=False, species=("human", "rat", "dog"), driver_id="metabolic_stability",
+                  "to support species selection and human clearance prediction"
+                  + ("; peptides are generally degraded by peptidases, and hepatic metabolism "
+                     "rarely plays a significant role in their clearance (FDA draft peptide "
+                     "guidance, December 2023)" if peptide else ""),
+        glp=False, species=("human", "rat", "dog"),
+        driver_id="peptide_stability" if peptide else "metabolic_stability",
         ctd_section="4.2.2.4",
     ))
     out.append(_req(

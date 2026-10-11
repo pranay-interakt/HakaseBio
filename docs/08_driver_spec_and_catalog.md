@@ -474,6 +474,50 @@ The kit checks:
   - Declared 12 ms QTc effect recovered exactly despite an 80 ms RR change.
   - Student-t CI and p against `scipy.stats.ttest_1samp`.
 
+### `peptide_stability` v1.0.0 — intact peptide in blood, serum or plasma (ICH M3(R2) §3)
+
+- **Serves.** `adme.metabolic_stability`, CTD 4.2.2.4, for peptides only. For a peptide, the
+  requirement reads "proteolysis in blood, serum or plasma". The FDA draft peptide guidance
+  (December 2023) states that hepatic metabolism rarely plays a significant role in peptide
+  clearance.
+- **Research note.** `docs/research/drivers/peptide_stability.md`.
+- **Design.** Required inputs, none defaulted:
+  - one or more conditions, each with species and matrix (whole blood, serum or plasma);
+  - for plasma and whole blood, the anticoagulant; for serum, whether a clot activator was
+    used;
+  - whether the matrix was freshly collected, its source, the matrix % v/v and any
+    pretreatment;
+  - peptide concentration, temperature and agitation;
+  - sampling times, starting at 0, and the number of replicates;
+  - the quench and the quantification method, and which response is reported;
+  - the fit model (first order or one-phase decay) with its basis;
+  - R² and depletion acceptance criteria with their basis.
+
+  Böttger et al. 2017 show that each matrix fact changes the result. Between papers, the assay
+  conditions span 5 µM to about 0.5 mM peptide, 25% to 100% matrix, and sampling from 10 min
+  to 24 h.
+- **Return data.** One row per sample: condition, replicate, time, and the response or
+  below-limit. Every replicate needs a quantifiable time-zero sample.
+- **Analysis.**
+  - Percent of each replicate's time zero; samples below the limit are excluded, never zeroed.
+  - The declared fit, giving k and t1/2 with 95% CIs.
+  - Under first order, a one-phase decay check: a plateau whose 95% CI lies above zero is
+    flagged, but only when a half-life is reported.
+  - A half-life beyond the last sample is censored, and the % remaining at the last sample is
+    reported instead.
+  - A time course of % remaining (mean, SD).
+- **Interpretation.**
+  - Each result holds for its matrix (Böttger 2017).
+  - Blood, serum and plasma speak to the systemic circulation (Di 2015; FDA draft 2023).
+  - A species comparison is stated only for conditions that differ in species alone.
+- **Determination.** None.
+- **Not built.** A protease panel (no source defines one), and GI, hepatic and renal matrices.
+- **Known-value tests.**
+  - Exact first-order (t1/2 = 60 min) and one-phase decay (t1/2 = 30 min, plateau 20%) curves.
+  - The t-interval transform matches an independent computation.
+  - Censoring at the last sample.
+  - Exact recovery of half-lives through the driver.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.
