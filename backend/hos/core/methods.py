@@ -774,6 +774,43 @@ METHODS: Final[dict[str, Method]] = dict(
             "Number of residues in a chain, from one-letter codes",
             ("iupac_iub_1984_amino_acids",),
         ),
+        # ---- in silico triage (decision support, never evidence) ------------
+        _m(
+            "triage.structural_alerts",
+            "Substructure screen against a published structural-alert set (RDKit FilterCatalog)",
+            ("brenk2008", "baell2010", "jadhav2010", "rdkit"),
+            assumptions=(
+                "an alert is a substructure match in the published set, not a measurement "
+                "and not a prediction of any in vivo outcome",
+            ),
+            limits=(
+                "alert sets differ in purpose and were derived for screening-library triage, "
+                "not for regulatory hazard classification",
+                "a structure with no alert is not thereby shown to be safe: the sets cover "
+                "only the functionality their authors catalogued",
+                "no sensitivity or specificity is claimed for any endpoint",
+            ),
+        ),
+        _m(
+            "triage.read_across",
+            "Similarity-weighted read-across over measured analogue values (GenRA-style)",
+            ("shah2016", "helman2019", "rogers2010"),
+            assumptions=(
+                "structurally similar compounds have similar measured values for the endpoint",
+                "analogue values are weighted by ECFP4 Tanimoto similarity to the query",
+                "potency values are averaged on the logarithmic (pIC50) scale",
+            ),
+            limits=(
+                "requires a stated minimum number of analogues above the similarity "
+                "threshold; otherwise the value is UNAVAILABLE and nothing is predicted",
+                "censored values (reported as a bound) are excluded, so a compound with only "
+                "bounded measurements contributes no analogue value",
+                "the analogue set reflects the external database at the time of retrieval; "
+                "the analogues used are recorded with the result",
+                "no accuracy is claimed until a pre-registered, held-out validation is "
+                "published for the endpoint",
+            ),
+        ),
         _m(
             "dose.mrsd",
             "Maximum recommended starting dose from the most sensitive species",

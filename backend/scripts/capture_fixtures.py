@@ -18,8 +18,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hos.core.provenance import utc_now
 from hos.data_sources import CachedHttp, ChEMBLClient, PubChemClient
+from hos.triage.herg import HergParams, screen_herg
+from hos.triage.readacross import ReadAcrossParams
 from hos.data_sources.http import USER_AGENT
 from tests.fixtures.transport import fixture_path
+
+
+#: Dofetilide's canonical SMILES exactly as ChEMBL serves it for CHEMBL473.
+DOFETILIDE_SMILES = "CN(CCOc1ccc(NS(C)(=O)=O)cc1)CCc1ccc(NS(C)(=O)=O)cc1"
+#: Paracetamol's canonical SMILES as ChEMBL serves it for CHEMBL112.
+PARACETAMOL_SMILES = "CC(=O)Nc1ccc(O)cc1"
+#: The neighbourhood tests/triage/test_herg.py asserts against.
+TRIAGE_PARAMS = HergParams(
+    read_across=ReadAcrossParams(min_similarity=0.5, max_analogues=5, min_analogues=3),
+    candidate_limit=100,
+    max_lookups=60,
+)
 
 
 class Recording(httpx.BaseTransport):
@@ -66,6 +80,13 @@ def main() -> None:
     ch.herg_ic50("CHEMBL473")  # dofetilide hERG IC50s
     ch.herg_ic50("CHEMBL113")  # caffeine: censored + missing
     ch.herg_ic50("CHEMBL25")  # aspirin (enrichment test)
+
+    # in silico triage, under the neighbourhood tests/triage/test_herg.py asserts against:
+    # dofetilide, whose own hERG IC50 is measured and published many times over
+    screen_herg(DOFETILIDE_SMILES, ch, TRIAGE_PARAMS, inchikey="IXTMWRCNAAVVAI-UHFFFAOYSA-N")
+    # paracetamol: no measured hERG value and no measured analogue near enough, so the
+    # screen abstains rather than estimating
+    screen_herg(PARACETAMOL_SMILES, ch, TRIAGE_PARAMS, inchikey="RZVAJINKPMORJF-UHFFFAOYSA-N")
 
 
 if __name__ == "__main__":

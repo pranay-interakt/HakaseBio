@@ -543,6 +543,53 @@ Sources are in `docs/research/sequence_entities.md`.
   - A surrogate names its clinical candidate and gives its rationale.
   - Isotype and light-chain type are for antibodies.
 
+## 4.26 In silico triage  [`triage.structural_alerts`, `triage.read_across`]
+
+Decision support before a study is commissioned. Never evidence: a triage result is not written
+into a study record, not counted towards IND readiness, and not carried into a submission
+(enforced in `hos/triage/`, tested in `tests/triage/test_service.py`).
+
+- **Structural alerts** — a substructure screen against published alert sets, as distributed with
+  RDKit's `FilterCatalog`. Each set is screened for what its authors built it for, and each match
+  carries the set's own scope and reference plus the atoms it matched:
+  - Brenk R, et al. Lessons learnt from assembling screening libraries for drug discovery for
+    neglected diseases. *ChemMedChem.* 2008;3(3):435-444. doi:10.1002/cmdc.200700139 — functionality
+    excluded for potential toxicity or unfavourable pharmacokinetics.
+  - Baell JB, Holloway GA. New substructure filters for removal of pan assay interference compounds
+    (PAINS). *J Med Chem.* 2010;53(7):2719-2740. doi:10.1021/jm901137j — assay interference.
+  - Jadhav A, et al. Quantitative analyses of aggregation, autofluorescence, and reactivity
+    artifacts. *J Med Chem.* 2010;53(1):37-51. doi:10.1021/jm901070c — screening artefacts.
+
+  A match is a deterministic fact about the structure (`COMPUTED`), not a prediction about an
+  animal. These sets were derived to triage screening libraries, not to classify hazard, and a
+  structure with no match is not thereby shown to be safe.
+
+- **Read-across** — similarity-weighted k-nearest-neighbour prediction from the measured values of
+  structural analogues, y&#770; = &Sigma;(s&#7522;·y&#7522;)/&Sigma;s&#7522;, with s&#7522; the ECFP4 Tanimoto similarity:
+  - Shah I, et al. Systematically evaluating read-across prediction and performance using a local
+    validity approach. *Regul Toxicol Pharmacol.* 2016;79:12-24. doi:10.1016/j.yrtph.2016.05.008
+  - Helman G, Shah I, Patlewicz G. Transitioning the generalised read-across approach (GenRA) to
+    quantitative predictions. *Comput Toxicol.* 2019;12:100097. doi:10.1016/j.comtox.2019.100097
+  - Rogers D, Hahn M. Extended-connectivity fingerprints. *J Chem Inf Model.* 2010;50(5):742-754.
+    doi:10.1021/ci100050t
+
+  The applicability domain is part of the method: without the required number of analogues at or
+  above the similarity threshold the result is `UNAVAILABLE` with the reason, never a number. The
+  neighbourhood (threshold, minimum and maximum analogues) is recorded with every result; no
+  threshold is claimed optimal.
+
+- **hERG screen** — applies the above to hERG IC50 (ChEMBL target CHEMBL240, human KCNH2), measured
+  values retrieved through the ChEMBL web services (Davies M, et al. *Nucleic Acids Res.*
+  2015;43(W1):W612-W620. doi:10.1093/nar/gkv352). A compound that has itself been measured is
+  reported as measured (`LITERATURE`) and nothing is estimated for it. Values reported as a bound
+  (`>`/`<`) and records ChEMBL flags as doubtful are excluded, never flattened into a number.
+  Potencies are averaged as pIC50. No safety margin is computed: a margin needs a clinical exposure
+  (ICH S7B; Redfern 2003), which does not exist at triage.
+
+**No accuracy is claimed** for any triage signal. A sensitivity, specificity or error figure may be
+stated only from a pre-registered, held-out validation published for that endpoint; until then the
+product states that none exists.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

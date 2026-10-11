@@ -33,6 +33,7 @@ from hos.core.provenance import utc_now
 from hos.db.repository import content_hash
 from hos.drivers.base import canonical_hash
 from hos.kernel.ledger import Ledger, LedgerEntry
+from hos.triage.service import ACTION as TRIAGE_ACTION
 
 __all__ = ["AnchorLog", "Finding", "reconcile"]
 
@@ -265,6 +266,24 @@ def reconcile(kernel: Any) -> list[Finding]:
             bad(subject, "document signatures are exactly those recorded", "signatures differ")
         if (d.status == "signed") != bool(signed):
             bad(subject, "document status follows its signature", f"status {d.status}")
+
+    for t in repo.all_triage_reports():
+        subject = f"{t.compound_id}/triage/v{t.version}"
+        ev = _last(
+            [
+                e
+                for e in by_subject[t.compound_id]
+                if e.action == TRIAGE_ACTION and e.payload.get("version") == t.version
+            ],
+            TRIAGE_ACTION,
+        )
+        if ev is None:
+            bad(subject, "triage report has its event", f"no {TRIAGE_ACTION}")
+        elif (
+            ev.payload.get("content_hash") != t.content_hash
+            or content_hash(t.content) != t.content_hash
+        ):
+            bad(subject, "triage report matches its event and recomputes", "content differs")
     return out
 
 

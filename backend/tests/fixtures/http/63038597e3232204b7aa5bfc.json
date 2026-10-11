@@ -1,0 +1,7 @@
+{
+ "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1200574&limit=100&target_chembl_id=CHEMBL240&standard_type__in=IC50",
+ "captured_at": "2026-10-11T17:34:12.037535+00:00",
+ "status_code": 200,
+ "body": "{\"activities\": [], \"page_meta\": {\"limit\": 100, \"next\": null, \"offset\": 0, \"previous\": null, \"total_count\": 0}}",
+ "body_sha256": "ca507b06ce8c54c331fb1b3b45f7acdb77d30d921b83bff62ae15a375090d782"
+}

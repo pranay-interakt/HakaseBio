@@ -197,6 +197,10 @@ class Kernel:
         from hos.ind.documents import SummaryService
 
         self.summaries = SummaryService(self)
+        # in silico triage (docs/16): decision support, never evidence
+        from hos.triage.service import TriageService
+
+        self.triage = TriageService(self)
         # checkpoints of the ledger head outside the database (docs/15 P0.2)
         self.anchors = AnchorLog.default(self.files.root.parent)
         if before is not None and before != self.schema_revision:

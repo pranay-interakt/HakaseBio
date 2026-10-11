@@ -986,6 +986,45 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             k, actor, compound_id, pubchem=PubChemClient(http), chembl=ChEMBLClient(http)
         )
 
+    # -- in silico triage (docs/16): decision support, never evidence ---------------------
+    @app.post("/api/compounds/{compound_id}/triage", dependencies=[Depends(compound_access)])
+    def run_triage(
+        compound_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
+    ) -> dict[str, Any]:
+        """Screen a compound and store the result as a new version."""
+        from hos.data_sources import ChEMBLClient
+        from hos.data_sources.http import CachedHttp
+        from hos.db.store import default_data_dir
+
+        http = state.get("http") or CachedHttp(cache_dir=default_data_dir() / "source_cache")
+        state["http"] = http
+        return k.triage.run(actor, compound_id, chembl=ChEMBLClient(http))
+
+    @app.get("/api/compounds/{compound_id}/triage", dependencies=[Depends(compound_access)])
+    def triage(
+        compound_id: str,
+        version: int | None = None,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> dict[str, Any] | None:
+        """The stored report (the latest by default); null if the compound has never been run."""
+        return k.triage.view(compound_id, version)
+
+    @app.get(
+        "/api/compounds/{compound_id}/triage/versions", dependencies=[Depends(compound_access)]
+    )
+    def triage_versions(
+        compound_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
+    ) -> list[dict[str, Any]]:
+        return k.triage.versions(compound_id)
+
+    @app.get("/api/programs/{program_id}/triage", dependencies=[Depends(program_access)])
+    def program_triage(
+        program_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
+    ) -> dict[str, Any]:
+        """The latest report per compound, keyed by compound id."""
+        return k.triage.program_latest(program_id)
+
     # -- studies --------------------------------------------------------------------------
     @app.get("/api/studies")
     def studies(

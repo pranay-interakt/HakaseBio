@@ -18,6 +18,7 @@ __all__ = [
     "ProgramRow",
     "SimulatedFileRow",
     "StudyRow",
+    "TriageReportRow",
     "WriterLockRow",
 ]
 
@@ -231,3 +232,24 @@ class ProgramDocumentRow(Base):
     __table_args__ = (
         Index("ix_program_document_version", "program_id", "kind", "version", unique=True),
     )
+
+
+class TriageReportRow(Base):
+    """A versioned in silico triage report for one compound (docs/16).
+
+    Decision support only: rows here are never read into a study, a readiness count or a
+    submission. Every version is kept, so what was known when a study was commissioned can
+    be seen later.
+    """
+
+    __tablename__ = "triage_reports"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    compound_id: Mapped[str] = mapped_column(ForeignKey("compounds.id"), index=True)
+    program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    content: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_triage_version", "compound_id", "version", unique=True),)

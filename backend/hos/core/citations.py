@@ -796,6 +796,62 @@ CITATIONS: Final[dict[str, Citation]] = dict(
             year=2026,
             url="https://github.com/cdisc-org/data-definition-engine",
         ),
+        # ---- structural alerts and read-across (in silico triage) ----------
+        _c(
+            "brenk2008",
+            "Brenk R, Schipani A, James D, et al. Lessons learnt from assembling screening "
+            "libraries for drug discovery for neglected diseases. ChemMedChem. "
+            "2008;3(3):435-444.",
+            year=2008,
+            doi="10.1002/cmdc.200700139",
+        ),
+        _c(
+            "baell2010",
+            "Baell JB, Holloway GA. New substructure filters for removal of pan assay "
+            "interference compounds (PAINS) from screening libraries and for their exclusion "
+            "in bioassays. J Med Chem. 2010;53(7):2719-2740.",
+            year=2010,
+            doi="10.1021/jm901137j",
+        ),
+        _c(
+            "jadhav2010",
+            "Jadhav A, Ferreira RS, Klumpp C, et al. Quantitative analyses of aggregation, "
+            "autofluorescence, and reactivity artifacts in a screen for inhibitors of a thiol "
+            "protease. J Med Chem. 2010;53(1):37-51.",
+            year=2010,
+            doi="10.1021/jm901070c",
+        ),
+        _c(
+            "rogers2010",
+            "Rogers D, Hahn M. Extended-connectivity fingerprints. J Chem Inf Model. "
+            "2010;50(5):742-754.",
+            year=2010,
+            doi="10.1021/ci100050t",
+        ),
+        _c(
+            "shah2016",
+            "Shah I, Liu J, Judson RS, Thomas RS, Patlewicz G. Systematically evaluating "
+            "read-across prediction and performance using a local validity approach "
+            "characterized by chemical structure and bioactivity information. Regul Toxicol "
+            "Pharmacol. 2016;79:12-24.",
+            year=2016,
+            doi="10.1016/j.yrtph.2016.05.008",
+        ),
+        _c(
+            "helman2019",
+            "Helman G, Shah I, Patlewicz G. Transitioning the generalised read-across approach "
+            "(GenRA) to quantitative predictions: a case study using acute oral toxicity data. "
+            "Comput Toxicol. 2019;12:100097.",
+            year=2019,
+            doi="10.1016/j.comtox.2019.100097",
+        ),
+        _c(
+            "davies2015",
+            "Davies M, Nowotka M, Papadatos G, et al. ChEMBL web services: streamlining access "
+            "to drug discovery data and utilities. Nucleic Acids Res. 2015;43(W1):W612-W620.",
+            year=2015,
+            doi="10.1093/nar/gkv352",
+        ),
         _c(
             "sas_ts140",
             "SAS Institute. Record Layout of a SAS Version 5 or 6 Data Set in SAS Transport "

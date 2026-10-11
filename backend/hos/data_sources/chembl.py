@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from hos.core.provenance import Citation, Provenance
 from hos.core.quantity import Quantity
@@ -104,6 +104,85 @@ class ChEMBLClient:
             attribution=f"ChEMBL {cid}, EMBL-EBI, CC BY-SA 3.0",
         )
 
+    def similar_molecules(
+        self, smiles: str, *, threshold: int = 70, limit: int = 50, refresh: bool = False
+    ) -> SourceResult:
+        """Structures ChEMBL holds that resemble ``smiles``, as candidate analogues.
+
+        ``threshold`` is ChEMBL's similarity percentage, used only to retrieve candidates;
+        the similarity a prediction is weighted by is recomputed locally from the returned
+        structures (``hos.triage.readacross``), so the number behind a result is one this
+        system computed and can state the method for.
+
+        An empty match set is ``NOT_FOUND``, never an error. ChEMBL answers 404 for a
+        structure it holds nothing similar to, which is the same thing.
+        """
+        url = (
+            f"{CHEMBL_BASE}/similarity/{quote(smiles, safe='')}/{int(threshold)}.json?"
+            + urlencode({"limit": limit})
+        )
+        status, payload, at, cached, err = self.http.get_json(url, refresh=refresh)
+        if status is SourceStatus.NOT_FOUND:
+            return SourceResult(
+                self.source, status, smiles, url, at, from_cache=cached, license=LICENSE
+            )
+        if status is not SourceStatus.OK:
+            return SourceResult(
+                self.source,
+                status,
+                smiles,
+                url,
+                at,
+                from_cache=cached,
+                error=err,
+                license=LICENSE,
+            )
+        mols = (payload or {}).get("molecules")
+        if mols is None:
+            return SourceResult(
+                self.source,
+                SourceStatus.ERROR,
+                smiles,
+                url,
+                at,
+                from_cache=cached,
+                error="unexpected response schema",
+                license=LICENSE,
+            )
+        records = []
+        for m in mols:
+            structures = m.get("molecule_structures") or {}
+            records.append(
+                {
+                    "chembl_id": m.get("molecule_chembl_id"),
+                    "pref_name": m.get("pref_name"),
+                    "canonical_smiles": structures.get("canonical_smiles"),
+                    "standard_inchi_key": structures.get("standard_inchi_key"),
+                    "chembl_similarity": m.get("similarity"),
+                }
+            )
+        if not records:
+            return SourceResult(
+                self.source,
+                SourceStatus.NOT_FOUND,
+                smiles,
+                url,
+                at,
+                from_cache=cached,
+                license=LICENSE,
+            )
+        return SourceResult(
+            self.source,
+            SourceStatus.OK,
+            smiles,
+            url,
+            at,
+            records=tuple(records),
+            from_cache=cached,
+            license=LICENSE,
+            attribution="ChEMBL similarity search, EMBL-EBI, CC BY-SA 3.0",
+        )
+
     def activities(
         self,
         molecule_chembl_id: str,
@@ -112,14 +191,56 @@ class ChEMBLClient:
         standard_types: Iterable[str] = (),
         refresh: bool = False,
     ) -> SourceResult:
-        params: dict[str, Any] = {"molecule_chembl_id": molecule_chembl_id, "limit": 100}
+        return self._activities(
+            {"molecule_chembl_id": molecule_chembl_id},
+            molecule_chembl_id,
+            target_chembl_id=target_chembl_id,
+            standard_types=standard_types,
+            refresh=refresh,
+        )
+
+    def activities_for(
+        self,
+        molecule_chembl_ids: Iterable[str],
+        *,
+        target_chembl_id: str | None = None,
+        standard_types: Iterable[str] = (),
+        refresh: bool = False,
+    ) -> SourceResult:
+        """Activities for several molecules in one query (``molecule_chembl_id__in``).
+
+        Used where a set of candidate analogues must be checked for a measured endpoint:
+        one request answers for all of them instead of one request each. The records
+        carry ``molecule_chembl_id``, so the caller groups them itself.
+        """
+        ids = sorted({i for i in molecule_chembl_ids if i})
+        if not ids:
+            raise ValueError("activities_for needs at least one molecule id")
+        return self._activities(
+            {"molecule_chembl_id__in": ",".join(ids)},
+            f"{len(ids)} molecules",
+            target_chembl_id=target_chembl_id,
+            standard_types=standard_types,
+            refresh=refresh,
+        )
+
+    def _activities(
+        self,
+        selector: dict[str, Any],
+        subject: str,
+        *,
+        target_chembl_id: str | None,
+        standard_types: Iterable[str],
+        refresh: bool,
+    ) -> SourceResult:
+        params: dict[str, Any] = {**selector, "limit": 100}
         if target_chembl_id:
             params["target_chembl_id"] = target_chembl_id
         types = list(standard_types)
         if types:
             params["standard_type__in"] = ",".join(types)
         url = f"{CHEMBL_BASE}/activity.json?" + urlencode(params)
-        query = f"{molecule_chembl_id}/{target_chembl_id or '*'}/{','.join(types) or '*'}"
+        query = f"{subject}/{target_chembl_id or '*'}/{','.join(types) or '*'}"
         records: list[dict[str, Any]] = []
         q: dict[str, Quantity] = {}
         next_url: str | None = url
@@ -155,6 +276,7 @@ class ChEMBLClient:
                 )
             for a in acts:
                 rec, qty = _activity(a, at)
+                rec["molecule_chembl_id"] = a.get("molecule_chembl_id")
                 records.append(rec)
                 if qty is not None:
                     q[f"activity:{a.get('activity_id')}"] = qty

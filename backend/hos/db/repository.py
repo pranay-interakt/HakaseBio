@@ -21,6 +21,7 @@ from hos.db.models import (
     SessionRow,
     SimulatedFileRow,
     StudyRow,
+    TriageReportRow,
 )
 from hos.db.store import Database, FileStore
 from hos.kernel.errors import NotFound
@@ -308,6 +309,30 @@ class Repository:
             r.status = "signed"
             s.flush()
             return r
+
+    def triage_reports(self, compound_id: str) -> list[TriageReportRow]:
+        """Every version for one compound, oldest first."""
+        with self.db.session() as s:
+            q = (
+                select(TriageReportRow)
+                .where(TriageReportRow.compound_id == compound_id)
+                .order_by(TriageReportRow.version)
+            )
+            return list(s.execute(q).scalars())
+
+    def program_triage_reports(self, program_id: str) -> list[TriageReportRow]:
+        """Every version across a programme's compounds, oldest first."""
+        with self.db.session() as s:
+            q = (
+                select(TriageReportRow)
+                .where(TriageReportRow.program_id == program_id)
+                .order_by(TriageReportRow.id)
+            )
+            return list(s.execute(q).scalars())
+
+    def all_triage_reports(self) -> list[TriageReportRow]:
+        with self.db.session() as s:
+            return list(s.execute(select(TriageReportRow).order_by(TriageReportRow.id)).scalars())
 
     def artifacts_page(
         self, study_id: str, kind: str | None, limit: int, offset: int
