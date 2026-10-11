@@ -76,7 +76,7 @@ def check_driver(
         except Exception as exc:  # noqa: BLE001 - every failure is reported, not raised
             rep.checks.append(ConformanceCheck(name, False, f"{type(exc).__name__}: {exc}"))
             return None
-        rep.checks.append(ConformanceCheck(name, True, "" if out is None else str(out)))
+        rep.checks.append(ConformanceCheck(name, True, out if isinstance(out, str) else ""))
         return out if out is not None else True
 
     def identity() -> str:
