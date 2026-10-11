@@ -264,6 +264,37 @@ The kit checks:
   - The exact log-trapezoid AUMC.
   - Adjusted R², the vendor best-fit rule, and C0 back-extrapolation.
 
+### `plasma_protein_binding` v1.0.0 — equilibrium dialysis (ICH M3(R2) §3; ICH M12 §7.2)
+
+- **Serves.** `adme.plasma_protein_binding`, CTD 4.2.2.3, for small molecules and peptides.
+  Monoclonal antibodies are excluded because they cannot cross a dialysis membrane.
+- **Research note.** `docs/research/drivers/plasma_protein_binding.md`.
+- **Design.** Required inputs:
+  - device and membrane MWCO (a design note appears if the analyte is not smaller than the
+    MWCO);
+  - matrix per species with anticoagulant, test concentrations, LLOQ;
+  - incubation time, temperature, agitation and atmosphere, with the evidence that equilibrium
+    is reached;
+  - chamber volumes, buffer and replicates;
+  - bioanalytical method;
+  - positive controls, each with its qualified mean fu and qualification reference;
+  - optionally, laboratory recovery and stability criteria with their basis.
+- **Return data.** One row per dialysis cell: compound, species, nominal concentration,
+  replicate, buffer concentration or BLQ, plasma concentration, and optional laboratory recovery
+  and stability.
+- **Analysis.**
+  - fu per cell; mean (SD), CV and % bound per compound × species × concentration.
+  - An upper bound when the buffer is BLQ.
+  - The positive-control 3-fold check (FAIL outside it).
+  - A warning when a species has no positive control.
+  - The fu < 1% flag.
+  - Laboratory recovery and stability against the stated criteria.
+- **Determination.** Optional: reliability of fu < 1% demonstrated / not demonstrated
+  (responsible scientist).
+- **Known-value tests.**
+  - Exact fu recovery from declared chamber concentrations.
+  - The M12 3-fold boundary: exactly 3-fold passes; 3.1-fold fails in either direction.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

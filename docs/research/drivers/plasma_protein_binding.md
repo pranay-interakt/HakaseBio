@@ -116,3 +116,23 @@ paper (PMC12151198) 6 h at 37 °C, 5% CO₂.
 6. Di L, Breen C, Chambers R, Eckley ST, Fricke R, Ghosh A, Harradine P, Kalvass JC, Ho S, Lee CA, Marathe P, Perkins EJ, Qian M, Tse S, Yan Z, Zamek-Gliszczynski MJ. Industry perspective on contemporary protein-binding methodologies: considerations for regulatory drug-drug interaction and related guidelines on highly bound drugs. *J Pharm Sci.* 2017;106(12):3442–3452. DOI: 10.1016/j.xphs.2017.09.005. PMID 28927987. *(abstract only; ICH M12 ref 21)*
 7. Ryu S, Riccardi K, Patel R, Zueva L, Burchett W, Di L. Applying two orthogonal methods to assess accuracy of plasma protein binding measurements for highly bound compounds. *J Pharm Sci.* 2019;108(11):3745–3749. DOI: 10.1016/j.xphs.2019.08.004. PMID 31419399. *(abstract only; ICH M12 ref 22)*
 8. Wernevik J, Bergström F, Novén A, Hulthe J, Fredlund L, Addison D, Holmgren J, Strömstedt PE, Rehnström E, Lundbäck T. A fully integrated assay panel for early drug metabolism and pharmacokinetics profiling. *Assay Drug Dev Technol.* 2020;18(4):157–179. DOI: 10.1089/adt.2020.970. PMC7567642. *(secondary — single-laboratory QC convention)*
+
+## Implementation record (driver `plasma_protein_binding` v1.0.0, 2026-10-11)
+
+- **M12 rules re-checked against the official PDF.** SHA-256
+  `ff0624ed…397ce`, matching the hash above.
+  - §2.1.2.1: "If the reliability of fu,p measurements <1% cannot be demonstrated, a default value
+    of 1% unbound fraction in plasma (i.e., fu,p= 0.01) should be used".
+  - §7.2: "The positive control should be demonstrated to be within 3-fold of the mean fu,p value
+    that was previously reported with the qualification of the protein binding assay method."
+- **Citations verified on Crossref this session.** Waters 2008 (10.1002/jps.21317), Di 2012
+  (10.1002/jps.23013), Di 2017 (10.1016/j.xphs.2017.09.005), Ryu 2019 (10.1016/j.xphs.2019.08.004).
+- **Decisions.**
+  - Recovery and stability are not computed (items 2–3 above remain NOT VERIFIED). The
+    laboratory's values are checked only against criteria stated in the protocol with their
+    basis.
+  - The measured fu < 1% is never replaced by 0.01. It is flagged, and the reliability question
+    goes to the responsible scientist.
+  - The M12 3-fold rule applies to every species with a declared positive control. M12 itself
+    addresses human plasma.
+  - There is no volume-shift correction (item 4 remains open).

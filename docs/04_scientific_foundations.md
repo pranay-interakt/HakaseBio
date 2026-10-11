@@ -273,6 +273,25 @@ is a new registry version; it never silently alters past results.
   - **Limits.** %extrapolated and adjusted-R² limits are optional inputs with a stated basis. The
     80% coverage rule of ICH M13A is a bioequivalence criterion, so it is not applied by default.
 
+## 4.15 Plasma protein binding by equilibrium dialysis  [`ppb.*`]
+
+- fu = C_buffer / C_plasma at the end of dialysis, per cell, with replicate mean and SD; %
+  bound = 100(1 − fu). The source is the Pierce RED device user guide (Thermo Fisher, MAN0011571
+  Rev. C.0), a secondary source. Waters et al. 2008 (J Pharm Sci 97:4586, abstract) validated the
+  RED approach.
+- A buffer concentration below the LLOQ bounds fu from above (fu < LLOQ / C_plasma); no value
+  is imputed.
+- In-study positive controls must be within 3-fold of the mean fu,p from the assay
+  qualification (ICH M12 §7.2). M12 states this for human plasma in DDI work; the driver applies
+  it to each species for which the protocol declares a positive control.
+- A measured fu below 1% is reported, not replaced. It is flagged because ICH M12 §2.1.2.1 sets
+  fu,p = 0.01 for DDI predictions unless reliability is demonstrated. Whether reliability is
+  demonstrated is an optional responsible-scientist determination.
+- Recovery (mass balance) and stability are not computed: no primary formula or consensus
+  criterion was verified. Laboratory-reported values are checked against criteria stated with
+  their basis. Di et al. 2012 (abstract) found low recovery did not bias fu once equilibrium is
+  established.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

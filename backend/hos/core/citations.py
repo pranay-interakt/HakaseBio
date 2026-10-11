@@ -142,6 +142,37 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "steady-state volume of distribution, J Pharm Sci 68, 1071-1074, 1979 - the "
            "backstory. AAPS J. 2012;14(2):164-167.",
            year=2012, doi="10.1208/s12248-012-9326-9"),
+        _c("waters2008",
+           "Waters NJ, Jones R, Williams G, Sohal B. Validation of a rapid equilibrium dialysis "
+           "approach for the measurement of plasma protein binding. J Pharm Sci. "
+           "2008;97(10):4586-4595.",
+           year=2008, doi="10.1002/jps.21317"),
+        _c("thermo_red_2023",
+           "Thermo Fisher Scientific. Pierce RED Device Inserts User Guide (Cat. 89809, 89810). "
+           "Pub. No. MAN0011571, Rev. C.0, 16 June 2023. (Manufacturer instructions; a "
+           "secondary source for the fraction-unbound calculation.)",
+           year=2023,
+           url="https://assets.thermofisher.com/TFS-Assets/LSG/manuals/"
+               "MAN0011571_RED_Device_Insert_UG.pdf"),
+        _c("ich_m12",
+           "ICH Harmonised Guideline M12: Drug Interaction Studies. Final version, adopted 21 May "
+           "2024.",
+           year=2024,
+           url="https://database.ich.org/sites/default/files/ICH_M12_Step4_Guideline_2024_0521.pdf"),
+        _c("di2012",
+           "Di L, Umland JP, Trapa PE, Maurer TS. Impact of recovery on fraction unbound using "
+           "equilibrium dialysis. J Pharm Sci. 2012;101(3):1327-1335.",
+           year=2012, doi="10.1002/jps.23013"),
+        _c("di2017",
+           "Di L, Breen C, Chambers R, et al. Industry perspective on contemporary "
+           "protein-binding methodologies: considerations for regulatory drug-drug interaction "
+           "and related guidelines on highly bound drugs. J Pharm Sci. 2017;106(12):3442-3452.",
+           year=2017, doi="10.1016/j.xphs.2017.09.005"),
+        _c("ryu2019",
+           "Ryu S, Riccardi K, Patel R, Zueva L, Burchett W, Di L. Applying two orthogonal "
+           "methods to assess accuracy of plasma protein binding measurements for highly bound "
+           "compounds. J Pharm Sci. 2019;108(11):3745-3749.",
+           year=2019, doi="10.1016/j.xphs.2019.08.004"),
         _c("purves1992",
            "Purves RD. Optimum numerical integration methods for estimation of "
            "area-under-the-curve (AUC) and area-under-the-moment-curve (AUMC). "

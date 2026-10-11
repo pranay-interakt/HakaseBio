@@ -228,6 +228,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         rationale="Unbound fractions are needed to compare exposures across species and to "
                   "compute free-drug safety margins",
         glp=False, species=("human", "rat", "dog"), ctd_section="4.2.2.3",
+        driver_id="plasma_protein_binding",
     ))
     out.append(_req(
         id="adme.in_vivo_pk", name="In vivo pharmacokinetics (ADME) in test species",

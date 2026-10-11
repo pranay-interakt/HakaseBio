@@ -216,6 +216,26 @@ METHODS: Final[dict[str, Method]] = dict(
            "log-normal between-animal and residual variability", ("fda_ba_2022",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("ppb.fraction_unbound",
+           "Fraction unbound by equilibrium dialysis: buffer-chamber / plasma-chamber "
+           "concentration at equilibrium; replicate mean and SD",
+           ("thermo_red_2023", "waters2008"),
+           assumptions=("equilibrium was reached at the stated incubation time",
+                        "buffer and plasma samples are matrix-matched before analysis",),
+           limits=("no volume-shift correction",
+                   "a buffer concentration below the LLOQ bounds fu from above only",)),
+        _m("ppb.positive_control_m12",
+           "In-study positive control within 3-fold of the mean fu,p from assay qualification",
+           ("ich_m12",),
+           assumptions=("the qualified mean fu,p comes from the laboratory's assay "
+                        "qualification",),
+           limits=("ICH M12 states the rule for human plasma in drug-interaction work; it is "
+                   "applied to any species for which the protocol declares a positive control",)),
+        _m("sim.ppb_declared_fu",
+           "Simulated equilibrium-dialysis chamber concentrations from declared true fu values "
+           "with log-normal analytical variability", ("thermo_red_2023",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",
