@@ -3,7 +3,7 @@
 import io
 import json
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -266,7 +266,7 @@ def test_a_unit_term_that_is_not_the_protocol_unit_is_refused(k):  # noqa: F811
 
 def test_package_is_byte_reproducible(k):  # noqa: F811
     sci, rd, tk = _studies(k)
-    when = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
+    when = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
     a = send_export(k, sci, rd, _spec(k, rd, tk), exported_at=when)
     b = send_export(k, sci, rd, _spec(k, rd, tk), exported_at=when)
     assert a["ok"] and a["package_sha256"] == b["package_sha256"]

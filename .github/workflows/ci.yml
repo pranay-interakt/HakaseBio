@@ -1,9 +1,11 @@
 name: CI
 
 on:
-  # every branch, so work is checked before it reaches main (docs/15 P0.4)
+  # every branch, so work is checked before it reaches main (docs/15 P0.4); a v* tag also
+  # publishes a release once every job is green (docs/15 P2.4)
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -26,9 +28,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
-      - name: Install
-        run: pip install -e ".[api,db,dev]"
+          cache-dependency-path: backend/requirements-dev.lock
+      - name: Install the locked, hash-checked dependency set (docs/15 P2.4)
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install --no-deps -e .
+          pip check
       - name: Lint (ruff)
         run: ruff check hos tests scripts
       - name: Type check (mypy)
@@ -73,9 +78,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
-      - name: Install
-        run: pip install -e ".[api,db,pg,dev]"
+          cache-dependency-path: backend/requirements-dev.lock
+      - name: Install the locked, hash-checked dependency set (docs/15 P2.4)
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install --no-deps -e .
+          pip check
       - name: Migrations (empty database to head; no drift from the models)
         run: hos-db upgrade && hos-db check
         env:
@@ -146,3 +154,71 @@ jobs:
       - name: Stop
         if: always()
         run: docker compose down -v
+
+  artifacts:
+    # what a release ships, built on every run so it never breaks unnoticed (docs/15 P2.4):
+    # the wheel, the locked runtime set, CycloneDX SBOMs and the versions hos-verify records
+    name: release artifacts (wheel, SBOMs, versions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Runtime environment from the lock, as in the image
+        working-directory: backend
+        run: |
+          python -m venv /tmp/runtime
+          /tmp/runtime/bin/pip install --require-hashes -r requirements.lock
+          /tmp/runtime/bin/pip wheel --no-deps --wheel-dir ../release .
+          /tmp/runtime/bin/pip install --no-deps ../release/*.whl
+          /tmp/runtime/bin/pip check
+          cp requirements.lock ../release/
+      - name: Versions recorded by hos-verify
+        run: >
+          /tmp/runtime/bin/python -c "import json; from hos.verify.bundle import software_versions;
+          print(json.dumps(software_versions(), indent=2, sort_keys=True))"
+          > release/software-versions.json
+      - name: SBOM, backend (CycloneDX)
+        run: |
+          python -m venv /tmp/sbom
+          /tmp/sbom/bin/pip install "cyclonedx-bom==7.4.0"
+          /tmp/sbom/bin/cyclonedx-py environment /tmp/runtime/bin/python \
+            --pyproject backend/pyproject.toml --of JSON --output-reproducible --validate \
+            -o release/sbom-backend.cdx.json
+      - name: SBOM, web app (CycloneDX)
+        working-directory: frontend
+        run: |
+          npm ci
+          npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-reproducible --validate \
+            --output-format JSON --output-file ../release/sbom-web.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release/
+
+  release:
+    name: publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [backend, postgres, frontend, containers, artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME" --notes "Wheel, locked runtime dependencies,
+          CycloneDX SBOMs (backend and web app) and the software versions hos-verify records.
+          Built after every CI job passed."

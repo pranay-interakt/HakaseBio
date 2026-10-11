@@ -24,7 +24,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -41,7 +41,7 @@ __all__ = [
 
 def utc_now() -> datetime:
     """Timezone-aware UTC timestamp (never a naive local clock)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ProvenanceKind(str, Enum):

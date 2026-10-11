@@ -60,8 +60,11 @@ Requirements: Python 3.11+, Node 18+.
 ### Backend
 
 ```bash
-cd backend && python3.11 -m venv .venv && .venv/bin/pip install -e ".[api,db,dev]"
+cd backend && python3.11 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements-dev.lock && .venv/bin/pip install --no-deps -e .
 ```
+
+Dependencies are locked with hashes (`requirements.lock` for the runtime and the image,
+`requirements-dev.lock` adding test tools); the command that regenerates each is in its header.
 
 ```bash
 cd backend && .venv/bin/pytest

@@ -8,7 +8,7 @@ with its errors too.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from hos.drivers.base import IngestedData
@@ -76,7 +76,7 @@ def _send_export(kernel: Any, actor: Principal, study_id: str, spec: SendExportS
     sigs = kernel.protocol_signatures(row)
     start = str(sigs[0]["signed_at"])[:10] if sigs else None
     director = str(sigs[0]["signer_name"]) if sigs else None
-    when = exported_at or datetime.now(timezone.utc).replace(microsecond=0)
+    when = exported_at or datetime.now(UTC).replace(microsecond=0)
     pkg = assemble(spec, tox=tox, tk=tk, study_start=start, study_director=director,
                    glp=bool(row.glp), exported_at=when)
     record: dict[str, Any] = {"ok": pkg.ok, "errors": pkg.errors, "warnings": pkg.warnings,

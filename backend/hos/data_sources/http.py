@@ -12,7 +12,7 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -124,4 +124,4 @@ def _retry_after(r: httpx.Response) -> float | None:
 
 
 def iso_to_dt(s: str) -> datetime:
-    return datetime.fromisoformat(s).astimezone(timezone.utc)
+    return datetime.fromisoformat(s).astimezone(UTC)

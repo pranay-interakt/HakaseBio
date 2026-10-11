@@ -58,6 +58,24 @@ Every setting is an environment variable. The table lists them all, with their d
 | `HOS_CORS_ORIGINS` | the Vite dev server | browser origins allowed to call the API directly; empty behind the proxy |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | uvicorn: addresses whose `X-Forwarded-For` is trusted |
 
+## Releases and dependencies
+
+The dependency set is locked, with a SHA-256 for every file, in `backend/requirements.lock`
+(runtime) and `backend/requirements-dev.lock` (plus test tools). The lock is resolved with
+`uv pip compile --universal` for Python 3.11 and up, and the command is in each file's header.
+CI and the image install with `pip install --require-hashes`, then `pip check`.
+
+Every CI run builds what a release ships, so a release cannot fail for a reason CI has not seen:
+- the wheel;
+- `requirements.lock`;
+- CycloneDX SBOMs for the backend (`sbom-backend.cdx.json`, from the installed runtime
+  environment) and the web app (`sbom-web.cdx.json`, production dependencies);
+- `software-versions.json`, the versions `hos-verify` records.
+
+Pushing a `v*` tag publishes these as a GitHub release, only after every job has passed. To
+update a dependency, re-run the lock command with `--upgrade-package NAME`, then let CI run the
+suite on the new set.
+
 ## Health
 
 - `GET /api/health` is liveness. It answers whenever the process runs and touches nothing

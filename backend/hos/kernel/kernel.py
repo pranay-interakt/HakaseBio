@@ -26,7 +26,7 @@ import secrets
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +155,7 @@ def _token_hash(token: str) -> str:
 
 def _aware(dt: datetime) -> datetime:
     """SQLite returns naive datetimes; every stored time is UTC."""
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 #: A hash of a random secret, checked when a principal has none, so a refusal costs the same

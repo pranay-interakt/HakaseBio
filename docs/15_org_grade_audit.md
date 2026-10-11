@@ -187,7 +187,11 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
      frontend static).
    - Documented environment configuration.
    - `/api/health` (liveness) and `/api/ready` (DB and file store reachable).
-4. **Reproducible, validated builds.** Dependencies are `>=` ranges, but a validated system
+4. **Reproducible, validated builds — fixed.** *Hash-pinned universal locks
+   (`requirements.lock`, `requirements-dev.lock`) used by CI and the image with
+   `--require-hashes` and `pip check`; every CI run builds the wheel, CycloneDX SBOMs for backend
+   and web app, and the recorded software versions; a `v*` tag publishes them as a release after
+   all jobs pass (docs/16).* Dependencies are `>=` ranges, but a validated system
    (CSA, GAMP 5) needs a locked state.
    - A hash-pinned lockfile (`uv lock` or `pip-compile --generate-hashes`) used by CI and the
      image.
@@ -218,8 +222,9 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
 - Deprecations:
   - `starlette.testclient` with `httpx` (move to the replacement client);
   - `Column.copy()` in `tests/kernel/test_imports.py`.
-- Python version: CLAUDE.md says 3.11+, `requires-python` says >=3.10, and CI tests 3.11/3.12.
-  Settle on one stated floor.
+- ~~Python version: CLAUDE.md says 3.11+, `requires-python` says >=3.10, and CI tests 3.11/3.12.
+  Settle on one stated floor.~~ *Fixed: 3.11 everywhere (`requires-python`, ruff, mypy, the
+  lock); the image runs 3.12.*
 - `Content-Disposition` filenames come from user input. Sanitise them, and emit RFC 6266
   `filename*=`.
 

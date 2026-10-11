@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "hakase-os"
 version = "0.1.0"
 description = "Hakase Operating System - preclinical drug development kernel"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "rdkit>=2024.3.1",
   "numpy>=1.26",
@@ -49,7 +49,7 @@ markers = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 # Explicit rule set so results do not change with ruff's defaults.
@@ -58,6 +58,7 @@ ignore = [
   "ISC004",  # multi-line string literals inside tuples are intentional (method assumptions/limits)
   "E501",    # line length is advisory; long citations and user-facing messages are kept whole
   "RUF005",  # list concatenation vs unpacking is a style preference
+  "UP042",   # (str, Enum) kept: StrEnum changes str() of members, which can reach hashed records
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -65,7 +66,7 @@ ignore = [
 "hos/api/app.py" = ["B008"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

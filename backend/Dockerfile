@@ -11,8 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin hos \
  && mkdir -p /var/lib/hos /var/lib/hos-anchors \
  && chown hos:hos /var/lib/hos /var/lib/hos-anchors
+# the locked, hash-checked dependency set (docs/15 P2.4), then the application itself
+COPY requirements.lock /tmp/requirements.lock
+RUN pip install --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
 COPY --from=build /wheels /wheels
-RUN pip install "$(ls /wheels/*.whl)[api,db,pg]" && rm -rf /wheels
+RUN pip install --no-deps /wheels/*.whl && rm -rf /wheels && pip check
 USER hos
 WORKDIR /var/lib/hos
 EXPOSE 8000
