@@ -173,7 +173,10 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
    `create_all()` plus `_add_missing_columns()` is not a migration system.
    - Adopt Alembic with a baseline revision matching the current models.
    - CI checks `alembic upgrade head` on an empty DB and that autogenerate produces no diff.
-2. **PostgreSQL is untested.** Every test runs on SQLite. Add a CI job that runs the suite on
+2. **PostgreSQL is untested — fixed.** *A CI job runs the whole suite and the migration check on
+   PostgreSQL 16 (`HOS_TEST_DATABASE_URL`; each test gets a fresh schema). The cross-process
+   writer test arrives with item 6.*
+   Every test runs on SQLite. Add a CI job that runs the suite on
    PostgreSQL 16 through a service container, including the P0.1 concurrency test across
    processes.
 3. **Packaging.**

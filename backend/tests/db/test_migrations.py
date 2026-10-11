@@ -35,7 +35,7 @@ def test_a_model_change_without_a_revision_is_drift(tmp_path):
 def _old_database(url):
     """The schema as released before study import and sessions existed (created the way
     releases then did, with create_all and no migration history)."""
-    eng = sa.create_engine(url)
+    eng = Database(url).engine
     Base.metadata.create_all(eng)
     with eng.begin() as c:
         for t in ("sessions", "program_members", "file_links"):
@@ -58,7 +58,7 @@ def test_a_database_from_before_migrations_is_adopted(tmp_path):
 
 def test_an_unsafe_schema_gap_is_refused(tmp_path):
     url = _url(tmp_path)
-    with sa.create_engine(url).begin() as c:
+    with Database(url).engine.begin() as c:
         c.execute(sa.text("CREATE TABLE studies (id VARCHAR(64) PRIMARY KEY)"))
     with pytest.raises(RuntimeError, match="cannot be added automatically"):
         Database(url).upgrade()

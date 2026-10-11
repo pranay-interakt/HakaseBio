@@ -74,6 +74,13 @@ contract against the live services:
 cd backend && .venv/bin/pytest -m live
 ```
 
+The same suite runs on PostgreSQL (CI does this on PostgreSQL 16); each test gets a fresh schema
+in the database you name:
+
+```bash
+cd backend && .venv/bin/pip install -e ".[pg]" && HOS_TEST_DATABASE_URL=postgresql+psycopg://user@localhost/hos_test .venv/bin/pytest
+```
+
 ### End-to-end demo (no setup, temporary database)
 
 ```bash
