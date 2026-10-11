@@ -121,6 +121,15 @@ class CompoundBody(BaseModel):
     smiles: str
 
 
+class BiologicBody(BaseModel):
+    name: str
+    entity: dict[str, Any]
+
+
+class TextBody(BaseModel):
+    text: str
+
+
 class StudyBody(BaseModel):
     program_id: str
     compound_id: str
@@ -410,6 +419,27 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
     def add_compound(program_id: str, body: CompoundBody, actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.register_compound(actor, program_id, name=body.name, smiles=body.smiles)
+
+    @app.post("/api/programs/{program_id}/biologics")
+    def add_biologic(program_id: str, body: BiologicBody, actor: Principal = Depends(current),
+                     k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.register_biologic(actor, program_id, name=body.name, entity=body.entity)
+
+    @app.post("/api/sequence/fasta")
+    def parse_fasta(body: TextBody, actor: Principal = Depends(current)) -> dict[str, Any]:
+        from hos.core.sequence import parse_fasta
+        records, errors = parse_fasta(body.text)
+        return {"records": [{"description": r.description, "sequence": r.sequence,
+                             "residues": len(r.sequence)} for r in records],
+                "errors": errors}
+
+    @app.post("/api/sequence/helm")
+    def check_helm(body: TextBody, actor: Principal = Depends(current)) -> dict[str, Any]:
+        from hos.core.sequence import HelmError, parse_helm
+        try:
+            return {"structure": parse_helm(body.text).to_dict(), "errors": []}
+        except HelmError as exc:
+            return {"structure": None, "errors": exc.errors}
 
     @app.get("/api/compounds/{compound_id}")
     def compound(compound_id: str, actor: Principal = Depends(current),

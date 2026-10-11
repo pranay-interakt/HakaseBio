@@ -131,8 +131,11 @@ export interface Compound {
   id: string;
   program_id: string;
   name: string;
-  smiles: string;
+  /** small_molecule (registered by structure) or sequence (peptide or antibody). */
+  kind?: "small_molecule" | "sequence";
+  smiles: string | null;
   inchikey: string | null;
+  entity?: SequenceEntityRecord | null;
   profile: {
     canonical_smiles: string;
     formula: string;
@@ -563,4 +566,46 @@ export interface ProgramDetermination {
   applies: boolean;
   rationale: string;
   signature: { signer_name: string; role: string; signed_at: string; statement: string };
+}
+
+// ---- sequence entities (docs/14 P4) ---------------------------------------------------------
+
+export interface SequenceChain {
+  name: string;
+  role: "peptide" | "heavy_chain" | "light_chain" | "other";
+  sequence: string;
+  copies: number;
+}
+
+export interface EngineeredMutation {
+  chain: string;
+  position: number;
+  from_residue: string;
+  to_residue: string;
+  purpose: string;
+  label?: string | null;
+}
+
+export interface SequenceEntitySpec {
+  format: "sequence" | "helm";
+  chains: SequenceChain[];
+  helm?: string | null;
+  monomer_library?: { name: string; version: string; sha256: string } | null;
+  isotype?: string | null;
+  light_chain_type?: "kappa" | "lambda" | null;
+  engineered_mutations: EngineeredMutation[];
+  surrogate_for?: string | null;
+  surrogate_rationale?: string | null;
+}
+
+export interface SequenceEntityRecord {
+  spec: SequenceEntitySpec;
+  fingerprint: string;
+  derived: {
+    helm: { polymers: { id: string; type: string; monomers: number }[]; connections: number; version: string | null; monomer_ids: string[]; warnings: string[] } | null;
+    chains: { name: string; role: string; copies: number; residues: number; average_mass: Quantity }[];
+    total_mass: Quantity;
+    amino_acid_chains: number[];
+    classification: ProteinClassification | null;
+  };
 }

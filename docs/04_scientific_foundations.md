@@ -510,6 +510,39 @@ Two facts, kept separate because no source links them
 - **No defaults.** Concentration, matrix %, temperature, sampling, quench and the acceptance
   criteria are all stated by the protocol. No source fixes them.
 
+## 4.25 Sequence entities: codes, FASTA, average mass, HELM  [`seq.*`]
+
+Sources are in `docs/research/sequence_entities.md`.
+
+- **One-letter codes.** These come from IUPAC-IUB 1983 Table 5: the 20 standard residues, B,
+  Z, X and U (U from a later addendum). O is accepted as ExPASy's mass table carries it, and each
+  symbol records its authority. `*` and `-` are FASTA file conventions (NCBI), not residues, and
+  are refused in a product sequence. Lower case is refused because the codes are upper case.
+- **FASTA.** NCBI: a single-line description beginning with ">", then the sequence lines.
+- **Average mass** (`seq.average_mass`). Sum of average residue masses plus one water (ExPASy
+  Compute pI/Mw; Gasteiger 2005), from `RESIDUE_MASS_TABLE`.
+  - Known values: UniProt P01308 and P01275 reproduce to the stated dalton.
+  - B, Z and X have no mass, so none is computed.
+  - The ExPASy selenocysteine average uses an older selenium atomic weight, about 0.011 Da low
+    per residue, and is flagged.
+  - A molecule's mass is the sum of its polypeptide chains times their copies. Disulfides,
+    glycans and other modifications are not included, and the label says so.
+- **HELM 2.04** (Pistoia Alliance specification, sections 4.1 and 5.2–5.5). The parser checks:
+  - the four "$" sections and the "V2.0" marker;
+  - polymer IDs, bracketed multi-character IDs and in-line SMILES;
+  - monomer lists (`+` mixture, `,` exclusive or, ratios) and repeats with ranges;
+  - annotations, connections (positions, `R#`, `?`, `pair`) and groups;
+  - that the extended annotation is valid JSON, and that there is no whitespace between
+    elements.
+
+  CHEM polymers hold one monomer. A HELM entity records its monomer library (name, version,
+  SHA-256), since the IDs mean nothing without it. No mass is computed from HELM.
+- **Entity rules.**
+  - An engineered mutation is checked against the registered chain, which must carry the
+    engineered residue. The sponsor's numbering label is kept and never converted.
+  - A surrogate names its clinical candidate and gives its rationale.
+  - Isotype and light-chain type are for antibodies.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

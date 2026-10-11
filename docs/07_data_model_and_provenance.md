@@ -95,6 +95,14 @@ computed from it, so an unverified constant is visible in the final result.
 Changing any value requires bumping `REGISTRY_VERSION`; results record the version they used and
 are never silently recomputed. The verification status of each value is in `docs/09` §9.4.
 
+**Separately versioned tables.** `ReferenceTable` holds a cited table that has its own version,
+for constants unrelated to the physiological registry. Bumping `REGISTRY_VERSION` would change
+the provenance, and so the analysis hash, of results already signed.
+
+The first such table is `RESIDUE_MASS_TABLE` (`expasy-findmod.2026-10-11`), which holds the
+ExPASy average residue masses and water. Its values were transcribed by script from the page,
+whose hash is in `docs/research/sequence_entities.md`.
+
 ## 7.5 QC verdicts
 
 `hos/core/qc.py`. `QCFinding(code, status ∈ {PASS, WARN, FAIL}, message, observed, threshold)` and
@@ -128,7 +136,14 @@ subject id, **subject hash** (SHA-256 of the exact record signed), UTC time and 
 ## 7.8 Persistence
 
 `hos/db/models.py` (SQLAlchemy 2.x). Tables: `principals`, `programs`, `compounds`, `studies`,
-`files`, `ledger`. SQLite by default (`~/.hakase_os/hos.sqlite3`); `HOS_DATABASE_URL` selects
+`files`, `ledger`. A compound has a `kind`:
+- `small_molecule` compounds are registered by SMILES, with an RDKit profile;
+- `sequence` compounds are peptides or antibodies registered by one-letter chains or a HELM
+  string (`hos/kernel/entities.py`, docs/14 P4). The entity stores the registered spec, a
+  fingerprint and the facts derived from it. Drivers see no SMILES, and the average mass where
+  one is defined.
+
+SQLite by default (`~/.hakase_os/hos.sqlite3`); `HOS_DATABASE_URL` selects
 PostgreSQL. Raw files go to `FileStore`, a content-addressed object directory keyed by SHA-256;
 `get()` re-hashes on read and raises if the bytes changed.
 

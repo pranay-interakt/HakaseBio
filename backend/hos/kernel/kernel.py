@@ -33,6 +33,7 @@ from hos.core.descriptors import compute_profile
 from hos.core.provenance import utc_now
 from hos.core.quantity import Quantity
 from hos.core.regulatory import Modality, PeptideOrigin, ProgramContext, derive_study_set
+from hos.core.regulatory.context import AMINO_ACID_MODALITIES
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
 from hos.db.models import CompoundRow, PrincipalRow, ProgramRow, StudyRow
 from hos.db.repository import Repository, content_hash
@@ -54,6 +55,8 @@ from hos.kernel.attestation import (
     SignatureMeaning,
     sign,
 )
+from hos.kernel.entities import SequenceEntity, biologic_compound_info
+from hos.kernel.entities import derive as derive_entity
 from hos.kernel.errors import (
     AttestationRequired,
     DriverError,
@@ -295,8 +298,52 @@ class Kernel:
                      {"source": source, "record_hash": content_hash(dict(record))})
         return self.compound_view(compound_id)
 
+    def register_biologic(self, actor: Principal, program_id: str, *, name: str,
+                          entity: Mapping[str, Any]) -> dict[str, Any]:
+        """Register a peptide or antibody by its sequence (or HELM string). The sequence is
+        the registered fact; residue counts and masses are derived (hos.kernel.entities)."""
+        self._require_worker(actor)
+        if not name.strip():
+            raise KernelError("a name is required")
+        row = self.repo.program(program_id)
+        modality = ProgramContext.from_dict(row.context).modality
+        if modality not in AMINO_ACID_MODALITIES:
+            raise KernelError(f"a {modality.value} programme registers compounds by structure; "
+                              "sequence entities are for peptides and antibodies")
+        try:
+            spec = SequenceEntity.model_validate(dict(entity))
+        except ValidationError as exc:
+            raise KernelError("; ".join(e["msg"].removeprefix("Value error, ")
+                                        for e in exc.errors())) from None
+        if modality is not Modality.MONOCLONAL_ANTIBODY and (spec.isotype or
+                                                              spec.light_chain_type):
+            raise KernelError("isotype and light-chain type apply to antibody programmes")
+        existing = self.repo.compounds(program_id)
+        if spec.surrogate_for and spec.surrogate_for not in {c.id for c in existing}:
+            raise KernelError(f"the clinical candidate {spec.surrogate_for} is not a compound "
+                              "of this programme")
+        fingerprint = content_hash({"chains": [(c.sequence, c.copies) for c in spec.chains],
+                                    "helm": spec.helm})
+        for c in existing:
+            if c.kind == "sequence" and (c.entity or {}).get("fingerprint") == fingerprint:
+                raise KernelError(f"this sequence is already registered as {c.name} ({c.id})")
+        cid = _new_id("cmp")
+        record = {"spec": spec.model_dump(mode="json"), "fingerprint": fingerprint,
+                  "derived": derive_entity(spec)}
+        self.repo.add(CompoundRow(id=cid, program_id=program_id, name=name.strip(), smiles="",
+                                  inchikey=None, profile={}, external={}, kind="sequence",
+                                  entity=record, created_by=actor.id, created_at=utc_now()))
+        self._record(actor, "compound.registered", "compound", cid,
+                     {"program_id": program_id, "name": name, "kind": "sequence",
+                      "format": spec.format, "fingerprint": fingerprint,
+                      "surrogate_for": spec.surrogate_for})
+        return self.compound_view(cid)
+
     def compound_info(self, compound_id: str) -> CompoundInfo:
         row = self.repo.compound(compound_id)
+        if row.kind == "sequence":
+            return biologic_compound_info(row.id, row.name, SequenceEntity.model_validate(
+                (row.entity or {})["spec"]))
         prof = compute_profile(row.smiles)
         return CompoundInfo(id=row.id, name=row.name, smiles=row.smiles, inchikey=row.inchikey,
                             molecular_weight=prof.molecular_weight, clogp=prof.clogp)
@@ -766,9 +813,10 @@ class Kernel:
 
     def compound_view(self, compound_id: str) -> dict[str, Any]:
         r = self.repo.compound(compound_id)
-        return {"id": r.id, "program_id": r.program_id, "name": r.name, "smiles": r.smiles,
+        return {"id": r.id, "program_id": r.program_id, "name": r.name,
+                "kind": r.kind or "small_molecule", "smiles": r.smiles or None,
                 "inchikey": r.inchikey, "profile": r.profile, "external": r.external or {},
-                "created_at": r.created_at.isoformat()}
+                "entity": r.entity, "created_at": r.created_at.isoformat()}
 
     def _study_summary(self, s: StudyRow) -> dict[str, Any]:
         return {"id": s.id, "title": s.title, "state": s.state, "driver_id": s.driver_id,

@@ -14,7 +14,7 @@ confirmed against the primary literature before supporting a regulatory claim.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Final
 
@@ -24,8 +24,12 @@ from hos.core.quantity import Quantity
 __all__ = [
     "REFERENCE_PARAMETERS",
     "REGISTRY_VERSION",
+    "RESIDUE_MASSES",
+    "RESIDUE_MASS_TABLE",
+    "RESIDUE_MASS_TABLE_VERSION",
     "ReferenceParameter",
     "ReferenceParameterSet",
+    "ReferenceTable",
     "get_parameter",
     "get_quantity",
 ]
@@ -258,3 +262,60 @@ def get_parameter(param_id: str) -> ReferenceParameter:
 
 def get_quantity(param_id: str) -> Quantity:
     return _DEFAULT_SET.quantity(param_id)
+
+
+# --------------------------------------------------------------------------
+# Average amino-acid residue masses and water, transcribed by script from the ExPASy FindMod
+# "Mass values used" page (read 2026-10-11, SHA-256 1bcb8504aea37ac7826c882195318585989503743a
+# 042c6d1470ac0f8e99357b), the table the ExPASy Compute pI/Mw method links to. Residue mass is
+# the free amino acid minus water; the page gives daltons, numerically equal to g/mol.
+#
+# A separate table with its own version: the physiological registry's version is embedded in
+# results already signed, so new, unrelated constants do not bump it.
+# --------------------------------------------------------------------------
+RESIDUE_MASS_TABLE_VERSION: Final[str] = "expasy-findmod.2026-10-11"
+_RM = "expasy_findmod_masses"
+_RESIDUE_AVERAGE = {
+    "A": ("alanine", 71.0788), "R": ("arginine", 156.1875), "N": ("asparagine", 114.1038),
+    "D": ("aspartic acid", 115.0886), "C": ("cysteine", 103.1388),
+    "E": ("glutamic acid", 129.1155), "Q": ("glutamine", 128.1307), "G": ("glycine", 57.0519),
+    "H": ("histidine", 137.1411), "I": ("isoleucine", 113.1594), "L": ("leucine", 113.1594),
+    "K": ("lysine", 128.1741), "M": ("methionine", 131.1926),
+    "F": ("phenylalanine", 147.1766), "P": ("proline", 97.1167), "S": ("serine", 87.0782),
+    "T": ("threonine", 101.1051), "W": ("tryptophan", 186.2132), "Y": ("tyrosine", 163.1760),
+    "V": ("valine", 99.1326), "U": ("selenocysteine", 150.0388), "O": ("pyrrolysine", 237.3018),
+}
+_SEC_NOTE = ("listed under non-standard amino acids; the average is consistent with selenium "
+             "78.96, about 0.011 Da below a value from the 2024 standard atomic weight 78.971")
+RESIDUE_MASSES: Final[dict[str, ReferenceParameter]] = dict(
+    [_p(f"residue_mass.average.{code}", mass, "g/mol",
+        f"Average residue mass, {name} ({code})", _RM,
+        note=_SEC_NOTE if code == "U" else
+        "listed under non-standard amino acids" if code == "O" else None)
+     for code, (name, mass) in _RESIDUE_AVERAGE.items()]
+    + [_p("water_mass.average", 18.01524, "g/mol", "Average mass of water (H2O)", _RM)]
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ReferenceTable:
+    """A cited table versioned on its own, outside the physiological registry."""
+
+    version: str
+    entries: Mapping[str, ReferenceParameter]
+
+    def get(self, param_id: str) -> ReferenceParameter:
+        try:
+            return self.entries[param_id]
+        except KeyError:
+            raise KeyError(f"unknown entry {param_id!r} in table {self.version}") from None
+
+    def quantity(self, param_id: str) -> Quantity:
+        return self.get(param_id).as_quantity(self.version)
+
+    def has(self, param_id: str) -> bool:
+        return param_id in self.entries
+
+
+RESIDUE_MASS_TABLE: Final[ReferenceTable] = ReferenceTable(RESIDUE_MASS_TABLE_VERSION,
+                                                           RESIDUE_MASSES)

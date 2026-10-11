@@ -53,9 +53,14 @@ class CompoundRow(Base):
     program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), index=True)
     name: Mapped[str] = mapped_column(String(256))
     smiles: Mapped[str] = mapped_column(Text)
+    """Canonical SMILES; empty for a sequence entity."""
     inchikey: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
     profile: Mapped[dict] = mapped_column(JSON)
     external: Mapped[dict] = mapped_column(JSON, default=dict)
+    kind: Mapped[str] = mapped_column(String(32), default="small_molecule")
+    """small_molecule (registered by structure) or sequence (peptide or antibody, docs/14 P4)."""
+    entity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    """The sequence entity as registered (hos.kernel.entities.SequenceEntity)."""
     created_by: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

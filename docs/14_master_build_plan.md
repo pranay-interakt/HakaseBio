@@ -67,7 +67,16 @@ Radioactive activity decays: `A(t) = A0 * exp(-lambda * t)`, `lambda = ln(2) / t
 `DecayingQuantity` whose value is defined at a reference time and which converts to any other time
 with the conversion recorded. Required for radioligands (Wave G).
 
-### P4. Modality-native entities
+### P4. Modality-native entities — **built** for peptides and monoclonal antibodies
+
+*Implemented in `hos/core/sequence.py` (one-letter codes with their authority, strict FASTA, average mass
+from the separately versioned ExPASy residue-mass table, HELM 2.04 structural parser) and
+`hos/kernel/entities.py` (sequence or HELM entity with chain roles and copies, isotype, light-chain type,
+engineered mutations checked against the chain, surrogate link with rationale). Compounds gain `kind` and
+`entity`. Drivers receive the average mass, and the offline verifier rebuilds it. API:
+`/api/programs/{id}/biologics`, `/api/sequence/fasta`, `/api/sequence/helm`; the Compounds tab registers and
+shows sequence entities. Within the build scope (small molecules, synthetic peptides, mAbs), the ADC/LNP
+composites, vectors and cell products below are not built.*
 
 - **Biologic sequence** (protein/antibody; FASTA, and HELM for non-natural chemistry) with format,
   isotype, and engineered mutations.

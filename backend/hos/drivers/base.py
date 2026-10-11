@@ -146,7 +146,8 @@ class CompoundInfo:
 
     id: str
     name: str
-    smiles: str
+    smiles: str | None
+    """None for a sequence entity (peptide or antibody registered by sequence or HELM)."""
     inchikey: str | None = None
     molecular_weight: Quantity | None = None
     clogp: Quantity | None = None

@@ -452,6 +452,36 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "(vendor documentation; equation form and half-life = ln(2)/K).",
            url="https://www.graphpad.com/guides/prism/latest/curve-fitting/"
                "reg_exponential_decay_1phase.htm"),
+        # -- sequence entities (docs/research/sequence_entities.md; read 2026-10-11) --------
+        _c("expasy_findmod_masses",
+           "SIB Swiss Institute of Bioinformatics, ExPASy. Protein Identification Tools - Mass "
+           "values used (FindMod): average and monoisotopic amino-acid residue masses and "
+           "water.",
+           url="https://web.expasy.org/findmod/findmod_masses.html"),
+        _c("gasteiger2005",
+           "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. "
+           "Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. "
+           "The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+           year=2005, doi="10.1385/1-59259-890-0:571"),
+        _c("iupac_iub_1984_amino_acids",
+           "IUPAC-IUB Joint Commission on Biochemical Nomenclature. Nomenclature and symbolism "
+           "for amino acids and peptides (Recommendations 1983). Pure Appl Chem. "
+           "1984;56(5):595-624.",
+           year=1984, doi="10.1351/pac198456050595"),
+        _c("ncbi_blast_input_formats",
+           "National Center for Biotechnology Information. BLAST documentation: Query input "
+           "and database selection, Accepted input formats (FASTA definition line and residue "
+           "codes).",
+           url="https://blast.ncbi.nlm.nih.gov/doc/blast-topics/"),
+        _c("zhang2012_helm",
+           "Zhang T, Li H, Xi H, Stanton RV, Rotstein SH. HELM: a hierarchical notation "
+           "language for complex biomolecule structure representation. J Chem Inf Model. "
+           "2012;52(10):2796-2806.",
+           year=2012, doi="10.1021/ci3001925"),
+        _c("pistoia_helm_spec_2_04",
+           "Pistoia Alliance HELM project. HELM Standards Specification, Version 2.04 "
+           "(Document-ID HELM_STDSPEC-2.01), 1 November 2018.",
+           year=2018, url="https://pistoiaalliance.atlassian.net/wiki/spaces/PUB/pages/13795362"),
         # -- SEND export (docs/research/send_export.md; files read 2026-10-11, SHA-256 there) --
         _c("fda_data_standards_catalog_v11",
            "U.S. Food and Drug Administration. FDA Data Standards Catalog, version 11.0. "

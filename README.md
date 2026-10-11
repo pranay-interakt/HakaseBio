@@ -26,6 +26,7 @@ Read [`CLAUDE.md`](CLAUDE.md) before writing code. The plan of record and status
 | external data | ChEMBL and PubChem clients, cached, honest failure | `backend/hos/data_sources` |
 | output | IND readiness report, CTD Module 4 (ICH M4S(R2)) assembler, verification bundles | `backend/hos/ind`, `backend/hos/verify` |
 | data standards | SEND export: SENDIG v3.1.1, SEND CT, Define-XML 2.1, SAS XPORT v5, FDA pre-export checks | `backend/hos/send` |
+| entities | peptides and antibodies by sequence (FASTA) or HELM 2.04, average mass from cited residue masses, engineered mutations, surrogates | `backend/hos/core/sequence.py`, `backend/hos/kernel/entities.py` |
 | syscalls | REST API (FastAPI, OpenAPI), re-authenticated e-signatures | `backend/hos/api` |
 | userland | React + TypeScript app with provenance badges | `frontend` |
 

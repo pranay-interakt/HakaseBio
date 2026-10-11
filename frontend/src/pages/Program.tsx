@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { Citations, ErrorBox, Section, StateTag } from "../components/common";
 import { QuantityView } from "../components/QuantityView";
+import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
 import { RehearsalView, WhatIf } from "./ProgramPlanning";
 import type {
   Compound,
@@ -351,9 +352,11 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
       setBusy("");
     }
   }
+  const aminoAcid = ["peptide", "monoclonal_antibody", "recombinant_protein"].includes(String(p.context.modality));
   return (
     <>
-      <Section title="Register compound">
+      {aminoAcid && <SequenceRegistration p={p} reload={reload} onErr={onErr} />}
+      <Section title={aminoAcid ? "Register by structure (SMILES)" : "Register compound"}>
         <div className="grid2">
           <div className="field">
             <label className="field-label">Name</label>
@@ -368,7 +371,9 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
           Register (RDKit profile)
         </button>
       </Section>
-      {p.compounds.map((c) => (
+      {p.compounds.map((c) => c.kind === "sequence" && c.entity ? (
+        <SequenceEntityView key={c.id} c={c} p={p} reload={reload} onErr={onErr} />
+      ) : (
         <Section
           key={c.id}
           title={c.name}

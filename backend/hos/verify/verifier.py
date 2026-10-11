@@ -32,6 +32,7 @@ from hos.core.regulatory import ProgramContext
 from hos.db.repository import content_hash
 from hos.drivers.base import CompoundInfo, DataOrigin, canonical_hash
 from hos.drivers.registry import default_registry
+from hos.kernel.entities import SequenceEntity, biologic_compound_info
 from hos.kernel.imports import compute_import_hash
 from hos.kernel.inputs import input_quantity
 from hos.kernel.ledger import GENESIS_HASH, LedgerEntry, canonical_json
@@ -165,11 +166,15 @@ def verify_bundle(content: bytes) -> VerificationReport:
             continue
         try:
             params = driver.validate_parameters(s["parameters"])
-            prof = compute_profile(s["compound"]["smiles"])
-            compound = CompoundInfo(id=s["compound"]["id"], name=s["compound"]["name"],
-                                    smiles=s["compound"]["smiles"],
-                                    inchikey=s["compound"]["inchikey"],
-                                    molecular_weight=prof.molecular_weight, clogp=prof.clogp)
+            sc = s["compound"]
+            if sc.get("kind") == "sequence":
+                compound = biologic_compound_info(sc["id"], sc["name"],
+                                                  SequenceEntity.model_validate(sc["entity"]))
+            else:
+                prof = compute_profile(sc["smiles"])
+                compound = CompoundInfo(id=sc["id"], name=sc["name"], smiles=sc["smiles"],
+                                        inchikey=sc["inchikey"],
+                                        molecular_weight=prof.molecular_weight, clogp=prof.clogp)
             protocol = driver.design(compound, params, ctx, s["hypothesis"])
             rep.add(sid, "protocol re-derives to the recorded hash",
                     protocol.content_hash == exp["protocol_hash"])

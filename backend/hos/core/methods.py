@@ -430,6 +430,19 @@ METHODS: Final[dict[str, Method]] = dict(
            "condition, with proportional log-normal noise", ("graphpad_one_phase_decay",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        # ---- sequence entities (docs/research/sequence_entities.md) -------------
+        _m("seq.average_mass",
+           "Average molecular mass of a polypeptide chain: the sum of the average residue "
+           "masses plus one water (ExPASy Compute pI/Mw)",
+           ("gasteiger2005", "expasy_findmod_masses"),
+           assumptions=("one linear chain with free termini",),
+           limits=("post-translational modifications, disulfide bonds and glycans are not "
+                   "included",
+                   "ambiguity codes (B, Z) and X have no defined mass, so no mass is computed",
+                   "the table's selenocysteine average uses an older selenium atomic weight "
+                   "(about 0.011 Da low per residue against the 2024 value)",)),
+        _m("seq.residue_count", "Number of residues in a chain, from one-letter codes",
+           ("iupac_iub_1984_amino_acids",)),
         _m("dose.mrsd", "Maximum recommended starting dose from the most sensitive species",
            ("fda_mrsd_2005", "ema_fih_2017"),
            assumptions=("the NOAEL-derived HED of the most sensitive relevant species governs",),
