@@ -4,6 +4,7 @@
 // starts empty, or from the spec of this study's previous export.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { fmtDateTime } from "../lib/format";
 import type {
   SendAnimal,
   SendContext,
@@ -317,7 +318,7 @@ function ExportHistory({
         {[...exports].reverse().map((e) => (
           <tr key={e.version}>
             <td>v{e.version}</td>
-            <td>{e.created_at?.slice(0, 19)}Z</td>
+            <td>{fmtDateTime(e.created_at)}</td>
             <td>{e.created_by}</td>
             <td>
               {e.ok ? (

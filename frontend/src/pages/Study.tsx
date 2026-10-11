@@ -3,12 +3,21 @@ import { api } from "../api";
 import { Citations, DataTable, ErrorBox, Lifecycle, Markdown, roleLabel, Section, StateTag } from "../components/common";
 import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
-import { SchemaForm, StructureHint } from "../components/SchemaForm";
+import { prune, SchemaFields, SchemaForm } from "../components/SchemaForm";
 import { SendExport } from "../components/SendExport";
+import { Collapsible, Facts, Loading, PageHeader, Pill, toast, useBreadcrumbs, ValueView } from "../components/ui";
+import { actionLabel, fmtDateTime, humanize, meaningLabel, MEANINGS, shortHash, statusLabel, targetLabel } from "../lib/format";
+import { href } from "../lib/router";
 import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
 
 const DESIGNABLE = ["proposed", "designed", "planned", "dispatched"];
 const RECEIVABLE = ["dispatched", "data_received", "analyzed"];
+
+type Run = <T>(fn: () => Promise<T>, done?: string) => Promise<void>;
+
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 export function Study({ id, me }: { id: string; me: Principal }) {
   const [s, setS] = useState<StudyT | null>(null);
@@ -27,128 +36,267 @@ export function Study({ id, me }: { id: string; me: Principal }) {
     }
   }, [id]);
   useEffect(() => {
+    setS(null);
+    setDriver(null);
     load();
   }, [load]);
+  useBreadcrumbs([
+    { label: "Programmes", href: href.programs() },
+    ...(s ? [{ label: s.program_name ?? "Programme", href: href.program(s.program_id) }, { label: "Studies", href: href.program(s.program_id, "studies") }] : []),
+    { label: s?.title ?? "Study" },
+  ]);
 
-  async function run<T>(fn: () => Promise<T>) {
+  const run: Run = async (fn, done) => {
     setBusy(true);
     setErr(null);
     try {
       const out = await fn();
       if (out && typeof out === "object" && "state" in (out as object)) setS(out as unknown as StudyT);
       else await load();
+      if (done) toast(done);
     } catch (e) {
       setErr(e);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  if (s && s.origin === "import") {
+  if (!s) return err ? <ErrorBox error={err} /> : <Loading />;
+  const facts: [ReactNode, ReactNode][] = [
+    ["Programme", <a href={href.program(s.program_id)}>{s.program_name ?? s.program_id}</a>],
+    ["Compound", s.compound_name ?? s.compound_id],
+    ["Requirement", s.requirement_name ?? s.requirement_id],
+  ];
+
+  if (s.origin === "import") {
     return (
       <div className="page">
-        <div className="crumbs">
-          <a href="#/">Programmes</a> / <a href={`#/program/${s.program_id}`}>programme</a> / imported study
-        </div>
-        <h2>{s.title}</h2>
-        <div className="row">
-          <StateTag state={s.state} />
-          <span className="muted small">
-            imported study · requirement <code>{s.requirement_id}</code> · {s.glp ? "GLP" : "non-GLP"}
-          </span>
-        </div>
-        <Lifecycle state={s.state} />
-        <ErrorBox error={err} />
+        <PageHeader eyebrow="Imported study" title={s.title} meta={<StateTag state={s.state} />}>
+          <Lifecycle state={s.state} />
+        </PageHeader>
+        <section className="card">
+          <Facts items={[...facts, ["GLP", s.glp ? "Yes" : "No"]]} />
+        </section>
+        <ErrorBox error={err} onDismiss={() => setErr(null)} />
         <ImportWorkspace s={s} me={me} siblings={siblings} busy={busy} run={run} />
         <AuditTrail id={id} key={s.state + s.updated_at} />
         {s.state === "import_draft" && <CancelSection id={id} run={run} />}
       </div>
     );
   }
-  if (!s || !driver) return <ErrorBox error={err} />;
+  if (!driver) return err ? <ErrorBox error={err} /> : <Loading />;
+
   const amending = s.state !== "proposed";
+  const sections: [string, string][] = [];
+  const add = (sid: string, label: string, when: unknown) => when && sections.push([sid, label]);
+  add("sec-design", amending ? "Amend design" : "Design", DESIGNABLE.includes(s.state));
+  add("sec-protocol", "Protocol", s.protocol);
+  add("sec-plan", "Plan", s.state === "designed" || s.plan);
+  add("sec-dispatch", "Dispatch", s.state === "planned");
+  add("sec-execution", "Execution & data", s.execution);
+  add("sec-inputs", "Analysis inputs", s.expected_inputs && Object.keys(s.expected_inputs).length > 0 && !["reported", "approved", "cancelled", "failed"].includes(s.state));
+  add("sec-analyse", "Analyse", ["data_received", "analyzed", "reported"].includes(s.state));
+  add("sec-results", "Results", s.results);
+  add("sec-determinations", "Expert determinations", s.expert_determinations && s.expert_determinations.length > 0 && s.results);
+  add("sec-report", "Report", s.state === "analyzed" || s.report);
+  add("sec-send", "SEND export", driver.id === "repeat_dose_toxicity" && s.data);
+  add("sec-audit", "Audit trail", true);
+
   return (
     <div className="page">
-      <div className="crumbs">
-        <a href="#/">Programmes</a> / <a href={`#/program/${s.program_id}`}>programme</a> / study
-      </div>
-      <h2>{s.title}</h2>
-      <div className="row">
-        <StateTag state={s.state} simulated={s.simulated} />
-        <span className="muted small">
-          driver <code>{driver.id}@{s.driver_version}</code> · CTD {driver.ctd_section} · {s.glp ? "GLP" : "non-GLP"}
-          {s.requirement_id && <> · requirement <code>{s.requirement_id}</code></>}
-        </span>
-      </div>
-      <Lifecycle state={s.state} />
+      <PageHeader
+        eyebrow="Study"
+        title={s.title}
+        meta={
+          <>
+            <StateTag state={s.state} simulated={s.simulated} />
+            <span>{s.glp ? "GLP" : "Non-GLP"}</span>
+            <span>CTD {driver.ctd_section}</span>
+          </>
+        }
+      >
+        <Lifecycle state={s.state} />
+      </PageHeader>
+      <section className="card">
+        <Facts
+          items={[
+            ...facts,
+            ["Method", `${driver.name} (v${s.driver_version})`],
+            ["Created", fmtDateTime(s.created_at)],
+            ["Last change", fmtDateTime(s.updated_at)],
+          ]}
+        />
+        {s.hypothesis && <p className="small">Hypothesis: {s.hypothesis}</p>}
+      </section>
+      <NextStep s={s} />
       {s.simulated && (
         <div className="banner-sim">
-          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be
-          approved or included in an IND.
+          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be approved or included in an
+          IND.
         </div>
       )}
-      {s.hypothesis && <p className="small">Hypothesis: {s.hypothesis}</p>}
-      <ErrorBox error={err} />
-
-      {DESIGNABLE.includes(s.state) && (
-        <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />
-      )}
-      {s.protocol && (
-        <ProtocolView protocol={s.protocol} hash={s.protocol_hash} version={s.protocol_version}>
-          <ProtocolApproval s={s} me={me} busy={busy} run={run} />
-        </ProtocolView>
-      )}
-      {s.state === "designed" && (
-        <Section title="Plan">
-          <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/plan`))}>
-            Plan study
-          </button>
-        </Section>
-      )}
-      {s.plan && <PlanView plan={s.plan} />}
-      {s.state === "planned" && <DispatchSection s={s} driver={driver} busy={busy} run={run} />}
-      {s.execution && <ExecutionView s={s} busy={busy} run={run} />}
-      {s.expected_inputs && Object.keys(s.expected_inputs).length > 0 &&
-        !["reported", "approved", "cancelled", "failed"].includes(s.state) && (
-          <InputsSection s={s} busy={busy} run={run} />
-        )}
-      {(s.state === "data_received" || s.state === "analyzed" || s.state === "reported") && (
-        <AnalyzeSection s={s} busy={busy} run={run} />
-      )}
-      {s.results && <ResultsView s={s} />}
-      {s.expert_determinations && s.expert_determinations.length > 0 && s.results && (
-        <DeterminationsSection s={s} me={me} busy={busy} run={run} />
-      )}
-      {s.state === "analyzed" && (
-        <Section title="Report">
-          <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/report`))}>
-            Generate report
-          </button>
-        </Section>
-      )}
-      {s.report && <ReportSection s={s} me={me} busy={busy} run={run} />}
-      {driver.id === "repeat_dose_toxicity" && s.data && <SendExport studyId={id} key={s.updated_at} />}
-      <AuditTrail id={id} key={s.state + s.updated_at} />
-      {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
+      <ErrorBox error={err} onDismiss={() => setErr(null)} />
+      <div className="with-toc">
+        <div className="stack">
+          {DESIGNABLE.includes(s.state) && <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />}
+          {s.protocol && (
+            <ProtocolView protocol={s.protocol} hash={s.protocol_hash} version={s.protocol_version}>
+              <ProtocolApproval s={s} me={me} busy={busy} run={run} />
+            </ProtocolView>
+          )}
+          {s.state === "designed" && (
+            <Section id="sec-plan" title="Plan" subtitle="Works out duration, sample size and dependencies from the protocol.">
+              <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/plan`), "Study planned")}>
+                Plan study
+              </button>
+            </Section>
+          )}
+          {s.plan && <PlanView plan={s.plan} />}
+          {s.state === "planned" && <DispatchSection s={s} driver={driver} busy={busy} run={run} />}
+          {s.execution && <ExecutionView s={s} busy={busy} run={run} />}
+          {s.expected_inputs && Object.keys(s.expected_inputs).length > 0 && !["reported", "approved", "cancelled", "failed"].includes(s.state) && (
+            <InputsSection s={s} busy={busy} run={run} />
+          )}
+          {["data_received", "analyzed", "reported"].includes(s.state) && <AnalyzeSection s={s} busy={busy} run={run} />}
+          {s.results && <ResultsView s={s} />}
+          {s.expert_determinations && s.expert_determinations.length > 0 && s.results && (
+            <DeterminationsSection s={s} me={me} busy={busy} run={run} />
+          )}
+          {s.state === "analyzed" && (
+            <Section id="sec-report" title="Report" subtitle="Renders the protocol, data, results and interpretation, with every value's provenance.">
+              <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/report`), "Report generated")}>
+                Generate report
+              </button>
+            </Section>
+          )}
+          {s.report && <ReportSection s={s} me={me} busy={busy} run={run} />}
+          {driver.id === "repeat_dose_toxicity" && s.data && (
+            <div id="sec-send">
+              <SendExport studyId={id} key={s.updated_at} />
+            </div>
+          )}
+          <AuditTrail id={id} key={s.state + s.updated_at} />
+          {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
+        </div>
+        <nav className="page-toc" aria-label="On this page">
+          <div className="page-toc-title">On this page</div>
+          {sections.map(([sid, label]) => (
+            <button key={sid} onClick={() => scrollTo(sid)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }
 
-type Run = <T>(fn: () => Promise<T>) => Promise<void>;
+// ---- what to do next ------------------------------------------------------------------------
+
+function NextStep({ s }: { s: StudyT }) {
+  const protocolApproved = s.signatures.some(
+    (g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`) && g.subject_hash === s.protocol_hash,
+  );
+  const current = s.determinations.filter((d) => s.results && d.analysis_hash === s.results.analysis_hash);
+  const pendingDets = (s.expert_determinations ?? []).filter((d) => d.required_for_approval && !current.some((x) => x.key === d.key));
+  let text: ReactNode = null;
+  let target: string | null = null;
+  let tone = "";
+  if (s.simulated && ["analyzed", "reported"].includes(s.state))
+    return (
+      <div className="callout warn">
+        <div>
+          <div className="callout-label">Simulated</div>
+          <div className="callout-text">
+            This study runs on simulated data: it can be reported for demonstration but never approved.{" "}
+            {s.state === "analyzed"
+              ? "Replace the data with measured data to take it further."
+              : "To take the requirement further, start a new study with measured data."}
+          </div>
+        </div>
+        {s.state === "analyzed" ? (
+          <button className="small" onClick={() => scrollTo("sec-execution")}>
+            Go to the data
+          </button>
+        ) : (
+          <a className="btn small" href={href.program(s.program_id, "studyset")}>
+            Open the study set
+          </a>
+        )}
+      </div>
+    );
+  switch (s.state) {
+    case "proposed":
+      [text, target] = ["Design the protocol: state the design values and their basis.", "sec-design"];
+      break;
+    case "designed":
+      if (s.glp && !protocolApproved)
+        [text, target] = ["The Study Director approves the protocol (GLP), then the study is planned.", "sec-protocol"];
+      else [text, target] = ["Plan the study.", "sec-plan"];
+      break;
+    case "planned":
+      [text, target] = ["Dispatch it to a laboratory.", "sec-dispatch"];
+      break;
+    case "dispatched":
+      [text, target] = ["Upload the data the laboratory returns.", "sec-execution"];
+      break;
+    case "data_received":
+      [text, target] = ["Record any analysis inputs, then run the analysis.", "sec-analyse"];
+      break;
+    case "analyzed":
+      if (pendingDets.length > 0)
+        [text, target] = [
+          `Signed determinations needed: ${pendingDets.map((d) => `${d.label} (${roleLabel(d.role)})`).join(", ")}.`,
+          "sec-determinations",
+        ];
+      else [text, target] = ["Generate the report.", "sec-report"];
+      break;
+    case "reported":
+      if (s.approval_missing && s.approval_missing.length > 0)
+        [text, target] = [`Signatures still needed: ${s.approval_missing.join(", ")}.`, "sec-report"];
+      else [text, target] = ["Every signature is in: approve the study.", "sec-report"];
+      break;
+    case "approved":
+      [text, tone] = ["Approved. The study is included when Module 4 is assembled.", "ok"];
+      break;
+    case "cancelled":
+    case "failed":
+      [text, tone] = [`This study was ${s.state}. Its record is kept unchanged.`, "bad"];
+      break;
+    default:
+      return null;
+  }
+  return (
+    <div className={`callout ${tone}`}>
+      <div>
+        <div className="callout-label">{tone === "ok" ? "Done" : tone === "bad" ? "Closed" : "Next step"}</div>
+        <div className="callout-text">{text}</div>
+      </div>
+      {target && (
+        <button className="primary small" onClick={() => scrollTo(target!)}>
+          Go there
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---- design & protocol ----------------------------------------------------------------------
 
 function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: Driver; amending: boolean; busy: boolean; run: Run }) {
   const [reason, setReason] = useState("");
   return (
-    <Section title={amending ? "Amend design" : "Design"}>
-      <p className="muted small">
-        Parameters come from the driver's schema. Scientific design values and acceptance criteria have no defaults:
-        state them and their basis. Pre-filled values come from the regulatory requirement.
-      </p>
+    <Section
+      id="sec-design"
+      title={amending ? "Amend design" : "Design"}
+      subtitle="Scientific design values and acceptance criteria have no defaults: state them and their basis. Values already filled in come from the regulatory requirement."
+    >
       {amending && (
-        <div className="field">
-          <label className="field-label">Reason for amendment *</label>
+        <label className="field" style={{ maxWidth: 520, marginBottom: 12 }}>
+          <span className="field-label">Reason for the amendment *</span>
           <input value={reason} onChange={(e) => setReason(e.target.value)} />
-        </div>
+        </label>
       )}
       <SchemaForm
         key={s.protocol_hash ?? "new"}
@@ -157,7 +305,7 @@ function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: 
         busy={busy}
         submitLabel={amending ? "Amend protocol" : "Design protocol"}
         onSubmit={(parameters) =>
-          run(() => api.post(`/studies/${s.id}/design`, { parameters, reason: amending ? reason : null }))
+          run(() => api.post(`/studies/${s.id}/design`, { parameters, reason: amending ? reason : null }), amending ? "Protocol amended" : "Protocol designed")
         }
       />
     </Section>
@@ -169,44 +317,46 @@ function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: 
 function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy: boolean; run: Run }) {
   const [statement, setStatement] = useState("");
   const [pw, setPw] = useState("");
-  const approvals = s.signatures.filter(
-    (g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`),
-  );
+  const approvals = s.signatures.filter((g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`));
   const signedCurrent = approvals.some((g) => g.subject_hash === s.protocol_hash);
   return (
-    <div className="small" style={{ marginTop: 6 }}>
+    <div style={{ marginTop: 10 }}>
       {approvals.length === 0 ? (
-        <span className="muted">Not yet approved by the Study Director.</span>
+        <div className="muted small">Not yet approved by the Study Director.</div>
       ) : (
-        <ul>
-          {approvals.map((g, i) => (
-            <li key={i}>
-              Approved by {g.signer_name} (Study Director) on {g.signed_at.slice(0, 10)}
-              {g.subject_hash !== s.protocol_hash && " (an earlier protocol version)"}: “{g.statement}”
-            </li>
-          ))}
-        </ul>
+        approvals.map((g, i) => (
+          <div key={i} className="signed small">
+            Approved by {g.signer_name} (Study Director), {fmtDateTime(g.signed_at)}
+            {g.subject_hash !== s.protocol_hash && " — an earlier protocol version"}: “{g.statement}”
+          </div>
+        ))
       )}
       {!signedCurrent && me.kind === "human" && me.roles.includes("study_director") && (
-        <div className="row">
-          <input style={{ flex: 2 }} placeholder="statement of approval *" value={statement}
-            onChange={(e) => setStatement(e.target.value)} />
-          <input style={{ flex: 1 }} type="password" placeholder="password (re-authentication) *" value={pw}
-            onChange={(e) => setPw(e.target.value)} />
-          <button disabled={busy || !statement || !pw}
-            onClick={() => run(() => api.post(`/studies/${s.id}/protocol/sign`, { statement, password: pw }))}>
-            Approve protocol
-          </button>
+        <div className="grid3" style={{ marginTop: 8, alignItems: "end" }}>
+          <label className="field" style={{ gridColumn: "span 2" }}>
+            <span className="field-label">Statement of approval *</span>
+            <input value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="I approve this protocol." />
+          </label>
+          <label className="field">
+            <span className="field-label">Your password *</span>
+            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+          </label>
+          <div className="field">
+            <button
+              className="primary"
+              disabled={busy || !statement || !pw}
+              onClick={() => run(() => api.post(`/studies/${s.id}/protocol/sign`, { statement, password: pw }), "Protocol approved")}
+            >
+              Approve protocol
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function ProtocolView({ protocol, hash, version, children }: {
-  protocol: Record<string, unknown>; hash: string | null; version: number; children?: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
+function ProtocolView({ protocol, hash, version, children }: { protocol: Record<string, unknown>; hash: string | null; version: number; children?: ReactNode }) {
   const p = protocol as {
     title: string;
     objective: string;
@@ -216,30 +366,29 @@ function ProtocolView({ protocol, hash, version, children }: {
     references: Citation[];
     regulatory_basis: string[];
   };
+  const [open, setOpen] = useState(false);
   return (
     <Section
-      title={`Protocol v${version}`}
+      id="sec-protocol"
+      title={`Protocol, version ${version}`}
+      subtitle={
+        <>
+          {p.title} · fingerprint <span className="mono">{shortHash(hash, 16)}</span>
+        </>
+      }
       right={
-        <button onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"} protocol</button>
+        <button className="small" onClick={() => setOpen(!open)}>
+          {open ? "Hide protocol" : "Show protocol"}
+        </button>
       }
     >
-      <div className="small">
-        <strong>{p.title}</strong> · hash <code>{hash?.slice(0, 16)}</code>
-      </div>
       {children}
       {open && (
-        <div>
+        <div style={{ marginTop: 12 }}>
+          <h4>Objective</h4>
           <p>{p.objective}</p>
-          <table>
-            <tbody>
-              {Object.entries(p.design).map(([k, v]) => (
-                <tr key={k}>
-                  <td>{k}</td>
-                  <td className="small">{typeof v === "object" ? <pre>{JSON.stringify(v, null, 2)}</pre> : String(v)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h4>Design</h4>
+          <ValueView value={p.design} />
           <h4>Procedure</h4>
           <ol>
             {p.steps.map((st) => (
@@ -262,6 +411,7 @@ function ProtocolView({ protocol, hash, version, children }: {
               <li key={r}>{r}</li>
             ))}
           </ul>
+          <h4>References</h4>
           <Citations list={p.references} />
         </div>
       )}
@@ -271,16 +421,22 @@ function ProtocolView({ protocol, hash, version, children }: {
 
 function PlanView({ plan }: { plan: Record<string, unknown> }) {
   return (
-    <Section title="Plan">
-      <div className="small">
-        Duration: {plan.execution_duration_days === null ? "set by the laboratory" : `${plan.execution_duration_days} days`}{" "}
-        ({String(plan.duration_basis)}) · {String(plan.sample_count)} samples/animals ({String(plan.sample_count_basis)})
-      </div>
-      <div className="small muted">Cost: {String(plan.cost_note)}</div>
-      <div className="small">Dependencies: {(plan.dependencies as string[]).join("; ")}</div>
+    <Section id="sec-plan" title="Plan">
+      <Facts
+        items={[
+          ["Duration", plan.execution_duration_days === null ? "set by the laboratory" : `${String(plan.execution_duration_days)} days`],
+          ["Duration basis", String(plan.duration_basis ?? "—")],
+          ["Samples / animals", String(plan.sample_count ?? "—")],
+          ["Sample basis", String(plan.sample_count_basis ?? "—")],
+          ["Cost", String(plan.cost_note ?? "—")],
+          ["Depends on", ((plan.dependencies as string[] | undefined) ?? []).join("; ") || "nothing"],
+        ]}
+      />
     </Section>
   );
 }
+
+// ---- dispatch & execution -------------------------------------------------------------------
 
 function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; busy: boolean; run: Run }) {
   const [kind, setKind] = useState("external_lab");
@@ -289,84 +445,79 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
   const [quote, setQuote] = useState("");
   const [glp, setGlp] = useState(false);
   const [scientist, setScientist] = useState("");
-  const [simJson, setSimJson] = useState("");
+  const [sim, setSim] = useState<Record<string, unknown>>({});
   const [seed, setSeed] = useState("");
-  const [err, setErr] = useState<string | null>(null);
   function dispatch() {
     let target: Record<string, unknown>;
     if (kind === "external_lab") target = { kind, laboratory: lab, contact: contact || null, quote_reference: quote || null, glp_certified: glp };
     else if (kind === "in_house") target = { kind, laboratory: lab, responsible_scientist: scientist };
-    else {
-      try {
-        target = { kind, simulation_parameters: JSON.parse(simJson), seed: Number(seed) };
-      } catch (e) {
-        setErr(`Simulation parameters are not valid JSON: ${(e as Error).message}`);
-        return;
-      }
-    }
-    setErr(null);
-    run(() => api.post(`/studies/${s.id}/dispatch`, { target }));
+    else target = { kind, simulation_parameters: prune(sim) ?? {}, seed: seed.trim() === "" ? null : Number(seed) };
+    run(() => api.post(`/studies/${s.id}/dispatch`, { target }), kind === "simulation" ? "Simulation set up" : `Dispatched to ${lab}`);
   }
+  const kinds = ["external_lab", "in_house", ...(driver.can_simulate ? ["simulation"] : [])];
   return (
-    <Section title="Dispatch">
+    <Section id="sec-dispatch" title="Dispatch" subtitle="Where the study is run. The dispatch bundle (protocol, sample manifest, data template) is produced for the laboratory.">
       <div className="checks">
-        {["external_lab", "in_house", ...(driver.can_simulate ? ["simulation"] : [])].map((k) => (
+        {kinds.map((k) => (
           <label key={k}>
-            <input type="radio" checked={kind === k} onChange={() => setKind(k)} /> {k.replace("_", " ")}
+            <input type="radio" checked={kind === k} onChange={() => setKind(k)} /> {targetLabel(k)}
           </label>
         ))}
       </div>
       {kind !== "simulation" && (
         <div className="grid2">
-          <div className="field">
-            <label className="field-label">Laboratory *</label>
+          <label className="field">
+            <span className="field-label">Laboratory *</span>
             <input value={lab} onChange={(e) => setLab(e.target.value)} />
-          </div>
+          </label>
           {kind === "external_lab" ? (
             <>
-              <div className="field">
-                <label className="field-label">Contact</label>
+              <label className="field">
+                <span className="field-label">Contact</span>
                 <input value={contact} onChange={(e) => setContact(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label">Laboratory quote reference</label>
+              </label>
+              <label className="field">
+                <span className="field-label">Laboratory quote reference</span>
                 <input value={quote} onChange={(e) => setQuote(e.target.value)} />
-              </div>
-              <label className="small">
-                <input type="checkbox" checked={glp} onChange={(e) => setGlp(e.target.checked)} /> GLP-certified facility
+              </label>
+              <label className="checks">
+                <span>
+                  <input type="checkbox" checked={glp} onChange={(e) => setGlp(e.target.checked)} /> GLP-certified facility
+                </span>
               </label>
             </>
           ) : (
-            <div className="field">
-              <label className="field-label">Responsible scientist *</label>
+            <label className="field">
+              <span className="field-label">Responsible scientist *</span>
               <input value={scientist} onChange={(e) => setScientist(e.target.value)} />
-            </div>
+            </label>
           )}
         </div>
       )}
       {kind === "simulation" && (
-        <>
+        <div className="stack">
           <div className="banner-sim">
-            Simulation generates data from a model you state. It is labelled SIMULATED everywhere and can never be
-            approved or used as evidence.
+            Simulation generates data from a model you state. It is labelled SIMULATED everywhere and can never be approved or used as evidence.
           </div>
-          <div className="field">
-            <label className="field-label">Generator parameters (JSON per the driver schema) *</label>
-            <textarea rows={6} value={simJson} onChange={(e) => setSimJson(e.target.value)} />
-            {driver.simulation_parameters_schema && (
-              <StructureHint s={driver.simulation_parameters_schema} root={driver.simulation_parameters_schema} />
-            )}
-          </div>
-          <div className="field">
-            <label className="field-label">Seed *</label>
-            <input type="number" value={seed} onChange={(e) => setSeed(e.target.value)} />
-          </div>
-        </>
+          {driver.simulation_parameters_schema && (
+            <div className="sf-group">
+              <div className="sf-group-head">
+                <span className="sf-group-title">Simulated truth</span>
+              </div>
+              <SchemaFields schema={driver.simulation_parameters_schema} value={sim} onChange={setSim} />
+            </div>
+          )}
+          <label className="field" style={{ maxWidth: 200 }}>
+            <span className="field-label">Seed *</span>
+            <input inputMode="numeric" value={seed} onChange={(e) => setSeed(e.target.value)} />
+          </label>
+        </div>
       )}
-      {err && <div className="error">{err}</div>}
-      <button className="primary" disabled={busy} onClick={dispatch}>
-        Dispatch
-      </button>
+      <div className="row-end">
+        <button className="primary" disabled={busy} onClick={dispatch}>
+          Dispatch
+        </button>
+      </div>
     </Section>
   );
 }
@@ -377,72 +528,111 @@ function ExecutionView({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
   const [reason, setReason] = useState("");
   const replacing = s.state !== "dispatched";
   return (
-    <Section title="Execution">
-      <div className="small">
-        {ex.target_kind.replace("_", " ")}: {String(ex.target.laboratory ?? "simulation")} · dispatched{" "}
-        {ex.dispatched_at.slice(0, 19)}Z · bundle <code>{ex.bundle_sha256.slice(0, 16)}</code>
-      </div>
+    <Section
+      id="sec-execution"
+      title="Execution & data"
+      right={
+        <>
+          <button className="small" onClick={() => api.download(`/studies/${s.id}/bundle`, `${s.id}_dispatch.zip`)}>
+            Download dispatch bundle
+          </button>
+          <button className="small" onClick={() => api.download(`/studies/${s.id}/template`, `${s.id}_template.csv`)}>
+            Download data template
+          </button>
+        </>
+      }
+    >
+      <Facts
+        items={[
+          ["Run by", `${targetLabel(ex.target_kind)}${ex.target.laboratory ? `: ${String(ex.target.laboratory)}` : ""}`],
+          ["Dispatched", fmtDateTime(ex.dispatched_at)],
+          ["Bundle", <span className="mono">{shortHash(ex.bundle_sha256, 16)}</span>],
+        ]}
+      />
       {ex.notes.map((n) => (
         <div key={n} className="muted small">
           {n}
         </div>
       ))}
-      <div className="row">
-        <button onClick={() => api.download(`/studies/${s.id}/bundle`, `${s.id}_dispatch.zip`)}>Download dispatch bundle</button>
-        <button onClick={() => api.download(`/studies/${s.id}/template`, `${s.id}_template.csv`)}>Download data template</button>
-      </div>
       {RECEIVABLE.includes(s.state) && (
-        <div className="upload">
-          {ex.target_kind === "simulation" ? (
-            <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${s.id}/data/simulated`, { reason: replacing ? reason : null }))}>
-              Load simulated data
-            </button>
-          ) : (
-            <>
-              <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <div className="sf-group" style={{ marginTop: 12 }}>
+          <div className="sf-group-head">
+            <span className="sf-group-title">{replacing ? "Replace the data" : "Receive the data"}</span>
+          </div>
+          <div className="upload">
+            {ex.target_kind === "simulation" ? (
               <button
                 className="primary"
-                disabled={busy || !file}
-                onClick={() =>
-                  file &&
-                  run(() =>
-                    api.upload(
-                      `/studies/${s.id}/data?filename=${encodeURIComponent(file.name)}${replacing ? `&reason=${encodeURIComponent(reason)}` : ""}`,
-                      file,
-                    ),
-                  )
-                }
+                disabled={busy || (replacing && !reason.trim())}
+                onClick={() => run(() => api.post(`/studies/${s.id}/data/simulated`, { reason: replacing ? reason : null }), "Simulated data loaded")}
               >
-                Upload returned data
+                Load simulated data
               </button>
-            </>
-          )}
+            ) : (
+              <>
+                <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <button
+                  className="primary"
+                  disabled={busy || !file || (replacing && !reason.trim())}
+                  onClick={() =>
+                    file &&
+                    run(
+                      () =>
+                        api.upload(
+                          `/studies/${s.id}/data?filename=${encodeURIComponent(file.name)}${replacing ? `&reason=${encodeURIComponent(reason)}` : ""}`,
+                          file,
+                        ),
+                      `${file.name} received and validated`,
+                    )
+                  }
+                >
+                  Upload returned data
+                </button>
+              </>
+            )}
+          </div>
           {replacing && (
-            <input placeholder="reason for replacing data *" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <label className="field">
+              <span className="field-label">Reason for replacing the data *</span>
+              <input value={reason} onChange={(e) => setReason(e.target.value)} />
+            </label>
           )}
         </div>
       )}
       {s.raw_files.length > 0 && (
-        <table>
-          <tbody>
-            {s.raw_files.map((f) => (
-              <tr key={f.sha256 + f.received_at}>
-                <td>{f.filename}</td>
-                <td>
-                  <span className={`badge badge-${f.origin}`}>{f.origin}</span>
-                </td>
-                <td className="small">
-                  <code>{f.sha256.slice(0, 16)}</code>
-                </td>
-                <td className="small">{f.received_at.slice(0, 19)}Z</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <h4>Files received</h4>
+          <div className="table-wrap">
+            <table className="compact">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Origin</th>
+                  <th>SHA-256</th>
+                  <th>Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.raw_files.map((f) => (
+                  <tr key={f.sha256 + f.received_at}>
+                    <td>{f.filename}</td>
+                    <td>
+                      <span className={`badge badge-${f.origin}`}>{f.origin}</span>
+                    </td>
+                    <td className="mono">{shortHash(f.sha256, 16)}</td>
+                    <td>{fmtDateTime(f.received_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </Section>
   );
 }
+
+// ---- inputs & analysis ----------------------------------------------------------------------
 
 function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }) {
   const expected = s.expected_inputs ?? {};
@@ -471,97 +661,104 @@ function InputsSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run })
         : { value: Number(v.value), unit: v.unit, kind: v.kind, source: v.source || null };
     }
     if (Object.keys(inputs).length === 0) return;
-    run(() => api.put(`/studies/${s.id}/inputs`, { inputs }));
+    run(() => api.put(`/studies/${s.id}/inputs`, { inputs }), "Analysis inputs recorded");
     setEdits({});
   }
   const upd = (n: string, k: string, v: string) => setEdits((o) => ({ ...o, [n]: { ...val(n), [k]: v } }));
+  const recorded = (n: string) => s.analysis_inputs[n]?.value !== undefined;
   return (
-    <Section title="Analysis inputs">
+    <Section id="sec-inputs" title="Analysis inputs">
       {names.length > 0 && (
         <>
           <p className="muted small">
-            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured
-            (name the study/assay), literature (name the source) or user-supplied. Missing inputs make the dependent
-            results unavailable, never assumed.
+            Values the analysis needs that this study does not measure. Each is recorded with its provenance: measured (name the study or
+            assay), literature (name the source) or user-supplied. A missing input makes the results that depend on it unavailable, never
+            assumed.
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Input</th>
-                <th>Value</th>
-                <th>Unit</th>
-                <th>Kind</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {names.map((n) => (
-                <tr key={n}>
-                  <td>
-                    <code>{n}</code>
-                  </td>
-                  <td>
-                    <input type="number" step="any" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
-                  </td>
-                  <td>
-                    <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
-                  </td>
-                  <td>
-                    <select value={val(n).kind} onChange={(e) => upd(n, "kind", e.target.value)}>
-                      <option>measured</option>
-                      <option>literature</option>
-                      <option>user_supplied</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
-                  </td>
+          <div className="table-wrap">
+            <table className="sf-table">
+              <thead>
+                <tr>
+                  <th>Input</th>
+                  <th>Value</th>
+                  <th>Unit</th>
+                  <th>Provenance</th>
+                  <th>Source</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {names.map((n) => (
+                  <tr key={n}>
+                    <td>
+                      {humanize(n)} <div className="muted small mono">{n}</div>
+                      {recorded(n) && <Pill tone="ok">recorded</Pill>}
+                    </td>
+                    <td>
+                      <input inputMode="decimal" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                    </td>
+                    <td>
+                      <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
+                    </td>
+                    <td>
+                      <select value={val(n).kind} onChange={(e) => upd(n, "kind", e.target.value)}>
+                        <option value="measured">Measured</option>
+                        <option value="literature">Literature</option>
+                        <option value="user_supplied">User supplied</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
       {selNames.length > 0 && (
         <>
           <p className="muted small">
-            Selections only you can make after seeing the data (for example the start of each profile&apos;s terminal
-            phase; see the candidate table in the results). Each is recorded as user-supplied under your name, and the
-            analysis uses it on the next re-analysis.
+            Selections only you can make after seeing the data (for example the start of each profile&apos;s terminal phase; see the
+            candidate table in the results). Each is recorded as user-supplied under your name, and the next analysis uses it.
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Selection</th>
-                <th>Value</th>
-                <th>Unit</th>
-                <th>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selNames.map((n) => (
-                <tr key={n}>
-                  <td>
-                    <code>{n}</code>
-                  </td>
-                  <td>
-                    <input type="number" step="any" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
-                  </td>
-                  <td>
-                    <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
-                  </td>
-                  <td>
-                    <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
-                  </td>
+          <div className="table-wrap">
+            <table className="sf-table">
+              <thead>
+                <tr>
+                  <th>Selection</th>
+                  <th>Value</th>
+                  <th>Unit</th>
+                  <th>Note</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {selNames.map((n) => (
+                  <tr key={n}>
+                    <td>
+                      {humanize(n)} <div className="muted small mono">{n}</div>
+                    </td>
+                    <td>
+                      <input inputMode="decimal" value={val(n).value} onChange={(e) => upd(n, "value", e.target.value)} />
+                    </td>
+                    <td>
+                      <input value={val(n).unit} onChange={(e) => upd(n, "unit", e.target.value)} />
+                    </td>
+                    <td>
+                      <input value={val(n).source} onChange={(e) => upd(n, "source", e.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
-      <button disabled={busy} onClick={save}>
-        Save inputs
-      </button>
+      <div className="row-end">
+        <button disabled={busy || Object.keys(edits).length === 0} onClick={save}>
+          Save inputs
+        </button>
+      </div>
     </Section>
   );
 }
@@ -570,11 +767,17 @@ function AnalyzeSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }
   const [reason, setReason] = useState("");
   const re = s.state !== "data_received";
   return (
-    <Section title={re ? "Re-analyse" : "Analyse"}>
-      {re && <input placeholder="reason for re-analysis *" value={reason} onChange={(e) => setReason(e.target.value)} />}
-      <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${s.id}/analyze`, { reason: re ? reason : null }))}>
-        {re ? "Re-analyse" : "Run analysis"}
-      </button>
+    <Section id="sec-analyse" title={re ? "Re-analyse" : "Analyse"} subtitle={re ? "A new analysis is a new version; the earlier one stays on the record." : undefined}>
+      <div className="row">
+        {re && <input style={{ maxWidth: 420 }} placeholder="Reason for re-analysis *" value={reason} onChange={(e) => setReason(e.target.value)} />}
+        <button
+          className="primary"
+          disabled={busy || (re && !reason.trim())}
+          onClick={() => run(() => api.post(`/studies/${s.id}/analyze`, { reason: re ? reason : null }), "Analysis complete")}
+        >
+          {re ? "Re-analyse" : "Run analysis"}
+        </button>
+      </div>
     </Section>
   );
 }
@@ -582,16 +785,24 @@ function AnalyzeSection({ s, busy, run }: { s: StudyT; busy: boolean; run: Run }
 function ResultsView({ s }: { s: StudyT }) {
   const r = s.results!;
   const interp = s.interpretation;
-  const qcClass = r.qc.status === "fail" ? "tag-fail" : r.qc.status === "warn" ? "tag-warn" : "tag-pass";
   return (
     <>
-      <Section title="Results" right={<span className={`tag ${qcClass}`}>QC {r.qc.status}</span>}>
+      <Section
+        id="sec-results"
+        title="Results"
+        subtitle={
+          <>
+            Click any value for its derivation. Analysis fingerprint <span className="mono">{shortHash(r.analysis_hash, 16)}</span>
+          </>
+        }
+        right={<span className={`tag tag-${r.qc.status}`}>QC {statusLabel(r.qc.status)}</span>}
+      >
         {!r.evidence_admissible && <div className="banner-sim">Not admissible as evidence (simulated data).</div>}
         {r.qc.findings.length > 0 && (
           <ul className="small">
             {r.qc.findings.map((f, i) => (
               <li key={i} className={`qc-${f.status}`}>
-                [{f.status}] {f.message}
+                <span className={`tag tag-${f.status}`}>{statusLabel(f.status)}</span> {f.message}
               </li>
             ))}
           </ul>
@@ -600,12 +811,9 @@ function ResultsView({ s }: { s: StudyT }) {
           <DataTable key={t.title} t={t} />
         ))}
         {r.notes.length > 0 && <div className="muted small">{r.notes.join(" · ")}</div>}
-        <div className="small muted">
-          analysis hash <code>{r.analysis_hash.slice(0, 16)}</code>
-        </div>
       </Section>
       {interp && (
-        <Section title="Interpretation (cited rules only)">
+        <Section title="Interpretation" subtitle="Statements come from cited rules only; judgements are left to the accountable expert.">
           {interp.statements.map((st, i) => (
             <div key={i} className={`statement sev-${st.severity}`}>
               <div>{st.statement}</div>
@@ -637,71 +845,93 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
   const f = (k: string) => form[k] ?? { value: "", notEstablished: false, rationale: "", password: "", reason: "" };
   const upd = (k: string, patch: Partial<ReturnType<typeof f>>) => setForm((o) => ({ ...o, [k]: { ...f(k), ...patch } }));
   return (
-    <Section title="Expert determinations (signed by the accountable human)">
+    <Section id="sec-determinations" title="Expert determinations" subtitle="Each is signed by the accountable person; the system never decides these.">
       {specs.map((d) => {
         const rec = current.find((x) => x.key === d.key);
         const canSign = me.kind === "human" && me.roles.includes(d.role);
         return (
           <div key={d.key} className="determination">
-            <div>
-              <strong>{d.label}</strong> {d.required_for_approval && <span className="tag tag-required">required</span>}{" "}
+            <div className="row">
+              <strong>{d.label}</strong>
+              {d.required_for_approval && <Pill tone={rec ? "ok" : "warn"}>{rec ? "signed" : "required"}</Pill>}
               <span className="muted small">signed by the {roleLabel(d.role)}</span>
             </div>
             <div className="muted small">{d.guidance}</div>
             {rec && (
-              <div className="signed">
-                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} ({roleLabel(rec.role)}),{" "}
-                {rec.signed_at.slice(0, 19)}Z. Rationale:{" "}
-                {rec.rationale}
+              <div className="signed small">
+                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} (
+                {roleLabel(rec.role)}), {fmtDateTime(rec.signed_at)}. Rationale: {rec.rationale}
               </div>
             )}
             {s.state === "analyzed" && canSign && (
-              <div className="grid2">
-                {!d.categorical && (
-                  <label className="small">
-                    <input type="checkbox" checked={f(d.key).notEstablished} onChange={(e) => upd(d.key, { notEstablished: e.target.checked })} /> not
-                    established
+              <div className="grid2" style={{ marginTop: 8 }}>
+                {d.categorical ? (
+                  <label className="field">
+                    <span className="field-label">Determination *</span>
+                    <select value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })}>
+                      <option value="">Choose…</option>
+                      {d.choices.map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="field">
+                    <span className="field-label">Value{d.unit ? ` (${d.unit})` : ""} *</span>
+                    <input
+                      inputMode="decimal"
+                      disabled={f(d.key).notEstablished}
+                      value={f(d.key).value}
+                      onChange={(e) => upd(d.key, { value: e.target.value })}
+                    />
+                    <span className="checks small" style={{ margin: 0 }}>
+                      <label>
+                        <input type="checkbox" checked={f(d.key).notEstablished} onChange={(e) => upd(d.key, { notEstablished: e.target.checked })} /> Not
+                        established
+                      </label>
+                    </span>
                   </label>
                 )}
-                {d.categorical ? (
-                  <select value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })}>
-                    <option value="">— choose —</option>
-                    {d.choices.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                ) : (
-                  !f(d.key).notEstablished && (
-                    <input type="number" step="any" placeholder={`value (${d.unit ?? ""})`} value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })} />
-                  )
+                <label className="field">
+                  <span className="field-label">Rationale *</span>
+                  <textarea className="prose" rows={2} value={f(d.key).rationale} onChange={(e) => upd(d.key, { rationale: e.target.value })} />
+                </label>
+                {rec && (
+                  <label className="field">
+                    <span className="field-label">Reason for revision *</span>
+                    <input value={f(d.key).reason} onChange={(e) => upd(d.key, { reason: e.target.value })} />
+                  </label>
                 )}
-                <textarea placeholder="rationale *" value={f(d.key).rationale} onChange={(e) => upd(d.key, { rationale: e.target.value })} />
-                {rec && <input placeholder="reason for revision *" value={f(d.key).reason} onChange={(e) => upd(d.key, { reason: e.target.value })} />}
-                <input type="password" placeholder="password (re-authentication) *" value={f(d.key).password} onChange={(e) => upd(d.key, { password: e.target.value })} />
-                <button
-                  className="primary"
-                  disabled={busy}
-                  onClick={() =>
-                    run(() =>
-                      api.post(`/studies/${s.id}/determinations`, {
-                        key: d.key,
-                        value: d.categorical || f(d.key).notEstablished ? null : Number(f(d.key).value),
-                        category: d.categorical ? f(d.key).value : null,
-                        unit: d.unit,
-                        rationale: f(d.key).rationale,
-                        password: f(d.key).password,
-                        reason: f(d.key).reason || null,
-                      }),
-                    )
-                  }
-                >
-                  Sign determination
-                </button>
+                <label className="field">
+                  <span className="field-label">Your password *</span>
+                  <input type="password" value={f(d.key).password} onChange={(e) => upd(d.key, { password: e.target.value })} autoComplete="current-password" />
+                </label>
+                <div className="field" style={{ justifyContent: "flex-end" }}>
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={() =>
+                      run(
+                        () =>
+                          api.post(`/studies/${s.id}/determinations`, {
+                            key: d.key,
+                            value: d.categorical || f(d.key).notEstablished ? null : Number(f(d.key).value),
+                            category: d.categorical ? f(d.key).value : null,
+                            unit: d.unit,
+                            rationale: f(d.key).rationale,
+                            password: f(d.key).password,
+                            reason: f(d.key).reason || null,
+                          }),
+                        `${d.label} signed`,
+                      )
+                    }
+                  >
+                    Sign determination
+                  </button>
+                </div>
               </div>
             )}
-            {s.state === "analyzed" && !canSign && !rec && (
-              <div className="muted small">Awaiting the {roleLabel(d.role)}.</div>
-            )}
+            {s.state === "analyzed" && !canSign && !rec && <div className="muted small">Awaiting the {roleLabel(d.role)}.</div>}
           </div>
         );
       })}
@@ -709,7 +939,7 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
   );
 }
 
-const MEANINGS = ["approval", "review", "authorship", "responsibility", "qa_compliance_statement"];
+// ---- report, signatures, approval -----------------------------------------------------------
 
 function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: boolean; run: Run }) {
   const [role, setRole] = useState(me.roles[0] ?? "");
@@ -720,49 +950,78 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
   const current = s.signatures.filter((g) => g.subject_hash === s.report_hash);
   return (
     <Section
+      id="sec-report"
       title="Report"
       right={
-        <button onClick={() => api.download(`/studies/${s.id}/report.md`, `${s.id}_report.md`)}>Download</button>
+        <button className="small" onClick={() => api.download(`/studies/${s.id}/report.md`, `${s.id}_report.md`)}>
+          Download
+        </button>
       }
     >
       <div className="report-box">
         <Markdown text={s.report!.markdown} />
       </div>
       <h4>Signatures on this report</h4>
-      {current.length === 0 && <p className="muted small">None.</p>}
-      <ul>
-        {current.map((g, i) => (
-          <li key={i}>
-            {g.signer_name} — {roleLabel(g.role)} ({g.meaning.replace(/_/g, " ")}), {g.signed_at.slice(0, 19)}Z: “{g.statement}”
-          </li>
-        ))}
-      </ul>
+      {current.length === 0 && <p className="muted small">None yet.</p>}
+      {current.map((g, i) => (
+        <div key={i} className="signed small">
+          <strong>{g.signer_name}</strong> — {roleLabel(g.role)} ({meaningLabel(g.meaning).toLowerCase()}), {fmtDateTime(g.signed_at)}: “{g.statement}”
+        </div>
+      ))}
       {s.state === "reported" && me.kind === "human" && (
         <>
+          <h4>Sign</h4>
           <div className="grid2">
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              {me.roles.map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
-            <select value={meaning} onChange={(e) => setMeaning(e.target.value)}>
-              {MEANINGS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-            <input placeholder="statement of meaning *" value={statement} onChange={(e) => setStatement(e.target.value)} />
-            <input type="password" placeholder="password (re-authentication) *" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <label className="field">
+              <span className="field-label">Signing as *</span>
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
+                {me.roles.map((r) => (
+                  <option key={r} value={r}>
+                    {roleLabel(r)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Meaning of the signature *</span>
+              <select value={meaning} onChange={(e) => setMeaning(e.target.value)}>
+                {Object.keys(MEANINGS).map((m) => (
+                  <option key={m} value={m}>
+                    {meaningLabel(m)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Statement *</span>
+              <input value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="I approve this report as an accurate account." />
+            </label>
+            <label className="field">
+              <span className="field-label">Your password *</span>
+              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+            </label>
           </div>
-          <button disabled={busy} onClick={() => run(() => api.post(`/studies/${s.id}/sign`, { role, meaning, statement, password: pw }))}>
-            Sign report
-          </button>
+          <div className="row-end">
+            <button
+              disabled={busy || !statement || !pw}
+              onClick={() => run(() => api.post(`/studies/${s.id}/sign`, { role, meaning, statement, password: pw }), "Report signed")}
+            >
+              Sign report
+            </button>
+          </div>
           <h4>Approve</h4>
-          {s.approval_missing && s.approval_missing.length > 0 ? (
-            <p className="small">Still required: {s.approval_missing.join(", ")}</p>
+          {s.simulated ? (
+            <p className="small muted">Simulated data cannot be approved.</p>
+          ) : s.approval_missing && s.approval_missing.length > 0 ? (
+            <p className="small">Still required before approval: {s.approval_missing.join(", ")}</p>
           ) : (
             <div className="row">
-              <input type="password" placeholder="password *" value={apw} onChange={(e) => setApw(e.target.value)} />
-              <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${s.id}/approve`, { password: apw }))}>
+              <input style={{ maxWidth: 260 }} type="password" placeholder="Your password *" value={apw} onChange={(e) => setApw(e.target.value)} />
+              <button
+                className="primary"
+                disabled={busy || !apw}
+                onClick={() => run(() => api.post(`/studies/${s.id}/approve`, { password: apw }), "Study approved")}
+              >
                 Approve study
               </button>
             </div>
@@ -773,45 +1032,53 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
   );
 }
 
+// ---- audit trail & cancel -------------------------------------------------------------------
+
 function AuditTrail({ id }: { id: string }) {
-  const [entries, setEntries] = useState<LedgerEntry[]>([]);
-  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
   useEffect(() => {
-    if (open) api.getAll<LedgerEntry>(`/ledger/${id}`).then(setEntries).catch(() => setEntries([]));
-  }, [id, open]);
+    api
+      .getAll<LedgerEntry>(`/ledger/${id}`)
+      .then(setEntries)
+      .catch(() => setEntries([]));
+  }, [id]);
   return (
-    <Section title="Audit trail" right={<button onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"}</button>}>
-      {open && (
-        <table>
-          <tbody>
-            {entries.map((e) => (
-              <tr key={e.seq}>
-                <td className="small">#{e.seq}</td>
-                <td className="small">{e.recorded_at.slice(0, 19)}Z</td>
-                <td>{e.action}</td>
-                <td className="small">
-                  {e.actor_id} ({e.actor_kind})
-                </td>
-                <td className="small">{e.reason ?? ""}</td>
-                <td className="small">
-                  <code>{e.entry_hash.slice(0, 12)}</code>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <Collapsible id="sec-audit" title={`Audit trail${entries ? ` (${entries.length})` : ""}`} defaultOpen={false}>
+      {entries === null ? (
+        <Loading />
+      ) : entries.length === 0 ? (
+        <div className="muted small">No entries.</div>
+      ) : (
+        <ol className="timeline">
+          {[...entries].reverse().map((e) => (
+            <li key={e.seq}>
+              <span className="when">{fmtDateTime(e.recorded_at)}</span>
+              <span>
+                <span className="what">{actionLabel(e.action)}</span> <span className="who">by {e.actor_id}</span>
+                {e.reason && <div className="small">Reason: {e.reason}</div>}
+              </span>
+              <span className="hash mono" title={`entry #${e.seq}, hash ${e.entry_hash}`}>
+                #{e.seq} · {shortHash(e.entry_hash, 10)}
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
-    </Section>
+    </Collapsible>
   );
 }
 
 function CancelSection({ id, run }: { id: string; run: Run }) {
   const [reason, setReason] = useState("");
   return (
-    <details className="card">
-      <summary>Cancel study</summary>
-      <input placeholder="reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
-      <button onClick={() => run(() => api.post(`/studies/${id}/cancel`, { reason }))}>Cancel study</button>
-    </details>
+    <Collapsible title="Cancel this study" defaultOpen={false}>
+      <p className="muted small">Cancelling ends the study. Everything recorded so far is kept unchanged.</p>
+      <div className="row">
+        <input style={{ maxWidth: 420 }} placeholder="Reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <button className="danger" disabled={!reason.trim()} onClick={() => run(() => api.post(`/studies/${id}/cancel`, { reason }), "Study cancelled")}>
+          Cancel study
+        </button>
+      </div>
+    </Collapsible>
   );
 }

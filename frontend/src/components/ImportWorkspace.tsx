@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
+import { fmtDateTime, meaningLabel } from "../lib/format";
+import { href } from "../lib/router";
 import type { Principal, Study, StudySummary } from "../types";
 import { roleLabel, Section } from "./common";
 import { QuantityView } from "./QuantityView";
@@ -53,7 +55,7 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
         </div>
         {rec.superseded_by && (
           <div className="note small">
-            Superseded by driver-run study <a href={`#/study/${rec.superseded_by.study_id}`}>{rec.superseded_by.study_id}</a>: {rec.superseded_by.reason}
+            Superseded by driver-run study <a href={href.study(rec.superseded_by.study_id)}>{rec.superseded_by.study_id}</a>: {rec.superseded_by.reason}
           </div>
         )}
         {rec.datasets.length > 0 && (
@@ -263,7 +265,7 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
         <ul className="small">
           {s.signatures.filter((g) => g.subject_hash === info.import_hash).map((g, i) => (
             <li key={i}>
-              {g.signer_name} — {roleLabel(g.role)} ({g.meaning.replace(/_/g, " ")}), {g.signed_at.slice(0, 19)}Z
+              {g.signer_name} — {roleLabel(g.role)} ({meaningLabel(g.meaning).toLowerCase()}), {fmtDateTime(g.signed_at)}
             </li>
           ))}
         </ul>

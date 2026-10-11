@@ -8,11 +8,20 @@ export class ApiError extends Error {
   errors: string[];
   /** Server-side exception name, e.g. "LedgerIntegrityError". */
   kind: string | null;
-  constructor(status: number, message: string, errors: string[] = [], kind: string | null = null) {
+  /** The server's request ID: quote it to an administrator to find the request in the log. */
+  requestId: string | null;
+  constructor(
+    status: number,
+    message: string,
+    errors: string[] = [],
+    kind: string | null = null,
+    requestId: string | null = null,
+  ) {
     super(message);
     this.status = status;
     this.errors = errors;
     this.kind = kind;
+    this.requestId = requestId;
   }
 }
 
@@ -75,13 +84,20 @@ async function send<T>(
       detail?: unknown;
       errors?: string[];
       error?: string;
+      request_id?: string;
     };
     const msg = typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail ?? data);
     if (res.status === 401 && path !== "/auth/login") {
       setToken(null);
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     }
-    throw new ApiError(res.status, msg, d.errors ?? [], d.error ?? null);
+    throw new ApiError(
+      res.status,
+      msg,
+      d.errors ?? [],
+      d.error ?? null,
+      d.request_id ?? res.headers.get("X-Request-ID"),
+    );
   }
   return { data: data as T, headers: res.headers };
 }
@@ -98,7 +114,16 @@ export const api = {
     const res = await fetch(`/api${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!res.ok) throw new ApiError(res.status, await res.text());
+    if (!res.ok) {
+      const text = await res.text();
+      let detail = text;
+      try {
+        detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
+      } catch {
+        /* not JSON */
+      }
+      throw new ApiError(res.status, detail, [], null, res.headers.get("X-Request-ID"));
+    }
     const url = URL.createObjectURL(await res.blob());
     const a = document.createElement("a");
     a.href = url;

@@ -215,6 +215,11 @@ export interface ExpertDeterminationSpec {
 
 export interface Study extends StudySummary {
   program_id: string;
+  /** Names for navigation; the ids stay the references. */
+  program_name?: string;
+  compound_name?: string;
+  requirement_name?: string | null;
+  created_at?: string;
   driver_version: string;
   hypothesis: string | null;
   parameters: Record<string, unknown>;
@@ -302,6 +307,12 @@ export interface JsonSchema {
   default?: unknown;
   minimum?: number;
   exclusiveMinimum?: number;
+  /** A map: values of this shape under free keys. */
+  additionalProperties?: JsonSchema | boolean;
+  /** A fixed-length tuple. */
+  prefixItems?: JsonSchema[];
+  minItems?: number;
+  maxItems?: number;
 }
 
 export interface LedgerEntry {

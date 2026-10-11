@@ -3,7 +3,7 @@ the kernel facade (``hos.kernel.kernel``) owns every state change."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Select, func, or_, select
@@ -25,6 +25,13 @@ from hos.db.store import Database, FileStore
 from hos.kernel.errors import NotFound
 
 __all__ = ["Repository", "content_hash"]
+
+
+def _utc(dt: datetime | None) -> datetime | None:
+    """SQLite returns naive datetimes from aggregates; every stored time is UTC."""
+    if dt is None or dt.tzinfo is not None:
+        return dt
+    return dt.replace(tzinfo=UTC)
 
 
 def content_hash(obj: Any) -> str:
@@ -134,6 +141,29 @@ class Repository:
         )
         with self.db.session() as s:
             return self._page(s, q, limit, offset)
+
+    def program_counts(self, program_ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Compounds, studies and the latest study change per programme (two grouped queries)."""
+        out: dict[str, dict[str, Any]] = {
+            i: {"compounds": 0, "studies": 0, "last_study_update": None} for i in program_ids
+        }
+        if not program_ids:
+            return out
+        with self.db.session() as s:
+            for pid, n in s.execute(
+                select(CompoundRow.program_id, func.count())
+                .where(CompoundRow.program_id.in_(program_ids))
+                .group_by(CompoundRow.program_id)
+            ):
+                out[pid]["compounds"] = n
+            for pid, n, last in s.execute(
+                select(StudyRow.program_id, func.count(), func.max(StudyRow.updated_at))
+                .where(StudyRow.program_id.in_(program_ids))
+                .group_by(StudyRow.program_id)
+            ):
+                out[pid]["studies"] = n
+                out[pid]["last_study_update"] = _utc(last)
+        return out
 
     def update_program(self, program_id: str, **fields: Any) -> ProgramRow:
         with self.db.session() as s:

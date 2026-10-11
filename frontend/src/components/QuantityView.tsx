@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtDateTime } from "../lib/format";
 import type { Citation, ProvenanceKind, Quantity } from "../types";
 
 const KIND_LABEL: Record<ProvenanceKind, string> = {
@@ -22,7 +23,13 @@ export function fmt(v: number | null | undefined): string {
 }
 
 function unitText(u: string): string {
-  return u === "dimensionless" ? "" : ` ${u.replace(/\*\*/g, "^")}`;
+  if (u === "dimensionless") return "";
+  const shown = u
+    .replace(/angstrom/g, "Å")
+    .replace(/\*\*2\b/g, "²")
+    .replace(/\*\*3\b/g, "³")
+    .replace(/\*\*/g, "^");
+  return ` ${shown}`;
 }
 
 export function CitationLine({ c }: { c: Citation }) {
@@ -80,7 +87,7 @@ export function Derivation({ q }: { q: Quantity }) {
               </a>
             </>
           )}
-          {p.retrieved_at && <> · retrieved {p.retrieved_at.slice(0, 19)}Z</>}
+          {p.retrieved_at && <> · retrieved {fmtDateTime(p.retrieved_at)}</>}
         </div>
       )}
       {p.actor && (
@@ -137,7 +144,7 @@ export function Derivation({ q }: { q: Quantity }) {
         </>
       )}
       <div className="muted">
-        id <code>{q.id}</code> · recorded {p.recorded_at.slice(0, 19)}Z
+        id <code>{q.id}</code> · recorded {fmtDateTime(p.recorded_at)}
       </div>
     </div>
   );

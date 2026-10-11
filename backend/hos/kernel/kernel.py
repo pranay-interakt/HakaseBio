@@ -1683,9 +1683,22 @@ class Kernel:
                 params = driver.validate_parameters(s.parameters)
             except ValidationError:
                 params = None
+        prog = self.repo.program(s.program_id)
+        requirement = next(
+            (
+                r
+                for r in (prog.study_set or {}).get("requirements", [])
+                if r.get("id") == s.requirement_id
+            ),
+            None,
+        )
         view = {
             **self._study_summary(s),
             "program_id": s.program_id,
+            # names for navigation (breadcrumbs); the ids above stay the references
+            "program_name": prog.name,
+            "compound_name": self.repo.compound(s.compound_id).name,
+            "requirement_name": requirement.get("name") if requirement else None,
             "driver_version": s.driver_version,
             "hypothesis": s.hypothesis,
             "parameters": s.parameters,
@@ -1776,12 +1789,22 @@ class Kernel:
         rows, total = self.repo.programs_page(
             actor.organisation, self.repo.member_programs(actor.id), limit, offset
         )
+        counts = self.repo.program_counts([r.id for r in rows])
         return [
             {
                 "id": r.id,
                 "name": r.name,
                 "sponsor": r.sponsor,
+                "modality": r.context.get("modality"),
+                "indication": r.context.get("indication"),
+                "route": r.context.get("route"),
+                "compounds": counts[r.id]["compounds"],
+                "studies": counts[r.id]["studies"],
                 "created_at": r.created_at.isoformat(),
+                "updated_at": max(
+                    _aware(r.updated_at),
+                    counts[r.id]["last_study_update"] or _aware(r.updated_at),
+                ).isoformat(),
             }
             for r in rows
         ], total

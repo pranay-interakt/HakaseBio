@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ErrorBox, Section } from "../components/common";
+import { Loading, PageHeader, toast, useBreadcrumbs } from "../components/ui";
+import { go, href } from "../lib/router";
 import type { ImportFieldSpec, Program, Study } from "../types";
 
 // Create an imported study: a study run outside HOS, entered from its final report.
-export function ImportNew({ programId, requirementId, go }: { programId: string; requirementId: string; go: (h: string) => void }) {
+export function ImportNew({ programId, requirementId }: { programId: string; requirementId: string }) {
   const [p, setP] = useState<Program | null>(null);
   const [fields, setFields] = useState<ImportFieldSpec[]>([]);
   const [compound, setCompound] = useState("");
@@ -29,6 +31,12 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
   }, [programId, requirementId]);
 
   const req = p?.study_set.requirements.find((r) => r.id === requirementId);
+  useBreadcrumbs([
+    { label: "Programmes", href: href.programs() },
+    { label: p?.name ?? "Programme", href: href.program(programId) },
+    { label: "Study set", href: href.program(programId, "studyset") },
+    { label: "Import a report" },
+  ]);
 
   async function create() {
     if (!file) return;
@@ -46,7 +54,8 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
       if (labNo) q.set("lab_study_number", labNo);
       if (parts.length) q.set("components", parts.join(","));
       const s = await api.upload<Study>(`/programs/${programId}/imports?${q.toString()}`, file);
-      go(`#/study/${s.id}`);
+      toast("Report stored; transcribe its values next");
+      go(href.study(s.id));
     } catch (e) {
       setErr(e);
     } finally {
@@ -54,25 +63,29 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
     }
   }
 
-  if (!p) return <ErrorBox error={err} />;
+  if (!p) return err ? <ErrorBox error={err} /> : <Loading />;
   return (
     <div className="page">
-      <div className="crumbs">
-        <a href="#/">Programmes</a> / <a href={`#/program/${p.id}`}>{p.name}</a> / import study
-      </div>
-      <h2>Import a study from its final report</h2>
-      {req && (
-        <p className="small">
-          Requirement: <strong>{req.name}</strong> ({req.section}) · CTD {req.ctd_section ?? "—"} · {req.glp ? "GLP" : "non-GLP"}
-        </p>
-      )}
+      <PageHeader
+        eyebrow="Import a study"
+        title={req ? req.name : "Import a study from its final report"}
+        meta={
+          req && (
+            <>
+              <span>{req.section}</span>
+              <span>CTD {req.ctd_section ?? "—"}</span>
+              <span>{req.glp ? "GLP" : "Non-GLP"}</span>
+            </>
+          )
+        }
+      />
       <div className="note small">
         Use this for a study run outside Hakase (at a CRO, before Hakase, or of a type without a driver). The report is stored by
         its SHA-256. Every value you transcribe needs the page or table it came from, and the import is signed by the
         responsible people (Study Director and QA for a GLP study). Readiness counts it as <em>imported</em>, never as
         driver-run.
       </div>
-      <ErrorBox error={err} />
+      <ErrorBox error={err} onDismiss={() => setErr(null)} />
       <Section title="Report">
         <div className="grid2">
           <div className="field">
@@ -109,8 +122,8 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
             <label className="field-label">Conducted under GLP? *</label>
             <select value={glp} onChange={(e) => setGlp(e.target.value as "" | "true" | "false")}>
               <option value="">—</option>
-              <option value="true">yes</option>
-              <option value="false">no</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
             </select>
           </div>
         </div>
@@ -134,13 +147,18 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
             You will transcribe: {fields.map((f) => f.label + (f.unit ? ` [${f.unit}]` : "")).join(", ")}.
           </p>
         )}
-        <button
-          className="primary"
-          disabled={busy || !file || !compound || (!!req && req.components.length > 0 && parts.length === 0)}
-          onClick={create}
-        >
-          Upload report and create import
-        </button>
+        <div className="row-end">
+          <a className="btn" href={href.program(programId, "studyset")}>
+            Cancel
+          </a>
+          <button
+            className="primary"
+            disabled={busy || !file || !compound || (!!req && req.components.length > 0 && parts.length === 0)}
+            onClick={create}
+          >
+            {busy ? "Uploading…" : "Upload report and create import"}
+          </button>
+        </div>
       </Section>
     </div>
   );

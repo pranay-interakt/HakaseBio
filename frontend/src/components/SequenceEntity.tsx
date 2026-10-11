@@ -2,6 +2,7 @@
 // every rule and computes every derived value; this form only gathers the registered facts.
 import { useState } from "react";
 import { api } from "../api";
+import { humanize } from "../lib/format";
 import type {
   Compound,
   EngineeredMutation,
@@ -306,7 +307,7 @@ export function SequenceEntityView({ c, p, reload, onErr }: {
             {d.chains.map((ch) => (
               <tr key={ch.name}>
                 <td>{ch.name}</td>
-                <td>{ch.role.replace(/_/g, " ")}</td>
+                <td>{humanize(ch.role)}</td>
                 <td>{ch.copies}</td>
                 <td>{ch.residues}</td>
                 <td>

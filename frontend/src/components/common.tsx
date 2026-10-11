@@ -2,18 +2,39 @@ import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useMemo, type ReactNode } from "react";
 import { ApiError } from "../api";
+import { stateLabel } from "../lib/format";
 import { isQuantity, type Table } from "../types";
 import { CitationLine, QuantityView } from "./QuantityView";
 import logoOnDark from "../assets/hakase-logo-on-dark.png";
 import logoOnLight from "../assets/hakase-logo-on-light.png";
 
-export function ErrorBox({ error }: { error: unknown }) {
+const ERROR_TITLES: Record<number, string> = {
+  400: "That could not be done",
+  401: "Please sign in again",
+  403: "Not allowed",
+  404: "Not found",
+  409: "Not possible at this stage",
+  413: "Too large",
+  422: "Please check the form",
+  429: "Too many attempts",
+  500: "Something went wrong",
+  503: "The system is busy",
+};
+
+export function ErrorBox({ error, onDismiss }: { error: unknown; onDismiss?: () => void }) {
   if (!error) return null;
   const e = error as ApiError;
   return (
-    <div className="error">
-      <strong>{e.status ? `Error ${e.status}: ` : "Error: "}</strong>
-      {e.message ?? String(error)}
+    <div className="error" role="alert">
+      <div className="error-head">
+        <strong>{(e.status && ERROR_TITLES[e.status]) ?? "Error"}</strong>
+        {onDismiss && (
+          <button className="icon-btn small" onClick={onDismiss} aria-label="Dismiss">
+            ×
+          </button>
+        )}
+      </div>
+      <div>{e.message ?? String(error)}</div>
       {e.errors && e.errors.length > 0 && (
         <ul>
           {e.errors.map((x, i) => (
@@ -21,6 +42,7 @@ export function ErrorBox({ error }: { error: unknown }) {
           ))}
         </ul>
       )}
+      {e.requestId && <div className="muted small">Reference {e.requestId}</div>}
     </div>
   );
 }
@@ -36,41 +58,63 @@ export function Cell({ v }: { v: unknown }) {
   return <>{String(v)}</>;
 }
 
+const numeric = (v: unknown) => isQuantity(v) || typeof v === "number";
+
 export function DataTable({ t }: { t: Table }) {
+  const numCols = t.columns.map((_, j) => t.rows.length > 0 && t.rows.every((r) => r[j] === null || numeric(r[j])));
   return (
-    <div className="table-wrap">
+    <div className="table-block">
       <div className="table-title">{t.title}</div>
-      <table>
-        <thead>
-          <tr>
-            {t.columns.map((c) => (
-              <th key={c}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {t.rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j}>
-                  <Cell v={c} />
-                </td>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {t.columns.map((c, j) => (
+                <th key={c} className={numCols[j] ? "num" : undefined}>
+                  {c}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {t.rows.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className={numCols[j] ? "num" : undefined}>
+                    <Cell v={c} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {t.note && <div className="muted small">{t.note}</div>}
     </div>
   );
 }
 
-export function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
+export function Section({
+  title,
+  children,
+  right,
+  id,
+  subtitle,
+}: {
+  title: string;
+  children: ReactNode;
+  right?: ReactNode;
+  id?: string;
+  subtitle?: ReactNode;
+}) {
   return (
-    <section className="card">
+    <section className="card" id={id}>
       <div className="card-head">
-        <h3>{title}</h3>
-        {right}
+        <div>
+          <h3>{title}</h3>
+          {subtitle && <div className="card-sub">{subtitle}</div>}
+        </div>
+        {right && <div className="card-actions">{right}</div>}
       </div>
       {children}
     </section>
@@ -101,37 +145,46 @@ export const LIFECYCLE = [
 export const IMPORT_LIFECYCLE = ["import_draft", "imported"];
 
 export function Lifecycle({ state }: { state: string }) {
-  if (IMPORT_LIFECYCLE.includes(state) || state === "superseded") {
-    const i = IMPORT_LIFECYCLE.indexOf(state);
-    return (
-      <ol className="lifecycle">
-        {IMPORT_LIFECYCLE.map((x, j) => (
-          <li key={x} className={state === "superseded" || j < i ? "done" : j === i ? "current" : ""}>
-            {x.replace("_", " ")}
-          </li>
-        ))}
-        {state === "superseded" && <li className="current">superseded</li>}
-      </ol>
-    );
-  }
-  const idx = LIFECYCLE.indexOf(state);
+  const steps = IMPORT_LIFECYCLE.includes(state) || state === "superseded" ? IMPORT_LIFECYCLE : LIFECYCLE;
+  const idx = steps.indexOf(state);
+  const ended = state === "cancelled" || state === "failed" || state === "superseded";
   return (
-    <ol className="lifecycle">
-      {LIFECYCLE.map((s, i) => (
-        <li key={s} className={i < idx ? "done" : i === idx ? "current" : ""}>
-          {s.replace("_", " ")}
+    <ol className="stepper" aria-label="Study progress">
+      {steps.map((s, i) => (
+        <li key={s} className={ended || i < idx ? "done" : i === idx ? "current" : ""}>
+          <span className="step-dot" aria-hidden>
+            {ended || i < idx ? "✓" : i + 1}
+          </span>
+          <span className="step-label">{stateLabel(s)}</span>
         </li>
       ))}
-      {(state === "cancelled" || state === "failed") && <li className="current bad">{state}</li>}
+      {ended && (
+        <li className={state === "superseded" ? "current" : "current bad"}>
+          <span className="step-dot" aria-hidden>
+            {state === "superseded" ? "↺" : "×"}
+          </span>
+          <span className="step-label">{stateLabel(state)}</span>
+        </li>
+      )}
     </ol>
   );
 }
 
+const STATE_TONE: Record<string, string> = {
+  approved: "ok",
+  imported: "info",
+  reported: "accent",
+  analyzed: "accent",
+  cancelled: "bad",
+  failed: "bad",
+  superseded: "neutral",
+};
+
 export function StateTag({ state, simulated }: { state: string; simulated?: boolean }) {
   return (
-    <span className={`tag tag-${state}`}>
-      {state.replace("_", " ")}
-      {simulated && <span className="badge badge-simulated"> SIMULATED</span>}
+    <span className="tag-group">
+      <span className={`pill pill-${STATE_TONE[state] ?? "neutral"}`}>{stateLabel(state)}</span>
+      {simulated && <span className="pill pill-simulated">Simulated</span>}
     </span>
   );
 }

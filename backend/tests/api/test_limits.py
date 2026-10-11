@@ -96,3 +96,31 @@ def test_lists_are_paged_in_the_database(tmp_path):
     assert pages == history.json()
     r = c.get(f"/api/studies?program_id={ids[0]}", headers=sci)
     assert r.json() == [] and r.headers["X-Total-Count"] == "0"
+
+
+def test_lists_and_views_carry_names_for_navigation(tmp_path):
+    from tests.drivers.test_metabolic_stability import PARAMS
+
+    c, _, _ = _app(tmp_path)
+    sci = _login(c, "sci")
+    pid = c.post("/api/programs", headers=sci, json={"name": "N", "context": CTX}).json()["id"]
+    cid = c.post(
+        f"/api/programs/{pid}/compounds", headers=sci, json={"name": "ethanol", "smiles": "CCO"}
+    ).json()["id"]
+    sid = c.post(
+        "/api/studies",
+        headers=sci,
+        json={"program_id": pid, "compound_id": cid, "requirement_id": "adme.metabolic_stability"},
+    ).json()["id"]
+    c.post(f"/api/studies/{sid}/design", headers=sci, json={"parameters": PARAMS})
+    row = c.get("/api/programs", headers=sci).json()[0]
+    assert (row["modality"], row["indication"], row["route"]) == (
+        "small_molecule",
+        "chronic_non_oncology",
+        "oral",
+    )
+    assert (row["compounds"], row["studies"]) == (1, 1)
+    assert row["updated_at"] >= row["created_at"]
+    v = c.get(f"/api/studies/{sid}", headers=sci).json()
+    assert (v["program_name"], v["compound_name"]) == ("N", "ethanol")
+    assert v["requirement_name"]
