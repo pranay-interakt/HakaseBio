@@ -10,3 +10,4 @@ demo-out
 scripts/dev_principals.local.json
 *.sqlite3
 **/.DS_Store
+build

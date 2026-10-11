@@ -16,3 +16,4 @@ dist/
 *.tsbuildinfo
 backend/scripts/dev_principals.local.json
 backend/demo-out/
+build/
