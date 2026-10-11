@@ -84,3 +84,15 @@ The two most relevant to "vs vehicle, time-matched":
 2. Murphy DJ. Safety pharmacology of the respiratory system: techniques and study design. *Drug Dev Res.* 1994;32(4):237–246. DOI: 10.1002/ddr.430320408 *(bibliographic only — cite as the reference S7A attaches to tidal volume)*.
 3. Lim R, Zavou MJ, Milton PL, Chan ST, Tan JL, Dickinson H, Murphy SV, Jenkin G, Wallace EM. Measuring respiratory function in mice using unrestrained whole-body plethysmography. *J Vis Exp.* 2014;(90):e51755. DOI: 10.3791/51755 *(secondary statement of MV = VT × f)*.
 4. Drorbaugh JE, Fenn WO. A barometric method for measuring ventilation in newborn infants. *Pediatrics.* 1955;16(1):81–87. DOI: 10.1542/peds.16.1.81 *(bibliographic only)*.
+## Implementation record (driver `safety_pharm_respiratory` v1.0.0, 2026-10-11)
+
+- **Citations verified on Crossref.**
+  - Murphy 1994: Drug Dev Res 32(4):237–246.
+  - Lim et al. 2014: J Vis Exp (90) e51755, nine authors.
+- **S7A §2.7.3 encoded as written.** Respiratory rate is required, plus at least one other
+  measure (tidal volume or SpO2).
+- **Minute volume** is derived and labelled as not named in S7A.
+- **Tidal volume** is ingested as reported by the system. The Drorbaugh & Fenn equation remains
+  NOT VERIFIED.
+- **No respiratory-specific statistic.** Dunnett's test (already verified) is applied only when
+  the protocol states it.

@@ -225,6 +225,16 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "pharmaceuticals. J Am Coll Toxicol. 1991;10(6):677-688. (Named by ICH S7A 2.7.1; "
            "bibliographic only.)",
            year=1991, doi="10.3109/10915819109078660"),
+        _c("murphy1994",
+           "Murphy DJ. Safety pharmacology of the respiratory system: techniques and study "
+           "design. Drug Dev Res. 1994;32(4):237-246. (Cited by ICH S7A 2.7.3 for tidal volume; "
+           "bibliographic only.)",
+           year=1994, doi="10.1002/ddr.430320408"),
+        _c("lim2014",
+           "Lim R, Zavou MJ, Milton PL, et al. Measuring respiratory function in mice using "
+           "unrestrained whole-body plethysmography. J Vis Exp. 2014;(90):e51755. (Secondary "
+           "statement of minute volume = tidal volume x frequency.)",
+           year=2014, doi="10.3791/51755"),
         _c("redfern2003",
            "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical "
            "cardiac electrophysiology, clinical QT interval prolongation and torsade de "

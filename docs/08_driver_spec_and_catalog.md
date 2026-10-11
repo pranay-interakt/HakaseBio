@@ -417,6 +417,29 @@ The kit checks:
   - % vs vehicle for body temperature.
   - Refusal of a protocol missing an S7A domain.
 
+### `safety_pharm_respiratory` v1.0.0 — respiratory core battery (ICH S7A §2.7.3)
+
+- **Serves.** `safety.core_battery`, part `respiratory`. CTD 4.2.1.3. GLP-capable.
+- **Research note.** `docs/research/drivers/safety_pharm_respiratory.md`.
+- **Design.**
+  - Method and acquisition system with its corrections.
+  - Tidal volume (mL or mL/kg) and/or SpO2 alongside the required respiratory rate.
+  - Doses, group size, positive control (or justified omission), timepoints and statistics, each
+    with its basis.
+- **Return data.** One row per animal × timepoint: group, dose, respiratory rate, tidal volume,
+  SpO2.
+- **Analysis.**
+  - Measures against the time-matched vehicle group.
+  - Minute volume derived per animal, with % vs vehicle.
+  - Positive-control means (FAIL if absent).
+  - Missing-animal warnings.
+- **Determinations.** Adverse respiratory effect (required) and no-effect dose (optional), both
+  by the Study Director.
+- **Known-value tests.**
+  - Exact % vs vehicle from declared effects.
+  - Minute volume 1.6 mL × 150/min = 240 mL/min, and its % change.
+  - Refusal of rate-only protocols.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

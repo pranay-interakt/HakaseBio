@@ -371,6 +371,20 @@ is a new registry version; it never silently alters past results.
     signed into the import hash).
   - It is runnable in HOS only when the installed drivers cover every part.
 
+## 4.20 Respiratory safety pharmacology  [`safety.minute_volume`]
+
+- **Measures.** ICH S7A §2.7.3 requires respiratory rate and other measures of respiratory
+  function, for example tidal volume (Murphy 1994) or haemoglobin oxygen saturation. The
+  protocol must include rate and at least one other measure.
+- **Tidal volume** is taken as reported by the acquisition system, which is recorded with its
+  corrections. The barometric equation (Drorbaugh & Fenn 1955) is NOT VERIFIED and is not
+  implemented.
+- **Minute volume** = tidal volume × rate, per animal (Lim et al. 2014, J Vis Exp e51755; a
+  secondary statement). S7A does not name it.
+- **Comparison.** Each dose group is compared with vehicle at the same timepoint, using the
+  §4.11 group comparison, descriptively or by Dunnett's test when stated. This time-matched
+  design is an analysis choice consistent with S7A §2.3.1 and §2.4.1, not an S7A requirement.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

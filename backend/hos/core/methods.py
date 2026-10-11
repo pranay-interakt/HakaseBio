@@ -284,6 +284,18 @@ METHODS: Final[dict[str, Method]] = dict(
            "incidences and effects", ("ich_s7a",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("safety.minute_volume",
+           "Minute volume as tidal volume x respiratory rate, per animal and timepoint, "
+           "summarised by group", ("lim2014",),
+           assumptions=("tidal volume as reported by the acquisition system, with its own "
+                        "corrections",),
+           limits=("a derived measure; ICH S7A 2.7.3 names respiratory rate and, as examples, "
+                   "tidal volume or haemoglobin oxygen saturation",)),
+        _m("sim.respiratory_declared",
+           "Simulated respiratory rate, tidal volume and oxygen saturation from declared group "
+           "means and effects with normal variability", ("ich_s7a",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",
