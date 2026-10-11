@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { AuditTrail } from "../components/AuditTrail";
-import { TriagePanel } from "../components/Triage";
+import { ProgramTriage, TriagePanel } from "../components/Triage";
 import { Citations, ErrorBox, roleLabel, Section, StateTag } from "../components/common";
 import { ProvenanceLegend, QuantityView } from "../components/QuantityView";
 import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
@@ -37,6 +37,7 @@ const TABS = [
   "overview",
   "studyset",
   "compounds",
+  "triage",
   "studies",
   "readiness",
   "module2",
@@ -70,6 +71,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
     overview: "Overview",
     studyset: "Study set",
     compounds: "Compounds",
+    triage: "In silico triage",
     studies: "Studies",
     readiness: "IND readiness",
     module2: "Module 2 summaries",
@@ -112,6 +114,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
                 { id: "overview", label: "Overview" },
                 { id: "studyset", label: "Study set", count: p.study_set.summary.required },
                 { id: "compounds", label: "Compounds", count: p.compounds.length },
+                { id: "triage", label: "In silico triage" },
                 { id: "studies", label: "Studies", count: p.studies.length },
               ],
             },
@@ -147,6 +150,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
           )}
           {active === "studyset" && <StudySet p={p} onErr={setErr} />}
           {active === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
+          {active === "triage" && <ProgramTriage programId={id} compounds={p.compounds} />}
           {active === "studies" && <Studies p={p} />}
           {active === "readiness" && <ReadinessView id={id} />}
           {active === "module2" && <ProgramSummaries programId={id} me={me} />}
