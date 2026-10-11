@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { ErrorBox, roleLabel, Section } from "../components/common";
-import { QuantityView } from "../components/QuantityView";
+import { ProvenanceLegend, QuantityView } from "../components/QuantityView";
 import { Empty, Loading, Pill, toast } from "../components/ui";
 import { fmtDate, fmtDateTime, meaningLabel, shortHash } from "../lib/format";
 import { href } from "../lib/router";
@@ -74,15 +74,30 @@ interface Listing {
   latest: Doc | null;
 }
 
-const PARTS: { id: string; label: string; sections?: (id: string) => boolean; tables?: string }[] = [
-  { id: "2.4", label: "2.4 Nonclinical overview", sections: (s) => s.startsWith("2.4.") },
-  { id: "2.6.1", label: "2.6.1 Introduction", sections: (s) => s === "2.6.1" },
-  { id: "2.6.2", label: "2.6.2 Pharmacology written summary", sections: (s) => s.startsWith("2.6.2.") },
-  { id: "2.6.3", label: "2.6.3 Pharmacology tabulated summary", tables: "2.6.3." },
-  { id: "2.6.4", label: "2.6.4 Pharmacokinetics written summary", sections: (s) => s.startsWith("2.6.4.") },
-  { id: "2.6.5", label: "2.6.5 Pharmacokinetics tabulated summary", tables: "2.6.5." },
-  { id: "2.6.6", label: "2.6.6 Toxicology written summary", sections: (s) => s.startsWith("2.6.6.") },
-  { id: "2.6.7", label: "2.6.7 Toxicology tabulated summary", tables: "2.6.7." },
+const PARTS: { id: string; label: string; short: string; sections?: (id: string) => boolean; tables?: string }[] = [
+  { id: "2.4", label: "2.4 Nonclinical overview", short: "2.4 Overview", sections: (s) => s.startsWith("2.4.") },
+  { id: "2.6.1", label: "2.6.1 Introduction", short: "2.6.1 Introduction", sections: (s) => s === "2.6.1" },
+  {
+    id: "2.6.2",
+    label: "2.6.2 Pharmacology written summary",
+    short: "2.6.2 Pharmacology",
+    sections: (s) => s.startsWith("2.6.2."),
+  },
+  { id: "2.6.3", label: "2.6.3 Pharmacology tabulated summary", short: "2.6.3 Pharmacology tables", tables: "2.6.3." },
+  {
+    id: "2.6.4",
+    label: "2.6.4 Pharmacokinetics written summary",
+    short: "2.6.4 Pharmacokinetics",
+    sections: (s) => s.startsWith("2.6.4."),
+  },
+  { id: "2.6.5", label: "2.6.5 Pharmacokinetics tabulated summary", short: "2.6.5 PK tables", tables: "2.6.5." },
+  {
+    id: "2.6.6",
+    label: "2.6.6 Toxicology written summary",
+    short: "2.6.6 Toxicology",
+    sections: (s) => s.startsWith("2.6.6."),
+  },
+  { id: "2.6.7", label: "2.6.7 Toxicology tabulated summary", short: "2.6.7 Toxicology tables", tables: "2.6.7." },
 ];
 
 function StudyLink({ id, children }: { id: string; children: ReactNode }) {
@@ -151,7 +166,7 @@ function CellView({ c }: { c: Cell }) {
   if ("quantity" in c)
     return (
       <span>
-        <QuantityView q={c.quantity} />{" "}
+        <QuantityView q={c.quantity} compact />{" "}
         <StudyLink id={c.source.study_id}>
           <span className="small" aria-label="source study">
             ↗
@@ -208,6 +223,9 @@ function TableView({ t }: { t: SummaryTable }) {
           {n}
         </div>
       ))}
+      {t.rows.some((r) => r.some((c) => typeof c === "object" && c !== null && "quantity" in c)) && (
+        <ProvenanceLegend />
+      )}
     </div>
   );
 }
@@ -419,7 +437,19 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
         )}
       </Section>
       {doc && shown && (
-        <div className="with-toc m2-layout">
+        <>
+          <nav className="subtabs" aria-label="Module 2 parts">
+            {PARTS.map((p) => (
+              <button
+                key={p.id}
+                className={p.id === part ? "subtab active" : "subtab"}
+                onClick={() => setPart(p.id)}
+                title={p.label}
+              >
+                {p.short}
+              </button>
+            ))}
+          </nav>
           <Section title={PARTS.find((p) => p.id === part)!.label}>
             {shown.isTables ? (
               shown.tables.length === 0 ? (
@@ -438,15 +468,7 @@ export function ProgramSummaries({ programId, me }: { programId: string; me: Pri
               ))
             )}
           </Section>
-          <nav className="page-toc" aria-label="Module 2 parts">
-            <div className="page-toc-title">Module 2</div>
-            {PARTS.map((p) => (
-              <button key={p.id} className={p.id === part ? "active" : ""} onClick={() => setPart(p.id)}>
-                {p.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        </>
       )}
       {doc && <SignPanel doc={doc} me={me} base={base} latest={latest} onSigned={load} onErr={setErr} />}
     </>

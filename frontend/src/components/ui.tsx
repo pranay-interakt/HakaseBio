@@ -142,6 +142,43 @@ export function Tabs({
   );
 }
 
+export interface NavGroup {
+  label: string;
+  items: TabItem[];
+}
+
+/** A grouped section menu beside the content (a scrolling row of links on narrow screens). */
+export function SideNav({
+  groups,
+  active,
+  hrefFor,
+}: {
+  groups: NavGroup[];
+  active: string;
+  hrefFor: (id: string) => string;
+}) {
+  return (
+    <nav className="side-nav" aria-label="Sections">
+      {groups.map((g) => (
+        <div key={g.label} className="side-group">
+          <div className="side-group-label">{g.label}</div>
+          {g.items.map((t) => (
+            <a
+              key={t.id}
+              href={hrefFor(t.id)}
+              className={t.id === active ? "side-link active" : "side-link"}
+              aria-current={t.id === active ? "page" : undefined}
+            >
+              <span>{t.label}</span>
+              {t.count !== undefined && <span className="tab-count">{t.count}</span>}
+            </a>
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="loading" role="status">
@@ -418,5 +455,37 @@ export function ReasonAction({
         Cancel
       </button>
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// a choice of a few options, shown side by side
+
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: T; label: ReactNode; title?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          role="radio"
+          aria-checked={o.value === value}
+          className={o.value === value ? "seg active" : "seg"}
+          title={o.title}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }

@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { ApiError } from "../api";
 import { stateLabel } from "../lib/format";
 import { isQuantity, type Table } from "../types";
-import { CitationLine, QuantityView } from "./QuantityView";
+import { CitationLine, ProvenanceLegend, QuantityView } from "./QuantityView";
 import logoOnDark from "../assets/hakase-logo-on-dark.png";
 import logoOnLight from "../assets/hakase-logo-on-light.png";
 
@@ -53,7 +53,7 @@ export function Markdown({ text }: { text: string }) {
 }
 
 export function Cell({ v }: { v: unknown }) {
-  if (isQuantity(v)) return <QuantityView q={v} />;
+  if (isQuantity(v)) return <QuantityView q={v} compact />;
   if (v === null || v === undefined) return <span className="muted">—</span>;
   return <>{String(v)}</>;
 }
@@ -71,7 +71,7 @@ export function DataTable({ t }: { t: Table }) {
             <tr>
               {t.columns.map((c, j) => (
                 <th key={c} className={numCols[j] ? "num" : undefined}>
-                  {c}
+                  {c.charAt(0).toUpperCase() + c.slice(1)}
                 </th>
               ))}
             </tr>
@@ -90,6 +90,7 @@ export function DataTable({ t }: { t: Table }) {
         </table>
       </div>
       {t.note && <div className="muted small">{t.note}</div>}
+      {t.rows.some((r) => r.some(isQuantity)) && <ProvenanceLegend />}
     </div>
   );
 }
@@ -186,9 +187,12 @@ const STATE_TONE: Record<string, string> = {
 
 export function StateTag({ state, simulated }: { state: string; simulated?: boolean }) {
   return (
-    <span className="tag-group">
-      <span className={`pill pill-${STATE_TONE[state] ?? "neutral"}`}>{stateLabel(state)}</span>
-      {simulated && <span className="pill pill-simulated">Simulated</span>}
+    <span
+      className={`pill pill-${STATE_TONE[state] ?? "neutral"}${simulated ? " has-sim" : ""}`}
+      title={simulated ? "Contains simulated data: never approved or used as evidence" : undefined}
+    >
+      {stateLabel(state)}
+      {simulated && <span className="sim-mark">SIM</span>}
     </span>
   );
 }

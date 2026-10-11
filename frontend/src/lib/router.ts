@@ -6,20 +6,21 @@ export type Route =
   | { name: "programs" }
   | { name: "new-program" }
   | { name: "program"; id: string; tab: string | null }
-  | { name: "study"; id: string }
+  | { name: "study"; id: string; tab: string | null }
   | { name: "import"; programId: string; requirementId: string }
   | { name: "users" }
-  | { name: "password" };
+  | { name: "settings" };
 
 export function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "programs" && parts[1] === "new") return { name: "new-program" };
   if (parts[0] === "program" && parts[1]) return { name: "program", id: parts[1], tab: parts[2] ?? null };
-  if (parts[0] === "study" && parts[1]) return { name: "study", id: parts[1] };
+  if (parts[0] === "study" && parts[1]) return { name: "study", id: parts[1], tab: parts[2] ?? null };
   if (parts[0] === "import" && parts[1] && parts[2])
     return { name: "import", programId: parts[1], requirementId: parts[2] };
   if (parts[0] === "users") return { name: "users" };
-  if (parts[0] === "password") return { name: "password" };
+  // #/password is the older address of the password form, now part of Settings
+  if (parts[0] === "settings" || parts[0] === "password") return { name: "settings" };
   return { name: "programs" };
 }
 
@@ -27,11 +28,11 @@ export const href = {
   programs: () => "#/",
   newProgram: () => "#/programs/new",
   program: (id: string, tab?: string) => `#/program/${encodeURIComponent(id)}${tab ? `/${tab}` : ""}`,
-  study: (id: string) => `#/study/${encodeURIComponent(id)}`,
+  study: (id: string, tab?: string) => `#/study/${encodeURIComponent(id)}${tab ? `/${tab}` : ""}`,
   importReport: (programId: string, requirementId: string) =>
     `#/import/${encodeURIComponent(programId)}/${encodeURIComponent(requirementId)}`,
   users: () => "#/users",
-  password: () => "#/password",
+  settings: () => "#/settings",
 };
 
 export function go(hash: string): void {

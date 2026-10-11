@@ -14,7 +14,18 @@ import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
 import { prune, SchemaFields, SchemaForm } from "../components/SchemaForm";
 import { SendExport } from "../components/SendExport";
-import { Collapsible, Facts, Loading, PageHeader, Pill, toast, useBreadcrumbs, ValueView } from "../components/ui";
+import {
+  Collapsible,
+  Facts,
+  Loading,
+  PageHeader,
+  Pill,
+  Tabs,
+  toast,
+  useBreadcrumbs,
+  ValueView,
+  type TabItem,
+} from "../components/ui";
 import {
   actionLabel,
   fmtDateTime,
@@ -33,11 +44,24 @@ const RECEIVABLE = ["dispatched", "data_received", "analyzed"];
 
 type Run = <T>(fn: () => Promise<T>, done?: string) => Promise<void>;
 
-function scrollTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+type StudyTab = "overview" | "design" | "execution" | "results" | "report" | "send" | "audit";
+
+/** Where each piece of work lives: the overview's next step sends you to its tab. */
+function tabFor(target: string): StudyTab {
+  if (["sec-design", "sec-protocol", "sec-plan"].includes(target)) return "design";
+  if (["sec-dispatch", "sec-execution"].includes(target)) return "execution";
+  if (["sec-inputs", "sec-analyse", "sec-results", "sec-determinations"].includes(target)) return "results";
+  if (target === "sec-report") return "report";
+  return "overview";
 }
 
-export function Study({ id, me }: { id: string; me: Principal }) {
+/** Open a study tab and bring the given section into view. */
+function goTo(studyId: string, target: string) {
+  window.location.hash = href.study(studyId, tabFor(target));
+  window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+}
+
+export function Study({ id, tab, me }: { id: string; tab: string | null; me: Principal }) {
   const [s, setS] = useState<StudyT | null>(null);
   const [driver, setDriver] = useState<Driver | null>(null);
   const [siblings, setSiblings] = useState<StudySummary[]>([]);
@@ -58,16 +82,6 @@ export function Study({ id, me }: { id: string; me: Principal }) {
     setDriver(null);
     load();
   }, [load]);
-  useBreadcrumbs([
-    { label: "Programmes", href: href.programs() },
-    ...(s
-      ? [
-          { label: s.program_name ?? "Programme", href: href.program(s.program_id) },
-          { label: "Studies", href: href.program(s.program_id, "studies") },
-        ]
-      : []),
-    { label: s?.title ?? "Study" },
-  ]);
 
   const run: Run = async (fn, done) => {
     setBusy(true);
@@ -84,6 +98,32 @@ export function Study({ id, me }: { id: string; me: Principal }) {
       setBusy(false);
     }
   };
+
+  const tabs: TabItem[] = [];
+  if (s && driver) {
+    const st = s.state;
+    const later = (states: string[]) => states.includes(st);
+    tabs.push({ id: "overview", label: "Overview" });
+    tabs.push({ id: "design", label: "Design & protocol" });
+    if (s.execution || st === "planned") tabs.push({ id: "execution", label: "Execution & data" });
+    if (s.results || later(["data_received", "analyzed"])) tabs.push({ id: "results", label: "Results" });
+    if (s.report || st === "analyzed") tabs.push({ id: "report", label: "Report & signatures" });
+    if (driver.id === "repeat_dose_toxicity" && s.data) tabs.push({ id: "send", label: "SEND export" });
+    tabs.push({ id: "audit", label: "Audit trail" });
+  }
+  const active = (tabs.some((t) => t.id === tab) ? tab : "overview") as StudyTab;
+  const tabLabel = tabs.find((t) => t.id === active)?.label;
+  useBreadcrumbs([
+    { label: "Programmes", href: href.programs() },
+    ...(s
+      ? [
+          { label: s.program_name ?? "Programme", href: href.program(s.program_id) },
+          { label: "Studies", href: href.program(s.program_id, "studies") },
+          { label: s.title, href: href.study(s.id) },
+        ]
+      : [{ label: "Study" }]),
+    ...(s && active !== "overview" && tabLabel ? [{ label: tabLabel }] : []),
+  ]);
 
   if (!s) return err ? <ErrorBox error={err} /> : <Loading />;
   const facts: [ReactNode, ReactNode][] = [
@@ -111,31 +151,6 @@ export function Study({ id, me }: { id: string; me: Principal }) {
   if (!driver) return err ? <ErrorBox error={err} /> : <Loading />;
 
   const amending = s.state !== "proposed";
-  const sections: [string, string][] = [];
-  const add = (sid: string, label: string, when: unknown) => when && sections.push([sid, label]);
-  add("sec-design", amending ? "Amend design" : "Design", DESIGNABLE.includes(s.state));
-  add("sec-protocol", "Protocol", s.protocol);
-  add("sec-plan", "Plan", s.state === "designed" || s.plan);
-  add("sec-dispatch", "Dispatch", s.state === "planned");
-  add("sec-execution", "Execution & data", s.execution);
-  add(
-    "sec-inputs",
-    "Analysis inputs",
-    s.expected_inputs &&
-      Object.keys(s.expected_inputs).length > 0 &&
-      !["reported", "approved", "cancelled", "failed"].includes(s.state),
-  );
-  add("sec-analyse", "Analyse", ["data_received", "analyzed", "reported"].includes(s.state));
-  add("sec-results", "Results", s.results);
-  add(
-    "sec-determinations",
-    "Expert determinations",
-    s.expert_determinations && s.expert_determinations.length > 0 && s.results,
-  );
-  add("sec-report", "Report", s.state === "analyzed" || s.report);
-  add("sec-send", "SEND export", driver.id === "repeat_dose_toxicity" && s.data);
-  add("sec-audit", "Audit trail", true);
-
   return (
     <div className="page">
       <PageHeader
@@ -146,32 +161,22 @@ export function Study({ id, me }: { id: string; me: Principal }) {
             <StateTag state={s.state} simulated={s.simulated} />
             <span>{s.glp ? "GLP" : "Non-GLP"}</span>
             <span>CTD {driver.ctd_section}</span>
+            <span>{driver.name}</span>
           </>
         }
       >
         <Lifecycle state={s.state} />
       </PageHeader>
-      <section className="card">
-        <Facts
-          items={[
-            ...facts,
-            ["Method", `${driver.name} (v${s.driver_version})`],
-            ["Created", fmtDateTime(s.created_at)],
-            ["Last change", fmtDateTime(s.updated_at)],
-          ]}
-        />
-        {s.hypothesis && <p className="small">Hypothesis: {s.hypothesis}</p>}
-      </section>
-      <NextStep s={s} />
-      {s.simulated && (
-        <div className="banner-sim">
-          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be
-          approved or included in an IND.
-        </div>
-      )}
+      <Tabs items={tabs} active={active} hrefFor={(t) => href.study(s.id, t === "overview" ? undefined : t)} />
       <ErrorBox error={err} onDismiss={() => setErr(null)} />
-      <div className="with-toc">
-        <div className="stack">
+      {s.simulated && active !== "overview" && (
+        <div className="banner-sim">SIMULATED data: for demonstration only; never approved or included in an IND.</div>
+      )}
+
+      {active === "overview" && <Overview s={s} driver={driver} facts={facts} />}
+
+      {active === "design" && (
+        <>
           {DESIGNABLE.includes(s.state) && (
             <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />
           )}
@@ -196,8 +201,18 @@ export function Study({ id, me }: { id: string; me: Principal }) {
             </Section>
           )}
           {s.plan && <PlanView plan={s.plan} />}
+        </>
+      )}
+
+      {active === "execution" && (
+        <>
           {s.state === "planned" && <DispatchSection s={s} driver={driver} busy={busy} run={run} />}
           {s.execution && <ExecutionView s={s} busy={busy} run={run} />}
+        </>
+      )}
+
+      {active === "results" && (
+        <>
           {s.expected_inputs &&
             Object.keys(s.expected_inputs).length > 0 &&
             !["reported", "approved", "cancelled", "failed"].includes(s.state) && (
@@ -210,6 +225,11 @@ export function Study({ id, me }: { id: string; me: Principal }) {
           {s.expert_determinations && s.expert_determinations.length > 0 && s.results && (
             <DeterminationsSection s={s} me={me} busy={busy} run={run} />
           )}
+        </>
+      )}
+
+      {active === "report" && (
+        <>
           {s.state === "analyzed" && (
             <Section
               id="sec-report"
@@ -226,24 +246,152 @@ export function Study({ id, me }: { id: string; me: Principal }) {
             </Section>
           )}
           {s.report && <ReportSection s={s} me={me} busy={busy} run={run} />}
-          {driver.id === "repeat_dose_toxicity" && s.data && (
-            <div id="sec-send">
-              <SendExport studyId={id} key={s.updated_at} />
-            </div>
-          )}
-          <AuditTrail id={id} key={s.state + s.updated_at} />
+        </>
+      )}
+
+      {active === "send" && <SendExport studyId={id} key={s.updated_at} />}
+
+      {active === "audit" && (
+        <>
+          <AuditTrail id={id} key={s.state + s.updated_at} open />
           {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
-        </div>
-        <nav className="page-toc" aria-label="On this page">
-          <div className="page-toc-title">On this page</div>
-          {sections.map(([sid, label]) => (
-            <button key={sid} onClick={() => scrollTo(sid)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-      </div>
+        </>
+      )}
     </div>
+  );
+}
+
+// ---- overview -------------------------------------------------------------------------------
+
+function Overview({ s, driver, facts }: { s: StudyT; driver: Driver; facts: [ReactNode, ReactNode][] }) {
+  const current = s.determinations.filter((d) => s.results && d.analysis_hash === s.results.analysis_hash);
+  const specs = s.expert_determinations ?? [];
+  const reportSigs = s.report_hash ? s.signatures.filter((g) => g.subject_hash === s.report_hash) : [];
+  const protocolApproved = s.signatures.some(
+    (g) =>
+      g.role === "study_director" &&
+      (g.subject_id ?? "").startsWith(`${s.id}/protocol/`) &&
+      g.subject_hash === s.protocol_hash,
+  );
+  return (
+    <>
+      <NextStep s={s} />
+      {s.simulated && (
+        <div className="banner-sim">
+          This study contains SIMULATED data. It can be analysed and reported for demonstration but can never be
+          approved or included in an IND.
+        </div>
+      )}
+      <Section title="About this study">
+        <Facts
+          items={[
+            ...facts,
+            ["Method", `${driver.name} (v${s.driver_version})`],
+            ["Created", fmtDateTime(s.created_at)],
+            ["Last change", fmtDateTime(s.updated_at)],
+          ]}
+        />
+        {s.hypothesis && <p className="small">Hypothesis: {s.hypothesis}</p>}
+      </Section>
+      <Section title="At a glance">
+        <div className="glance">
+          <Glance
+            label="Protocol"
+            value={s.protocol ? `Version ${s.protocol_version}` : "Not designed"}
+            sub={
+              s.protocol
+                ? s.glp
+                  ? protocolApproved
+                    ? "Approved by the Study Director"
+                    : "Awaiting Study Director approval"
+                  : "Designed"
+                : undefined
+            }
+            tone={s.protocol ? (s.glp && !protocolApproved ? "warn" : "ok") : "neutral"}
+            target={() => goTo(s.id, "sec-protocol")}
+          />
+          <Glance
+            label="Data"
+            value={
+              s.raw_files.length > 0 ? `${s.raw_files.length} file${s.raw_files.length === 1 ? "" : "s"}` : "None yet"
+            }
+            sub={
+              s.raw_files.length > 0
+                ? `last ${fmtDateTime(s.raw_files[s.raw_files.length - 1].received_at)}`
+                : undefined
+            }
+            tone={s.raw_files.length > 0 ? (s.simulated ? "bad" : "ok") : "neutral"}
+            target={() => goTo(s.id, "sec-execution")}
+          />
+          <Glance
+            label="Analysis"
+            value={s.results ? `QC ${statusLabel(s.results.qc.status).toLowerCase()}` : "Not run"}
+            sub={
+              s.results
+                ? `${s.results.qc.findings.length} QC finding${s.results.qc.findings.length === 1 ? "" : "s"}`
+                : undefined
+            }
+            tone={
+              s.results
+                ? s.results.qc.status === "fail"
+                  ? "bad"
+                  : s.results.qc.status === "warn"
+                    ? "warn"
+                    : "ok"
+                : "neutral"
+            }
+            target={() => goTo(s.id, "sec-results")}
+          />
+          <Glance
+            label="Determinations"
+            value={specs.length === 0 ? "None needed" : `${current.length} of ${specs.length} signed`}
+            tone={
+              specs.length === 0
+                ? "neutral"
+                : current.length >= specs.filter((d) => d.required_for_approval).length
+                  ? "ok"
+                  : "warn"
+            }
+            target={() => goTo(s.id, "sec-determinations")}
+          />
+          <Glance
+            label="Report"
+            value={s.report ? `${reportSigs.length} signature${reportSigs.length === 1 ? "" : "s"}` : "Not generated"}
+            sub={
+              s.state === "approved"
+                ? "Approved"
+                : s.approval_missing && s.approval_missing.length > 0
+                  ? `still needed: ${s.approval_missing.join(", ")}`
+                  : undefined
+            }
+            tone={s.state === "approved" ? "ok" : s.report ? "warn" : "neutral"}
+            target={() => goTo(s.id, "sec-report")}
+          />
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function Glance({
+  label,
+  value,
+  sub,
+  tone,
+  target,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone: string;
+  target: () => void;
+}) {
+  return (
+    <button className={`glance-item tone-${tone}`} onClick={target}>
+      <span className="glance-label">{label}</span>
+      <span className="glance-value">{value}</span>
+      {sub && <span className="glance-sub">{sub}</span>}
+    </button>
   );
 }
 
@@ -276,7 +424,7 @@ function NextStep({ s }: { s: StudyT }) {
           </div>
         </div>
         {s.state === "analyzed" ? (
-          <button className="small" onClick={() => scrollTo("sec-execution")}>
+          <button className="small" onClick={() => goTo(s.id, "sec-execution")}>
             Go to the data
           </button>
         ) : (
@@ -334,7 +482,7 @@ function NextStep({ s }: { s: StudyT }) {
         <div className="callout-text">{text}</div>
       </div>
       {target && (
-        <button className="primary small" onClick={() => scrollTo(target!)}>
+        <button className="primary small" onClick={() => goTo(s.id, target!)}>
           Go there
         </button>
       )}
@@ -1226,7 +1374,7 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
 
 // ---- audit trail & cancel -------------------------------------------------------------------
 
-function AuditTrail({ id }: { id: string }) {
+function AuditTrail({ id, open = false }: { id: string; open?: boolean }) {
   const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
   useEffect(() => {
     api
@@ -1235,7 +1383,7 @@ function AuditTrail({ id }: { id: string }) {
       .catch(() => setEntries([]));
   }, [id]);
   return (
-    <Collapsible id="sec-audit" title={`Audit trail${entries ? ` (${entries.length})` : ""}`} defaultOpen={false}>
+    <Collapsible id="sec-audit" title={`Audit trail${entries ? ` (${entries.length})` : ""}`} defaultOpen={open}>
       {entries === null ? (
         <Loading />
       ) : entries.length === 0 ? (

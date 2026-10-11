@@ -343,7 +343,6 @@ function ManageUser({ u, me, act }: { u: UserRow; me: Principal; act: Act }) {
 
 /** Change one's own password; also the forced change after an administrator's reset. */
 export function ChangePassword({ forced, onDone }: { forced: boolean; onDone: () => void }) {
-  useBreadcrumbs([{ label: "Change password" }]);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -352,6 +351,10 @@ export function ChangePassword({ forced, onDone }: { forced: boolean; onDone: ()
     try {
       await api.post("/auth/password", { current_password: current, new_password: next });
       toast("Password changed");
+      setCurrent("");
+      setNext("");
+      setAgain("");
+      setErr(null);
       onDone();
     } catch (e) {
       setErr(e);

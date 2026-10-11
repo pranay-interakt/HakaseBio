@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { Citations, ErrorBox, roleLabel, Section, StateTag } from "../components/common";
-import { QuantityView } from "../components/QuantityView";
+import { ProvenanceLegend, QuantityView } from "../components/QuantityView";
 import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
-import { Empty, Facts, Loading, PageHeader, Pill, Tabs, toast, useBreadcrumbs, ValueView } from "../components/ui";
+import { Empty, Facts, Loading, PageHeader, Pill, SideNav, toast, useBreadcrumbs, ValueView } from "../components/ui";
 import {
   fmtAgo,
   fmtDate,
@@ -69,8 +69,8 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
     compounds: "Compounds",
     studies: "Studies",
     readiness: "IND readiness",
-    module2: "Module 2",
-    module4: "Module 4",
+    module2: "Module 2 summaries",
+    module4: "Module 4 reports",
     whatif: "What-if",
     rehearsal: "Rehearsal",
     access: "Access",
@@ -97,36 +97,55 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
           </>
         }
       />
-      <Tabs
-        active={active}
-        hrefFor={(t) => href.program(id, t === "overview" ? undefined : t)}
-        items={[
-          { id: "overview", label: "Overview" },
-          { id: "studyset", label: "Study set", count: p.study_set.summary.required },
-          { id: "compounds", label: "Compounds", count: p.compounds.length },
-          { id: "studies", label: "Studies", count: p.studies.length },
-          { id: "readiness", label: "IND readiness" },
-          { id: "module2", label: "Module 2" },
-          { id: "module4", label: "Module 4" },
-          { id: "whatif", label: "What-if" },
-          { id: "rehearsal", label: "Rehearsal" },
-          { id: "access", label: "Access" },
-        ]}
-      />
-      <ErrorBox error={err} onDismiss={() => setErr(null)} />
-      {active === "overview" && <Overview p={p} />}
-      {active === "studyset" && ctx.modality === "peptide" && (
-        <PeptideRouting p={p} me={me} reload={load} onErr={setErr} />
-      )}
-      {active === "studyset" && <StudySet p={p} onErr={setErr} />}
-      {active === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
-      {active === "studies" && <Studies p={p} />}
-      {active === "readiness" && <ReadinessView id={id} />}
-      {active === "module2" && <ProgramSummaries programId={id} me={me} />}
-      {active === "module4" && <Module4 id={id} />}
-      {active === "whatif" && <WhatIf p={p} reload={load} />}
-      {active === "rehearsal" && <RehearsalView p={p} />}
-      {active === "access" && <ProgramAccess id={id} me={me} onErr={setErr} />}
+      <div className="side-layout">
+        <SideNav
+          active={active}
+          hrefFor={(t) => href.program(id, t === "overview" ? undefined : t)}
+          groups={[
+            {
+              label: "Programme",
+              items: [
+                { id: "overview", label: "Overview" },
+                { id: "studyset", label: "Study set", count: p.study_set.summary.required },
+                { id: "compounds", label: "Compounds", count: p.compounds.length },
+                { id: "studies", label: "Studies", count: p.studies.length },
+              ],
+            },
+            {
+              label: "Submission",
+              items: [
+                { id: "readiness", label: "IND readiness" },
+                { id: "module2", label: "Module 2 summaries" },
+                { id: "module4", label: "Module 4 reports" },
+              ],
+            },
+            {
+              label: "Planning",
+              items: [
+                { id: "whatif", label: "What-if" },
+                { id: "rehearsal", label: "Rehearsal" },
+              ],
+            },
+            { label: "Settings", items: [{ id: "access", label: "Access" }] },
+          ]}
+        />
+        <div className="side-content">
+          <ErrorBox error={err} onDismiss={() => setErr(null)} />
+          {active === "overview" && <Overview p={p} />}
+          {active === "studyset" && ctx.modality === "peptide" && (
+            <PeptideRouting p={p} me={me} reload={load} onErr={setErr} />
+          )}
+          {active === "studyset" && <StudySet p={p} onErr={setErr} />}
+          {active === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
+          {active === "studies" && <Studies p={p} />}
+          {active === "readiness" && <ReadinessView id={id} />}
+          {active === "module2" && <ProgramSummaries programId={id} me={me} />}
+          {active === "module4" && <Module4 id={id} />}
+          {active === "whatif" && <WhatIf p={p} reload={load} />}
+          {active === "rehearsal" && <RehearsalView p={p} />}
+          {active === "access" && <ProgramAccess id={id} me={me} onErr={setErr} />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -497,9 +516,8 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: "38%" }}>Study</th>
+                    <th style={{ width: "40%" }}>Study</th>
                     <th>Status</th>
-                    <th>GLP</th>
                     <th>Basis</th>
                     <th>Studies</th>
                     <th />
@@ -527,11 +545,13 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
                             {r.rationale}
                           </details>
                         </td>
-                        <td>
-                          <span className={`tag tag-${r.status}`}>{statusLabel(r.status)}</span>
+                        <td className="nowrap">
+                          <span className="tag-group">
+                            <span className={`tag tag-${r.status}`}>{statusLabel(r.status)}</span>
+                            {r.glp && <span className="tag">GLP</span>}
+                          </span>
                           {r.pending_fact && <div className="small muted">pending: {r.pending_fact}</div>}
                         </td>
-                        <td>{r.glp ? "Yes" : "No"}</td>
                         <td className="small" title={r.citation.text}>
                           {r.section}
                           {r.ctd_section && <div className="muted">CTD {r.ctd_section}</div>}
@@ -540,13 +560,13 @@ function StudySet({ p, onErr }: { p: ProgramT; onErr: (e: unknown) => void }) {
                           {existing.length === 0 ? (
                             <span className="muted">—</span>
                           ) : (
-                            existing.map((s) => (
-                              <div key={s.id}>
-                                <a href={href.study(s.id)}>
+                            <span className="tag-group">
+                              {existing.map((s) => (
+                                <a key={s.id} href={href.study(s.id)} title={s.title}>
                                   <StateTag state={s.state} simulated={s.simulated} />
                                 </a>
-                              </div>
-                            ))
+                              ))}
+                            </span>
                           )}
                         </td>
                         <td>
@@ -650,24 +670,21 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
               ]}
             />
             <h4>Descriptors</h4>
-            <div className="table-wrap">
-              <table className="compact">
-                <tbody>
-                  {Object.entries(c.profile.descriptors).map(([k, q]) => (
-                    <tr key={k}>
-                      <td style={{ width: "40%" }}>{q.label ?? humanize(k)}</td>
-                      <td>
-                        <QuantityView q={q} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <dl className="descriptors">
+              {Object.entries(c.profile.descriptors).map(([k, q]) => (
+                <div key={k} className="descriptor">
+                  <dt>{q.label ?? humanize(k)}</dt>
+                  <dd>
+                    <QuantityView q={q} compact />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <ProvenanceLegend />
             {Object.entries(c.external).map(([src, r]) => (
-              <div key={src} className="external">
-                <div className="row">
-                  <strong>{src === "pubchem" ? "PubChem" : src === "chembl" ? "ChEMBL" : humanize(src)}</strong>
+              <details key={src} className="external">
+                <summary className="row">
+                  <strong>{sourceLabel(src)}</strong>
                   <span className={`tag tag-${r.status}`}>{statusLabel(r.status)}</span>
                   {r.from_cache && <span className="muted small">cached</span>}
                   <span className="muted small">
@@ -675,7 +692,7 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
-                </div>
+                </summary>
                 {r.error && <div className="muted small">{r.error}</div>}
                 {r.records.slice(0, 1).map((rec, i) => (
                   <div key={i} style={{ marginTop: 6 }}>
@@ -689,17 +706,20 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
                   </div>
                 ))}
                 {Object.keys(r.quantities).length > 0 && (
-                  <div className="qty-list">
+                  <dl className="descriptors" style={{ marginTop: 8 }}>
                     {Object.values(r.quantities)
                       .slice(0, 30)
                       .map((q) => (
-                        <div key={q.id}>
-                          <QuantityView q={q} showLabel />
+                        <div key={q.id} className="descriptor">
+                          <dt>{q.label}</dt>
+                          <dd>
+                            <QuantityView q={q} compact />
+                          </dd>
                         </div>
                       ))}
-                  </div>
+                  </dl>
                 )}
-              </div>
+              </details>
             ))}
           </Section>
         ),
@@ -728,6 +748,15 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
       </Section>
     </>
   );
+}
+
+/** A data source key as people write it: chembl_herg_ic50 -> ChEMBL hERG IC50. */
+function sourceLabel(key: string): string {
+  const words: Record<string, string> = { pubchem: "PubChem", chembl: "ChEMBL", herg: "hERG", ic50: "IC50" };
+  return key
+    .split("_")
+    .map((w) => words[w] ?? w)
+    .join(" ");
 }
 
 // ---- studies --------------------------------------------------------------------------------

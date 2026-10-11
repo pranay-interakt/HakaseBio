@@ -352,15 +352,33 @@ function ValueInput({
 
 // ---- objects, record lists, maps ------------------------------------------------------------
 
-function Label({ name, raw, s, required }: { name: string; raw: JsonSchema; s: JsonSchema; required: boolean }) {
+function Label({
+  name,
+  raw,
+  s,
+  required,
+  inline = false,
+}: {
+  name: string;
+  raw: JsonSchema;
+  s: JsonSchema;
+  required: boolean;
+  inline?: boolean;
+}) {
   const desc = raw.description ?? s.description;
   return (
-    <span className="field-label">
+    <span className="field-label" title={fieldLabel(name)}>
       {fieldLabel(name)}
       {required && <span className="req"> *</span>}
-      {desc && <span className="sf-desc"> — {desc}</span>}
+      {inline && desc && <span className="sf-desc"> — {desc}</span>}
     </span>
   );
+}
+
+/** A field's description under its input, so labels stay on one line and inputs line up. */
+function Help({ raw, s }: { raw: JsonSchema; s: JsonSchema }) {
+  const desc = raw.description ?? s.description;
+  return desc ? <span className="field-help">{desc}</span> : null;
 }
 
 export function ObjectFields({
@@ -368,11 +386,13 @@ export function ObjectFields({
   value,
   onChange,
   root,
+  collapseOptional = false,
 }: {
   schema: JsonSchema;
   value: Obj;
   onChange: (v: Obj) => void;
   root: JsonSchema;
+  collapseOptional?: boolean;
 }) {
   const props = schema.properties ?? {};
   const required = new Set(schema.required ?? []);
@@ -384,30 +404,61 @@ export function ObjectFields({
   };
   const entries = Object.entries(props).map(([k, raw]) => {
     const { schema: s, optional } = unwrapOptional(raw, root);
-    return { k, raw, s, optional, kind: kindOf(s, root) };
+    return { k, raw, s, optional, kind: kindOf(s, root), req: required.has(k) && !optional };
   });
-  const simple = entries.filter((e) => SCALAR.includes(e.kind) || e.kind === "tuple" || e.kind === "json");
-  const complex = entries.filter((e) => !simple.includes(e));
+  // optional fields that start empty wait under "More options", so the form opens on what is
+  // needed; the split is fixed when the form opens, so a field never jumps while being typed in
+  const [tucked] = useState<Set<string>>(
+    () =>
+      new Set(
+        collapseOptional
+          ? entries.filter((e) => !e.req && (value[e.k] === undefined || value[e.k] === null)).map((e) => e.k)
+          : [],
+      ),
+  );
+  const render = (list: typeof entries) => {
+    const simple = list.filter((e) => SCALAR.includes(e.kind) || e.kind === "tuple" || e.kind === "json");
+    const complex = list.filter((e) => !simple.includes(e));
+    return (
+      <>
+        {simple.length > 0 && (
+          <div className="sf-grid">
+            {simple.map(({ k, raw, s, req }) => (
+              <label className="field" key={k}>
+                <Label name={k} raw={raw} s={s} required={req} />
+                <ValueInput schema={s} value={value[k]} onChange={(v) => set(k, v)} root={root} />
+                <Help raw={raw} s={s} />
+              </label>
+            ))}
+          </div>
+        )}
+        {complex.map(({ k, raw, s, req }) => (
+          <div className="sf-group" key={k}>
+            <div className="sf-group-head">
+              <Label name={k} raw={raw} s={s} required={req} inline />
+            </div>
+            <ValueInput schema={s} value={value[k]} onChange={(v) => set(k, v)} root={root} />
+          </div>
+        ))}
+      </>
+    );
+  };
+  const main = entries.filter((e) => !tucked.has(e.k));
+  const more = entries.filter((e) => tucked.has(e.k));
   return (
     <div className="stack">
-      {simple.length > 0 && (
-        <div className="sf-grid">
-          {simple.map(({ k, raw, s, optional }) => (
-            <label className="field" key={k}>
-              <Label name={k} raw={raw} s={s} required={required.has(k) && !optional} />
-              <ValueInput schema={s} value={value[k]} onChange={(v) => set(k, v)} root={root} />
-            </label>
-          ))}
-        </div>
-      )}
-      {complex.map(({ k, raw, s, optional }) => (
-        <div className="sf-group" key={k}>
-          <div className="sf-group-head">
-            <Label name={k} raw={raw} s={s} required={required.has(k) && !optional} />
+      {render(main)}
+      {more.length > 0 && (
+        <details className="more-options">
+          <summary>
+            More options <span className="tab-count">{more.length}</span>
+            <span className="muted small">optional fields</span>
+          </summary>
+          <div className="stack" style={{ marginTop: 10 }}>
+            {render(more)}
           </div>
-          <ValueInput schema={s} value={value[k]} onChange={(v) => set(k, v)} root={root} />
-        </div>
-      ))}
+        </details>
+      )}
     </div>
   );
 }
@@ -614,7 +665,7 @@ export function SchemaFields({
   value: Obj;
   onChange: (v: Obj) => void;
 }) {
-  return <ObjectFields schema={schema} value={value} onChange={onChange} root={schema} />;
+  return <ObjectFields schema={schema} value={value} onChange={onChange} root={schema} collapseOptional />;
 }
 
 export function SchemaForm({

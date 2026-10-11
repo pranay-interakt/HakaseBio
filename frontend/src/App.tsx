@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, UNAUTHORIZED_EVENT, api, getToken, setToken } from "./api";
 import { Logo, roleLabel } from "./components/common";
+import { DerivationDrawer } from "./components/QuantityView";
 import { Breadcrumbs, CrumbProvider, Menu, NavArrows, Toaster, type Crumb } from "./components/ui";
 import { href, useRoute, type Route } from "./lib/router";
 import { ImportNew } from "./pages/ImportNew";
@@ -9,7 +10,9 @@ import { NewProgram } from "./pages/NewProgram";
 import { Program } from "./pages/Program";
 import { Programs } from "./pages/Programs";
 import { Study } from "./pages/Study";
+import { Settings } from "./pages/Settings";
 import { ChangePassword, Users } from "./pages/Users";
+import { effectiveTheme, usePrefs } from "./lib/prefs";
 import type { Principal } from "./types";
 
 /** Breadcrumbs shown until the page names its own place (e.g. while it loads). */
@@ -26,8 +29,8 @@ function defaultCrumbs(r: Route): Crumb[] {
       return [home, { label: "Import a report" }];
     case "users":
       return [{ label: "Users" }];
-    case "password":
-      return [{ label: "Change password" }];
+    case "settings":
+      return [{ label: "Settings" }];
     default:
       return [{ label: "Programmes" }];
   }
@@ -35,6 +38,7 @@ function defaultCrumbs(r: Route): Crumb[] {
 
 export function App() {
   const { route, hash, canBack, canForward } = useRoute();
+  const [prefs, setPrefs] = usePrefs();
   const [me, setMe] = useState<Principal | null>(null);
   const [checked, setChecked] = useState(false);
   const [crumbs, setCrumbs] = useState<{ hash: string; crumbs: Crumb[] } | null>(null);
@@ -108,7 +112,7 @@ export function App() {
       page = <Program id={route.id} tab={route.tab} me={me} />;
       break;
     case "study":
-      page = <Study id={route.id} me={me} />;
+      page = <Study id={route.id} tab={route.tab} me={me} />;
       break;
     case "import":
       page = <ImportNew programId={route.programId} requirementId={route.requirementId} />;
@@ -116,12 +120,8 @@ export function App() {
     case "users":
       page = me.roles.includes("admin") ? <Users me={me} /> : <Programs />;
       break;
-    case "password":
-      page = (
-        <div className="page">
-          <ChangePassword forced={false} onDone={() => window.history.back()} />
-        </div>
-      );
+    case "settings":
+      page = <Settings me={me} />;
       break;
     default:
       page = <Programs />;
@@ -150,6 +150,14 @@ export function App() {
                 : "Audit trail check unavailable"}
           </span>
         )}
+        <button
+          className="icon-btn theme-toggle"
+          onClick={() => setPrefs({ theme: effectiveTheme(prefs.theme) === "dark" ? "light" : "dark" })}
+          title={effectiveTheme(prefs.theme) === "dark" ? "Switch to the light theme" : "Switch to the dark theme"}
+          aria-label="Toggle light or dark theme"
+        >
+          {effectiveTheme(prefs.theme) === "dark" ? "☀" : "☾"}
+        </button>
         <Menu label={<span className="hide-narrow">{me.name}</span>}>
           <div className="menu-head">
             <div className="who">{me.name}</div>
@@ -157,12 +165,13 @@ export function App() {
             {me.organisation && <div className="muted small">{me.organisation}</div>}
           </div>
           {me.roles.includes("admin") && <a href={href.users()}>Users</a>}
-          <a href={href.password()}>Change password</a>
+          <a href={href.settings()}>Settings</a>
           <button onClick={signOut}>Sign out</button>
         </Menu>
       </header>
       <main>{page}</main>
       <Toaster />
+      <DerivationDrawer />
     </CrumbProvider>
   );
 }
