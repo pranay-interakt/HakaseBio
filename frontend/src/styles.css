@@ -1361,17 +1361,28 @@ details > summary {
   margin-bottom: 3px;
 }
 .statement {
-  border-left: 3px solid var(--line);
-  padding: 6px 12px;
+  padding: 8px 12px;
   margin: 8px 0;
   background: var(--panel-2);
-  border-radius: 0 6px 6px 0;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
 }
-.sev-notable {
-  border-left-color: var(--warn);
+/* severity is a quiet mark on the statement, not a coloured bar down the page */
+.statement.sev-notable > div:first-child::before,
+.statement.sev-concern > div:first-child::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: 1px;
 }
-.sev-concern {
-  border-left-color: var(--bad);
+.statement.sev-notable > div:first-child::before {
+  background: var(--warn);
+}
+.statement.sev-concern > div:first-child::before {
+  background: var(--bad);
 }
 .qc-fail {
   color: var(--bad);
@@ -1424,8 +1435,9 @@ details > summary {
 }
 .markdown blockquote {
   margin: 0;
-  padding: 6px 10px;
-  border-left: 3px solid var(--simulated);
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--simulated) 35%, transparent);
+  border-radius: 8px;
   background: var(--sim-bg);
 }
 .external {
@@ -1611,10 +1623,10 @@ p.drafted {
 }
 .author-text {
   white-space: pre-wrap;
-  border-left: 3px solid var(--accent);
-  padding: 6px 12px;
+  padding: 8px 12px;
   background: var(--panel-2);
-  border-radius: 0 6px 6px 0;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
 }
 .page-toc button.active {
   color: var(--accent);
@@ -1834,23 +1846,29 @@ p.drafted {
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--panel);
-  border-left-width: 4px;
 }
 .glance-item:hover:not(:disabled) {
   border-color: var(--accent);
-  border-left-color: var(--accent);
 }
-.glance-item.tone-ok {
-  border-left-color: var(--ok);
+/* tone reads from a small mark beside the label, not a coloured edge */
+.glance-item .glance-label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+  background: var(--line);
 }
-.glance-item.tone-warn {
-  border-left-color: var(--warn);
+.glance-item.tone-ok .glance-label::before {
+  background: var(--ok);
 }
-.glance-item.tone-bad {
-  border-left-color: var(--bad);
+.glance-item.tone-warn .glance-label::before {
+  background: var(--warn);
 }
-.glance-item.tone-neutral {
-  border-left-color: var(--line);
+.glance-item.tone-bad .glance-label::before {
+  background: var(--bad);
 }
 .glance-label {
   font-size: 11.5px;
@@ -2161,4 +2179,51 @@ details.basis > summary {
 }
 details.basis .cites {
   margin: 4px 0 2px;
+}
+
+/* ---- in silico triage ------------------------------------------------------------------ */
+.signals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.signal {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--panel);
+}
+.signal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.signal-title {
+  font-weight: 600;
+}
+.signal-summary {
+  color: var(--ink-2);
+  font-size: 13px;
+  margin-top: 2px;
+}
+.signal-value {
+  margin-top: 8px;
+  font-size: 15px;
+}
+.signal-sub {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+table.signal-table {
+  margin-top: 6px;
+}
+details.signal-limits {
+  margin-top: 8px;
+}
+.triage-limitation {
+  margin-top: 12px;
 }

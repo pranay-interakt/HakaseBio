@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { AuditTrail } from "../components/AuditTrail";
+import { TriagePanel } from "../components/Triage";
 import { Citations, ErrorBox, roleLabel, Section, StateTag } from "../components/common";
 import { ProvenanceLegend, QuantityView } from "../components/QuantityView";
 import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
@@ -681,6 +682,7 @@ function Compounds({ p, reload, onErr }: { p: ProgramT; reload: () => void; onEr
                 ["Computed with", `RDKit ${c.profile.rdkit_version}`],
               ]}
             />
+            <TriagePanel compoundId={c.id} collapsible />
             <h4>Descriptors</h4>
             <dl className="descriptors">
               {Object.entries(c.profile.descriptors).map(([k, q]) => (

@@ -12,6 +12,7 @@ import {
 } from "../components/common";
 import { AuditTrail } from "../components/AuditTrail";
 import { ImportWorkspace } from "../components/ImportWorkspace";
+import { TriagePanel } from "../components/Triage";
 import { QuantityView } from "../components/QuantityView";
 import { prune, SchemaFields, SchemaForm } from "../components/SchemaForm";
 import { SendExport } from "../components/SendExport";
@@ -183,6 +184,8 @@ export function Study({ id, tab, me }: { id: string; tab: string | null; me: Pri
 
       {active === "design" && (
         <>
+          {/* what is already known about the compound, while the design can still change */}
+          {DESIGNABLE.includes(s.state) && <TriagePanel compoundId={s.compound_id} collapsible />}
           {DESIGNABLE.includes(s.state) && (
             <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />
           )}
