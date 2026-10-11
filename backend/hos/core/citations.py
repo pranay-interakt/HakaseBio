@@ -52,11 +52,11 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            year=2012, doi="10.1038/nchem.1243"),
         # ---- DMPK / IVIVE ----------------------------------------------------
         _c("obach1999",
-           "Obach RS. Prediction of human clearance of twenty-five drugs from hepatic "
+           "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic "
            "microsomal intrinsic clearance data: an examination of in vitro half-life "
            "approach and nonspecific binding to microsomes. Drug Metab Dispos. "
            "1999;27(11):1350-1359.",
-           year=1999),
+           year=1999, doi="10.1016/S0090-9556(24)14938-0"),
         _c("wilkinson1975",
            "Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug "
            "clearance. Clin Pharmacol Ther. 1975;18(4):377-390.",
@@ -125,65 +125,75 @@ CITATIONS: Final[dict[str, Citation]] = dict(
         _c("ich_m3r2",
            "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety "
            "Studies for the Conduct of Human Clinical Trials and Marketing Authorization "
-           "for Pharmaceuticals. June 2009.",
-           year=2009),
+           "for Pharmaceuticals. Step 4, 11 June 2009.",
+           year=2009, url="https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf"),
         _c("ich_s2r1",
            "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing "
-           "and Data Interpretation for Pharmaceuticals Intended for Human Use. Nov 2011.",
-           year=2011),
+           "and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+           year=2011, url="https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf"),
         _c("ich_s7a",
            "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for "
-           "Human Pharmaceuticals. November 2000.",
-           year=2000),
+           "Human Pharmaceuticals. Step 4, 8 November 2000.",
+           year=2000, url="https://database.ich.org/sites/default/files/S7A_Guideline.pdf"),
         _c("ich_s7b",
            "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the "
            "Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) "
-           "by Human Pharmaceuticals. May 2005.",
-           year=2005),
+           "by Human Pharmaceuticals. Step 4, 12 May 2005.",
+           year=2005, url="https://database.ich.org/sites/default/files/S7B_Guideline.pdf"),
         _c("ich_e14_s7b_qa",
-           "ICH E14/S7B Implementation Working Group: Questions and Answers. 2022.",
-           year=2022),
+           "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of "
+           "QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. "
+           "Adopted 21 February 2022.",
+           year=2022, url="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"),
         _c("ich_s9",
            "ICH Harmonised Tripartite Guideline S9: Nonclinical Evaluation for Anticancer "
-           "Pharmaceuticals. October 2009.",
-           year=2009),
+           "Pharmaceuticals. Step 4, 29 October 2009.",
+           year=2009, url="https://database.ich.org/sites/default/files/S9_Guideline.pdf"),
         _c("ich_s6r1",
            "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of "
-           "Biotechnology-Derived Pharmaceuticals. June 2011.",
-           year=2011),
+           "Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+           year=2011, url="https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf"),
         _c("ich_s5r3",
            "ICH Harmonised Guideline S5(R3): Detection of Reproductive and Developmental "
-           "Toxicity for Human Pharmaceuticals. February 2020.",
-           year=2020),
+           "Toxicity for Human Pharmaceuticals. Step 4, 18 February 2020.",
+           year=2020, url="https://database.ich.org/sites/default/files/S5-R3_Step4_Guideline_2020_0218_1.pdf"),
+        _c("ich_s1a",
+           "ICH Harmonised Tripartite Guideline S1A: Guideline on the Need for "
+           "Carcinogenicity Studies of Pharmaceuticals. Step 4, 29 November 1995.",
+           year=1995, url="https://database.ich.org/sites/default/files/S1A_Guideline.pdf"),
         _c("ich_s1b_r1",
            "ICH Harmonised Guideline S1B(R1): Testing for Carcinogenicity of "
-           "Pharmaceuticals - Addendum. 2022.",
-           year=2022),
+           "Pharmaceuticals. Adopted 4 August 2022.",
+           year=2022,
+           url="https://database.ich.org/sites/default/files/S1B-R1_FinalGuideline_2022_0719.pdf"),
         _c("ich_s8",
            "ICH Harmonised Tripartite Guideline S8: Immunotoxicity Studies for Human "
-           "Pharmaceuticals. September 2005.",
-           year=2005),
+           "Pharmaceuticals. Step 4, 15 September 2005.",
+           year=2005, url="https://database.ich.org/sites/default/files/S8_Guideline.pdf"),
         _c("ich_s10",
            "ICH Harmonised Guideline S10: Photosafety Evaluation of Pharmaceuticals. "
-           "November 2013.",
-           year=2013),
+           "Step 4, 13 November 2013.",
+           year=2013, url="https://database.ich.org/sites/default/files/S10_Guideline.pdf"),
         _c("ich_s11",
            "ICH Harmonised Guideline S11: Nonclinical Safety Testing in Support of "
-           "Development of Paediatric Pharmaceuticals. April 2020.",
-           year=2020),
+           "Development of Paediatric Pharmaceuticals. Step 4, 14 April 2020.",
+           year=2020, url="https://database.ich.org/sites/default/files/S11_Step4_FinalGuideline_2020_0310.pdf"),
         _c("ich_m10",
            "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study "
-           "Sample Analysis. May 2022.",
-           year=2022),
+           "Sample Analysis. Step 4, 24 May 2022.",
+           year=2022, url="https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"),
         _c("ich_s3a",
            "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: "
-           "The Assessment of Systemic Exposure in Toxicity Studies. October 1994.",
-           year=1994),
+           "The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+           year=1994, url="https://database.ich.org/sites/default/files/S3A_Guideline.pdf"),
         _c("ema_fih_2017",
            "EMA. Guideline on strategies to identify and mitigate risks for first-in-human "
            "and early clinical trials with investigational medicinal products. "
            "EMEA/CHMP/SWP/28367/07 Rev. 1, July 2017.",
-           year=2017),
+           year=2017,
+           url="https://www.ema.europa.eu/en/documents/scientific-guideline/guideline-strategies-"
+               "identify-and-mitigate-risks-first-human-and-early-clinical-trials-investigational-"
+               "medicinal-products-revision-1_en.pdf"),
         _c("fda_cber_cgt_2013",
            "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical "
            "Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",

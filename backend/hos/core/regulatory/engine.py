@@ -250,7 +250,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="safety.core_battery", name="Stand-alone safety pharmacology core battery",
             category=StudyCategory.SAFETY_PHARMACOLOGY, status=RequirementStatus.NOT_REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s9"), section="S9 section 2.3",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s9"), section="S9 section 2.2",
             rationale="For advanced cancer, safety pharmacology endpoints may be incorporated "
                       "into general toxicology studies; stand-alone studies are not needed "
                       "unless a specific concern exists",
@@ -262,7 +262,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             name="Safety pharmacology core battery: CNS, cardiovascular, respiratory",
             category=StudyCategory.SAFETY_PHARMACOLOGY, status=RequirementStatus.REQUIRED,
             timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7a"),
-            section="S7A section 2.7",
+            section="S7A sections 2.7, 2.10.1",
             rationale="The core battery must be completed before first administration in humans",
             glp=True, species=("rat", "dog"), ctd_section="4.2.1.3",
         ))
@@ -270,7 +270,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         id="safety.herg", name="In vitro hERG (IKr) assay",
         category=StudyCategory.SAFETY_PHARMACOLOGY,
         status=RequirementStatus.REQUIRED if not s9 else RequirementStatus.CONDITIONAL,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7b"), section="S7B section 3.1",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7b"), section="S7B sections 2.3.1, 3.1.2",
         rationale="An in vitro IKr assay is part of the S7B integrated risk assessment for "
                   "delayed ventricular repolarisation" + (
                       "; under S9 it is conducted when a cardiac concern exists" if s9 else ""),
@@ -281,7 +281,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="safety.in_vivo_qt", name="In vivo QT assessment in a non-rodent (telemetry)",
             category=StudyCategory.SAFETY_PHARMACOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7b"), section="S7B section 3.2",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s7b"), section="S7B sections 2.3.2, 3.1.3",
             rationale="An in vivo QT assay complements the in vitro IKr result; together they "
                       "form the S7B integrated risk assessment",
             glp=True, species=("dog",), ctd_section="4.2.1.3",
@@ -293,7 +293,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="tox.repeat_dose", name="Repeat-dose toxicity on the clinical schedule",
             category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s9"), section="S9 section 2.5",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s9"), section="S9 sections 2.4, 3.3",
             rationale="Studies matching the clinical schedule support first-in-human; 3-month "
                       "studies generally support further development and marketing",
             glp=True, species=("rat", "dog"), duration_weeks=round(weeks, 1),
@@ -304,21 +304,21 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="tox.dose_range_finding", name="Dose range-finding / MTD studies",
             category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 4",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) sections 1.5, 4",
             rationale="Dose selection for the pivotal repeat-dose studies",
             glp=False, species=("rat", "dog"), ctd_section="4.2.3.2",
         ))
         out.append(_req(
             id="tox.repeat_dose_rodent", name="Repeat-dose toxicity (rodent)",
             category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) Table 1",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 5.1, Table 1",
             rationale=note, glp=True, species=("rat",), duration_weeks=round(rod_w, 1),
             driver_id="repeat_dose_toxicity", ctd_section="4.2.3.2",
         ))
         out.append(_req(
             id="tox.repeat_dose_nonrodent", name="Repeat-dose toxicity (non-rodent)",
             category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) Table 1",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 5.1, Table 1",
             rationale=note, glp=True, species=("dog",), duration_weeks=round(non_w, 1),
             driver_id="repeat_dose_toxicity", ctd_section="4.2.3.2",
         ))
@@ -327,7 +327,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             out.append(_req(
                 id="tox.repeat_dose_marketing", name="Chronic repeat-dose toxicity for marketing",
                 category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-                timing=Timing.MARKETING, citation=m3, section="M3(R2) Table 2",
+                timing=Timing.MARKETING, citation=m3, section="M3(R2) section 5.2, Table 2",
                 rationale=mnote, glp=True, species=("rat", "dog"), duration_weeks=max(mr, mn),
                 driver_id="repeat_dose_toxicity", ctd_section="4.2.3.2",
             ))
@@ -363,7 +363,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="genotox.ames", name="Bacterial reverse mutation assay (Ames)",
             category=StudyCategory.GENOTOXICITY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 7",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 9",
             rationale="A gene mutation assay is generally considered sufficient to support "
                       "single-dose clinical trials",
             glp=True, ctd_section="4.2.3.3.1",
@@ -371,7 +371,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="genotox.chromosomal", name="Chromosomal damage assay (in vitro or in vivo micronucleus)",
             category=StudyCategory.GENOTOXICITY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_MULTIPLE_DOSE, citation=s2, section="S2(R1) section 2; M3(R2) section 7",
+            timing=Timing.BEFORE_MULTIPLE_DOSE, citation=s2, section="M3(R2) section 9; S2(R1) section 2",
             rationale="An assessment of chromosomal damage in mammalian systems is added to "
                       "support multiple-dose trials",
             glp=True, ctd_section="4.2.3.3",
@@ -379,7 +379,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="genotox.full_battery", name="Complete genotoxicity battery (S2(R1) option 1 or 2)",
             category=StudyCategory.GENOTOXICITY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_PHASE_2, citation=s2, section="S2(R1) section 2",
+            timing=Timing.BEFORE_PHASE_2, citation=s2, section="S2(R1) section 2.2; M3(R2) section 9",
             rationale="The complete standard battery should be finished before Phase 2",
             glp=True, ctd_section="4.2.3.3",
         ))
@@ -390,7 +390,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="dart.efd", name="Embryo-fetal development study",
             category=StudyCategory.REPRODUCTIVE_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.MARKETING, citation=cite("ich_s9"), section="S9 section 2.7",
+            timing=Timing.MARKETING, citation=cite("ich_s9"), section="S9 section 2.5",
             rationale="For advanced cancer, embryo-fetal studies are needed for marketing; "
                       "fertility and pre/postnatal studies are generally not needed",
             glp=True, ctd_section="4.2.3.5.2",
@@ -410,7 +410,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="dart.fertility", name="Fertility and early embryonic development",
             category=StudyCategory.REPRODUCTIVE_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_PHASE_3, citation=m3, section="M3(R2) section 11.2",
+            timing=Timing.BEFORE_PHASE_3, citation=m3, section="M3(R2) sections 11.1, 11.3",
             rationale="Male reproductive organs are evaluated in repeat-dose studies; a "
                       "dedicated fertility study is expected before large-scale trials",
             glp=True, species=("rat",), ctd_section="4.2.3.5.1",
@@ -418,7 +418,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="dart.ppnd", name="Pre- and postnatal development",
             category=StudyCategory.REPRODUCTIVE_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-            timing=Timing.MARKETING, citation=s5, section="S5(R3); M3(R2) section 11.4",
+            timing=Timing.MARKETING, citation=s5, section="M3(R2) section 11.3; S5(R3)",
             rationale="Pre/postnatal development is submitted for marketing approval",
             glp=True, species=("rat",), ctd_section="4.2.3.5.3",
         ))
@@ -426,7 +426,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             out.append(_req(
                 id="dart.pregnant_women", name="All reproductive studies plus full genotox before pregnant-women exposure",
                 category=StudyCategory.REPRODUCTIVE_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-                timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 11.5",
+                timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 11.4",
                 rationale="Inclusion of pregnant women requires completion of all female "
                           "reproductive studies and the standard genotoxicity battery",
                 glp=True, ctd_section="4.2.3.5",
@@ -446,18 +446,22 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             id="carc.bioassay",
             name="Carcinogenicity assessment (2-year rat or S1B(R1) weight of evidence + rasH2 mouse)",
             category=StudyCategory.CARCINOGENICITY, status=RequirementStatus.REQUIRED,
-            timing=Timing.MARKETING, citation=cite("ich_s1b_r1"), section="S1B(R1)",
-            rationale="Continuous clinical use of 6 months or more triggers a carcinogenicity "
-                      "assessment; a weight-of-evidence case may replace the 2-year rat study",
+            timing=Timing.MARKETING, citation=cite("ich_s1a"),
+            section="S1A section 4.1; M3(R2) section 10; S1B(R1)",
+            rationale="S1A: carcinogenicity studies are performed for any pharmaceutical whose "
+                      "expected clinical use is continuous for at least 6 months; M3(R2) places "
+                      "them before the marketing application; under S1B(R1) a weight-of-evidence "
+                      "assessment may replace the 2-year rat study",
             glp=True, ctd_section="4.2.3.4",
         ))
     else:
         out.append(_req(
             id="carc.bioassay", name="Carcinogenicity studies",
             category=StudyCategory.CARCINOGENICITY, status=RequirementStatus.NOT_REQUIRED,
-            timing=Timing.MARKETING, citation=cite("ich_m3r2"), section="M3(R2) section 8",
-            rationale="Intended clinical use is shorter than 6 months continuous; carcinogenicity "
-                      "studies are not generally expected absent a specific concern",
+            timing=Timing.MARKETING, citation=cite("ich_s1a"), section="S1A sections 4.1, 4.2",
+            rationale="Intended clinical use is shorter than 6 months continuous (S1A section 4.1); "
+                      "carcinogenicity studies are not generally expected absent a cause for "
+                      "concern (S1A section 4.2)",
             glp=False,
         ))
 
@@ -466,7 +470,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="tox.local_tolerance", name="Local tolerance at the clinical route",
             category=StudyCategory.LOCAL_TOLERANCE, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 6",
+            timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 8",
             rationale="Local tolerance is evaluated, preferably within general toxicity studies, "
                       "by the intended clinical route",
             glp=True, ctd_section="4.2.3.6",
@@ -475,9 +479,9 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="photo.assessment", name="Photosafety assessment",
             category=StudyCategory.PHOTOSAFETY, status=RequirementStatus.CONDITIONAL,
-            timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s10"), section="S10 section 3",
-            rationale="Triggered if the molecule absorbs 290-700 nm light with a molar extinction "
-                      "coefficient of at least 1000 L/mol/cm",
+            timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s10"), section="S10 sections 2, 5.1.1",
+            rationale="Triggered if the molecule has a molar extinction coefficient greater than "
+                      "1000 L/mol/cm at any wavelength between 290 and 700 nm",
             glp=False, pending_fact="UV-visible absorption spectrum",
             ctd_section="4.2.3.7.7",
         ))
@@ -485,14 +489,14 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         out.append(_req(
             id="photo.assessment", name="Photosafety assessment (in vitro 3T3 NRU first)",
             category=StudyCategory.PHOTOSAFETY, status=RequirementStatus.REQUIRED,
-            timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s10"), section="S10 section 3",
+            timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s10"), section="S10 sections 2, 5.1.1",
             rationale="Absorption meets the S10 trigger",
             glp=False, ctd_section="4.2.3.7.7",
         ))
     out.append(_req(
         id="immunotox.weight_of_evidence", name="Immunotoxicity weight-of-evidence review",
         category=StudyCategory.IMMUNOTOXICITY, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s8"), section="S8 section 3",
+        timing=Timing.BEFORE_PHASE_3, citation=cite("ich_s8"), section="S8 sections 2.1, 2.2",
         rationale="Standard toxicity data are evaluated for immunotoxic signals; dedicated "
                   "studies such as TDAR are added only if signals are found",
         glp=False, ctd_section="4.2.3.7.2",
@@ -517,7 +521,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="bio.species_relevance", name="Pharmacologically relevant species selection",
         category=StudyCategory.BIOLOGICS_SPECIFIC, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.3",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.3; Addendum section 2",
         rationale="Toxicity studies must use species in which the product is pharmacologically "
                   "active, established by target homology, binding and functional activity",
         glp=False, ctd_section="4.2.1.1",
@@ -545,7 +549,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="tox.repeat_dose", name="Repeat-dose toxicity in relevant species",
         category=StudyCategory.GENERAL_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) sections 3.4, 4.3",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 4.4; Addendum section 3.2",
         rationale=f"Duration generally 1-3 months; 6 months supports chronic use ({sp_note})",
         glp=True, species=species, duration_weeks=26.0 if ctx.intended_clinical_duration_days > 91 else 13.0,
         driver_id="repeat_dose_toxicity", ctd_section="4.2.3.2",
@@ -554,7 +558,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="bio.immunogenicity", name="Anti-drug antibody assessment in toxicity studies",
         category=StudyCategory.BIOLOGICS_SPECIFIC, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.4",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.6; Addendum section 4",
         rationale="ADA must be measured to interpret exposure and findings; animal "
                   "immunogenicity does not predict human immunogenicity",
         glp=True, ctd_section="4.2.3.7.1",
@@ -562,7 +566,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="safety.core_battery", name="Safety pharmacology endpoints (within tox studies)",
         category=StudyCategory.SAFETY_PHARMACOLOGY, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.5",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 4.1",
         rationale="Safety pharmacology endpoints may be incorporated into toxicity studies",
         glp=True, ctd_section="4.2.1.3",
     ))
@@ -571,7 +575,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         category=StudyCategory.GENOTOXICITY,
         status=(RequirementStatus.CONDITIONAL if ctx.modality is Modality.ANTIBODY_DRUG_CONJUGATE
                 else RequirementStatus.NOT_REQUIRED),
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 3.6",
+        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=s6, section="S6(R1) section 4.7",
         rationale=("Not applicable to biotechnology-derived proteins; for ADCs the small-molecule "
                    "linker-payload is assessed for genotoxicity")
         if ctx.modality is Modality.ANTIBODY_DRUG_CONJUGATE else
@@ -583,7 +587,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="carc.bioassay", name="Rodent carcinogenicity bioassay",
         category=StudyCategory.CARCINOGENICITY, status=RequirementStatus.NOT_REQUIRED,
-        timing=Timing.MARKETING, citation=s6, section="S6(R1) section 3.7",
+        timing=Timing.MARKETING, citation=s6, section="S6(R1) section 4.8; Addendum section 6",
         rationale="Standard bioassays are generally inappropriate; carcinogenic potential is "
                   "addressed by a product-specific weight-of-evidence assessment",
         glp=False,
@@ -591,7 +595,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     out.append(_req(
         id="dart.biologic", name="Reproductive toxicity in a relevant species (ePPND if NHP-only)",
         category=StudyCategory.REPRODUCTIVE_TOXICOLOGY, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_PHASE_3, citation=s6, section="S6(R1) section 3.8",
+        timing=Timing.BEFORE_PHASE_3, citation=s6, section="S6(R1) Addendum section 5",
         rationale="Conducted in a pharmacologically relevant species; where only NHP are "
                   "relevant an enhanced pre/postnatal study can replace separate EFD/PPND",
         glp=True, ctd_section="4.2.3.5",
@@ -601,7 +605,7 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             id="bio.cytokine_release", name="In vitro cytokine release assay (human cells)",
             category=StudyCategory.BIOLOGICS_SPECIFIC, status=RequirementStatus.REQUIRED,
             timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ema_fih_2017"),
-            section="EMA FIH guideline section 6",
+            section="EMA FIH Rev. 1 sections 6.3, 7.2",
             rationale="Immune agonists require human in vitro data to identify cytokine release "
                       "risk and to inform a MABEL-based starting dose",
             glp=False, ctd_section="4.2.1.1",
