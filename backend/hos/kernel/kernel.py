@@ -32,7 +32,7 @@ from hos.core import units as U
 from hos.core.descriptors import compute_profile
 from hos.core.provenance import utc_now
 from hos.core.quantity import Quantity
-from hos.core.regulatory import ProgramContext, derive_study_set
+from hos.core.regulatory import Modality, PeptideOrigin, ProgramContext, derive_study_set
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
 from hos.db.models import CompoundRow, PrincipalRow, ProgramRow, StudyRow
 from hos.db.repository import Repository, content_hash
@@ -103,6 +103,10 @@ def _check_password(password: str, stored: str) -> bool:
     calc = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), dklen=32,
                           n=int(n), r=int(r), p=int(p))
     return hmac.compare_digest(calc.hex(), dk)
+
+
+#: Signed programme determinations -> the ProgramContext field each one records.
+PROGRAM_DETERMINATIONS = {"s6_principles_apply": "s6_determination"}
 
 
 def _new_id(prefix: str) -> str:
@@ -186,6 +190,9 @@ class Kernel:
         self._require_worker(actor)
         if not name.strip():
             raise KernelError("programme name is required")
+        if context.s6_determination is not None:
+            raise KernelError("an S6(R1) determination is recorded by its signer after the "
+                              "programme exists, not supplied with it")
         ss = derive_study_set(context)
         pid = _new_id("prg")
         now = utc_now()
@@ -203,13 +210,57 @@ class Kernel:
         self._require_worker(actor)
         if not reason.strip():
             raise KernelError("a reason is required to change programme context")
+        signed = sorted(set(changes) & set(PROGRAM_DETERMINATIONS.values()))
+        if signed:
+            raise KernelError(f"{signed} can only be recorded as a signed determination")
         row = self.repo.program(program_id)
-        ctx = ProgramContext.from_dict({**row.context, **dict(changes)})
+        merged = {**row.context, **dict(changes)}
+        withdrawn = []
+        if merged.get("s6_determination") and (
+                merged.get("modality") != Modality.PEPTIDE.value
+                or merged.get("peptide_origin") != PeptideOrigin.CHEMICAL_SYNTHESIS.value):
+            # the signed judgement was about a chemically synthesised peptide; it stays in the
+            # ledger but no longer governs this programme
+            merged["s6_determination"] = None
+            withdrawn.append("s6_principles_apply")
+        ctx = ProgramContext.from_dict(merged)
         ss = derive_study_set(ctx)
         self.repo.update_program(program_id, context=ctx.to_dict(), study_set=ss.to_dict())
         self._record(actor, "program.context_updated", "program", program_id,
-                     {"changes": dict(changes), "study_set_hash": content_hash(ss.to_dict())},
+                     {"changes": dict(changes), "withdrawn_determinations": withdrawn,
+                      "study_set_hash": content_hash(ss.to_dict())},
                      reason=reason)
+        return self.program_view(program_id)
+
+    def record_program_determination(self, actor: Principal, program_id: str, *, key: str,
+                                     applies: bool, rationale: str) -> dict[str, Any]:
+        """A signed programme-level judgement that changes the study set. Today one exists:
+        ``s6_principles_apply``, whether ICH S6(R1) principles apply to a chemically
+        synthesised peptide (S6(R1) section 1.3: they "may also be applicable"). The
+        responsible scientist signs it; the API re-authenticates first."""
+        if key not in PROGRAM_DETERMINATIONS:
+            raise KernelError(f"unknown programme determination {key!r}")
+        if not rationale.strip():
+            raise KernelError("a determination needs its rationale")
+        row = self.repo.program(program_id)
+        ctx = ProgramContext.from_dict(row.context)
+        if ctx.modality is not Modality.PEPTIDE or \
+                ctx.peptide_origin is not PeptideOrigin.CHEMICAL_SYNTHESIS:
+            raise KernelError("this determination is for chemically synthesised peptides; "
+                              "record the peptide origin first")
+        subject = {"program_id": program_id, "key": key, "applies": applies,
+                   "rationale": rationale.strip(), "context_hash": content_hash(row.context)}
+        sig = sign(actor, role=Role.RESPONSIBLE_SCIENTIST, meaning=SignatureMeaning.RESPONSIBILITY,
+                   subject_id=f"{program_id}/determination/{key}",
+                   subject_hash=content_hash(subject), statement=rationale)
+        record = {"applies": applies, "rationale": rationale.strip(),
+                  "signature": sig.to_dict()}
+        ctx = ProgramContext.from_dict({**row.context, PROGRAM_DETERMINATIONS[key]: record})
+        ss = derive_study_set(ctx)
+        self.repo.update_program(program_id, context=ctx.to_dict(), study_set=ss.to_dict())
+        self._record(actor, "program.determination_recorded", "program", program_id,
+                     {"key": key, "determination": record,
+                      "study_set_hash": content_hash(ss.to_dict())})
         return self.program_view(program_id)
 
     def register_compound(self, actor: Principal, program_id: str, *, name: str,

@@ -59,6 +59,15 @@ export function Programs({ go }: { go: (hash: string) => void }) {
   const [species, setSpecies] = useState("");
   const [agonist, setAgonist] = useState(false);
   const [pediatric, setPediatric] = useState(false);
+  const [origin, setOrigin] = useState("");
+  const [chains, setChains] = useState("");
+  const [assoc, setAssoc] = useState<Tri>("");
+  const aminoAcid = ["peptide", "recombinant_protein", "monoclonal_antibody"].includes(modality);
+  const chainList = chains
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map(Number);
 
   useEffect(() => {
     api.get<typeof list>("/programs").then(setList).catch(setErr);
@@ -84,6 +93,9 @@ export function Programs({ go }: { go: (hash: string) => void }) {
             .filter(Boolean),
           is_immunomodulatory_agonist: agonist,
           intended_pediatric_use: pediatric,
+          peptide_origin: modality === "peptide" && origin ? origin : null,
+          amino_acid_chains: aminoAcid ? chainList : [],
+          chains_naturally_associated: aminoAcid && chainList.length > 1 && assoc !== "" ? assoc === "true" : null,
         },
       });
       go(`#/program/${p.id}`);
@@ -160,6 +172,32 @@ export function Programs({ go }: { go: (hash: string) => void }) {
               <option value="false">no</option>
             </select>
           </div>
+          {modality === "peptide" && (
+            <div className="field">
+              <label className="field-label">Peptide origin (ICH S6(R1) 1.3 scopes by origin)</label>
+              <select value={origin} onChange={(e) => setOrigin(e.target.value)}>
+                <option value="">unknown</option>
+                <option value="chemical_synthesis">chemical synthesis</option>
+                <option value="recombinant">recombinant expression</option>
+              </select>
+            </div>
+          )}
+          {aminoAcid && (
+            <div className="field">
+              <label className="field-label">Amino acids per chain (21 CFR 600.3(h)(6))</label>
+              <input placeholder="e.g. 31, or 21, 30" value={chains} onChange={(e) => setChains(e.target.value)} />
+            </div>
+          )}
+          {aminoAcid && chainList.length > 1 && (
+            <div className="field">
+              <label className="field-label">Chains associated as they occur in nature</label>
+              <select value={assoc} onChange={(e) => setAssoc(e.target.value as Tri)}>
+                <option value="">unknown</option>
+                <option value="true">yes</option>
+                <option value="false">no</option>
+              </select>
+            </div>
+          )}
           <div className="field">
             <label className="field-label">Pharmacologically relevant species (biologics)</label>
             <input

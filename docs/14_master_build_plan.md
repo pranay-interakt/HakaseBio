@@ -210,7 +210,7 @@ Peptides reuse the small-molecule drivers (Wave A). They add one driver and one 
 
 | # | Item | Basis | What it does | Human determination |
 |---|---|---|---|---|
-| P-1 | **Regulatory routing fix** (engine, not a driver) | FDA definition of a peptide in 21 CFR 314.3: 40 or fewer amino acids *(verify current text)* | Add `amino_acid_count` to `ProgramContext`. Peptides of 40 or fewer amino acids follow M3(R2) small-molecule rules; longer chains follow S6(R1) biologics rules. If the count is unknown, the routing is `CONDITIONAL` with the missing fact named. Today every peptide gets small-molecule rules, which is wrong for long peptides | — |
+| P-1 **built** | **Regulatory routing fix** (engine, not a driver) | 21 CFR 600.3(h)(6) and 85 FR 10057 (protein: greater than 40 amino acids, summed over chains associated as in nature); ICH S6(R1) section 1.3 and M3(R2) section 1.3 (scope by biotechnology origin). The originally named source, 21 CFR 314.3, holds no peptide definition | Two separate facts. (1) US classification from amino acids per chain: protein (a biological product) or not; pending when the count or the chain association is unknown. (2) ICH routing by manufacturing origin, not length (no ICH text draws a 40-amino-acid line): recombinant peptides take the S6(R1) set; chemically synthesised peptides take M3(R2), with the S6(R1) species-relevance and ADA items conditional until a signed determination; an unknown origin makes the set conditional on it | Whether S6(R1) principles apply to a chemically synthesised peptide (responsible scientist, signed) |
 | P-2 | peptide_stability | Di & Kerns 2016 | Plasma and serum stability across species, and protease panels where designed; reuses the first-order depletion fit with the matrix and enzyme recorded | — |
 | P-3 | Immunogenicity, when warranted | ICH S6(R1) for long peptides; case by case otherwise | Reuses the anti-drug antibody driver (C4) | Whether ADA assessment is warranted |
 
@@ -286,7 +286,7 @@ Copied from what the four existing drivers already meet:
 Smith et al. 2000 (dose proportionality); Gabrielsson & Weiner (NCA reference, edition); Waters et
 al. 2008 (rapid equilibrium dialysis); ICH M12 (drug interaction studies, 2024); Hubatsch et al.
 2007 (Caco-2 permeability); FDA *Safety Testing of Drug Metabolites* (current revision); FDA 2019
-anti-drug antibody assay guidance; Shankar et al. 2008 (ADA cut points); 21 CFR 314.3 peptide
-definition; Reed and Muench 1938; Kaplan and Meier 1958; CLSI M07; a primary reference for the 1:1
+anti-drug antibody assay guidance; Shankar et al. 2008 (ADA cut points); the 40-amino-acid line
+(verified: it is 21 CFR 600.3(h)(6), the definition of protein, not 21 CFR 314.3); Reed and Muench 1938; Kaplan and Meier 1958; CLSI M07; a primary reference for the 1:1
 Langmuir binding model and for tumour incidence statistics. Any that cannot be verified are not
 used; the method waits until a verifiable source is found.

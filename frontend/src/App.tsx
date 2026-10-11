@@ -72,7 +72,7 @@ export function App() {
 
   const parts = hash.replace(/^#\/?/, "").split("/");
   let page;
-  if (parts[0] === "program" && parts[1]) page = <Program id={parts[1]} go={go} />;
+  if (parts[0] === "program" && parts[1]) page = <Program id={parts[1]} go={go} me={me} />;
   else if (parts[0] === "study" && parts[1]) page = <Study id={parts[1]} me={me} />;
   else if (parts[0] === "import" && parts[1] && parts[2]) page = <ImportNew programId={parts[1]} requirementId={parts[2]} go={go} />;
   else page = <Programs go={go} />;

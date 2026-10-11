@@ -3,7 +3,15 @@ import { api } from "../api";
 import { Citations, ErrorBox, Section, StateTag } from "../components/common";
 import { QuantityView } from "../components/QuantityView";
 import { RehearsalView, WhatIf } from "./ProgramPlanning";
-import type { Compound, Program as ProgramT, Readiness, Requirement, Study } from "../types";
+import type {
+  Compound,
+  Principal,
+  Program as ProgramT,
+  ProgramDetermination,
+  Readiness,
+  Requirement,
+  Study,
+} from "../types";
 
 type Tab = "studyset" | "compounds" | "studies" | "readiness" | "module4" | "whatif" | "rehearsal";
 
@@ -16,7 +24,7 @@ const TIMING_ORDER = [
   "marketing_application",
 ];
 
-export function Program({ id, go }: { id: string; go: (hash: string) => void }) {
+export function Program({ id, go, me }: { id: string; go: (hash: string) => void; me: Principal }) {
   const [p, setP] = useState<ProgramT | null>(null);
   const [tab, setTab] = useState<Tab>("studyset");
   const [err, setErr] = useState<unknown>(null);
@@ -53,6 +61,9 @@ export function Program({ id, go }: { id: string; go: (hash: string) => void }) 
         ))}
       </div>
       <ErrorBox error={err} />
+      {tab === "studyset" && p.context.modality === "peptide" && (
+        <PeptideRouting p={p} me={me} reload={load} onErr={setErr} />
+      )}
       {tab === "studyset" && <StudySet p={p} go={go} onErr={setErr} />}
       {tab === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
       {tab === "studies" && <Studies p={p} />}
@@ -61,6 +72,150 @@ export function Program({ id, go }: { id: string; go: (hash: string) => void }) 
       {tab === "whatif" && <WhatIf p={p} />}
       {tab === "rehearsal" && <RehearsalView p={p} />}
     </div>
+  );
+}
+
+const ORIGINS: [string, string][] = [
+  ["", "unknown"],
+  ["chemical_synthesis", "chemical synthesis"],
+  ["recombinant", "recombinant expression"],
+];
+
+/** Peptide facts and their consequences: US classification (21 CFR 600.3(h)(6)) and ICH routing
+ * by origin (S6(R1) section 1.3), with the responsible scientist's signed S6(R1) determination. */
+function PeptideRouting({ p, me, reload, onErr }: {
+  p: ProgramT; me: Principal; reload: () => void; onErr: (e: unknown) => void;
+}) {
+  const ctx = p.context as {
+    peptide_origin?: string | null;
+    amino_acid_chains?: number[];
+    chains_naturally_associated?: boolean | null;
+    s6_determination?: ProgramDetermination | null;
+  };
+  const cls = p.study_set.classification;
+  const [origin, setOrigin] = useState(ctx.peptide_origin ?? "");
+  const [chains, setChains] = useState((ctx.amino_acid_chains ?? []).join(", "));
+  const [assoc, setAssoc] = useState(
+    ctx.chains_naturally_associated === null || ctx.chains_naturally_associated === undefined
+      ? ""
+      : String(ctx.chains_naturally_associated),
+  );
+  const [reason, setReason] = useState("");
+  const [applies, setApplies] = useState("");
+  const [rationale, setRationale] = useState("");
+  const [pw, setPw] = useState("");
+  const det = ctx.s6_determination;
+  const parsed = chains.split(",").map((x) => x.trim()).filter(Boolean).map(Number);
+  async function save() {
+    try {
+      await api.patch(`/programs/${p.id}/context`, {
+        changes: {
+          peptide_origin: origin || null,
+          amino_acid_chains: parsed,
+          chains_naturally_associated: assoc === "" ? null : assoc === "true",
+        },
+        reason,
+      });
+      setReason("");
+      reload();
+    } catch (e) {
+      onErr(e);
+    }
+  }
+  async function sign() {
+    try {
+      await api.post(`/programs/${p.id}/determinations`, {
+        key: "s6_principles_apply",
+        applies: applies === "true",
+        rationale,
+        password: pw,
+      });
+      setPw("");
+      reload();
+    } catch (e) {
+      onErr(e);
+    }
+  }
+  return (
+    <Section title="Peptide classification and guideline routing">
+      {cls && (
+        <div className="small">
+          <span className={`tag tag-${cls.outcome === "pending" ? "conditional" : "done"}`}>
+            {cls.outcome === "protein" ? "US: protein (biological product)" : cls.outcome === "not_protein" ? "US: not a protein" : "US classification pending"}
+          </span>{" "}
+          {cls.statement}
+          <Citations list={cls.citations} />
+        </div>
+      )}
+      <h4>ICH S6(R1) applicability</h4>
+      <div className="small">
+        {ctx.peptide_origin === "recombinant" && "Recombinant expression: within ICH S6(R1) (section 1.3); the S6(R1) study set applies."}
+        {!ctx.peptide_origin && "Origin unknown: the governing guideline depends on it, so required studies are conditional."}
+        {ctx.peptide_origin === "chemical_synthesis" &&
+          (det ? (
+            <>
+              Signed by {det.signature.signer_name} ({det.signature.role}) on {det.signature.signed_at.slice(0, 10)}: S6(R1)
+              principles <strong>{det.applies ? "apply" : "do not apply"}</strong>. “{det.rationale}”
+            </>
+          ) : (
+            <>
+              Chemically synthesised: ICH M3(R2) governs, and S6(R1) principles &ldquo;may also be applicable&rdquo; (S6(R1)
+              section 1.3). The species-relevance and anti-drug-antibody items stay conditional until the responsible
+              scientist signs whether they apply.
+            </>
+          ))}
+      </div>
+      {ctx.peptide_origin === "chemical_synthesis" && !det && me.kind === "human" && me.roles.includes("responsible_scientist") && (
+        <div className="grid2">
+          <select value={applies} onChange={(e) => setApplies(e.target.value)}>
+            <option value="">S6(R1) principles…</option>
+            <option value="true">apply</option>
+            <option value="false">do not apply</option>
+          </select>
+          <input placeholder="rationale (the evidence for the judgement) *" value={rationale} onChange={(e) => setRationale(e.target.value)} />
+          <input type="password" placeholder="password (re-authentication) *" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <button disabled={!applies || !rationale.trim() || !pw} onClick={sign}>
+            Sign determination
+          </button>
+        </div>
+      )}
+      <details>
+        <summary className="small">Update peptide facts</summary>
+        <div className="grid2">
+          <label className="field">
+            <span className="field-label">Manufacturing origin (ICH S6(R1) 1.3)</span>
+            <select value={origin} onChange={(e) => setOrigin(e.target.value)}>
+              {ORIGINS.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">Amino acids per chain (21 CFR 600.3(h)(6))</span>
+            <input placeholder="e.g. 31, or 21, 30" value={chains} onChange={(e) => setChains(e.target.value)} />
+          </label>
+          {parsed.length > 1 && (
+            <label className="field">
+              <span className="field-label">Chains associated as they occur in nature</span>
+              <select value={assoc} onChange={(e) => setAssoc(e.target.value)}>
+                <option value="">unknown</option>
+                <option value="true">yes</option>
+                <option value="false">no</option>
+              </select>
+            </label>
+          )}
+          <label className="field">
+            <span className="field-label">Reason for the change *</span>
+            <input value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+        </div>
+        <button disabled={!reason.trim()} onClick={save}>
+          Save peptide facts
+        </button>
+      </details>
+    </Section>
   );
 }
 

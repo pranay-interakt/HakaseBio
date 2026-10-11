@@ -455,6 +455,37 @@ A data standard, not an equation. Every rule below is tied to the text that stat
   - The package is produced only when every check passes. The FDA validator itself is not run.
 - **Evidence rule.** Simulated data never becomes SEND.
 
+## 4.23 Peptide classification and guideline routing  [`reg.peptide`]
+
+Two facts, kept separate because no source links them
+(`docs/research/peptide_routing.md`).
+
+- **US classification (21 CFR 600.3(h)(6)).**
+  - A protein is an alpha amino-acid polymer "greater than 40 amino acids in size". Chains
+    "associated with each other in a manner that occurs in nature" are counted together.
+  - A protein is a biological product (21 CFR 600.3(h); 85 FR 10057, effective 23 March 2020),
+    whatever its method of manufacture.
+  - Input: amino acids per chain. Known values: insulin, 21 + 30 associated as in nature,
+    is 51, so a protein (85 FR 10057); 40 is not a protein; 41 is.
+  - The rule states the counting only for natural association. So two chains that are each
+    40 or fewer but together exceed 40 stay pending until the association is known. If they
+    are not associated as in nature, the result stays pending: FDA's reading for that case is
+    not stated.
+  - 21 CFR 314.3 contains no peptide definition. FDA's draft peptide guidance (December 2023)
+    defines a peptide, for its own purposes, as 40 or fewer amino acids.
+- **ICH routing (S6(R1) §1.3; M3(R2) §1.3).**
+  - S6(R1) applies to products "derived from characterised cells", whose active substances
+    "include proteins and peptides". Its principles "may also be applicable to … chemically
+    synthesised peptides".
+  - M3(R2) defers biotechnology-derived products to S6(R1), except for the timing of studies.
+  - No ICH text uses a 40-amino-acid line, so length does not route.
+  - **Recombinant peptides:** the S6(R1) set.
+  - **Chemically synthesised peptides:** the M3(R2) set. The S6(R1) items with no M3(R2)
+    counterpart are species relevance (§3.3) and anti-drug antibodies (§3.6). They stay
+    conditional until the responsible scientist signs whether S6(R1) principles apply; the
+    signature re-authenticates and is ledgered.
+  - **Unknown origin:** every required study is conditional on the origin.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

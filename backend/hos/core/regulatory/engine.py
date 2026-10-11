@@ -12,13 +12,19 @@ ICH M3(R2) Tables 1 and 2 are applied in practice.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
 from hos.core.citations import cite
 from hos.core.provenance import Citation
-from hos.core.regulatory.context import Modality, ProgramContext
+from hos.core.regulatory.classification import ProteinClassification, us_protein_classification
+from hos.core.regulatory.context import (
+    AMINO_ACID_MODALITIES,
+    Modality,
+    PeptideOrigin,
+    ProgramContext,
+)
 
 __all__ = [
     "StudyCategory",
@@ -131,6 +137,8 @@ class StudySet:
     requirements: tuple[StudyRequirement, ...]
     governing_guidelines: tuple[Citation, ...]
     notes: tuple[str, ...] = field(default_factory=tuple)
+    classification: ProteinClassification | None = None
+    """US protein/peptide classification (21 CFR 600.3(h)(6)) for amino-acid polymers."""
 
     def required(self) -> list[StudyRequirement]:
         return [r for r in self.requirements if r.status is RequirementStatus.REQUIRED]
@@ -153,6 +161,7 @@ class StudySet:
             "requirements": [r.to_dict() for r in self.requirements],
             "governing_guidelines": [c.to_dict() for c in self.governing_guidelines],
             "notes": list(self.notes),
+            "classification": self.classification.to_dict() if self.classification else None,
             "summary": {
                 "required": len(self.required()),
                 "conditional": len(self.conditional()),
@@ -685,6 +694,60 @@ def _advanced_therapy_rules(ctx: ProgramContext) -> list[StudyRequirement]:
     return out
 
 
+#: S6(R1) items a chemically synthesised peptide takes on when S6(R1) principles apply; the
+#: small-molecule set has no counterpart for them.
+S6_PRINCIPLE_ITEMS = ("bio.species_relevance", "bio.immunogenicity")
+PEPTIDE_ORIGIN_FACT = ("peptide manufacturing origin: chemical synthesis or recombinant "
+                       "expression (ICH S6(R1) section 1.3)")
+S6_DETERMINATION_FACT = ("responsible scientist's signed determination whether ICH S6(R1) "
+                         "principles apply to this chemically synthesised peptide (S6(R1) "
+                         "section 1.3)")
+
+
+def _pending(reqs: list[StudyRequirement], fact: str) -> list[StudyRequirement]:
+    """Required items become conditional on ``fact``; items already conditional keep theirs."""
+    return [replace(r, status=RequirementStatus.CONDITIONAL, pending_fact=fact)
+            if r.status is RequirementStatus.REQUIRED else r for r in reqs]
+
+
+def _s6_principle_items(ctx: ProgramContext) -> list[StudyRequirement]:
+    items = [r for r in _biologic_rules(ctx) if r.id in S6_PRINCIPLE_ITEMS]
+    if ctx.peptide_origin is None:
+        return _pending(items, PEPTIDE_ORIGIN_FACT)
+    det = ctx.s6_determination
+    if det is None:
+        return _pending(items, S6_DETERMINATION_FACT)
+    sig = det["signature"]
+    who = (f"{sig['signer_name']} ({sig['role']}) determined on {str(sig['signed_at'])[:10]} "
+           f"that ICH S6(R1) principles {'apply' if det['applies'] else 'do not apply'}: "
+           f"{det['rationale']}")
+    if det["applies"]:
+        return [replace(r, rationale=f"{r.rationale}. {who}") for r in items]
+    return [replace(r, status=RequirementStatus.NOT_REQUIRED, pending_fact=None,
+                    rationale=who) for r in items]
+
+
+def _peptide_rules(ctx: ProgramContext) -> tuple[list[StudyRequirement], list[str]]:
+    """ICH routing for peptides follows manufacturing origin, not length. S6(R1) section 1.3
+    applies to products "derived from characterised cells" (its active substances "include
+    proteins and peptides") and "may also be applicable to ... chemically synthesised
+    peptides"; M3(R2) section 1.3 defers biotechnology-derived products to S6. No ICH text
+    draws a 40-amino-acid line (docs/research/peptide_routing.md)."""
+    if ctx.peptide_origin is PeptideOrigin.RECOMBINANT:
+        return _biologic_rules(ctx), [
+            "Recombinant peptide: within ICH S6(R1) (section 1.3, products derived from "
+            "characterised cells); ICH M3(R2) gives only the timing of studies (section 1.3)."]
+    if ctx.peptide_origin is PeptideOrigin.CHEMICAL_SYNTHESIS:
+        notes = ["Chemically synthesised peptide: ICH M3(R2) governs. ICH S6(R1) principles "
+                 "'may also be applicable' (section 1.3); whether they apply is the "
+                 "responsible scientist's signed determination, which decides the S6(R1) "
+                 "items below."]
+        return _small_molecule_rules(ctx) + _s6_principle_items(ctx), notes
+    return _pending(_small_molecule_rules(ctx), PEPTIDE_ORIGIN_FACT) + _s6_principle_items(ctx), [
+        "Peptide of unknown origin: the ICH guideline that governs the study set depends on "
+        "it (S6(R1) section 1.3), so required studies are shown as conditional on the origin."]
+
+
 def derive_study_set(ctx: ProgramContext) -> StudySet:
     """Derive the full nonclinical study set for a programme."""
     notes: list[str] = []
@@ -705,9 +768,22 @@ def derive_study_set(ctx: ProgramContext) -> StudySet:
                 "ADCs: the conjugate is the primary test article; the linker-payload is assessed "
                 "for genotoxicity and hERG separately."
             )
+    elif ctx.modality is Modality.PEPTIDE:
+        reqs, peptide_notes = _peptide_rules(ctx)
+        notes.extend(peptide_notes)
+        if ctx.peptide_origin is not PeptideOrigin.RECOMBINANT:
+            governing.extend([cite("ich_s2r1"), cite("ich_s7a"), cite("ich_s7b")])
+        governing.append(cite("ich_s6r1"))
     else:
         reqs = _small_molecule_rules(ctx)
         governing.extend([cite("ich_s2r1"), cite("ich_s7a"), cite("ich_s7b")])
+
+    classification = None
+    if ctx.modality is Modality.PEPTIDE or (ctx.modality in AMINO_ACID_MODALITIES
+                                            and ctx.amino_acid_chains):
+        classification = us_protein_classification(ctx.amino_acid_chains,
+                                                   ctx.chains_naturally_associated)
+        notes.append(f"US classification: {classification.statement}")
 
     if ctx.is_oncology_s9:
         governing.append(cite("ich_s9"))
@@ -724,4 +800,4 @@ def derive_study_set(ctx: ProgramContext) -> StudySet:
             seen.add(c.key)
             uniq.append(c)
     return StudySet(context=ctx, requirements=tuple(reqs), governing_guidelines=tuple(uniq),
-                    notes=tuple(notes))
+                    notes=tuple(notes), classification=classification)

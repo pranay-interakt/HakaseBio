@@ -109,6 +109,13 @@ class ContextChangeBody(BaseModel):
     reason: str
 
 
+class ProgramDeterminationBody(BaseModel):
+    key: str
+    applies: bool
+    rationale: str
+    password: str
+
+
 class CompoundBody(BaseModel):
     name: str
     smiles: str
@@ -377,6 +384,14 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
                        actor: Principal = Depends(current),
                        k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.update_program_context(actor, program_id, body.changes, reason=body.reason)
+
+    @app.post("/api/programs/{program_id}/determinations")
+    def program_determination(program_id: str, body: ProgramDeterminationBody,
+                              actor: Principal = Depends(current),
+                              k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.record_program_determination(reauth(k, actor, body.password), program_id,
+                                              key=body.key, applies=body.applies,
+                                              rationale=body.rationale)
 
     @app.get("/api/programs/{program_id}/readiness")
     def readiness(program_id: str, milestone: Timing = Query(Timing.BEFORE_FIRST_IN_HUMAN),

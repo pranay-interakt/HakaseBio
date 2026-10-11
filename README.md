@@ -18,7 +18,7 @@ Read [`CLAUDE.md`](CLAUDE.md) before writing code. The plan of record and status
 
 | OS concept | Component | Where |
 |---|---|---|
-| math library | descriptors (RDKit), IVIVE / well-stirred CLh, 4PL Hill fit, hERG margin, FDA 2005 HED/MRSD, ICH study-set rules, cited reference-parameter registry | `backend/hos/core` |
+| math library | descriptors (RDKit), IVIVE / well-stirred CLh, 4PL Hill fit, hERG margin, FDA 2005 HED/MRSD, ICH study-set rules with peptide routing by origin and the 21 CFR 600.3(h)(6) protein classification, cited reference-parameter registry | `backend/hos/core` |
 | kernel | study lifecycle, hash-chained ledger, human-only signatures, append-only versioned artefacts, kernel facade | `backend/hos/kernel` |
 | driver model | `StudyDriver` ABI, registry with requirement matching and plug-in discovery, conformance kit, strict CSV ingest | `backend/hos/drivers` |
 | drivers | microsomal metabolic stability · hERG patch clamp · repeat-dose toxicity (OECD TG 407/408/409, Dunnett) · bioanalytical validation (ICH M10) · toxicokinetics (ICH S3A) · in vivo PK (NCA) · plasma protein binding · Ames (OECD TG 471) · dose range-finding · in vitro potency · CNS, respiratory and QT/cardiovascular safety pharmacology (ICH S7A/S7B) | `backend/hos/drivers/*` |

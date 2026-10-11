@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-__all__ = ["ClinicalPopulation", "Indication", "Modality", "ProgramContext", "Route"]
+__all__ = ["AMINO_ACID_MODALITIES", "ClinicalPopulation", "Indication", "Modality", "PeptideOrigin",
+           "ProgramContext", "Route"]
 
 
 class Modality(str, Enum):
@@ -33,6 +34,20 @@ class Modality(str, Enum):
     def is_advanced_therapy(self) -> bool:
         """Cell and gene therapies: governed by CBER/EMA ATMP guidance, not M3(R2)."""
         return self in (Modality.CELL_THERAPY, Modality.GENE_THERAPY)
+
+
+#: Modalities that are amino-acid polymers, so 21 CFR 600.3(h)(6) can classify them.
+AMINO_ACID_MODALITIES = (Modality.PEPTIDE, Modality.RECOMBINANT_PROTEIN,
+                         Modality.MONOCLONAL_ANTIBODY)
+
+
+class PeptideOrigin(str, Enum):
+    """How a peptide is made. ICH S6(R1) section 1.3 scopes by origin: it "applies to products
+    derived from characterised cells through the use of a variety of expression systems", and
+    its principles "may also be applicable to ... chemically synthesised peptides"."""
+
+    CHEMICAL_SYNTHESIS = "chemical_synthesis"
+    RECOMBINANT = "recombinant"
 
 
 class Indication(str, Enum):
@@ -96,6 +111,18 @@ class ProgramContext:
     is_integrating_vector: bool | None = None
     """Gene therapy: integrating vectors require insertional-mutagenesis assessment."""
     intended_pediatric_use: bool = False
+    peptide_origin: PeptideOrigin | None = None
+    """Peptides only: chemical synthesis or recombinant expression (ICH S6(R1) section 1.3)."""
+    amino_acid_chains: tuple[int, ...] = ()
+    """Amino acids in each chain, for the 21 CFR 600.3(h)(6) protein definition; empty when
+    not known."""
+    chains_naturally_associated: bool | None = None
+    """21 CFR 600.3(h)(6): chains "associated with each other in a manner that occurs in
+    nature" are counted together. Needed only for more than one chain."""
+    s6_determination: dict[str, Any] | None = None
+    """Chemically synthesised peptides: the responsible scientist's signed determination
+    whether ICH S6(R1) principles apply (``applies``, ``rationale``, ``signature``). Recorded
+    only through ``Kernel.record_program_determination``."""
     notes: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -103,9 +130,20 @@ class ProgramContext:
             raise ValueError("intended_clinical_duration_days must be positive")
         if self.max_trial_duration_days <= 0:
             raise ValueError("max_trial_duration_days must be positive")
-        if self.modality.is_biotechnology_derived and not self.pharmacologically_relevant_species:
-            # not an error: the engine will record the species-relevance assessment as required
-            pass
+        if self.peptide_origin is not None and self.modality is not Modality.PEPTIDE:
+            raise ValueError("peptide_origin applies to peptide programmes only")
+        if self.amino_acid_chains and self.modality not in AMINO_ACID_MODALITIES:
+            raise ValueError(f"amino_acid_chains: a {self.modality.value} is not an amino-acid "
+                             "polymer")
+        if any(isinstance(c, bool) or not isinstance(c, int) or c <= 0
+               for c in self.amino_acid_chains):
+            raise ValueError("amino_acid_chains: positive whole numbers of amino acids")
+        if self.s6_determination is not None:
+            if self.modality is not Modality.PEPTIDE:
+                raise ValueError("an S6(R1) applicability determination is for peptides only")
+            if not isinstance(self.s6_determination.get("applies"), bool) or \
+                    not self.s6_determination.get("signature"):
+                raise ValueError("an S6(R1) determination needs 'applies' and its signature")
 
     @property
     def is_oncology_s9(self) -> bool:
@@ -135,6 +173,10 @@ class ProgramContext:
             is_immunomodulatory_agonist=bool(d.get("is_immunomodulatory_agonist", False)),
             is_integrating_vector=d.get("is_integrating_vector"),
             intended_pediatric_use=bool(d.get("intended_pediatric_use", False)),
+            peptide_origin=PeptideOrigin(d["peptide_origin"]) if d.get("peptide_origin") else None,
+            amino_acid_chains=tuple(d.get("amino_acid_chains") or ()),
+            chains_naturally_associated=d.get("chains_naturally_associated"),
+            s6_determination=d.get("s6_determination"),
             notes=dict(d.get("notes", {})),
         )
 
@@ -152,5 +194,9 @@ class ProgramContext:
             "is_immunomodulatory_agonist": self.is_immunomodulatory_agonist,
             "is_integrating_vector": self.is_integrating_vector,
             "intended_pediatric_use": self.intended_pediatric_use,
+            "peptide_origin": self.peptide_origin.value if self.peptide_origin else None,
+            "amino_acid_chains": list(self.amino_acid_chains),
+            "chains_naturally_associated": self.chains_naturally_associated,
+            "s6_determination": self.s6_determination,
             "notes": dict(self.notes),
         }

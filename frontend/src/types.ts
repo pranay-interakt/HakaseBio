@@ -168,6 +168,7 @@ export interface Program {
     governing_guidelines: Citation[];
     notes: string[];
     summary: { required: number; conditional: number; not_required: number };
+    classification?: ProteinClassification | null;
   };
   compounds: Compound[];
   studies: StudySummary[];
@@ -544,4 +545,22 @@ export interface SendTerms {
   ct_version: string;
   fields: Record<string, { code: string; name: string; extensible: boolean; terms: string[] }>;
   tests: Record<string, [string, string][]>;
+}
+
+/** US classification of an amino-acid polymer under 21 CFR 600.3(h)(6). */
+export interface ProteinClassification {
+  outcome: "protein" | "not_protein" | "pending";
+  amino_acids: number | null;
+  counted: string;
+  statement: string;
+  pending_fact: string | null;
+  section: string;
+  citations: Citation[];
+}
+
+/** A signed programme determination stored in the context (e.g. s6_determination). */
+export interface ProgramDetermination {
+  applies: boolean;
+  rationale: string;
+  signature: { signer_name: string; role: string; signed_at: string; statement: string };
 }

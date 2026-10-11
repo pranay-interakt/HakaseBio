@@ -408,6 +408,25 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "U.S. Code of Federal Regulations, Title 21, Section 312.23: IND content and "
            "format.",
            url="https://www.ecfr.gov/current/title-21/chapter-I/subchapter-D/part-312/subpart-B/section-312.23"),
+        # -- peptide routing (docs/research/peptide_routing.md; read 2026-10-11) -------------
+        _c("cfr21_600_3",
+           "U.S. Code of Federal Regulations, Title 21, Section 600.3: Definitions (paragraph "
+           "(h)(6), protein). eCFR, current as of 7 October 2026.",
+           url="https://www.ecfr.gov/current/title-21/chapter-I/subchapter-F/part-600/subpart-A/section-600.3"),
+        _c("cfr21_601_2",
+           "U.S. Code of Federal Regulations, Title 21, Section 601.2: Applications for "
+           "biologics licenses; procedures for filing. eCFR, current as of 7 October 2026.",
+           url="https://www.ecfr.gov/current/title-21/chapter-I/subchapter-F/part-601/subpart-A/section-601.2"),
+        _c("fda_biological_product_rule_2020",
+           "U.S. Food and Drug Administration. Definition of the Term \"Biological Product\". "
+           "Final rule. Fed Regist. 2020;85(35):10057-10063. FR Doc. 2020-03505; Docket "
+           "FDA-2018-N-2732; effective 23 March 2020.",
+           year=2020, url="https://www.govinfo.gov/content/pkg/FR-2020-02-21/pdf/2020-03505.pdf"),
+        _c("fda_peptide_clinpharm_draft_2023",
+           "U.S. Food and Drug Administration, CDER. Clinical Pharmacology Considerations for "
+           "Peptide Drug Products. Draft guidance for industry, December 2023 (not for "
+           "implementation).",
+           year=2023, url="https://www.fda.gov/media/171901/download"),
         # -- SEND export (docs/research/send_export.md; files read 2026-10-11, SHA-256 there) --
         _c("fda_data_standards_catalog_v11",
            "U.S. Food and Drug Administration. FDA Data Standards Catalog, version 11.0. "
