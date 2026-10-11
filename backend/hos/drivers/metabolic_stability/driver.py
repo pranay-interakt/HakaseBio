@@ -261,9 +261,12 @@ class MetabolicStabilityDriver(StudyDriver):
             duration_basis=f"bench scheduling is set by the laboratory; each incubation spans "
                            f"{p.timepoints_min[-1]:g} min",
             sample_count=n,
-            sample_count_basis=(f"{len(p.compound_codes())} compound(s) x {len(p.species)} "
-                                f"species x {len(p.cofactor_arms())} arm(s) x {p.replicates} "
-                                f"replicate(s) x {len(p.timepoints_min)} timepoints"),
+            sample_count_basis=(
+                f"test article: {len(p.species)} species x {len(p.cofactor_arms())} arm(s) x "
+                f"{p.replicates} replicate(s) x {len(p.timepoints_min)} timepoints"
+                + (f"; {len(p.positive_controls)} positive control(s): {len(p.species)} species x "
+                   f"NADPH arm x {p.replicates} replicate(s) x {len(p.timepoints_min)} timepoints"
+                   if p.positive_controls else "")),
             dependencies=("test article identity and purity documented",),
             material_requirements=tuple(protocol.materials),
         )
@@ -558,8 +561,9 @@ class MetabolicStabilityDriver(StudyDriver):
                     ("gertz2008", "hallifax2006"), "notable"))
             rem = analysis.quantities.get(f"{sp}.minus_nadph_remaining")
             if rem is not None and p.max_minus_nadph_loss_percent is None:
-                judgement.append(f"Significance of {100 - rem.require():.1f}% loss without NADPH "
-                                 f"in {sp} (no laboratory criterion supplied)")
+                judgement.append(f"Significance of {rem.require():.1f}% parent remaining at the "
+                                 f"last timepoint without NADPH in {sp} (no laboratory criterion "
+                                 "supplied)")
         for f in analysis.qc.findings:
             if f.code.endswith("out_of_range"):
                 out.append(InterpretiveStatement(
@@ -583,7 +587,9 @@ class MetabolicStabilityDriver(StudyDriver):
         qc = "\n".join(f"- [{f.status.value}] {f.code}: {f.message}" for f in analysis.qc.findings)
         return [
             ReportSection("Summary",
-                          f"Parent depletion was measured in liver microsomes of "
+                          f"Parent depletion was "
+                          f"{'SIMULATED (not measured)' if data.is_simulated else 'measured'} in "
+                          f"liver microsomes of "
                           f"{', '.join(p['species'])} at {p['substrate_concentration_uM']:g} uM "
                           f"substrate and {p['protein_concentration_mg_per_mL']:g} mg/mL protein. "
                           "CLint,app follows the in vitro half-life method (Obach 1999); hepatic "

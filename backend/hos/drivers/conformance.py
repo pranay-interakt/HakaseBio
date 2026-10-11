@@ -183,6 +183,9 @@ def check_driver(
                             assert not r.evidence_admissible
                             md = r.to_markdown()
                             assert "SIMULATED" in md
+                            summary = r.sections[0].body.lower()
+                            assert " measured" not in summary.replace("(not measured)", ""), \
+                                "simulated report summary describes the data as measured"
                             json.dumps(r.to_dict())
                             return f"{len(r.sections)} sections"
                         check("report of simulated data carries the disclaimer", sim_report)

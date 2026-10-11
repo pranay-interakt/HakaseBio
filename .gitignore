@@ -7,7 +7,9 @@ venv/
 .mypy_cache/
 .ruff_cache/
 node_modules/
+frontend/dist/
 dist/
 .env
 .DS_Store
 *.sqlite3
+.claude/launch.json

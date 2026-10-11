@@ -610,8 +610,10 @@ class HergPatchClampDriver(StudyDriver):
         comp = protocol.design.get("best_practice_compliance", {})
         qc = "\n".join(f"- [{f.status.value}] {f.code}: {f.message}" for f in analysis.qc.findings)
         return [
-            ReportSection("Summary", "hERG current inhibition was measured by patch clamp; the "
-                          "IC50 was fitted with a four-parameter logistic model.",
+            ReportSection("Summary", "hERG current inhibition was "
+                          + ("SIMULATED (not measured)" if data.is_simulated
+                             else "measured by patch clamp")
+                          + "; the IC50 was fitted with a four-parameter logistic model.",
                           tables=analysis.tables[:1]),
             ReportSection("E14/S7B Q&A 2.1 best-practice compliance",
                           "\n".join(f"- {k}: {v}" for k, v in comp.items())),

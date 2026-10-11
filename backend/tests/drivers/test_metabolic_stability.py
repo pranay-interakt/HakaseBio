@@ -173,3 +173,10 @@ def test_report_markdown_contains_provenance_and_hash():
     rep = D.report(proto, data, res, D.interpret(res, p))
     md = rep.to_markdown()
     assert data.file_sha256 in md and "obach1999" in md and rep.evidence_admissible
+
+
+def test_plan_sample_count_basis_matches_count():
+    p = D.validate_parameters(PARAMS)
+    plan = D.plan(D.design(COMPOUND, p), p)
+    assert plan.sample_count == 2 * 2 * 2 * 6 + 2 * 1 * 2 * 6  # TA both arms + PC NADPH arm
+    assert "positive control" in plan.sample_count_basis

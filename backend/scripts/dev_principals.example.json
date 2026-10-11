@@ -1,0 +1,42 @@
+{
+  "_note": "DEVELOPMENT/DEMO ONLY test accounts for a local HOS instance. Never use in a real deployment.",
+  "principals": [
+    {
+      "principal_id": "admin",
+      "name": "Demo Administrator",
+      "kind": "human",
+      "roles": [
+        "admin"
+      ],
+      "password": "dev-Q_rEx0bts3XSTTi3"
+    },
+    {
+      "principal_id": "sci",
+      "name": "Demo Scientist",
+      "kind": "human",
+      "roles": [
+        "scientist",
+        "responsible_scientist"
+      ],
+      "password": "dev-qrSM376LMi18uCRK"
+    },
+    {
+      "principal_id": "sd",
+      "name": "Demo Study Director",
+      "kind": "human",
+      "roles": [
+        "study_director"
+      ],
+      "password": "dev-c77YmHzU3AvPZokv"
+    },
+    {
+      "principal_id": "qa",
+      "name": "Demo QA Auditor",
+      "kind": "human",
+      "roles": [
+        "quality_assurance"
+      ],
+      "password": "dev-dk8ObAvdsdNxDrWH"
+    }
+  ]
+}

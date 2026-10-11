@@ -586,7 +586,9 @@ class RepeatDoseToxicityDriver(StudyDriver):
         else:
             nb = "NOAEL not yet determined by the Study Director."
         return [
-            ReportSection("Summary", f"{protocol.title}. {nb}"),
+            ReportSection("Summary", f"{protocol.title}. "
+                          + ("Data are SIMULATED (not measured). " if data.is_simulated else "")
+                          + nb),
             ReportSection("Study design", "\n".join(f"- **{k}:** {v}"
                                                     for k, v in protocol.design.items())),
             ReportSection("Statistical comparisons", "; ".join(analysis.notes),
