@@ -189,9 +189,12 @@ docs/                   specification (00-13), build plan (14), audit (15), oper
   conditions, so the driver offers no defaults.
 - **Pending re-verification.** The OECD TG 409 parameters were read from a mirrored copy and are
   marked for re-verification.
-- **Deployment hardening in progress.** Migrations, PostgreSQL CI, container images and
-  serialised writers are in place; a locked dependency set, request limits and observability
-  (docs/15 P2) are being added.
+- **Validation is the deploying organisation's step.** Every engineering control the audit
+  (docs/15) asked for is in place: atomic audit trail, tenancy, reconciliation and anchoring,
+  Part 11 sign-in, migrations, PostgreSQL, containers, locked builds with SBOMs, limits and
+  alerting. Installation, operational and performance qualification (IQ/OQ/PQ) and the SOPs a
+  regulated deployment needs are not in this repository. Protecting `main` is the repository
+  owner's setting.
 - **Not yet built.** SEND clinical-observation and pathology domains (CL, MA, MI) and the
   SENDIG-SP/DART domains, peptide and antibody drivers, and histopathology incidence statistics.
   SEND packages are checked by HOS's pre-export checks; the FDA validator is not run.
