@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import {
   Citations,
@@ -12,6 +12,7 @@ import {
 import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
 import { SchemaForm } from "../components/SchemaForm";
+import { SendExport } from "../components/SendExport";
 import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
 
 const DESIGNABLE = ["proposed", "designed", "planned", "dispatched"];
@@ -100,7 +101,11 @@ export function Study({ id, me }: { id: string; me: Principal }) {
       {DESIGNABLE.includes(s.state) && (
         <DesignSection s={s} driver={driver} amending={amending} busy={busy} run={run} />
       )}
-      {s.protocol && <ProtocolView protocol={s.protocol} hash={s.protocol_hash} version={s.protocol_version} />}
+      {s.protocol && (
+        <ProtocolView protocol={s.protocol} hash={s.protocol_hash} version={s.protocol_version}>
+          <ProtocolApproval s={s} me={me} busy={busy} run={run} />
+        </ProtocolView>
+      )}
       {s.state === "designed" && (
         <Section title="Plan">
           <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${id}/plan`))}>
@@ -130,6 +135,7 @@ export function Study({ id, me }: { id: string; me: Principal }) {
         </Section>
       )}
       {s.report && <ReportSection s={s} me={me} busy={busy} run={run} />}
+      {driver.id === "repeat_dose_toxicity" && s.data && <SendExport studyId={id} key={s.updated_at} />}
       <AuditTrail id={id} key={s.state + s.updated_at} />
       {!["approved", "cancelled", "failed"].includes(s.state) && <CancelSection id={id} run={run} />}
     </div>
@@ -166,7 +172,48 @@ function DesignSection({ s, driver, amending, busy, run }: { s: StudyT; driver: 
   );
 }
 
-function ProtocolView({ protocol, hash, version }: { protocol: Record<string, unknown>; hash: string | null; version: number }) {
+/** Study Director approval of the protocol. Its date is the study start date (STSTDTC; FDA TCG
+ * v6.3 4.1.3); the server re-authenticates the signer. */
+function ProtocolApproval({ s, me, busy, run }: { s: StudyT; me: Principal; busy: boolean; run: Run }) {
+  const [statement, setStatement] = useState("");
+  const [pw, setPw] = useState("");
+  const approvals = s.signatures.filter(
+    (g) => g.role === "study_director" && (g.subject_id ?? "").startsWith(`${s.id}/protocol/`),
+  );
+  const signedCurrent = approvals.some((g) => g.subject_hash === s.protocol_hash);
+  return (
+    <div className="small" style={{ marginTop: 6 }}>
+      {approvals.length === 0 ? (
+        <span className="muted">Not yet approved by the Study Director.</span>
+      ) : (
+        <ul>
+          {approvals.map((g, i) => (
+            <li key={i}>
+              Approved by {g.signer_name} (Study Director) on {g.signed_at.slice(0, 10)}
+              {g.subject_hash !== s.protocol_hash && " (an earlier protocol version)"}: “{g.statement}”
+            </li>
+          ))}
+        </ul>
+      )}
+      {!signedCurrent && me.kind === "human" && me.roles.includes("study_director") && (
+        <div className="row">
+          <input style={{ flex: 2 }} placeholder="statement of approval *" value={statement}
+            onChange={(e) => setStatement(e.target.value)} />
+          <input style={{ flex: 1 }} type="password" placeholder="password (re-authentication) *" value={pw}
+            onChange={(e) => setPw(e.target.value)} />
+          <button disabled={busy || !statement || !pw}
+            onClick={() => run(() => api.post(`/studies/${s.id}/protocol/sign`, { statement, password: pw }))}>
+            Approve protocol
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProtocolView({ protocol, hash, version, children }: {
+  protocol: Record<string, unknown>; hash: string | null; version: number; children?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const p = protocol as {
     title: string;
@@ -187,6 +234,7 @@ function ProtocolView({ protocol, hash, version }: { protocol: Record<string, un
       <div className="small">
         <strong>{p.title}</strong> · hash <code>{hash?.slice(0, 16)}</code>
       </div>
+      {children}
       {open && (
         <div>
           <p>{p.objective}</p>

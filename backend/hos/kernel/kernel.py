@@ -595,6 +595,34 @@ class Kernel:
                       "evidence_admissible": report.evidence_admissible})
         return self.study_view(study_id)
 
+    def sign_protocol(self, actor: Principal, study_id: str, *, statement: str) -> dict[str, Any]:
+        """The Study Director approves (signs) the current protocol. For nonclinical studies
+        the date of this signature is the study start date (FDA Study Data Technical
+        Conformance Guide v6.3, 4.1.3: STSTDTC "is the date on which the study protocol or plan
+        is approved (signed) by the Study Director"). The API re-authenticates first."""
+        row = self.repo.study(study_id)
+        if not row.protocol_hash:
+            raise KernelError("the study has no protocol to sign")
+        if any(s.get("subject_hash") == row.protocol_hash and s.get("role") ==
+               Role.STUDY_DIRECTOR.value for s in row.signatures or []):
+            raise KernelError("the Study Director has already signed this protocol version")
+        sig = sign(actor, role=Role.STUDY_DIRECTOR, meaning=SignatureMeaning.APPROVAL,
+                   subject_id=f"{study_id}/protocol/v{row.protocol_version}",
+                   subject_hash=row.protocol_hash, statement=statement)
+        self.repo.add_artifact(study_id, "protocol_signature", sig.to_dict(), actor=actor.id)
+        self.repo.update_study(study_id, signatures=list(row.signatures or []) + [sig.to_dict()])
+        self._record(actor, "study.protocol_signed", "study", study_id,
+                     {"signature": sig.to_dict(), "protocol_version": row.protocol_version})
+        return self.study_view(study_id)
+
+    @staticmethod
+    def protocol_signatures(row: Any) -> list[dict[str, Any]]:
+        """Study Director protocol approvals, every protocol version, oldest first."""
+        return sorted((s for s in row.signatures or []
+                       if str(s.get("subject_id", "")).startswith(f"{row.id}/protocol/")
+                       and s.get("role") == Role.STUDY_DIRECTOR.value),
+                      key=lambda s: str(s["signed_at"]))
+
     def sign_study(self, actor: Principal, study_id: str, *, role: Role,
                    meaning: SignatureMeaning, statement: str) -> dict[str, Any]:
         """Sign the current report. The API layer re-authenticates before calling this."""

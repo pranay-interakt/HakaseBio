@@ -408,6 +408,40 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "U.S. Code of Federal Regulations, Title 21, Section 312.23: IND content and "
            "format.",
            url="https://www.ecfr.gov/current/title-21/chapter-I/subchapter-D/part-312/subpart-B/section-312.23"),
+        # -- SEND export (docs/research/send_export.md; files read 2026-10-11, SHA-256 there) --
+        _c("fda_data_standards_catalog_v11",
+           "U.S. Food and Drug Administration. FDA Data Standards Catalog, version 11.0. "
+           "March 2025.",
+           year=2025,
+           url="https://www.fda.gov/regulatory-information/search-fda-guidance-documents/"
+               "data-standards-catalog"),
+        _c("fda_sdtcg_v6_3",
+           "U.S. Food and Drug Administration (CDER, CBER). Study Data Technical Conformance "
+           "Guide: Technical Specifications Document, version 6.3. October 2026.",
+           year=2026, url="https://www.fda.gov/media/153632/download"),
+        _c("fda_ectd_validation_v4_6",
+           "U.S. Food and Drug Administration. Specifications for eCTD Validation Criteria, "
+           "version 4.6. 17 August 2026.",
+           year=2026, url="https://www.fda.gov/media/87056/download"),
+        _c("cdisc_sendig_3_1_1",
+           "CDISC SEND Team. Standard for Exchange of Nonclinical Data Implementation Guide: "
+           "Nonclinical Studies, Version 3.1.1 (Final). CDISC, 30 March 2021. Dataset metadata "
+           "read from the CDISC Library cache in cdisc-org/cdisc-rules-engine at commit "
+           "9ffb1c611081b655c11fc0ac77ed6cc809828126.",
+           year=2021),
+        _c("nci_send_ct_2026_09_25",
+           "CDISC and NCI Enterprise Vocabulary Services. CDISC SEND Controlled Terminology, "
+           "2026-09-25.",
+           year=2026, url="https://evs.nci.nih.gov/ftp1/CDISC/SEND/SEND%20Terminology.txt"),
+        _c("cdisc_define_xml_2_1_schema",
+           "CDISC. Define-XML version 2.1 schemas (define2-1-0.xsd, ODM 1.3.2) and style sheet "
+           "define2-1.xsl, as published in cdisc-org/data-definition-engine at commit "
+           "924e5a9ec2a4e77bd8f6280f83066bf9f7d37e50 (MIT licence).",
+           year=2026, url="https://github.com/cdisc-org/data-definition-engine"),
+        _c("sas_ts140",
+           "SAS Institute. Record Layout of a SAS Version 5 or 6 Data Set in SAS Transport "
+           "(XPORT) Format. Technical paper TS-140, last updated October 2021.",
+           year=2021, url="https://support.sas.com/techsup/technote/ts140.pdf"),
     ]
 )
 

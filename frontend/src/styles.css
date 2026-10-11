@@ -162,3 +162,8 @@ details.card summary { cursor: pointer; color: var(--muted); }
 .tag-imported, .tag-import_draft { color: var(--literature); }
 .tag-superseded { color: var(--muted); }
 .tag-partial { color: var(--warn); }
+.send-animals select { min-width: 190px; }
+.send-animals input[type="date"] { min-width: 132px; }
+.send-animals input[type="number"] { min-width: 64px; }
+.send-animals input:not([type]) { min-width: 150px; }
+.send-endpoints select, .send-endpoints input { min-width: 110px; }

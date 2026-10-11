@@ -21,10 +21,11 @@ Read [`CLAUDE.md`](CLAUDE.md) before writing code. The plan of record and status
 | math library | descriptors (RDKit), IVIVE / well-stirred CLh, 4PL Hill fit, hERG margin, FDA 2005 HED/MRSD, ICH study-set rules, cited reference-parameter registry | `backend/hos/core` |
 | kernel | study lifecycle, hash-chained ledger, human-only signatures, append-only versioned artefacts, kernel facade | `backend/hos/kernel` |
 | driver model | `StudyDriver` ABI, registry with requirement matching and plug-in discovery, conformance kit, strict CSV ingest | `backend/hos/drivers` |
-| drivers | microsomal metabolic stability · hERG patch clamp (ICH E14/S7B Q&A) · repeat-dose toxicity (OECD TG 407/408/409, Dunnett) | `backend/hos/drivers/*` |
+| drivers | microsomal metabolic stability · hERG patch clamp · repeat-dose toxicity (OECD TG 407/408/409, Dunnett) · bioanalytical validation (ICH M10) · toxicokinetics (ICH S3A) · in vivo PK (NCA) · plasma protein binding · Ames (OECD TG 471) · dose range-finding · in vitro potency · CNS, respiratory and QT/cardiovascular safety pharmacology (ICH S7A/S7B) | `backend/hos/drivers/*` |
 | devices | execution targets: external lab (CRO dispatch bundle), in-house lab, simulation | `backend/hos/kernel/execution` |
 | external data | ChEMBL and PubChem clients, cached, honest failure | `backend/hos/data_sources` |
-| output | IND readiness report, CTD Module 4 (ICH M4S(R2)) assembler | `backend/hos/ind` |
+| output | IND readiness report, CTD Module 4 (ICH M4S(R2)) assembler, verification bundles | `backend/hos/ind`, `backend/hos/verify` |
+| data standards | SEND export: SENDIG v3.1.1, SEND CT, Define-XML 2.1, SAS XPORT v5, FDA pre-export checks | `backend/hos/send` |
 | syscalls | REST API (FastAPI, OpenAPI), re-authenticated e-signatures | `backend/hos/api` |
 | userland | React + TypeScript app with provenance badges | `frontend` |
 
@@ -154,7 +155,8 @@ docs/                   specification (00-13) and research records
 - **Single-workstation deployment.** Persistence uses SQLite with `create_all()` and API sessions
   are held in memory. Alembic migrations and a shared session store are needed before a
   multi-user deployment.
-- **Not yet built.** SEND dataset generation, additional study drivers (Ames, plasma protein
-  binding, safety pharmacology, TK), and histopathology incidence statistics.
+- **Not yet built.** SEND clinical-observation and pathology domains (CL, MA, MI) and the
+  SENDIG-SP/DART domains, peptide and antibody drivers, and histopathology incidence statistics.
+  SEND packages are checked by HOS's pre-export checks; the FDA validator is not run.
 - **Licensing.** ChEMBL data are CC BY-SA 3.0; review the share-alike implications before
   commercial redistribution.

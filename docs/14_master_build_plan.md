@@ -78,7 +78,17 @@ with the conversion recorded. Required for radioligands (Wave G).
 - **Surrogate molecule** linked to its clinical candidate (oligonucleotides and species-specific
   biologics run tox on a surrogate).
 
-### P5. SEND export
+### P5. SEND export — **built** (repeat-dose toxicity with its toxicokinetic study)
+
+*Implemented in `hos/send/` (XPORT v5 writer and reader, SENDIG v3.1.1 metadata and SEND CT 2026-09-25 as
+packaged reference data, domain builder, Define-XML 2.1 with schema validation, pre-export checks, package
+assembly, kernel service). The Study Director's protocol signature fixes STSTDTC (`kernel.sign_protocol`). API:
+`POST /api/studies/{id}/protocol/sign`, `GET|POST /api/studies/{id}/send-export`, `GET /api/send/terms`. The
+frontend has a SEND export panel and protocol approval on the study page. Tests: `tests/send/`. Built: TS, TX,
+DM, EX, DS, BW, FW, LB, OM, PC and PP, define.xml, and an nSDRG draft (Markdown; the PHUSE v1.2 template could
+not be retrieved). Not built: CL, MA and MI, because no driver holds clinical-observation or pathology data
+yet; and safety-pharmacology SEND, which needs the SENDIG-SP domains. The FDA validator is not run. Details:
+`docs/04` §4.22 and `docs/research/send_export.md`.*
 
 FDA requires SEND datasets for nonclinical toxicology. Generate them from the repeat-dose and
 safety studies: TS, TX, DM, EX, DS, BW, FW, CL, LB, MA, MI, OM (and others as drivers add

@@ -160,6 +160,11 @@ class ApproveBody(BaseModel):
     password: str
 
 
+class ProtocolSignBody(BaseModel):
+    statement: str
+    password: str
+
+
 class ImportValueBody(BaseModel):
     key: str
     page: str
@@ -506,6 +511,41 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
         signer = reauth(k, actor, body.password)
         return k.sign_study(signer, study_id, role=body.role, meaning=body.meaning,
                             statement=body.statement)
+
+    @app.post("/api/studies/{study_id}/protocol/sign")
+    def sign_protocol(study_id: str, body: ProtocolSignBody, actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.sign_protocol(reauth(k, actor, body.password), study_id,
+                               statement=body.statement)
+
+    # -- SEND export (docs/14 P5) -----------------------------------------------------------
+    @app.get("/api/send/terms")
+    def send_terms(actor: Principal = Depends(current)) -> dict[str, Any]:
+        from hos.send.service import send_terms
+        return send_terms()
+
+    @app.get("/api/studies/{study_id}/send-export")
+    def send_export_context(study_id: str, actor: Principal = Depends(current),
+                            k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        from hos.send.service import send_export_context
+        return send_export_context(k, study_id)
+
+    @app.post("/api/studies/{study_id}/send-export", response_model=None)
+    def send_export(study_id: str, body: dict[str, Any], actor: Principal = Depends(current),
+                    k: Kernel = Depends(get_kernel)) -> dict[str, Any] | JSONResponse:
+        from pydantic import ValidationError
+
+        from hos.send.service import send_export
+        from hos.send.spec import SendExportSpec
+        try:
+            spec = SendExportSpec.model_validate(body)
+        except ValidationError as exc:
+            return JSONResponse(status_code=422, content={
+                "error": "ValidationError", "detail": "the export details are incomplete or "
+                "not valid SEND terms", "errors": [
+                    f"{'.'.join(str(x) for x in e['loc']) or 'spec'}: {e['msg']}"
+                    for e in exc.errors()]})
+        return send_export(k, actor, study_id, spec)
 
     @app.post("/api/studies/{study_id}/approve")
     def approve(study_id: str, body: ApproveBody, actor: Principal = Depends(current),

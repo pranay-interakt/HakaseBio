@@ -415,6 +415,46 @@ is a new registry version; it never silently alters past results.
 - **Core battery.** When blood pressure is measured, the study also covers the S7A
   cardiovascular part (S7B §2.3.2; S7A §2.7.2).
 
+## 4.22 SEND export  [`hos.send`]
+
+A data standard, not an equation. Every rule below is tied to the text that states it
+(`docs/research/send_export.md`).
+
+- **Standards.**
+  - Target: SENDIG v3.1.1 (SDTM 1.5), the version required for CDER commercial INDs since
+    15 March 2023 (FDA Data Standards Catalog v11.0).
+  - SEND Controlled Terminology 2026-09-25 (NCI EVS).
+  - Define-XML 2.1; every define.xml is validated against CDISC's schemas.
+  - SAS XPORT v5 laid out per TS-140. IBM doubles are exact for IEEE inputs and match the TS-140
+    `testieee` vectors.
+- **Study start date.**
+  - STSTDTC is the date the Study Director approves (signs) the protocol (TCG v6.3 §4.1.3).
+  - HOS takes it only from that signature in the record. It cannot be typed in, and there is no
+    export without it (eCTD validation 1734).
+- **Domains built.**
+  - TS, TX, DM, EX and DS come from the design and the per-subject facts.
+  - BW, FW, LB and OM come from the repeat-dose endpoints. Results go out as collected:
+    STRESC/STRESN equal ORRES in the protocol unit, and a unit term that is not the protocol unit
+    is refused.
+  - PC and PP come from the toxicokinetic study's records and its individual NCA. BLQ is written
+    in PCSTRESC with PCSTRESN empty (TCG §4.1.3). A parameter the NCA could not estimate is
+    written with PPSTAT NOT DONE and the NCA's reason in PPREASND.
+  - CL, MA and MI are not built, because HOS drivers do not yet hold clinical-observation or
+    pathology data.
+- **No defaults.**
+  - Each FDA-desired TS parameter (TCG Appendix C) carries a value or an ISO 21090 null flavor
+    with a reason.
+  - Nominal days are stated per phase.
+  - Terms are checked against CT: a miss on a non-extensible codelist is an error, a miss on an
+    extensible one a warning for the nSDRG.
+  - A known --TESTCD must carry its CT --TEST name.
+- **Checks before release.**
+  - TRC 1734 and 1736.
+  - The TCG §4.1.3 conformance items, the Appendix I pre-submission items, and DM/DS one record
+    per subject.
+  - The package is produced only when every check passes. The FDA validator itself is not run.
+- **Evidence rule.** Simulated data never becomes SEND.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

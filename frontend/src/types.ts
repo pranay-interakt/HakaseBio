@@ -249,6 +249,7 @@ export interface Study extends StudySummary {
     signed_at: string;
     statement: string;
     subject_hash: string;
+    subject_id?: string;
   }[];
   allowed_transitions: string[];
   approval_missing?: string[];
@@ -406,4 +407,141 @@ export interface ImportRecord {
   values: ImportValue[];
   proposals: ImportProposal[];
   superseded_by?: { study_id: string; reason: string; at: string };
+}
+
+// ---- SEND export (docs/14 P5) -------------------------------------------------------------
+
+export interface SendSubject {
+  subject_id: string;
+  sex: string | null;
+  dose: number | null;
+  phase: string;
+}
+
+export interface SendAnimal {
+  subject_id: string;
+  first_dose_date: string;
+  last_dose_date: string;
+  end_date: string;
+  disposition: string;
+  disposition_term: string;
+  disposition_date: string;
+  disposition_nominal_day: number | null;
+  unscheduled: boolean;
+}
+
+export interface SendEndpointMap {
+  domain: "" | "BW" | "FW" | "LB" | "OM";
+  testcd: string;
+  test: string;
+  unit: string;
+  category: string | null;
+  specimen: string | null;
+}
+
+export interface SendNullValue {
+  flavor: string;
+  reason: string;
+}
+
+export interface SendFacts {
+  studyid: string;
+  test_facility_study_id: string;
+  study_title: string;
+  sponsor: string;
+  test_facility: string;
+  test_facility_location: string;
+  test_facility_country: string;
+  study_type: string;
+  study_category: string;
+  design: string;
+  report_status: string;
+  glp_type: string | null;
+  species: string;
+  strain: string;
+  age: number | null;
+  age_text: string | null;
+  age_unit: string;
+  route: string;
+  dose_form: string;
+  dosing_frequency: string;
+  test_article: string;
+  vehicle: string;
+  test_article_lot: string;
+  dosing_start: string;
+  dosing_end: string;
+  experimental_start: string;
+  experimental_end: string;
+  dosing_duration: string;
+  terminal_sacrifice: string;
+  recovery_sacrifice: string | null;
+  values: Record<string, string>;
+  null_values: Record<string, SendNullValue>;
+}
+
+export interface SendPKMap {
+  tk_study_id: string;
+  analyte_testcd: string;
+  analyte_test: string;
+  specimen: string;
+  concentration_unit: string;
+  auc_unit: string;
+  time_unit: string;
+  animals: SendAnimal[];
+}
+
+export interface SendSpec {
+  facts: SendFacts;
+  animals: SendAnimal[];
+  endpoints: Record<string, SendEndpointMap>;
+  timepoints: Record<string, number>;
+  recovery_timepoints: Record<string, number>;
+  baseline_timepoint: string | null;
+  pk: SendPKMap | null;
+}
+
+export interface SendCheck {
+  rule: string;
+  source: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface SendExportRecord {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  checks: SendCheck[];
+  manifest: { files?: Record<string, string>; records?: Record<string, number>; exported_at?: string };
+  package_sha256: string | null;
+  spec?: SendSpec;
+  version?: number;
+  created_at?: string;
+  created_by?: string;
+}
+
+export interface SendContext {
+  study_id: string;
+  state: string;
+  glp: boolean;
+  has_data: boolean;
+  simulated: boolean;
+  subjects: SendSubject[];
+  endpoints: { name: string; unit: string; category: string }[];
+  timepoints: string[];
+  recovery: boolean;
+  study_start: string | null;
+  study_director: string | null;
+  tk_studies: { id: string; title: string; state: string; simulated: boolean; analysed: boolean; subjects: SendSubject[] }[];
+  exports: SendExportRecord[];
+  standards: Record<string, string>;
+  ts_fda_desired: string[];
+  ts_fda_conditional: string[];
+  ts_to_enter: string[];
+}
+
+export interface SendTerms {
+  ct_version: string;
+  fields: Record<string, { code: string; name: string; extensible: boolean; terms: string[] }>;
+  tests: Record<string, [string, string][]>;
 }
