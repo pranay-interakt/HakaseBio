@@ -778,35 +778,34 @@ details > summary {
 .note p:last-child {
   margin-bottom: 0;
 }
+/* A callout is a card like any other; its tone reads from the label, not from a
+   page-wide block of colour. */
 .callout {
   display: flex;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px 16px;
-}
-.callout.ok {
-  background: var(--ok-soft);
-  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
-}
-.callout.bad {
-  background: var(--bad-soft);
-  border-color: color-mix(in srgb, var(--bad) 30%, transparent);
-}
-.callout.warn {
-  background: var(--warn-soft);
-  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
 }
 .callout-label {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--muted);
+  color: var(--accent);
+}
+.callout.ok .callout-label {
+  color: var(--ok);
+}
+.callout.bad .callout-label {
+  color: var(--bad);
+}
+.callout.warn .callout-label {
+  color: var(--warn);
 }
 .callout-text {
   font-weight: 560;
