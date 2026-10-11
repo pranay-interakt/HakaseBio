@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +19,7 @@ from sqlalchemy.sql.schema import ScalarElementColumnDefault
 from hos.db.models import Base, LedgerRow
 from hos.kernel.ledger import LedgerEntry
 
-__all__ = ["Database", "FileStore", "SqlLedgerBackend", "default_data_dir"]
+__all__ = ["CommitThenRaise", "Database", "FileStore", "SqlLedgerBackend", "default_data_dir"]
 
 
 def default_data_dir() -> Path:
@@ -43,8 +45,11 @@ class Database:
                 cur = dbapi_conn.cursor()
                 cur.execute("PRAGMA foreign_keys=ON")
                 cur.execute("PRAGMA journal_mode=WAL")
+                cur.execute("PRAGMA busy_timeout=5000")  # wait for another writer's lock
                 cur.close()
         self._factory = sessionmaker(self.engine, expire_on_commit=False, future=True)
+        self._uow: ContextVar[Session | None] = ContextVar(f"hos_uow_{id(self)}", default=None)
+        self._write_lock = threading.RLock()
 
     def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
@@ -83,6 +88,12 @@ class Database:
 
     @contextmanager
     def session(self) -> Iterator[Session]:
+        """A session. Inside :meth:`transaction` it is the unit of work's own session, which
+        only the unit of work commits; otherwise a short session committed on exit."""
+        uow = self._uow.get()
+        if uow is not None:
+            yield uow
+            return
         s = self._factory()
         try:
             yield s
@@ -92,6 +103,47 @@ class Database:
             raise
         finally:
             s.close()
+
+    def in_transaction(self) -> bool:
+        return self._uow.get() is not None
+
+    @contextmanager
+    def transaction(self) -> Iterator[Session]:
+        """One unit of work (docs/15 P0.1). A state change, its artefacts and its ledger entry
+        commit together or not at all: every :meth:`session` opened inside joins this one,
+        nested calls join too, and only the outermost commits. Writers are serialised within
+        the process, so ledger sequence numbers are allocated one writer at a time; across
+        processes the ledger's primary key on ``seq`` refuses a second entry with the same
+        number, which rolls that writer's whole change back.
+
+        Raising :class:`CommitThenRaise` commits what was recorded (a refused login, a
+        rejected upload) and then raises the wrapped error."""
+        if self._uow.get() is not None:
+            yield self._uow.get()  # type: ignore[misc]
+            return
+        with self._write_lock:
+            s = self._factory()
+            token = self._uow.set(s)
+            try:
+                yield s
+                s.commit()
+            except CommitThenRaise as ctr:
+                s.commit()
+                raise ctr.error from None
+            except BaseException:
+                s.rollback()
+                raise
+            finally:
+                self._uow.reset(token)
+                s.close()
+
+
+class CommitThenRaise(Exception):
+    """Inside :meth:`Database.transaction`: keep what was recorded, then raise ``error``."""
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__(str(error))
+        self.error = error
 
 
 class FileStore:

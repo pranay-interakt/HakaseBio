@@ -124,6 +124,18 @@ raises `LedgerIntegrityError` on a sequence gap, a broken link, an altered paylo
 whose hash does not match its contents. Backends: `MemoryLedgerBackend` (tests) and
 `SqlLedgerBackend` (`hos/db/store.py`, table `ledger`).
 
+**Atomic with the state it records** (docs/15 P0.1). Every kernel operation that writes is an
+`@atomic` unit of work (`hos/kernel/uow.py`, `Database.transaction`). Its state changes,
+artefacts and ledger entry share one database transaction, so either all commit or none does.
+- Nested operations join the outer unit; only the outermost commits.
+- Writers are serialised within the process. Across processes, the primary key on `seq` refuses
+  a second entry with the same number, which rolls that writer's whole change back. SQLite
+  connections wait up to five seconds for the write lock.
+- A refusal that must stay on the record while the call fails, such as a failed login, a rejected
+  upload or a refused approval, raises `CommitThenRaise`.
+- Tests make the ledger write fail before every step of a full lifecycle and check that no table
+  changes. A static test checks that every writing kernel method is `@atomic`.
+
 ## 7.7 Principals and signatures
 
 `hos/kernel/attestation.py`. `Principal(id, name, kind ∈ {HUMAN, AGENT, SYSTEM}, roles)`. Roles

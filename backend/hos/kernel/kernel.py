@@ -37,7 +37,7 @@ from hos.core.regulatory.context import AMINO_ACID_MODALITIES
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
 from hos.db.models import CompoundRow, PrincipalRow, ProgramRow, StudyRow
 from hos.db.repository import Repository, content_hash
-from hos.db.store import Database, FileStore, SqlLedgerBackend
+from hos.db.store import CommitThenRaise, Database, FileStore, SqlLedgerBackend
 from hos.drivers.base import (
     CompoundInfo,
     DataOrigin,
@@ -70,6 +70,7 @@ from hos.kernel.imports import ImportService
 from hos.kernel.inputs import input_quantity
 from hos.kernel.ledger import Ledger
 from hos.kernel.lifecycle import TRANSITIONS, StudyState, assert_transition
+from hos.kernel.uow import atomic
 
 __all__ = ["WORK_ROLES", "Kernel"]
 
@@ -112,6 +113,7 @@ def _check_password(password: str, stored: str) -> bool:
 PROGRAM_DETERMINATIONS = {"s6_principles_apply": "s6_determination"}
 
 
+
 #: A hash of a random secret, checked when a principal has none, so a refusal costs the same
 #: time whether or not the id exists (no user enumeration by timing).
 _DUMMY_HASH = _hash_password(secrets.token_hex(16))
@@ -142,6 +144,7 @@ class Kernel:
                          roles=frozenset(Role(r) for r in row.roles),
                          organisation=row.organisation)
 
+    @atomic
     def register_principal(self, actor: Principal | None, *, principal_id: str, name: str,
                            kind: PrincipalKind, roles: Sequence[Role],
                            password: str | None = None,
@@ -174,6 +177,7 @@ class Kernel:
     def get_principal(self, principal_id: str) -> Principal:
         return self._principal(self.repo.principal(principal_id))
 
+    @atomic
     def authenticate(self, principal_id: str, password: str) -> Principal:
         """Verify a human's credentials. Used at login and again at every signature
         (21 CFR 11.200 re-authentication)."""
@@ -189,13 +193,15 @@ class Kernel:
             self.ledger.record(actor_id=principal_id, actor_kind="unknown",
                                action="auth.failed", subject_type="principal",
                                subject_id=principal_id)
-            raise PermissionDenied("invalid credentials")
+            # the failed attempt stays on the record although the call fails
+            raise CommitThenRaise(PermissionDenied("invalid credentials"))
         return self._principal(row)
 
     # ======================================================================
     # programmes and compounds
     # ======================================================================
 
+    @atomic
     def create_program(self, actor: Principal, *, name: str, context: ProgramContext,
                        sponsor: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
@@ -215,6 +221,7 @@ class Kernel:
                       "study_set_hash": content_hash(ss.to_dict())})
         return self.program_view(pid)
 
+    @atomic
     def update_program_context(self, actor: Principal, program_id: str,
                                changes: Mapping[str, Any], *, reason: str) -> dict[str, Any]:
         """Change programme facts (e.g. resolve a pending fact) and re-derive the study set."""
@@ -243,6 +250,7 @@ class Kernel:
                      reason=reason)
         return self.program_view(program_id)
 
+    @atomic
     def record_program_determination(self, actor: Principal, program_id: str, *, key: str,
                                      applies: bool, rationale: str) -> dict[str, Any]:
         """A signed programme-level judgement that changes the study set. Today one exists:
@@ -274,6 +282,7 @@ class Kernel:
                       "study_set_hash": content_hash(ss.to_dict())})
         return self.program_view(program_id)
 
+    @atomic
     def register_compound(self, actor: Principal, program_id: str, *, name: str,
                           smiles: str) -> dict[str, Any]:
         self._require_worker(actor)
@@ -294,6 +303,7 @@ class Kernel:
                       "rdkit": profile.rdkit_version})
         return self.compound_view(cid)
 
+    @atomic
     def attach_external_record(self, actor: Principal, compound_id: str, source: str,
                                record: Mapping[str, Any]) -> dict[str, Any]:
         """Store a data-source result (ChEMBL, PubChem, ...) against a compound."""
@@ -306,6 +316,7 @@ class Kernel:
                      {"source": source, "record_hash": content_hash(dict(record))})
         return self.compound_view(compound_id)
 
+    @atomic
     def register_biologic(self, actor: Principal, program_id: str, *, name: str,
                           entity: Mapping[str, Any]) -> dict[str, Any]:
         """Register a peptide or antibody by its sequence (or HELM string). The sequence is
@@ -368,6 +379,7 @@ class Kernel:
         raise NotFound(f"requirement {requirement_id!r} is not in the study set of "
                        f"{program.name}")
 
+    @atomic
     def create_study(self, actor: Principal, *, program_id: str, compound_id: str,
                      requirement_id: str | None = None, driver_id: str | None = None,
                      hypothesis: str | None = None) -> dict[str, Any]:
@@ -417,6 +429,7 @@ class Kernel:
                       "hypothesis": hypothesis})
         return self.study_view(sid)
 
+    @atomic
     def design_study(self, actor: Principal, study_id: str, parameters: Mapping[str, Any],
                      *, reason: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
@@ -441,6 +454,7 @@ class Kernel:
                       "parameters": params.model_dump()}, reason=reason)
         return self.study_view(study_id)
 
+    @atomic
     def plan_study(self, actor: Principal, study_id: str) -> dict[str, Any]:
         self._require_worker(actor)
         row = self.repo.study(study_id)
@@ -454,6 +468,7 @@ class Kernel:
         self._record(actor, "study.planned", "study", study_id, {"plan": plan})
         return self.study_view(study_id)
 
+    @atomic
     def dispatch_study(self, actor: Principal, study_id: str,
                        target: Mapping[str, Any]) -> dict[str, Any]:
         self._require_worker(actor)
@@ -490,6 +505,7 @@ class Kernel:
             raise NotFound("study has not been dispatched")
         return self.files.get(row.execution["bundle_file"])
 
+    @atomic
     def receive_data(self, actor: Principal, study_id: str, content: bytes | None = None, *,
                      filename: str = "upload.csv", reason: str | None = None) -> dict[str, Any]:
         """Ingest a returned data file (or, for a simulation target, the generated file)."""
@@ -525,7 +541,7 @@ class Kernel:
             self._record(actor, "data.rejected", "study", study_id,
                          {"file_sha256": stored, "filename": filename,
                           "errors": list(exc.errors)})
-            raise
+            raise CommitThenRaise(exc) from None
         d = data.to_dict()
         self.repo.add_artifact(study_id, "data", d, actor=actor.id, reason=reason)
         raw = list(row.raw_files or []) + [{"sha256": stored, "filename": filename,
@@ -549,6 +565,7 @@ class Kernel:
             declared.update(driver.post_data_inputs(params, IngestedData.from_dict(row.data)))
         return declared
 
+    @atomic
     def set_analysis_inputs(self, actor: Principal, study_id: str,
                             inputs: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
         """Supply quantities the analysis needs from outside the return file.
@@ -577,6 +594,7 @@ class Kernel:
         self._record(actor, "study.inputs_set", "study", study_id, {"inputs": merged})
         return self.study_view(study_id)
 
+    @atomic
     def analyze_study(self, actor: Principal, study_id: str, *,
                       reason: str | None = None) -> dict[str, Any]:
         self._require_worker(actor)
@@ -603,6 +621,7 @@ class Kernel:
                       "evidence_admissible": res.evidence_admissible}, reason=reason)
         return self.study_view(study_id)
 
+    @atomic
     def record_determination(self, actor: Principal, study_id: str, *, key: str,
                              value: float | None, unit: str | None, rationale: str,
                              reason: str | None = None,
@@ -669,6 +688,7 @@ class Kernel:
                       "signature": sig.to_dict()}, reason=reason)
         return self.study_view(study_id)
 
+    @atomic
     def report_study(self, actor: Principal, study_id: str) -> dict[str, Any]:
         self._require_worker(actor)
         row = self.repo.study(study_id)
@@ -701,6 +721,7 @@ class Kernel:
                       "evidence_admissible": report.evidence_admissible})
         return self.study_view(study_id)
 
+    @atomic
     def sign_protocol(self, actor: Principal, study_id: str, *, statement: str) -> dict[str, Any]:
         """The Study Director approves (signs) the current protocol. For nonclinical studies
         the date of this signature is the study start date (FDA Study Data Technical
@@ -729,6 +750,7 @@ class Kernel:
                        and s.get("role") == Role.STUDY_DIRECTOR.value),
                       key=lambda s: str(s["signed_at"]))
 
+    @atomic
     def sign_study(self, actor: Principal, study_id: str, *, role: Role,
                    meaning: SignatureMeaning, statement: str) -> dict[str, Any]:
         """Sign the current report. The API layer re-authenticates before calling this."""
@@ -759,6 +781,7 @@ class Kernel:
                 missing.append(f"{role.value} ({meaning.value})")
         return missing
 
+    @atomic
     def approve_study(self, actor: Principal, study_id: str) -> dict[str, Any]:
         if actor.kind is not PrincipalKind.HUMAN:
             raise PermissionDenied("only a human can approve a study")
@@ -768,8 +791,8 @@ class Kernel:
         if not row.evidence_admissible or DataOrigin.SIMULATED.value in origins:
             self._record(actor, "study.approval_refused", "study", study_id,
                          {"reason": "simulated data"})
-            raise EvidenceInadmissible("a study containing simulated data can never be "
-                                       "approved as evidence")
+            raise CommitThenRaise(EvidenceInadmissible(
+                "a study containing simulated data can never be approved as evidence"))
         missing = self._missing_signatures(row)
         if missing:
             raise AttestationRequired(f"approval needs signatures on the current report: "
@@ -779,9 +802,11 @@ class Kernel:
                      {"report_hash": row.report_hash, "glp": row.glp})
         return self.study_view(study_id)
 
+    @atomic
     def cancel_study(self, actor: Principal, study_id: str, *, reason: str) -> dict[str, Any]:
         return self._terminal(actor, study_id, StudyState.CANCELLED, reason)
 
+    @atomic
     def fail_study(self, actor: Principal, study_id: str, *, reason: str) -> dict[str, Any]:
         return self._terminal(actor, study_id, StudyState.FAILED, reason)
 
@@ -881,6 +906,7 @@ class Kernel:
                  "created_at": a.created_at.isoformat(), "content": a.content}
                 for a in self.repo.artifacts(study_id, kind)]
 
+    @atomic
     def record_event(self, actor: Principal, action: str, subject_type: str, subject_id: str,
                      payload: dict[str, Any], *, reason: str | None = None) -> None:
         """Ledger an event raised by a kernel service (e.g. IND assembly)."""

@@ -30,6 +30,7 @@ from hos.kernel.attestation import Principal, PrincipalKind, Role, SignatureMean
 from hos.kernel.errors import AttestationRequired, KernelError, NotFound, PermissionDenied
 from hos.kernel.import_specs import ImportField, import_fields
 from hos.kernel.lifecycle import StudyState, assert_transition
+from hos.kernel.uow import atomic
 
 if TYPE_CHECKING:
     from hos.kernel.kernel import Kernel
@@ -77,6 +78,7 @@ class ImportService:
 
     # -- creation ----------------------------------------------------------------
 
+    @atomic
     def import_study(self, actor: Principal, *, program_id: str, compound_id: str,
                      requirement_id: str, report: bytes, filename: str, title: str,
                      laboratory: str, report_date: str, glp: bool,
@@ -148,6 +150,7 @@ class ImportService:
                       "report_filename": filename, "glp": glp, "laboratory": laboratory})
         return self.k.study_view(sid)
 
+    @atomic
     def add_import_dataset(self, actor: Principal, study_id: str, content: bytes, *,
                            filename: str, description: str) -> dict[str, Any]:
         row = self._draft_import(actor, study_id)
@@ -167,6 +170,7 @@ class ImportService:
 
     # -- values ------------------------------------------------------------------------
 
+    @atomic
     def add_import_value(self, actor: Principal, study_id: str, *, key: str,
                          page: str, value: float | None = None, unit: str | None = None,
                          category: str | None = None, label: str | None = None,
@@ -191,6 +195,7 @@ class ImportService:
                       "value": value, "unit": entry.get("unit"), "category": category})
         return self.k.study_view(study_id)
 
+    @atomic
     def withdraw_import_value(self, actor: Principal, study_id: str, value_id: str, *,
                               reason: str) -> dict[str, Any]:
         if not reason.strip():
@@ -213,6 +218,7 @@ class ImportService:
                      {"value_id": value_id}, reason=reason)
         return self.k.study_view(study_id)
 
+    @atomic
     def propose_import_value(self, actor: Principal, study_id: str, *, key: str,
                              page: str, value: float | None = None, unit: str | None = None,
                              category: str | None = None, label: str | None = None,
@@ -237,6 +243,7 @@ class ImportService:
                      {"proposal_id": prop["id"], "key": key, "page": page})
         return self.k.study_view(study_id)
 
+    @atomic
     def confirm_import_proposal(self, actor: Principal, study_id: str,
                                 proposal_id: str, *, page: str | None = None) -> dict[str, Any]:
         if actor.kind is not PrincipalKind.HUMAN:
@@ -260,6 +267,7 @@ class ImportService:
                      {"proposal_id": proposal_id, "value_id": entry["id"]})
         return self.k.study_view(study_id)
 
+    @atomic
     def reject_import_proposal(self, actor: Principal, study_id: str, proposal_id: str,
                                *, reason: str) -> dict[str, Any]:
         if actor.kind is not PrincipalKind.HUMAN:
@@ -313,6 +321,7 @@ class ImportService:
                 out.append(f"{' or '.join(sorted(roles))} ({meaning.value})")
         return out
 
+    @atomic
     def sign_import(self, actor: Principal, study_id: str, *, role: Role,
                     meaning: SignatureMeaning, statement: str) -> dict[str, Any]:
         """Sign the import as it stands. The API re-authenticates before calling this."""
@@ -333,6 +342,7 @@ class ImportService:
         self.k._record(actor, "import.signed", "study", study_id, {"signature": sig.to_dict()})
         return self.k.study_view(study_id)
 
+    @atomic
     def complete_import(self, actor: Principal, study_id: str) -> dict[str, Any]:
         if actor.kind is not PrincipalKind.HUMAN:
             raise PermissionDenied("only a human can complete an import")
@@ -350,6 +360,7 @@ class ImportService:
                       "values": len([v for v in rec.get("values", []) if not v.get("withdrawn")])})
         return self.k.study_view(study_id)
 
+    @atomic
     def supersede_import(self, actor: Principal, study_id: str, *, by_study_id: str,
                          reason: str) -> dict[str, Any]:
         """Retire an imported study once a driver-run study for the same requirement is

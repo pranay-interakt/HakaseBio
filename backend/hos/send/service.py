@@ -51,6 +51,14 @@ def _source(kernel: Any, row: Any, driver_id: str) -> dict[str, Any]:
 
 def send_export(kernel: Any, actor: Principal, study_id: str, spec: SendExportSpec,
                 exported_at: datetime | None = None) -> dict[str, Any]:
+    """One unit of work: the package file record, the export artefact and the ledger event
+    commit together (docs/15 P0.1)."""
+    with kernel.db.transaction():
+        return _send_export(kernel, actor, study_id, spec, exported_at)
+
+
+def _send_export(kernel: Any, actor: Principal, study_id: str, spec: SendExportSpec,
+                 exported_at: datetime | None) -> dict[str, Any]:
     kernel._require_worker(actor)
     row = kernel.repo.study(study_id)
     tox = _source(kernel, row, "repeat_dose_toxicity")

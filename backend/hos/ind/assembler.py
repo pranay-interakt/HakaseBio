@@ -268,6 +268,13 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
 
 
 def assemble_module4(kernel: Any, actor: Principal, program_id: str) -> dict[str, Any]:
+    """One unit of work: the bundle's file record and the ledger event commit together
+    (docs/15 P0.1)."""
+    with kernel.db.transaction():
+        return _assemble_module4(kernel, actor, program_id)
+
+
+def _assemble_module4(kernel: Any, actor: Principal, program_id: str) -> dict[str, Any]:
     program = kernel.repo.program(program_id)
     studies = kernel.repo.studies(program_id)
     included, refused, imports = [], [], []

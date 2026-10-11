@@ -27,7 +27,9 @@ Everything below was checked by running it, not by reading it:
 
 ## P0 — integrity and compliance blockers (fix before any customer data)
 
-### P0.1 The audit trail is not atomic with the state it records
+### P0.1 The audit trail is not atomic with the state it records — **fixed**
+*Every writing kernel operation is a unit of work; see `docs/07` §7.6 and `backend/tests/kernel/test_atomicity.py`.*
+
 Each state change and its ledger entry commit in **separate transactions**:
 `repo.add` / `repo.update_study` / `repo.add_artifact` commit first, then `_record` → `ledger.record`.
 If the ledger write fails (disk, lock, a second worker colliding on `seq`), the change persists
@@ -88,7 +90,9 @@ history in the system. A sponsor and its CROs, or two sponsors, cannot share one
   every write endpoint for org A's objects. The test enumerates routes from `app.routes`, so
   new endpoints are covered automatically.
 
-### P0.4 The code exists on one laptop, and CI has never run
+### P0.4 The code exists on one laptop, and CI has never run — **partly fixed**
+*Pushed to github.com/pranay-interakt/HakaseBio, branch `pranay_hakase_os`; CI now runs on every branch push. Protecting `main` is the repository owner's setting.*
+
 `git remote -v` is empty. `.github/workflows/ci.yml` has therefore never executed.
 
 **Fix:**
