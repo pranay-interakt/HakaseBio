@@ -40,3 +40,8 @@ Documents 01–02 are the original thesis; their market figures are superseded b
   its applicability domain checked**, and the output is **labeled `predicted`** — see `09`.
 
 See `13_glossary.md` for terminology.
+
+## Build plan
+
+`14_master_build_plan.md` is the ordered plan for making small molecules, peptides and
+antibodies end to end: platform work first (study import), then driver waves A, P and C.
