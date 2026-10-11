@@ -226,37 +226,3 @@ def test_import_over_http(tmp_path):
     v = c.post(f"/api/studies/{sid}/import/complete", headers=h, json={"password": pw}).json()
     assert v["state"] == "imported"
     assert c.get(f"/api/studies/{sid}/import/report", headers=h).content == REPORT
-
-
-def test_database_from_earlier_release_is_upgraded(tmp_path):
-    import sqlalchemy as sa
-
-    from hos.db.models import Base
-    from hos.db.store import Database
-    url = f"sqlite:///{tmp_path / 'old.sqlite3'}"
-    eng = sa.create_engine(url)
-    old = sa.MetaData()  # the schema as released before study import existed
-    for t in Base.metadata.sorted_tables:
-        if t.name == "studies":
-            sa.Table("studies", old, *[c.copy() for c in t.columns
-                                       if c.name not in ("origin", "import_record")])
-        else:
-            t.to_metadata(old)
-    old.create_all(eng)
-    db = Database(url)
-    added = db._add_missing_columns()
-    assert sorted(added) == ["studies.import_record", "studies.origin"]
-    cols = {c["name"] for c in sa.inspect(db.engine).get_columns("studies")}
-    assert {"origin", "import_record"} <= cols
-    assert db._add_missing_columns() == []  # idempotent
-
-
-def test_unsafe_schema_gap_is_refused(tmp_path):
-    import sqlalchemy as sa
-
-    from hos.db.store import Database
-    url = f"sqlite:///{tmp_path / 'odd.sqlite3'}"
-    with sa.create_engine(url).begin() as c:
-        c.execute(sa.text("CREATE TABLE studies (id VARCHAR(64) PRIMARY KEY)"))
-    with pytest.raises(RuntimeError, match="cannot be added automatically"):
-        Database(url).create_all()

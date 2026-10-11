@@ -222,9 +222,18 @@ SQLite by default (`~/.hakase_os/hos.sqlite3`); `HOS_DATABASE_URL` selects
 PostgreSQL. Raw files go to `FileStore`, a content-addressed object directory keyed by SHA-256;
 `get()` re-hashes on read and raises if the bytes changed.
 
-Known gaps: schema is created with `create_all()`; Alembic migrations are **(planned)** before
-any shared deployment. The kernel facade that writes these tables is built in build step 5
-(`docs/11`).
+**Schema migrations** (docs/15 P2.1). The schema changes only through Alembic revisions in
+`hos/db/migrations/versions`; revision 0001 is the schema when migrations were adopted, frozen
+in `hos/db/migrations/baseline.py`. A test and the CI step `hos-db upgrade && hos-db check`
+prove that an empty database upgraded to head matches the models exactly, so a model change
+without its revision fails CI. A database created before migrations is adopted: missing tables
+are created, missing columns that are nullable or have a scalar default are added (anything
+else is refused), then it is stamped 0001 and upgraded. The kernel upgrades at start-up unless
+`HOS_DB_AUTO_UPGRADE=0`, in which case it refuses a database that is not at head and an
+operator runs `hos-db upgrade` as a separate step. On PostgreSQL the upgrade holds an advisory
+lock. An upgrade of a database that already holds records is itself ledgered
+(`system.schema_upgraded`, actor `system`, from and to revisions) and anchored. New revisions:
+`HOS_DATABASE_URL=… alembic revision --autogenerate -m "…"` from `backend/`.
 
 ## 7.9 Serialisation
 

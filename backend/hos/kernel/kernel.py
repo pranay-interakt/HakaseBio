@@ -171,7 +171,12 @@ class Kernel:
                  auth_policy: AuthPolicy | None = None) -> None:
         self.auth_policy = auth_policy or AuthPolicy.from_env()
         self.db = db or Database()
-        self.db.create_all()
+        # the schema is changed only by migrations (docs/15 P2.1); with
+        # HOS_DB_AUTO_UPGRADE=0 an operator runs `hos-db upgrade` as a separate step
+        if os.environ.get("HOS_DB_AUTO_UPGRADE", "1") == "0":
+            before, self.schema_revision = None, self.db.require_current()
+        else:
+            before, self.schema_revision = self.db.upgrade()
         self.files = files or FileStore()
         self.repo = Repository(self.db, self.files)
         self.registry = registry or default_registry()
@@ -179,6 +184,8 @@ class Kernel:
         self.imports = ImportService(self)
         # checkpoints of the ledger head outside the database (docs/15 P0.2)
         self.anchors = AnchorLog.default(self.files.root.parent)
+        if before is not None and before != self.schema_revision:
+            self._record_schema_upgrade(before, self.schema_revision)
 
     # ======================================================================
     # principals
@@ -1223,6 +1230,16 @@ class Kernel:
     # ======================================================================
     # internals
     # ======================================================================
+
+    def _record_schema_upgrade(self, before: str, after: str) -> None:
+        """A schema change to a database that holds records is itself on the record."""
+        if self.ledger.last() is None:
+            return
+        with self.db.transaction():
+            self.ledger.record(actor_id="system", actor_kind="system",
+                               action="system.schema_upgraded", subject_type="system",
+                               subject_id="schema", payload={"from": before, "to": after})
+        self.checkpoint()
 
     def _record(self, actor: Principal, action: str, subject_type: str, subject_id: str,
                 payload: dict[str, Any], reason: str | None = None) -> None:

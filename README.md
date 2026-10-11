@@ -100,7 +100,9 @@ cd backend && HOS_DATA_DIR=./data .venv/bin/uvicorn hos.api.app:app --port 8000
 ```
 
 Storage defaults to SQLite under `HOS_DATA_DIR` (default `~/.hakase_os`); set
-`HOS_DATABASE_URL` for PostgreSQL. The interactive API docs (`/docs`, `/openapi.json`) are off
+`HOS_DATABASE_URL` for PostgreSQL. The schema is migrated at start-up; with
+`HOS_DB_AUTO_UPGRADE=0` the API refuses an out-of-date database and `hos-db upgrade` migrates it
+as a separate step (`hos-db current`, `hos-db check` report the revision and any drift). The interactive API docs (`/docs`, `/openapi.json`) are off
 unless `HOS_API_DOCS=1`. Ledger checkpoints go to `HOS_ANCHOR_DIR` (default
 `$HOS_DATA_DIR/anchors`; use write-once storage in production); set `HOS_ANCHOR_KEY` to
 authenticate them. Access policy has stated defaults: `HOS_SESSION_HOURS` (8),
@@ -164,9 +166,9 @@ docs/                   specification (00-13) and research records
   conditions, so the driver offers no defaults.
 - **Pending re-verification.** The OECD TG 409 parameters were read from a mirrored copy and are
   marked for re-verification.
-- **Single-workstation deployment.** Persistence uses SQLite with `create_all()` and API sessions
-  are held in memory. Alembic migrations and a shared session store are needed before a
-  multi-user deployment.
+- **Deployment hardening in progress.** Schema migrations and database sessions are in place;
+  the PostgreSQL CI job, container images, a locked dependency set and observability
+  (docs/15 P2) are being added.
 - **Not yet built.** SEND clinical-observation and pathology domains (CL, MA, MI) and the
   SENDIG-SP/DART domains, peptide and antibody drivers, and histopathology incidence statistics.
   SEND packages are checked by HOS's pre-export checks; the FDA validator is not run.

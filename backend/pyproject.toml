@@ -20,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 hos-verify = "hos.verify.cli:main"
+hos-db = "hos.db.cli:main"
 
 [project.optional-dependencies]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
@@ -33,6 +34,8 @@ include = ["hos*"]
 
 [tool.setuptools.package-data]
 # SENDIG v3.1.1 metadata, SEND CT and the CDISC Define-XML 2.1 schemas (hos/send/schemas/PROVENANCE.md).
+# Alembic revisions are loaded by path, not imported as a package.
+"hos.db.migrations" = ["script.py.mako", "versions/*.py"]
 "hos.send" = ["reference/*.json", "schemas/LICENSE", "schemas/PROVENANCE.md",
               "schemas/define2-1.xsl", "schemas/define/2.1/*.xsd", "schemas/odm/1.3.2/*.xsd"]
 

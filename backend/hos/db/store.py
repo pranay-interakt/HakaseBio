@@ -11,12 +11,11 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, inspect, select, text
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.sql.schema import ScalarElementColumnDefault
 
-from hos.db.models import Base, LedgerRow
+from hos.db.models import LedgerRow
 from hos.kernel.ledger import LedgerEntry
 
 __all__ = ["CommitThenRaise", "Database", "FileStore", "SqlLedgerBackend", "default_data_dir"]
@@ -51,40 +50,24 @@ class Database:
         self._uow: ContextVar[Session | None] = ContextVar(f"hos_uow_{id(self)}", default=None)
         self._write_lock = threading.RLock()
 
-    def create_all(self) -> None:
-        Base.metadata.create_all(self.engine)
-        self._add_missing_columns()
+    def upgrade(self) -> tuple[str | None, str]:
+        """Bring the schema to this release's head revision (docs/15 P2.1); returns the
+        revisions before and after."""
+        from hos.db.migrate import upgrade
 
-    def _add_missing_columns(self) -> list[str]:
-        """Bring a database created by an earlier release up to the current schema by adding
-        columns that are nullable or carry a scalar default. Anything else (renames, type
-        changes, new constraints) is refused with an error; full migrations are Alembic's job
-        (docs/14 P7)."""
-        added: list[str] = []
-        insp = inspect(self.engine)
-        with self.engine.begin() as conn:
-            for table in Base.metadata.sorted_tables:
-                if not insp.has_table(table.name):
-                    continue
-                present = {c["name"] for c in insp.get_columns(table.name)}
-                for col in table.columns:
-                    if col.name in present:
-                        continue
-                    default = (col.default.arg if isinstance(col.default, ScalarElementColumnDefault)
-                               else None)
-                    if not col.nullable and default is None:
-                        raise RuntimeError(f"database is older than the schema: {table.name}."
-                                           f"{col.name} cannot be added automatically")
-                    col_type = col.type.compile(dialect=self.engine.dialect)
-                    ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}"
-                    if default is not None:
-                        lit = (("1" if default else "0") if isinstance(default, bool)
-                               else repr(default) if isinstance(default, (int, float))
-                               else "'" + str(default).replace("'", "''") + "'")
-                        ddl += f" DEFAULT {lit}"
-                    conn.execute(text(ddl))
-                    added.append(f"{table.name}.{col.name}")
-        return added
+        with self._write_lock:
+            return upgrade(self.engine)
+
+    def require_current(self) -> str:
+        """Refuse a database whose schema is not this release's (``HOS_DB_AUTO_UPGRADE=0``,
+        where an operator runs ``hos-db upgrade`` as a deliberate, recorded step)."""
+        from hos.db.migrate import current_revision, head_revision
+
+        current, head = current_revision(self.engine), head_revision()
+        if current != head:
+            raise RuntimeError(f"the database schema is at {current or 'nothing'}, this release "
+                               f"needs {head}: run `hos-db upgrade`")
+        return head
 
     @contextmanager
     def session(self) -> Iterator[Session]:

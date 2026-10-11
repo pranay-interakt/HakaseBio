@@ -33,6 +33,11 @@ jobs:
         run: ruff check hos tests scripts
       - name: Type check (mypy)
         run: mypy hos
+      - name: Migrations (empty database to head; no drift from the models)
+        run: hos-db upgrade && hos-db check
+        env:
+          HOS_DATABASE_URL: sqlite:///${{ runner.temp }}/migrations.sqlite3
+          HOS_DATA_DIR: ${{ runner.temp }}/hos-migrations
       - name: Tests (offline; recorded real API responses)
         run: pytest -m "not live"
       - name: End-to-end demo

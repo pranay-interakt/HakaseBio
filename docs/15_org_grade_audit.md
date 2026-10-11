@@ -167,7 +167,10 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
 
 ## P2 — Deployability and operations
 
-1. **Migrations.** `create_all()` plus `_add_missing_columns()` is not a migration system.
+1. **Migrations — fixed.** *Alembic, baseline 0001; `hos-db upgrade|current|check`; CI upgrades
+   an empty database and fails on drift; pre-migration databases are adopted; upgrades of a
+   database holding records are ledgered (docs/07 §7.8).*
+   `create_all()` plus `_add_missing_columns()` is not a migration system.
    - Adopt Alembic with a baseline revision matching the current models.
    - CI checks `alembic upgrade head` on an empty DB and that autogenerate produces no diff.
 2. **PostgreSQL is untested.** Every test runs on SQLite. Add a CI job that runs the suite on
