@@ -18,11 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hos.core.provenance import utc_now
 from hos.data_sources import CachedHttp, ChEMBLClient, PubChemClient
+from hos.data_sources.http import USER_AGENT
 from hos.triage.herg import HergParams, screen_herg
 from hos.triage.readacross import ReadAcrossParams
-from hos.data_sources.http import USER_AGENT
 from tests.fixtures.transport import fixture_path
-
 
 #: Dofetilide's canonical SMILES exactly as ChEMBL serves it for CHEMBL473.
 DOFETILIDE_SMILES = "CN(CCOc1ccc(NS(C)(=O)=O)cc1)CCc1ccc(NS(C)(=O)=O)cc1"
