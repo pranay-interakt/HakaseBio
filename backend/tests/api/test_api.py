@@ -182,8 +182,11 @@ def test_full_flow_over_http(api):
     )
     r = c.get(f"/api/programs/{prog['id']}/readiness", headers=h).json()
     assert r["summary"]["done"] == 1
+    assert c.get(f"/api/programs/{prog['id']}/module4", headers=h).json() is None
     pkg = c.post(f"/api/programs/{prog['id']}/module4", headers=h).json()
     assert pkg["included_studies"] == 1
+    latest = c.get(f"/api/programs/{prog['id']}/module4", headers=h).json()
+    assert latest["package_hash"] == pkg["package_hash"]
     assert c.get(f"/api/files/{pkg['bundle_sha256']}", headers=h).content[:2] == b"PK"
     integrity = c.get("/api/ledger/verify", headers=adm).json()
     assert integrity["valid"], integrity["findings"]

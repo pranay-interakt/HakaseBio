@@ -507,6 +507,27 @@ def _assemble_module4(kernel: Any, actor: Principal, program_id: str) -> dict[st
     return package
 
 
+def latest_module4(kernel: Any, program_id: str) -> dict[str, Any] | None:
+    """The programme's most recently assembled Module 4, read back from its stored bundle
+    (``m4/index.json``) exactly as it was assembled, with who assembled it and when; None if
+    Module 4 has never been assembled. Nothing is recomputed: assembling again is a new,
+    recorded action."""
+    events = [e for e in kernel.ledger.history(program_id) if e.action == "ind.module4_assembled"]
+    if not events:
+        return None
+    last = events[-1]
+    sha = str(last.payload["bundle_sha256"])
+    with zipfile.ZipFile(io.BytesIO(kernel.files.get(sha))) as z:
+        package: dict[str, Any] = json.loads(z.read("m4/index.json"))
+    package["bundle_sha256"] = sha
+    package["assembled"] = {
+        "at": last.recorded_at,
+        "by": last.actor_id,
+        "by_name": kernel.principal_name(last.actor_id),
+    }
+    return package
+
+
 def _index_markdown(pkg: dict[str, Any]) -> str:
     out = [
         f"# Module 4: Nonclinical Study Reports — {pkg['program']}",

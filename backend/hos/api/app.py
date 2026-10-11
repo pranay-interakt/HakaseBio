@@ -833,6 +833,15 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
         return assemble_module4(k, actor, program_id)
 
+    @app.get("/api/programs/{program_id}/module4", dependencies=[Depends(program_access)])
+    def latest_module4(
+        program_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
+    ) -> dict[str, Any] | None:
+        """The last assembled Module 4, as assembled; null if there is none yet."""
+        from hos.ind import latest_module4
+
+        return latest_module4(k, program_id)
+
     # -- CTD Module 2 nonclinical summaries (docs/14 P6) ---------------------------------
     @app.get("/api/programs/{program_id}/summaries", dependencies=[Depends(program_access)])
     def summaries(

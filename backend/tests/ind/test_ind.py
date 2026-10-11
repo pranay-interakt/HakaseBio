@@ -6,7 +6,7 @@ import zipfile
 
 import pytest
 
-from hos.ind import assemble_module4, readiness_report
+from hos.ind import assemble_module4, latest_module4, readiness_report
 from hos.kernel.attestation import Role, SignatureMeaning
 from hos.kernel.errors import EvidenceInadmissible
 from tests.drivers.test_metabolic_stability import HL, _measured_csv
@@ -142,6 +142,21 @@ def test_module4_assembly_with_noael_dose_projection(k):  # noqa: F811
         assert f"m4/4.2.3.2/{rd}.md" in names and "m4/index.md" in names
         assert json.loads(z.read("m4/index.json"))["package_hash"] == pkg["package_hash"]
     assert "ind.module4_assembled" in [e["action"] for e in k.history(pid)]
+
+
+def test_latest_module4_is_read_back_as_assembled(k):  # noqa: F811
+    sci, pid, cid = _program(k)
+    assert latest_module4(k, pid) is None
+    _approved_metstab(k, sci, pid, cid)
+    first = assemble_module4(k, sci, pid)
+    back = latest_module4(k, pid)
+    assert back is not None
+    as_json = json.loads(json.dumps(first, default=str))
+    for key in ("package_hash", "bundle_sha256", "toc", "dose_projection", "refused_studies"):
+        assert back[key] == as_json[key]
+    assert back["assembled"]["by"] == "sci" and back["assembled"]["by_name"] == sci.name
+    second = assemble_module4(k, sci, pid)  # assembling again is a new record; the latest wins
+    assert latest_module4(k, pid)["bundle_sha256"] == second["bundle_sha256"]
 
 
 def test_assembler_refuses_simulated_content():

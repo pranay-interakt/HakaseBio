@@ -274,6 +274,14 @@ class Kernel:
     def get_principal(self, principal_id: str) -> Principal:
         return self._principal(self.repo.principal(principal_id))
 
+    def principal_name(self, principal_id: str) -> str | None:
+        """A user's current name for display beside a recorded id; None if the id is unknown.
+        Records keep the id, which never changes."""
+        try:
+            return self.repo.principal(principal_id).name
+        except NotFound:
+            return None
+
     @atomic
     def authenticate(self, principal_id: str, password: str) -> Principal:
         """Verify a human's credentials. Used at login and again at every signature
@@ -1845,8 +1853,11 @@ class Kernel:
     def history_page(
         self, subject_id: str, limit: int, offset: int
     ) -> tuple[list[dict[str, Any]], int]:
+        """A page of a subject's audit trail. ``actor_name`` is display only, looked up when
+        the trail is read: the chained entry records the actor's id, which never changes."""
         entries, total = self.ledger.history_page(subject_id, limit, offset)
-        return [e.to_dict() for e in entries], total
+        names = {a: self.principal_name(a) for a in {e.actor_id for e in entries}}
+        return [{**e.to_dict(), "actor_name": names[e.actor_id]} for e in entries], total
 
     def verify_ledger(self) -> int:
         return self.ledger.verify()

@@ -244,6 +244,7 @@ def send_export_context(kernel: Any, study_id: str) -> dict[str, Any]:
                 "version": a.version,
                 "created_at": a.created_at.isoformat(),
                 "created_by": a.created_by,
+                "created_by_name": kernel.principal_name(a.created_by),
                 **a.content,
             }
             for a in kernel.repo.artifacts(study_id, "send_export")

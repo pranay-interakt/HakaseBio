@@ -47,6 +47,15 @@ def _actions(c, adm, subject):
     return [e["action"] for e in c.get(f"/api/ledger/{subject}", headers=adm).json()]
 
 
+def test_audit_trail_names_each_actor_without_changing_the_entry(tmp_path):
+    c, _, adm = _app(tmp_path)
+    entries = c.get("/api/ledger/sci", headers=adm).json()
+    assert entries and all(e["actor_id"] == "admin" for e in entries)
+    assert {e["actor_name"] for e in entries} == {"Ada Admin"}
+    # the name is looked up on read; the chained entry still verifies
+    assert c.get("/api/ledger/verify", headers=adm).json()["valid"]
+
+
 def test_sessions_survive_a_restart_and_store_only_hashes(tmp_path):
     c, k, adm = _app(tmp_path)
     h = _login(c, "sci")

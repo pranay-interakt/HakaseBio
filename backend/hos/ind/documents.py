@@ -52,8 +52,7 @@ class SummaryService:
         rows: list[ProgramDocumentRow] = self.k.repo.documents(program_id, KIND)
         return rows
 
-    @staticmethod
-    def _view(row: ProgramDocumentRow) -> dict[str, Any]:
+    def _view(self, row: ProgramDocumentRow) -> dict[str, Any]:
         return {
             "id": row.id,
             "version": row.version,
@@ -64,6 +63,7 @@ class SummaryService:
             "reason": row.reason,
             "signatures": row.signatures or [],
             "created_by": row.created_by,
+            "created_by_name": self.k.principal_name(row.created_by),
             "created_at": row.created_at.isoformat(),
             "missing_author_sections": _missing(row.content),
         }
@@ -75,6 +75,7 @@ class SummaryService:
                 "status": r.status,
                 "content_hash": r.content_hash,
                 "created_by": r.created_by,
+                "created_by_name": self.k.principal_name(r.created_by),
                 "created_at": r.created_at.isoformat(),
                 "reason": r.reason,
             }
