@@ -230,10 +230,14 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         glp=False, species=("human", "rat", "dog"), ctd_section="4.2.2.3",
     ))
     out.append(_req(
-        id="adme.in_vivo_pk", name="Pharmacokinetics in the toxicology species",
+        id="adme.in_vivo_pk", name="In vivo pharmacokinetics (ADME) in test species",
         category=StudyCategory.PHARMACOKINETICS, status=RequirementStatus.REQUIRED,
-        timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) section 3",
-        rationale="Exposure in the tox species is needed to interpret NOAELs and margins",
+        timing=Timing.BEFORE_PHASE_3, citation=m3, section="M3(R2) section 3",
+        rationale="Further information on pharmacokinetics (absorption, distribution, metabolism "
+                  "and excretion) in test species should be available before exposing large "
+                  "numbers of human subjects or treating for long duration (generally before "
+                  "Phase III); exposure in the tox species before first-in-human is covered by "
+                  "toxicokinetics (ICH S3A)",
         glp=False, species=("rat", "dog"), ctd_section="4.2.2.2",
     ))
     out.append(_req(

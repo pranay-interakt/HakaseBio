@@ -83,3 +83,15 @@ def test_s9_sections_match_verified_text():
     assert s["tox.repeat_dose"] == "S9 sections 2.4, 3.3"
     assert s["dart.efd"] == "S9 section 2.5"
     assert s["genotox.battery"] == "S9 section 2.6"
+
+
+def test_in_vivo_adme_pk_is_due_before_phase_3_per_m3r2_section_3():
+    # M3(R2) section 3: before human trials, in vitro metabolism, plasma protein binding and
+    # systemic exposure (S3A) in the tox species; further ADME PK "generally before Phase III"
+    from hos.core.regulatory import Timing
+    ss = derive_study_set(SM)
+    pk = next(r for r in ss.requirements if r.id == "adme.in_vivo_pk")
+    assert pk.timing is Timing.BEFORE_PHASE_3
+    fih = {r.id for r in ss.due_by(Timing.BEFORE_FIRST_IN_HUMAN)}
+    assert {"adme.metabolic_stability", "adme.plasma_protein_binding",
+            "tox.toxicokinetics"} <= fih and "adme.in_vivo_pk" not in fih
