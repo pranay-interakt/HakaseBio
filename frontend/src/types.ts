@@ -193,6 +193,8 @@ export interface ExpertDeterminationSpec {
   role: string;
   required_for_approval: boolean;
   guidance: string;
+  choices: string[];
+  categorical: boolean;
 }
 
 export interface Study extends StudySummary {
@@ -220,7 +222,8 @@ export interface Study extends StudySummary {
   determinations: {
     key: string;
     label: string;
-    quantity: Quantity;
+    quantity: Quantity | null;
+    category: string | null;
     rationale: string;
     role: string;
     signer_name: string;

@@ -826,8 +826,10 @@ class Interpretation:
 
 @dataclass(frozen=True, slots=True)
 class ExpertDetermination:
-    """A conclusion only an accountable human may make (e.g. a NOAEL). The kernel records it
-    as a USER_SUPPLIED quantity bound to a signature by a principal holding ``role``."""
+    """A conclusion only an accountable human may make (e.g. a NOAEL, or a positive/negative
+    call). The kernel records it, bound to a signature by a principal holding ``role``: a
+    numeric determination as a USER_SUPPLIED quantity, a categorical one (``choices``) as the
+    chosen category."""
 
     key: str
     label: str
@@ -835,10 +837,20 @@ class ExpertDetermination:
     role: Role
     required_for_approval: bool
     guidance: str
+    choices: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.choices and self.unit:
+            raise DriverError(f"determination {self.key!r}: categorical determinations take no unit")
+
+    @property
+    def categorical(self) -> bool:
+        return bool(self.choices)
 
     def to_dict(self) -> dict[str, Any]:
         return {"key": self.key, "label": self.label, "unit": self.unit, "role": self.role.value,
-                "required_for_approval": self.required_for_approval, "guidance": self.guidance}
+                "required_for_approval": self.required_for_approval, "guidance": self.guidance,
+                "choices": list(self.choices), "categorical": self.categorical}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1224,8 +1236,11 @@ def _interpretation_section(interp: Interpretation,
     if determinations:
         body.append("\n**Recorded expert determinations:**")
         for d in determinations:
-            v = d.get("quantity", {})
-            body.append(f"- {d.get('label')}: {v.get('value')} {v.get('unit') or ''} — "
+            v = d.get("quantity") or {}
+            shown = (d["category"] if d.get("category") is not None
+                     else f"{v.get('value')} {v.get('unit') or ''}" if v.get("available")
+                     else "not established")
+            body.append(f"- {d.get('label')}: {shown} — "
                         f"{d.get('signer_name')} ({d.get('role')}), {d.get('signed_at')}. "
                         f"Rationale: {d.get('rationale')}")
     return ReportSection(heading="Interpretation", body="\n".join(body) or "No statements.")

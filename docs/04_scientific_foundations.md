@@ -180,6 +180,21 @@ is a new registry version; it never silently alters past results.
 - Citations: Dunnett CW. *J Am Stat Assoc* 1955;50:1096, doi:10.1080/01621459.1955.10501294;
   Jaki T, Hothorn LA. *Arch Toxicol* 2013;87:1901; OECD TG 407 (2008), 408 (2018), 409 (1998).
 
+## 4.13 Bioanalytical method validation  [`bioanalysis.*`]
+
+- Calibration by least squares with the regression model and weighting (none, 1/x, 1/x²) fixed by
+  the laboratory's written procedure (ICH M10 §3.2.4 prescribes no weighting); back-calculation by
+  inverting the fitted curve.
+- Accuracy = measured / nominal × 100; %CV = SD / mean × 100 (M10 glossary); between-run values
+  combine the data of all accepted runs (M10 §3.2.5.2).
+- Interference = blank response / LLOQ response × 100 for the analyte and the IS (M10 §3.2.1,
+  §3.2.6).
+- ISR % difference = (repeat − initial) / mean × 100; chromatography passes when ≥ 2/3 are within
+  ±20%; minimum sample count 10% of the first 1000 plus 5% of the excess (M10 §5).
+- Acceptance criteria are held in `hos/core/bioanalysis.py::M10_CHROMATOGRAPHIC` with the section
+  stating each.
+- Citation: ICH M10 Bioanalytical Method Validation and Study Sample Analysis, Step 4, 24 May 2022.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

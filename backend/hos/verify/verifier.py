@@ -196,10 +196,13 @@ def verify_bundle(content: bytes) -> VerificationReport:
         ok, need = _approval_roles_ok(on_report, s["glp"])
         rep.add(sid, f"signatures bind the report ({need})", ok)
         for d in s["determinations"]:
-            q = d["quantity"]
+            q = d.get("quantity")
             subject = {"study_id": sid, "key": d["key"],
-                       "value": q["value"] if q.get("available") else None, "unit": q["unit"],
+                       "value": q["value"] if q and q.get("available") else None,
+                       "unit": q["unit"] if q else None,
                        "rationale": d["rationale"], "analysis_hash": d["analysis_hash"]}
+            if d.get("category") is not None:
+                subject["category"] = d["category"]
             rep.add(sid, f"determination '{d['key']}' signature binds its content",
                     d["signature"]["subject_hash"] == content_hash(subject)
                     and d["signature"]["role"] == d["role"])

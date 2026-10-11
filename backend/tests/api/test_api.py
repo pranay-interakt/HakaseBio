@@ -107,7 +107,10 @@ def test_agent_token_can_work_but_not_sign(api):
 def test_reference_and_driver_catalogue(api):
     c = api
     drivers = {d["id"]: d for d in c.get("/api/drivers").json()}
-    assert set(drivers) == {"metabolic_stability", "herg_patch_clamp", "repeat_dose_toxicity"}
+    from hos.drivers.registry import default_registry
+    assert set(drivers) == set(default_registry().ids())
+    assert {"metabolic_stability", "herg_patch_clamp", "repeat_dose_toxicity",
+            "bioanalytical_validation"} <= set(drivers)
     assert drivers["herg_patch_clamp"]["parameters_schema"]["properties"]
     params = c.get("/api/reference/parameters").json()
     assert params["parameters"]["km.rat"]["provenance"]["kind"] == "guideline"

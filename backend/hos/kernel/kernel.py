@@ -492,7 +492,8 @@ class Kernel:
 
     def record_determination(self, actor: Principal, study_id: str, *, key: str,
                              value: float | None, unit: str | None, rationale: str,
-                             reason: str | None = None) -> dict[str, Any]:
+                             reason: str | None = None,
+                             category: str | None = None) -> dict[str, Any]:
         """Record an expert determination (e.g. a NOAEL) the driver declared. The actor must
         be a human holding the declared role; the record is signed and bound to the exact
         analysis it interprets. The API layer re-authenticates before calling this."""
@@ -504,6 +505,12 @@ class Kernel:
         spec = self._determination_spec(driver, params, key)
         if not rationale.strip():
             raise KernelError("a determination must state its rationale")
+        if spec.categorical:
+            if value is not None or category not in spec.choices:
+                raise KernelError(f"{spec.label} is a categorical determination: choose one of "
+                                  f"{list(spec.choices)}")
+        elif category is not None:
+            raise KernelError(f"{spec.label} is numeric; give a value (or none if not established)")
         unit = unit or spec.unit or "dimensionless"
         if spec.unit and not U.compatible(unit, spec.unit):
             raise KernelError(f"{key}: unit {unit!r} incompatible with {spec.unit!r}")
@@ -511,7 +518,11 @@ class Kernel:
                     if d["key"] == key and d["analysis_hash"] == _require_record(row.results, "analysis results", row.id)["analysis_hash"]]
         if existing and not (reason and reason.strip()):
             raise KernelError(f"{key} is already determined; a revision requires a reason")
-        if value is None:
+        q: Quantity | None
+        if spec.categorical:
+            q = None
+            claim = f"I determine {spec.label}: {category}"
+        elif value is None:
             q = Quantity.unavailable(unit, label=spec.label,
                                      reason=f"not established (determination by {actor.name}, "
                                             f"{spec.role.value}): {rationale}")
@@ -522,13 +533,17 @@ class Kernel:
                                              f"({spec.role.value}); rationale: {rationale}")
             claim = f"I determine {spec.label} = {value:g} {unit}"
         subject = {"study_id": study_id, "key": key,
-                   "value": None if value is None else float(value), "unit": unit,
+                   "value": None if value is None else float(value),
+                   "unit": None if spec.categorical else unit,
                    "rationale": rationale, "analysis_hash": _require_record(row.results, "analysis results", row.id)["analysis_hash"]}
+        if spec.categorical:
+            subject["category"] = category
         sig = sign(actor, role=spec.role, meaning=SignatureMeaning.RESPONSIBILITY,
                    subject_id=f"{study_id}/determination/{key}",
                    subject_hash=content_hash(subject),
                    statement=f"{claim}. Rationale: {rationale}")
-        det = {"key": key, "label": spec.label, "quantity": q.to_dict(), "rationale": rationale,
+        det = {"key": key, "label": spec.label, "quantity": q.to_dict() if q else None,
+               "category": category, "rationale": rationale,
                "role": spec.role.value, "signer_id": actor.id, "signer_name": actor.name,
                "signed_at": sig.signed_at, "analysis_hash": _require_record(row.results, "analysis results", row.id)["analysis_hash"],
                "signature": sig.to_dict()}
@@ -536,7 +551,8 @@ class Kernel:
         self.repo.add_artifact(study_id, "determination", det, actor=actor.id, reason=reason)
         self.repo.update_study(study_id, determinations=keep + [det])
         self._record(actor, "study.determination_recorded", "study", study_id,
-                     {"key": key, "value": None if value is None else float(value), "unit": unit,
+                     {"key": key, "value": None if value is None else float(value),
+                      "unit": None if spec.categorical else unit, "category": category,
                       "signature": sig.to_dict()}, reason=reason)
         return self.study_view(study_id)
 

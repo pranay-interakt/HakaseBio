@@ -202,7 +202,7 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
             continue
         species = (s.parameters or {}).get("species")
         det = next((d for d in s.determinations or [] if d["key"] == "noael"), None)
-        if not species or det is None or not det["quantity"].get("available"):
+        if not species or det is None or not (det.get("quantity") or {}).get("available"):
             continue
         q = det["quantity"]
         val = Quantity.user_supplied(

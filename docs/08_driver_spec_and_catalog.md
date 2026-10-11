@@ -158,6 +158,32 @@ The kit checks:
   `ExpertDetermination` by the Study Director, and "not established" can be recorded.
 - **Known-value test.** Dunnett's (1955) blood-count example reproduces the published conclusion.
 
+### `bioanalytical_validation` v1.0.0 — ICH M10 section 3 (chromatographic methods)
+
+- **Serves.** `bioanalytical.validation` (M10 §3), CTD 4.2.2.1. GLP-capable. Research note:
+  `docs/research/drivers/bioanalytical_validation.md`; criteria transcribed and cross-read
+  independently from the official PDF.
+- **Design.** Analyte, IS, matrix, species, technique, concentration unit, regression model and
+  weighting with their written-procedure basis (M10 does not prescribe a weighting), calibration
+  levels (≥ 6), QC levels checked against M10 §3.2.5.1 (LQC within 3× LLOQ, HQC ≥ 75% of ULOQ,
+  MQC "around" 30–50% of range flagged when outside), runs and replicates (≥ 3 × ≥ 5),
+  selectivity and matrix-effect lots (≥ 6 unless a rare-matrix justification is stated),
+  dilution factors (≥ 5 replicates) and stability tests (freeze–thaw ≥ 3 cycles, ≥ 3 aliquots).
+- **Return data.** One row per injection: run, experiment, sample type, level, nominal
+  concentration, analyte and IS responses, source lot, dilution factor, stability test. Each
+  run's curve (standards, blank, zero) is labelled experiment `calibration`.
+- **Analysis.** Per run: the stated regression and weighting, standards outside ±15% (±20% at
+  LLOQ) rejected and the curve re-evaluated once, run acceptance (≥ 75% of standards, ≥ 6 levels,
+  ≥ 50% per level with replicates; for accuracy-and-precision runs both LLOQ and ULOQ retained).
+  Then within- and between-run accuracy and precision, selectivity and carry-over relative to the
+  LLOQ analyte and IS responses, matrix effect per lot, dilution integrity and stability, each
+  failure citing its M10 section. ISR (M10 §5) is a core function used where study samples exist.
+- **Determination.** "Method validated / not validated" is a categorical determination signed by
+  the responsible scientist; the system reports criteria, it does not conclude.
+- **Known-value tests.** Exact recovery (100% accuracy, 0% CV) from a noise-free response model;
+  the weighted fit against an independent closed-form weighted regression; M10's ISR formula and
+  sample-count rule.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

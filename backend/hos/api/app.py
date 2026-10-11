@@ -141,7 +141,8 @@ class ReasonBody(BaseModel):
 
 class DeterminationBody(BaseModel):
     key: str
-    value: float | None
+    value: float | None = None
+    category: str | None = None
     unit: str | None = None
     rationale: str
     password: str
@@ -484,7 +485,7 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
         signer = reauth(k, actor, body.password)
         return k.record_determination(signer, study_id, key=body.key, value=body.value,
                                       unit=body.unit, rationale=body.rationale,
-                                      reason=body.reason)
+                                      reason=body.reason, category=body.category)
 
     @app.post("/api/studies/{study_id}/report")
     def report(study_id: str, actor: Principal = Depends(current),

@@ -561,18 +561,30 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
             <div className="muted small">{d.guidance}</div>
             {rec && (
               <div className="signed">
-                <QuantityView q={rec.quantity} /> — {rec.signer_name} ({rec.role}), {rec.signed_at.slice(0, 19)}Z. Rationale:{" "}
+                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} ({rec.role}),{" "}
+                {rec.signed_at.slice(0, 19)}Z. Rationale:{" "}
                 {rec.rationale}
               </div>
             )}
             {s.state === "analyzed" && canSign && (
               <div className="grid2">
-                <label className="small">
-                  <input type="checkbox" checked={f(d.key).notEstablished} onChange={(e) => upd(d.key, { notEstablished: e.target.checked })} /> not
-                  established
-                </label>
-                {!f(d.key).notEstablished && (
-                  <input type="number" step="any" placeholder={`value (${d.unit ?? ""})`} value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })} />
+                {!d.categorical && (
+                  <label className="small">
+                    <input type="checkbox" checked={f(d.key).notEstablished} onChange={(e) => upd(d.key, { notEstablished: e.target.checked })} /> not
+                    established
+                  </label>
+                )}
+                {d.categorical ? (
+                  <select value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })}>
+                    <option value="">— choose —</option>
+                    {d.choices.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                ) : (
+                  !f(d.key).notEstablished && (
+                    <input type="number" step="any" placeholder={`value (${d.unit ?? ""})`} value={f(d.key).value} onChange={(e) => upd(d.key, { value: e.target.value })} />
+                  )
                 )}
                 <textarea placeholder="rationale *" value={f(d.key).rationale} onChange={(e) => upd(d.key, { rationale: e.target.value })} />
                 {rec && <input placeholder="reason for revision *" value={f(d.key).reason} onChange={(e) => upd(d.key, { reason: e.target.value })} />}
@@ -584,7 +596,8 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
                     run(() =>
                       api.post(`/studies/${s.id}/determinations`, {
                         key: d.key,
-                        value: f(d.key).notEstablished ? null : Number(f(d.key).value),
+                        value: d.categorical || f(d.key).notEstablished ? null : Number(f(d.key).value),
+                        category: d.categorical ? f(d.key).value : null,
                         unit: d.unit,
                         rationale: f(d.key).rationale,
                         password: f(d.key).password,

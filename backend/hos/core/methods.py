@@ -138,6 +138,29 @@ METHODS: Final[dict[str, Method]] = dict(
            limits=("statistical significance is not adversity; biologically significant "
                    "effects can be non-significant (FDA 2005 glossary, NOAEL)",
                    "no transformation or non-parametric alternative is applied",)),
+        _m("bioanalysis.calibration",
+           "Calibration curve by (weighted) least squares, model and weighting per procedure",
+           ("ich_m10",),
+           assumptions=("the regression model and weighting were fixed during method validation "
+                        "by written procedure (M10 3.2.4)",),
+           limits=("blank and zero samples are excluded from the regression (M10 3.2.4)",)),
+        _m("bioanalysis.back_calculation", "Back-calculated concentration from the run's curve",
+           ("ich_m10",)),
+        _m("bioanalysis.accuracy_precision",
+           "Accuracy (% of nominal) and precision (%CV) within and between runs", ("ich_m10",),
+           assumptions=("between-run values combine the data from all accepted runs "
+                        "(M10 3.2.5.2)",)),
+        _m("bioanalysis.interference",
+           "Interfering response as a percentage of the LLOQ analyte or IS response",
+           ("ich_m10",)),
+        _m("bioanalysis.isr", "Incurred sample reanalysis percent difference", ("ich_m10",),
+           assumptions=("% difference relative to the mean of the initial and repeat values "
+                        "(M10 section 5)",)),
+        _m("sim.bioanalytical_runs",
+           "Simulated chromatographic responses from a declared linear response model with "
+           "multiplicative noise", ("ich_m10",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         # ---- verification data generators ------------------------------------
         _m("sim.first_order_depletion",
            "Simulated microsomal depletion from a declared first-order model with "
