@@ -366,6 +366,7 @@ details > summary { cursor: pointer; }
 /* ---- sign-in --------------------------------------------------------------------------- */
 .login { max-width: 400px; margin: 10vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px 28px; box-shadow: var(--shadow-pop); }
 .login input { margin-bottom: 10px; }
+.login button.primary { width: 100%; margin-top: 6px; padding: 9px 12px; }
 .login-logo { margin-bottom: 14px; }
 
 /* ---- SEND workspace -------------------------------------------------------------------- */

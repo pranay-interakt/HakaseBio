@@ -309,6 +309,11 @@ export function Menu({ label, children }: { label: ReactNode; children: ReactNod
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const close = () => setOpen(false);
+    window.addEventListener("hashchange", close);
+    return () => window.removeEventListener("hashchange", close);
+  }, []);
+  useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -332,5 +337,50 @@ export function Menu({ label, children }: { label: ReactNode; children: ReactNod
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// an action that needs a reason on the record, asked for inline (no browser prompt)
+
+export function ReasonAction({
+  label,
+  confirmLabel,
+  onConfirm,
+  danger = false,
+  disabled = false,
+}: {
+  label: string;
+  confirmLabel?: string;
+  onConfirm: (reason: string) => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  if (!open)
+    return (
+      <button className={`small${danger ? " danger" : ""}`} disabled={disabled} onClick={() => setOpen(true)}>
+        {label}
+      </button>
+    );
+  return (
+    <span className="row" style={{ flexWrap: "nowrap" }}>
+      <input autoFocus style={{ minWidth: 180 }} placeholder="Reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
+      <button
+        className={`small${danger ? " danger" : ""}`}
+        disabled={!reason.trim()}
+        onClick={() => {
+          onConfirm(reason);
+          setOpen(false);
+          setReason("");
+        }}
+      >
+        {confirmLabel ?? label}
+      </button>
+      <button className="small ghost" onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+    </span>
   );
 }

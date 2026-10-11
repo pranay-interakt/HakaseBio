@@ -5,8 +5,10 @@ import { href } from "../lib/router";
 import type { Principal, Study, StudySummary } from "../types";
 import { roleLabel, Section } from "./common";
 import { QuantityView } from "./QuantityView";
+import { Pill, ReasonAction } from "./ui";
+import { humanize, statusLabel } from "../lib/format";
 
-type Run = <T>(fn: () => Promise<T>) => Promise<void>;
+type Run = <T>(fn: () => Promise<T>, done?: string) => Promise<void>;
 
 const MEANINGS = ["approval", "qa_compliance_statement", "review"];
 
@@ -38,7 +40,7 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
       body.unit = form.unit || null;
     }
     if (form.kind === "literature") body.citation_text = form.citation_text;
-    run(() => api.post(`/studies/${s.id}/import/values`, body));
+    run(() => api.post(`/studies/${s.id}/import/values`, body), "Value recorded with its page reference");
   }
 
   const replacements = siblings.filter((x) => x.id !== s.id && x.origin === "driver" && x.state === "approved" && x.requirement_id === s.requirement_id);
@@ -62,7 +64,7 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
           <ul className="small">
             {rec.datasets.map((d) => (
               <li key={d.sha256}>
-                {d.filename} — {d.description} <code>{d.sha256.slice(0, 12)}</code>
+                {d.filename} — {d.description} <span className="mono muted">{d.sha256.slice(0, 12)}</span>
               </li>
             ))}
           </ul>
@@ -70,8 +72,8 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
         {draft && (
           <div className="upload">
             <input type="file" onChange={(e) => setDs(e.target.files?.[0] ?? null)} />
-            <input placeholder="dataset description" value={dsDesc} onChange={(e) => setDsDesc(e.target.value)} />
-            <button disabled={busy || !ds} onClick={() => ds && run(() => api.upload(`/studies/${s.id}/import/datasets?filename=${encodeURIComponent(ds.name)}&description=${encodeURIComponent(dsDesc)}`, ds))}>
+            <input style={{ maxWidth: 320 }} placeholder="Dataset description" value={dsDesc} onChange={(e) => setDsDesc(e.target.value)} />
+            <button disabled={busy || !ds} onClick={() => ds && run(() => api.upload(`/studies/${s.id}/import/datasets?filename=${encodeURIComponent(ds.name)}&description=${encodeURIComponent(dsDesc)}`, ds), "Dataset attached")}>
               Attach dataset
             </button>
           </div>
@@ -110,14 +112,11 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
                 <td className="small">{v.entered_by_name}</td>
                 <td>
                   {draft && !v.withdrawn && (
-                    <button
-                      onClick={() => {
-                        const r = window.prompt("Reason for withdrawing this value");
-                        if (r) run(() => api.post(`/studies/${s.id}/import/values/${v.id}/withdraw`, { reason: r }));
-                      }}
-                    >
-                      Withdraw
-                    </button>
+                    <ReasonAction
+                      label="Withdraw"
+                      danger
+                      onConfirm={(r) => run(() => api.post(`/studies/${s.id}/import/values/${v.id}/withdraw`, { reason: r }), "Value withdrawn")}
+                    />
                   )}
                 </td>
               </tr>
@@ -125,8 +124,8 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
           </tbody>
         </table>
         {draft && me.kind === "human" && (
-          <div className="card">
-            <h4>Transcribe a result</h4>
+          <div className="sf-group" style={{ marginTop: 12 }}>
+            <div className="sf-group-title">Transcribe a result</div>
             <div className="grid2">
               <div className="field">
                 <label className="field-label">Result *</label>
@@ -216,9 +215,11 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
               )}
             </div>
             {field?.note && <p className="muted small">{field.note}</p>}
-            <button className="primary" disabled={busy} onClick={addValue}>
-              Add transcribed value
-            </button>
+            <div className="row-end">
+              <button className="primary" disabled={busy} onClick={addValue}>
+                Add transcribed value
+              </button>
+            </div>
           </div>
         )}
       </Section>
@@ -234,22 +235,23 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
                     {pr.excerpt && <div className="muted small">“{pr.excerpt}”</div>}
                   </td>
                   <td className="small">p. {pr.page}</td>
-                  <td className="small">{pr.proposed_by} ({pr.proposed_by_kind})</td>
+                  <td className="small">
+                    {pr.proposed_by} ({humanize(pr.proposed_by_kind).toLowerCase()})
+                  </td>
                   <td>
-                    <span className="tag">{pr.status}</span>
+                    <Pill tone={pr.status === "confirmed" ? "ok" : pr.status === "rejected" ? "bad" : "warn"}>{statusLabel(pr.status)}</Pill>
                   </td>
                   <td>
                     {draft && pr.status === "proposed" && me.kind === "human" && (
                       <div className="row">
-                        <button onClick={() => run(() => api.post(`/studies/${s.id}/import/proposals/${pr.id}/confirm`, {}))}>Confirm</button>
-                        <button
-                          onClick={() => {
-                            const r = window.prompt("Reason for rejecting");
-                            if (r) run(() => api.post(`/studies/${s.id}/import/proposals/${pr.id}/reject`, { reason: r }));
-                          }}
-                        >
-                          Reject
+                        <button className="small" onClick={() => run(() => api.post(`/studies/${s.id}/import/proposals/${pr.id}/confirm`, {}), "Proposal confirmed as a value")}>
+                          Confirm
                         </button>
+                        <ReasonAction
+                          label="Reject"
+                          danger
+                          onConfirm={(r) => run(() => api.post(`/studies/${s.id}/import/proposals/${pr.id}/reject`, { reason: r }), "Proposal rejected")}
+                        />
                       </div>
                     )}
                   </td>
@@ -273,26 +275,47 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
         {draft && me.kind === "human" && (
           <>
             <div className="grid2">
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                {me.roles.map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-              <select value={meaning} onChange={(e) => setMeaning(e.target.value)}>
-                {MEANINGS.map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
-              <input placeholder="additional statement" value={statement} onChange={(e) => setStatement(e.target.value)} />
-              <input type="password" placeholder="password (re-authentication) *" value={pw} onChange={(e) => setPw(e.target.value)} />
+              <label className="field">
+                <span className="field-label">Signing as *</span>
+                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  {me.roles.map((r) => (
+                    <option key={r} value={r}>
+                      {roleLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Meaning *</span>
+                <select value={meaning} onChange={(e) => setMeaning(e.target.value)}>
+                  {MEANINGS.map((m) => (
+                    <option key={m} value={m}>
+                      {meaningLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Additional statement</span>
+                <input value={statement} onChange={(e) => setStatement(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">Your password *</span>
+                <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+              </label>
             </div>
-            <button disabled={busy || info.missing.length > 0} onClick={() => run(() => api.post(`/studies/${s.id}/import/sign`, { role, meaning, statement, password: pw }))}>
-              Sign import
-            </button>
+            <div className="row-end">
+              <button
+                disabled={busy || info.missing.length > 0 || !pw}
+                onClick={() => run(() => api.post(`/studies/${s.id}/import/sign`, { role, meaning, statement, password: pw }), "Import signed")}
+              >
+                Sign import
+              </button>
+            </div>
             {info.signatures_missing.length === 0 && info.missing.length === 0 && (
-              <div className="row">
-                <input type="password" placeholder="password *" value={cpw} onChange={(e) => setCpw(e.target.value)} />
-                <button className="primary" disabled={busy} onClick={() => run(() => api.post(`/studies/${s.id}/import/complete`, { password: cpw }))}>
+              <div className="row" style={{ marginTop: 10 }}>
+                <input style={{ maxWidth: 260 }} type="password" placeholder="Your password *" value={cpw} onChange={(e) => setCpw(e.target.value)} />
+                <button className="primary" disabled={busy || !cpw} onClick={() => run(() => api.post(`/studies/${s.id}/import/complete`, { password: cpw }), "Import completed")}>
                   Complete import
                 </button>
               </div>
@@ -300,20 +323,20 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
           </>
         )}
         {s.state === "imported" && replacements.length > 0 && (
-          <div className="card">
-            <h4>Supersede with a driver-run study</h4>
+          <div className="sf-group" style={{ marginTop: 12 }}>
+            <div className="sf-group-title">Supersede with a driver-run study</div>
             <div className="grid2">
               <select value={by} onChange={(e) => setBy(e.target.value)}>
-                <option value="">—</option>
+                <option value="">Choose the approved study…</option>
                 {replacements.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.title}
                   </option>
                 ))}
               </select>
-              <input placeholder="reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <input placeholder="Reason *" value={reason} onChange={(e) => setReason(e.target.value)} />
             </div>
-            <button disabled={busy || !by} onClick={() => run(() => api.post(`/studies/${s.id}/import/supersede`, { by_study_id: by, reason }))}>
+            <button disabled={busy || !by || !reason.trim()} onClick={() => run(() => api.post(`/studies/${s.id}/import/supersede`, { by_study_id: by, reason }), "Import superseded")}>
               Supersede import
             </button>
           </div>
