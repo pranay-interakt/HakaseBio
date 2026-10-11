@@ -104,17 +104,41 @@ def test_edited_file_without_manifest_is_detected(bundle):
     assert any("file hashes match" in c.check for c in _failed(verify_bundle(bad)))
 
 
-def test_rewritten_ledger_is_detected(bundle):
-    content, _ = bundle
-
+def _forge_chain(content: bytes, pick, edit) -> bytes:
     def forge(b: bytes) -> bytes:
         lines = b.splitlines()
-        e = json.loads(lines[2])
-        e["actor_id"] = "someone-else"
-        lines[2] = json.dumps(e).encode()
+        i = next(n for n, line in enumerate(lines) if pick(json.loads(line)))
+        e = json.loads(lines[i])
+        edit(e)
+        lines[i] = json.dumps(e).encode()
         return b"\n".join(lines) + b"\n"
-    bad = _rewrite(content, {"verification/ledger/chain.jsonl": forge})
+    return _rewrite(content, {"verification/ledger/chain.jsonl": forge})
+
+
+def test_rewritten_ledger_is_detected(bundle):
+    content, _ = bundle
+    bad = _forge_chain(content, lambda e: "redacted" not in e and e["seq"] > 1,
+                       lambda e: e.update(actor_id="someone-else"))
     assert any(c.subject == "ledger" for c in _failed(verify_bundle(bad)))
+
+
+def test_other_programmes_are_redacted_but_still_bind_the_chain(bundle, k):  # noqa: F811
+    content, _ = bundle
+    z = zipfile.ZipFile(io.BytesIO(content))
+    chain = [json.loads(line) for line in z.read("verification/ledger/chain.jsonl").splitlines()]
+    hidden = [e for e in chain if e.get("redacted")]
+    assert hidden and all(set(e) == {"seq", "scheme", "redacted", "prev_hash",
+                                     "content_digest", "entry_hash"} for e in hidden)
+    text = z.read("verification/ledger/chain.jsonl").decode()
+    assert "principal.registered" not in text            # users' records are not shown
+    rep = verify_bundle(content)
+    assert any("redacted" in c.check for c in rep.checks if c.subject == "ledger")
+    forged = _forge_chain(content, lambda e: e.get("redacted"),
+                          lambda e: e.update(content_digest="0" * 64))
+    assert any(c.subject == "ledger" for c in _failed(verify_bundle(forged)))
+    padded = _forge_chain(content, lambda e: e.get("redacted"),
+                          lambda e: e.update(actor_id="x"))
+    assert any(c.subject == "ledger" for c in _failed(verify_bundle(padded)))
 
 
 def test_forged_signature_and_report_hash_are_detected(bundle):

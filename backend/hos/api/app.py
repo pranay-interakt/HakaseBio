@@ -118,6 +118,11 @@ class ContextChangeBody(BaseModel):
     reason: str
 
 
+class MemberBody(BaseModel):
+    principal_id: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class ProgramDeterminationBody(BaseModel):
     key: str
     applies: bool
@@ -311,6 +316,70 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             raise PermissionDenied("only humans can sign")
         return k.authenticate(actor.id, password)
 
+    # -- access (docs/15 P0.3): every id in a path is checked before the handler runs; out
+    # of scope answers like a missing object, so it does not reveal that the object exists --
+    def _hidden(kind: str, ident: str) -> NotFound:
+        return NotFound(f"no {kind} {ident}")
+
+    def program_access(program_id: str, actor: Principal = Depends(current),
+                       k: Kernel = Depends(get_kernel)) -> None:
+        try:
+            ok = k.can_access(actor, program_id)
+        except NotFound:
+            ok = False
+        if not ok:
+            raise _hidden("programme", program_id)
+
+    def study_access(study_id: str, actor: Principal = Depends(current),
+                     k: Kernel = Depends(get_kernel)) -> None:
+        try:
+            ok = k.can_access(actor, k.repo.study(study_id).program_id)
+        except NotFound:
+            ok = False
+        if not ok:
+            raise _hidden("study", study_id)
+
+    def compound_access(compound_id: str, actor: Principal = Depends(current),
+                        k: Kernel = Depends(get_kernel)) -> None:
+        try:
+            ok = k.can_access(actor, k.repo.compound(compound_id).program_id)
+        except NotFound:
+            ok = False
+        if not ok:
+            raise _hidden("compound", compound_id)
+
+    def file_access(sha: str, actor: Principal = Depends(current),
+                    k: Kernel = Depends(get_kernel)) -> None:
+        programs = k.repo.file_programs(sha)
+        # a file stored before files were linked to programmes stays with the default
+        # organisation
+        ok = any(k.can_access(actor, pid) for pid in programs) if programs else \
+            actor.organisation is None
+        if not ok:
+            raise _hidden("file", sha)
+
+    def ledger_access(subject_id: str, actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> None:
+        for getter, check in ((k.repo.program, lambda r: k.can_access(actor, r.id)),
+                              (k.repo.study, lambda r: k.can_access(actor, r.program_id)),
+                              (k.repo.compound, lambda r: k.can_access(actor, r.program_id))):
+            try:
+                row = getter(subject_id)
+            except NotFound:
+                continue
+            if not check(row):
+                raise _hidden("record", subject_id)
+            return
+        if subject_id in {r.id for r in k.repo.principals()}:
+            target = k.get_principal(subject_id)
+            admin_of = Role.ADMIN in actor.roles and actor.organisation in (
+                None, target.organisation)
+            if subject_id != actor.id and not admin_of:
+                raise PermissionDenied("a user's own history is visible to that user and "
+                                       "administrators")
+            return
+        file_access(subject_id, actor, k)
+
     # -- error mapping -----------------------------------------------------------------
     def _err(code: int, exc: Exception, **extra: Any) -> JSONResponse:
         return JSONResponse(status_code=code, content={"error": type(exc).__name__,
@@ -377,7 +446,8 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                    k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         if Role.ADMIN not in actor.roles:
             raise PermissionDenied("only an administrator can list users")
-        return [k.get_principal(r.id).to_dict() for r in k.repo.principals()]
+        return [k.get_principal(r.id).to_dict() for r in k.repo.principals()
+                if actor.organisation is None or r.organisation == actor.organisation]
 
     @app.post("/api/principals")
     def add_principal(body: PrincipalBody, actor: Principal = Depends(current),
@@ -392,6 +462,8 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         if Role.ADMIN not in actor.roles:
             raise PermissionDenied("only an administrator can issue agent tokens")
         target = k.get_principal(principal_id)
+        if actor.organisation not in (None, target.organisation):
+            raise NotFound(f"no principal {principal_id}")
         if target.kind is not PrincipalKind.AGENT:
             raise PermissionDenied("tokens are issued to agents; humans log in")
         k.record_event(actor, "principal.agent_token_issued", "principal", principal_id, {})
@@ -425,7 +497,8 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     @app.get("/api/programs")
     def programs(actor: Principal = Depends(current),
                  k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        return k.programs()
+        mine = k.accessible_programs(actor)
+        return [p for p in k.programs() if p["id"] in mine]
 
     @app.post("/api/programs")
     def create_program(body: ProgramBody, actor: Principal = Depends(current),
@@ -436,18 +509,18 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             raise ValueError(f"invalid programme context: {exc}") from None
         return k.create_program(actor, name=body.name, context=ctx, sponsor=body.sponsor)
 
-    @app.get("/api/programs/{program_id}")
+    @app.get("/api/programs/{program_id}", dependencies=[Depends(program_access)])
     def program(program_id: str, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.program_view(program_id)
 
-    @app.patch("/api/programs/{program_id}/context")
+    @app.patch("/api/programs/{program_id}/context", dependencies=[Depends(program_access)])
     def change_context(program_id: str, body: ContextChangeBody,
                        actor: Principal = Depends(current),
                        k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.update_program_context(actor, program_id, body.changes, reason=body.reason)
 
-    @app.post("/api/programs/{program_id}/determinations")
+    @app.post("/api/programs/{program_id}/determinations", dependencies=[Depends(program_access)])
     def program_determination(program_id: str, body: ProgramDeterminationBody,
                               actor: Principal = Depends(current),
                               k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
@@ -455,25 +528,42 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                                               key=body.key, applies=body.applies,
                                               rationale=body.rationale)
 
-    @app.get("/api/programs/{program_id}/readiness")
+    @app.get("/api/programs/{program_id}/members", dependencies=[Depends(program_access)])
+    def members(program_id: str, actor: Principal = Depends(current),
+                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.program_members(program_id)
+
+    @app.post("/api/programs/{program_id}/members", dependencies=[Depends(program_access)])
+    def add_member(program_id: str, body: MemberBody, actor: Principal = Depends(current),
+                   k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.add_program_member(actor, program_id, body.principal_id, reason=body.reason)
+
+    @app.post("/api/programs/{program_id}/members/{principal_id}/remove",
+              dependencies=[Depends(program_access)])
+    def remove_member(program_id: str, principal_id: str, body: ReasonRequiredBody,
+                      actor: Principal = Depends(current),
+                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.remove_program_member(actor, program_id, principal_id, reason=body.reason)
+
+    @app.get("/api/programs/{program_id}/readiness", dependencies=[Depends(program_access)])
     def readiness(program_id: str, milestone: Timing = Query(Timing.BEFORE_FIRST_IN_HUMAN),
                   actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.ind import readiness_report
         return readiness_report(k, program_id, milestone)
 
-    @app.post("/api/programs/{program_id}/module4")
+    @app.post("/api/programs/{program_id}/module4", dependencies=[Depends(program_access)])
     def module4(program_id: str, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.ind import assemble_module4
         return assemble_module4(k, actor, program_id)
 
-    @app.post("/api/programs/{program_id}/compounds")
+    @app.post("/api/programs/{program_id}/compounds", dependencies=[Depends(program_access)])
     def add_compound(program_id: str, body: CompoundBody, actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.register_compound(actor, program_id, name=body.name, smiles=body.smiles)
 
-    @app.post("/api/programs/{program_id}/biologics")
+    @app.post("/api/programs/{program_id}/biologics", dependencies=[Depends(program_access)])
     def add_biologic(program_id: str, body: BiologicBody, actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.register_biologic(actor, program_id, name=body.name, entity=body.entity)
@@ -494,12 +584,12 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         except HelmError as exc:
             return {"structure": None, "errors": exc.errors}
 
-    @app.get("/api/compounds/{compound_id}")
+    @app.get("/api/compounds/{compound_id}", dependencies=[Depends(compound_access)])
     def compound(compound_id: str, actor: Principal = Depends(current),
                  k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.compound_view(compound_id)
 
-    @app.post("/api/compounds/{compound_id}/enrich")
+    @app.post("/api/compounds/{compound_id}/enrich", dependencies=[Depends(compound_access)])
     def enrich(compound_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.data_sources import ChEMBLClient, PubChemClient
@@ -515,43 +605,48 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     @app.get("/api/studies")
     def studies(program_id: str | None = None, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        return k.studies(program_id)
+        if program_id is not None:
+            program_access(program_id, actor, k)
+        mine = k.accessible_programs(actor)
+        return [s_ for s_ in k.studies(program_id)
+                if k.repo.study(s_["id"]).program_id in mine]
 
     @app.post("/api/studies")
     def create_study(body: StudyBody, actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        program_access(body.program_id, actor, k)
         return k.create_study(actor, program_id=body.program_id, compound_id=body.compound_id,
                               requirement_id=body.requirement_id, driver_id=body.driver_id,
                               hypothesis=body.hypothesis)
 
-    @app.get("/api/studies/{study_id}")
+    @app.get("/api/studies/{study_id}", dependencies=[Depends(study_access)])
     def study(study_id: str, actor: Principal = Depends(current),
               k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.study_view(study_id)
 
-    @app.post("/api/studies/{study_id}/design")
+    @app.post("/api/studies/{study_id}/design", dependencies=[Depends(study_access)])
     def design(study_id: str, body: DesignBody, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.design_study(actor, study_id, body.parameters, reason=body.reason)
 
-    @app.post("/api/studies/{study_id}/plan")
+    @app.post("/api/studies/{study_id}/plan", dependencies=[Depends(study_access)])
     def plan(study_id: str, actor: Principal = Depends(current),
              k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.plan_study(actor, study_id)
 
-    @app.post("/api/studies/{study_id}/dispatch")
+    @app.post("/api/studies/{study_id}/dispatch", dependencies=[Depends(study_access)])
     def dispatch(study_id: str, body: DispatchBody, actor: Principal = Depends(current),
                  k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.dispatch_study(actor, study_id, body.target)
 
-    @app.get("/api/studies/{study_id}/bundle")
+    @app.get("/api/studies/{study_id}/bundle", dependencies=[Depends(study_access)])
     def bundle(study_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> Response:
         return Response(k.dispatch_bundle(study_id), media_type="application/zip",
                         headers={"Content-Disposition":
                                  f'attachment; filename="{study_id}_dispatch.zip"'})
 
-    @app.get("/api/studies/{study_id}/template")
+    @app.get("/api/studies/{study_id}/template", dependencies=[Depends(study_access)])
     def template(study_id: str, actor: Principal = Depends(current),
                  k: Kernel = Depends(get_kernel)) -> PlainTextResponse:
         row = k.repo.study(study_id)
@@ -559,29 +654,29 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         t = d.data_template(d.validate_parameters(row.parameters))
         return PlainTextResponse(t.blank_csv(study_id), media_type="text/csv")
 
-    @app.post("/api/studies/{study_id}/data")
+    @app.post("/api/studies/{study_id}/data", dependencies=[Depends(study_access)])
     async def upload(study_id: str, request: Request, filename: str = Query("upload.csv"),
                      reason: str | None = Query(None), actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         content = await request.body()
         return k.receive_data(actor, study_id, content, filename=filename, reason=reason)
 
-    @app.post("/api/studies/{study_id}/data/simulated")
+    @app.post("/api/studies/{study_id}/data/simulated", dependencies=[Depends(study_access)])
     def receive_simulated(study_id: str, body: ReasonBody, actor: Principal = Depends(current),
                           k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.receive_data(actor, study_id, None, reason=body.reason)
 
-    @app.put("/api/studies/{study_id}/inputs")
+    @app.put("/api/studies/{study_id}/inputs", dependencies=[Depends(study_access)])
     def inputs(study_id: str, body: InputsBody, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.set_analysis_inputs(actor, study_id, body.inputs)
 
-    @app.post("/api/studies/{study_id}/analyze")
+    @app.post("/api/studies/{study_id}/analyze", dependencies=[Depends(study_access)])
     def analyze(study_id: str, body: ReasonBody, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.analyze_study(actor, study_id, reason=body.reason)
 
-    @app.post("/api/studies/{study_id}/determinations")
+    @app.post("/api/studies/{study_id}/determinations", dependencies=[Depends(study_access)])
     def determination(study_id: str, body: DeterminationBody,
                       actor: Principal = Depends(current),
                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
@@ -590,12 +685,12 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                                       unit=body.unit, rationale=body.rationale,
                                       reason=body.reason, category=body.category)
 
-    @app.post("/api/studies/{study_id}/report")
+    @app.post("/api/studies/{study_id}/report", dependencies=[Depends(study_access)])
     def report(study_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.report_study(actor, study_id)
 
-    @app.get("/api/studies/{study_id}/report.md")
+    @app.get("/api/studies/{study_id}/report.md", dependencies=[Depends(study_access)])
     def report_md(study_id: str, actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> PlainTextResponse:
         row = k.repo.study(study_id)
@@ -603,14 +698,14 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             raise NotFound("no report")
         return PlainTextResponse(row.report["markdown"], media_type="text/markdown")
 
-    @app.post("/api/studies/{study_id}/sign")
+    @app.post("/api/studies/{study_id}/sign", dependencies=[Depends(study_access)])
     def sign_study(study_id: str, body: SignBody, actor: Principal = Depends(current),
                    k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         signer = reauth(k, actor, body.password)
         return k.sign_study(signer, study_id, role=body.role, meaning=body.meaning,
                             statement=body.statement)
 
-    @app.post("/api/studies/{study_id}/protocol/sign")
+    @app.post("/api/studies/{study_id}/protocol/sign", dependencies=[Depends(study_access)])
     def sign_protocol(study_id: str, body: ProtocolSignBody, actor: Principal = Depends(current),
                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.sign_protocol(reauth(k, actor, body.password), study_id,
@@ -622,13 +717,13 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         from hos.send.service import send_terms
         return send_terms()
 
-    @app.get("/api/studies/{study_id}/send-export")
+    @app.get("/api/studies/{study_id}/send-export", dependencies=[Depends(study_access)])
     def send_export_context(study_id: str, actor: Principal = Depends(current),
                             k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.send.service import send_export_context
         return send_export_context(k, study_id)
 
-    @app.post("/api/studies/{study_id}/send-export", response_model=None)
+    @app.post("/api/studies/{study_id}/send-export", response_model=None, dependencies=[Depends(study_access)])
     def send_export(study_id: str, body: dict[str, Any], actor: Principal = Depends(current),
                     k: Kernel = Depends(get_kernel)) -> dict[str, Any] | JSONResponse:
         from pydantic import ValidationError
@@ -645,22 +740,22 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                     for e in exc.errors()]})
         return send_export(k, actor, study_id, spec)
 
-    @app.post("/api/studies/{study_id}/approve")
+    @app.post("/api/studies/{study_id}/approve", dependencies=[Depends(study_access)])
     def approve(study_id: str, body: ApproveBody, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.approve_study(reauth(k, actor, body.password), study_id)
 
-    @app.post("/api/studies/{study_id}/cancel")
+    @app.post("/api/studies/{study_id}/cancel", dependencies=[Depends(study_access)])
     def cancel(study_id: str, body: CancelBody, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.cancel_study(actor, study_id, reason=body.reason)
 
-    @app.get("/api/studies/{study_id}/artifacts")
+    @app.get("/api/studies/{study_id}/artifacts", dependencies=[Depends(study_access)])
     def artifacts(study_id: str, kind: str | None = None, actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         return k.artifacts(study_id, kind)
 
-    @app.get("/api/files/{sha}")
+    @app.get("/api/files/{sha}", dependencies=[Depends(file_access)])
     def file(sha: str, actor: Principal = Depends(current),
              k: Kernel = Depends(get_kernel)) -> Response:
         meta = k.repo.file_meta(sha)
@@ -669,7 +764,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
     # -- audit ----------------------------------------------------------------------------
     # -- study import (docs/14 P1) ---------------------------------------------------------
-    @app.post("/api/programs/{program_id}/imports")
+    @app.post("/api/programs/{program_id}/imports", dependencies=[Depends(program_access)])
     async def create_import(program_id: str, request: Request, compound_id: str = Query(...),
                             requirement_id: str = Query(...), filename: str = Query(...),
                             title: str = Query(...), laboratory: str = Query(...),
@@ -689,62 +784,62 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             components=[c.strip() for c in components.split(",") if c.strip()]
             if components else None)
 
-    @app.post("/api/studies/{study_id}/import/datasets")
+    @app.post("/api/studies/{study_id}/import/datasets", dependencies=[Depends(study_access)])
     async def import_dataset(study_id: str, request: Request, filename: str = Query(...),
                              description: str = Query(""), actor: Principal = Depends(current),
                              k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.add_import_dataset(actor, study_id, await request.body(),
                                             filename=filename, description=description)
 
-    @app.post("/api/studies/{study_id}/import/values")
+    @app.post("/api/studies/{study_id}/import/values", dependencies=[Depends(study_access)])
     def import_value(study_id: str, body: ImportValueBody, actor: Principal = Depends(current),
                      k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.add_import_value(actor, study_id, **body.model_dump())
 
-    @app.post("/api/studies/{study_id}/import/values/{value_id}/withdraw")
+    @app.post("/api/studies/{study_id}/import/values/{value_id}/withdraw", dependencies=[Depends(study_access)])
     def withdraw_value(study_id: str, value_id: str, body: ReasonRequiredBody,
                        actor: Principal = Depends(current),
                        k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.withdraw_import_value(actor, study_id, value_id, reason=body.reason)
 
-    @app.post("/api/studies/{study_id}/import/proposals")
+    @app.post("/api/studies/{study_id}/import/proposals", dependencies=[Depends(study_access)])
     def propose_value(study_id: str, body: ImportProposalBody,
                       actor: Principal = Depends(current),
                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.propose_import_value(actor, study_id, **body.model_dump())
 
-    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/confirm")
+    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/confirm", dependencies=[Depends(study_access)])
     def confirm_proposal(study_id: str, proposal_id: str, body: ConfirmProposalBody,
                          actor: Principal = Depends(current),
                          k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.confirm_import_proposal(actor, study_id, proposal_id, page=body.page)
 
-    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/reject")
+    @app.post("/api/studies/{study_id}/import/proposals/{proposal_id}/reject", dependencies=[Depends(study_access)])
     def reject_proposal(study_id: str, proposal_id: str, body: ReasonRequiredBody,
                         actor: Principal = Depends(current),
                         k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.reject_import_proposal(actor, study_id, proposal_id,
                                                 reason=body.reason)
 
-    @app.post("/api/studies/{study_id}/import/sign")
+    @app.post("/api/studies/{study_id}/import/sign", dependencies=[Depends(study_access)])
     def sign_import(study_id: str, body: SignBody, actor: Principal = Depends(current),
                     k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         signer = reauth(k, actor, body.password)
         return k.imports.sign_import(signer, study_id, role=body.role, meaning=body.meaning,
                                      statement=body.statement)
 
-    @app.post("/api/studies/{study_id}/import/complete")
+    @app.post("/api/studies/{study_id}/import/complete", dependencies=[Depends(study_access)])
     def complete_import(study_id: str, body: ApproveBody, actor: Principal = Depends(current),
                         k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.complete_import(reauth(k, actor, body.password), study_id)
 
-    @app.post("/api/studies/{study_id}/import/supersede")
+    @app.post("/api/studies/{study_id}/import/supersede", dependencies=[Depends(study_access)])
     def supersede_import(study_id: str, body: SupersedeBody, actor: Principal = Depends(current),
                          k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.imports.supersede_import(actor, study_id, by_study_id=body.by_study_id,
                                           reason=body.reason)
 
-    @app.get("/api/studies/{study_id}/import/report")
+    @app.get("/api/studies/{study_id}/import/report", dependencies=[Depends(study_access)])
     def import_report(study_id: str, actor: Principal = Depends(current),
                       k: Kernel = Depends(get_kernel)) -> Response:
         content, filename, media = k.imports.import_report_file(study_id)
@@ -767,7 +862,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             raise ValueError(f"invalid programme context: {exc}") from None
         return diff_contexts(a, b).to_dict()
 
-    @app.post("/api/programs/{program_id}/what-if")
+    @app.post("/api/programs/{program_id}/what-if", dependencies=[Depends(program_access)])
     def what_if(program_id: str, body: WhatIfBody, actor: Principal = Depends(current),
                 k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.core.regulatory.diff import diff_contexts
@@ -779,7 +874,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             raise ValueError(f"invalid programme context: {exc}") from None
         return diff_contexts(a, b).to_dict()
 
-    @app.post("/api/programs/{program_id}/rehearsal")
+    @app.post("/api/programs/{program_id}/rehearsal", dependencies=[Depends(program_access)])
     def rehearsal(program_id: str, body: RehearsalBody, actor: Principal = Depends(current),
                   k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.ind.rehearsal import rehearse
@@ -792,7 +887,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         from hos.verify import verify_bundle
         return verify_bundle(await request.body()).to_dict()
 
-    @app.get("/api/files/{sha}/verify")
+    @app.get("/api/files/{sha}/verify", dependencies=[Depends(file_access)])
     def verify_stored(sha: str, actor: Principal = Depends(current),
                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         from hos.verify import verify_bundle
@@ -803,13 +898,9 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return {"valid": True, "entries": k.verify_ledger(), "head": k.ledger.head}
 
-    @app.get("/api/ledger/{subject_id}")
+    @app.get("/api/ledger/{subject_id}", dependencies=[Depends(ledger_access)])
     def ledger(subject_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
-        if subject_id != actor.id and Role.ADMIN not in actor.roles and \
-                subject_id in {r.id for r in k.repo.principals()}:
-            raise PermissionDenied("a user's own history is visible to that user and "
-                                   "administrators")
         return k.history(subject_id)
 
     return app

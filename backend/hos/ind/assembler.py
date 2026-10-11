@@ -363,7 +363,8 @@ def _assemble_module4(kernel: Any, actor: Principal, program_id: str) -> dict[st
     files["m4/readiness.json"] = json.dumps(readiness, indent=2, sort_keys=True,
                                             default=str).encode()
     bundle = _zip(files)
-    sha = kernel.repo.store_file(bundle, filename=f"{program_id}_module4.zip",
+    sha = kernel.repo.store_file(bundle, program_id=program_id,
+                                 filename=f"{program_id}_module4.zip",
                                  media_type="application/zip", actor=actor.id)
     kernel.record_event(actor, "ind.module4_assembled", "program", program_id,
                         {"package_hash": package["package_hash"], "bundle_sha256": sha,

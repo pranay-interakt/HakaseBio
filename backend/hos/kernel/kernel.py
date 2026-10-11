@@ -35,7 +35,7 @@ from hos.core.quantity import Quantity
 from hos.core.regulatory import Modality, PeptideOrigin, ProgramContext, derive_study_set
 from hos.core.regulatory.context import AMINO_ACID_MODALITIES
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
-from hos.db.models import CompoundRow, PrincipalRow, ProgramRow, StudyRow
+from hos.db.models import CompoundRow, PrincipalRow, ProgramMemberRow, ProgramRow, StudyRow
 from hos.db.repository import Repository, content_hash
 from hos.db.store import CommitThenRaise, Database, FileStore, SqlLedgerBackend
 from hos.drivers.base import (
@@ -159,6 +159,12 @@ class Kernel:
             raise PermissionDenied("the first principal must be a human administrator")
         if any(p.id == principal_id for p in existing):
             raise KernelError(f"principal {principal_id!r} already exists")
+        if actor is not None and actor.organisation is not None:
+            # an organisation's administrator works inside that organisation only
+            if organisation not in (None, actor.organisation):
+                raise PermissionDenied("an organisation's administrator registers principals "
+                                       "in that organisation only")
+            organisation = actor.organisation
         if kind is PrincipalKind.HUMAN and (not password or len(password) < _MIN_PASSWORD):
             raise PermissionDenied(f"human principals need a password of at least "
                                    f"{_MIN_PASSWORD} characters")
@@ -198,6 +204,65 @@ class Kernel:
         return self._principal(row)
 
     # ======================================================================
+    # access (docs/15 P0.3)
+    # ======================================================================
+
+    def can_access(self, actor: Principal, program_id: str) -> bool:
+        """A programme is visible to its organisation (None is the default organisation)
+        and to principals added to it from elsewhere, such as a CRO."""
+        program = self.repo.program(program_id)
+        return actor.organisation == program.organisation or \
+            program_id in self.repo.member_programs(actor.id)
+
+    def accessible_programs(self, actor: Principal) -> set[str]:
+        guest = self.repo.member_programs(actor.id)
+        return {p.id for p in self.repo.programs()
+                if p.organisation == actor.organisation or p.id in guest}
+
+    def program_members(self, program_id: str) -> dict[str, Any]:
+        row = self.repo.program(program_id)
+        return {"organisation": row.organisation, "members": [
+            {"principal_id": m.principal_id, "name": self.repo.principal(m.principal_id).name,
+             "organisation": self.repo.principal(m.principal_id).organisation,
+             "added_by": m.added_by, "added_at": m.added_at.isoformat()}
+            for m in self.repo.members(program_id)]}
+
+    @atomic
+    def add_program_member(self, actor: Principal, program_id: str, principal_id: str, *,
+                           reason: str) -> dict[str, Any]:
+        """Give a principal from another organisation access to one programme. Only a human
+        of the owning organisation can do it, with a reason; it is on the record."""
+        program = self.repo.program(program_id)
+        if actor.kind is not PrincipalKind.HUMAN or actor.organisation != program.organisation:
+            raise PermissionDenied("only a person of the owning organisation can give access")
+        if not reason.strip():
+            raise KernelError("a reason is required to give access")
+        target = self.get_principal(principal_id)
+        if target.organisation == program.organisation:
+            raise KernelError(f"{principal_id} already has access through its organisation")
+        if principal_id in {m.principal_id for m in self.repo.members(program_id)}:
+            raise KernelError(f"{principal_id} is already a member")
+        self.repo.add(ProgramMemberRow(program_id=program_id, principal_id=principal_id,
+                                       added_by=actor.id, added_at=utc_now()))
+        self._record(actor, "program.member_added", "program", program_id,
+                     {"principal_id": principal_id, "organisation": target.organisation},
+                     reason=reason)
+        return self.program_members(program_id)
+
+    @atomic
+    def remove_program_member(self, actor: Principal, program_id: str, principal_id: str, *,
+                              reason: str) -> dict[str, Any]:
+        program = self.repo.program(program_id)
+        if actor.kind is not PrincipalKind.HUMAN or actor.organisation != program.organisation:
+            raise PermissionDenied("only a person of the owning organisation can remove access")
+        if not reason.strip():
+            raise KernelError("a reason is required to remove access")
+        self.repo.remove_member(program_id, principal_id)
+        self._record(actor, "program.member_removed", "program", program_id,
+                     {"principal_id": principal_id}, reason=reason)
+        return self.program_members(program_id)
+
+    # ======================================================================
     # programmes and compounds
     # ======================================================================
 
@@ -214,6 +279,7 @@ class Kernel:
         pid = _new_id("prg")
         now = utc_now()
         self.repo.add(ProgramRow(id=pid, name=name.strip(), sponsor=sponsor,
+                                 organisation=actor.organisation,
                                  context=context.to_dict(), study_set=ss.to_dict(),
                                  created_by=actor.id, created_at=now, updated_at=now))
         self._record(actor, "program.created", "program", pid,
@@ -481,12 +547,13 @@ class Kernel:
         tgt = target_from_spec(target)
         pkg = driver.instruction_package(study_id, protocol, params, compound)
         rec = tgt.dispatch(pkg, driver=driver, params=params, compound=compound)
-        bundle_sha = self.repo.store_file(rec.bundle, filename=f"{study_id}_dispatch.zip",
+        bundle_sha = self.repo.store_file(rec.bundle, program_id=row.program_id,
+                                          filename=f"{study_id}_dispatch.zip",
                                           media_type="application/zip", actor=actor.id)
         execution = rec.to_dict()
         execution["bundle_file"] = bundle_sha
         if rec.simulated is not None:
-            sim_sha = self.repo.store_file(rec.simulated.content,
+            sim_sha = self.repo.store_file(rec.simulated.content, program_id=row.program_id,
                                            filename=f"{study_id}_simulated.csv",
                                            media_type="text/csv", actor=actor.id)
             self.repo.register_simulated(sim_sha, study_id, rec.simulated.method_id)
@@ -532,7 +599,8 @@ class Kernel:
                           "reason": "file is byte-identical to data simulated by HOS"})
         driver = self._driver(row)
         params = self._validate(driver, row.parameters)
-        stored = self.repo.store_file(content, filename=filename, media_type="text/csv",
+        stored = self.repo.store_file(content, program_id=row.program_id, filename=filename,
+                                      media_type="text/csv",
                                       actor=actor.id)
         try:
             data = driver.ingest(content, params, filename=filename, claimed_origin=claimed,

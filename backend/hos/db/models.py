@@ -40,6 +40,8 @@ class ProgramRow(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(256))
     sponsor: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    organisation: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    """The owning organisation (the creator's); None is the default organisation."""
     context: Mapped[dict] = mapped_column(JSON)
     study_set: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_by: Mapped[str] = mapped_column(String(64))
@@ -110,6 +112,25 @@ class FileRow(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class ProgramMemberRow(Base):
+    """A principal from another organisation given access to one programme (e.g. a CRO)."""
+
+    __tablename__ = "program_members"
+    program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(ForeignKey("principals.id"), primary_key=True)
+    added_by: Mapped[str] = mapped_column(String(64))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FileLinkRow(Base):
+    """Which programmes a stored file belongs to; content addressing lets two programmes
+    hold the same bytes."""
+
+    __tablename__ = "file_links"
+    sha256: Mapped[str] = mapped_column(ForeignKey("files.sha256"), primary_key=True)
+    program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), primary_key=True)
+
+
 class LedgerRow(Base):
     __tablename__ = "ledger"
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
@@ -124,6 +145,7 @@ class LedgerRow(Base):
     prev_hash: Mapped[str] = mapped_column(String(64))
     entry_hash: Mapped[str] = mapped_column(String(64), unique=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scheme: Mapped[int] = mapped_column(Integer, default=1)
 
     __table_args__ = (Index("ix_ledger_subject", "subject_id"),)
 

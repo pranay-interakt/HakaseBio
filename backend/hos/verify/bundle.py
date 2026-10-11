@@ -81,7 +81,15 @@ def verification_files(kernel: Any, program: Any, studies: list[Any],
     for sha, content in raw.items():
         files[f"verification/raw/{sha}"] = content
     entries = kernel.ledger.entries()
-    chain = [{**e.body(), "entry_hash": e.entry_hash} for e in entries]
+    # other programmes' entries are shown only as (prev_hash, content_digest, entry_hash):
+    # the chain still recomputes to the head, their content stays private (docs/15 P0.3).
+    # Scheme-1 entries cannot be redacted without breaking the chain and are kept whole.
+    chain = [{**e.body(), "entry_hash": e.entry_hash}
+             if e.subject_id in subjects or e.scheme == 1 else
+             {"seq": e.seq, "scheme": e.scheme, "redacted": True, "prev_hash": e.prev_hash,
+              "content_digest": e.content_digest(), "entry_hash": e.entry_hash}
+             for e in entries]
+    redacted = sum(1 for c in chain if c.get("redacted"))
     files["verification/ledger/chain.jsonl"] = "\n".join(
         canonical_json(c) for c in chain).encode() + b"\n"
     mine = [e.to_dict() for e in entries if e.subject_id in subjects]
@@ -91,7 +99,7 @@ def verification_files(kernel: Any, program: Any, studies: list[Any],
         "format": BUNDLE_FORMAT, "software": software_versions(),
         "program": {"id": program.id, "name": program.name, "context": program.context},
         "ledger": {"head": kernel.ledger.head, "entries": len(entries),
-                   "program_entries": len(mine)},
+                   "program_entries": len(mine), "redacted_entries": redacted},
         "studies": sorted(s.id for s in studies), "imports": sorted(s.id for s in imports),
     }
     files["verification/manifest.json"] = _json(manifest)

@@ -12,8 +12,10 @@ from hos.core.provenance import utc_now
 from hos.db.models import (
     ArtifactRow,
     CompoundRow,
+    FileLinkRow,
     FileRow,
     PrincipalRow,
+    ProgramMemberRow,
     ProgramRow,
     SimulatedFileRow,
     StudyRow,
@@ -156,13 +158,42 @@ class Repository:
 
     # -- files ---------------------------------------------------------------------------
 
-    def store_file(self, content: bytes, *, filename: str, media_type: str, actor: str) -> str:
+    def store_file(self, content: bytes, *, filename: str, media_type: str, actor: str,
+                   program_id: str | None = None) -> str:
         sha = self.files.put(content)
         with self.db.session() as s:
             if s.get(FileRow, sha) is None:
                 s.add(FileRow(sha256=sha, filename=filename, media_type=media_type,
                               size_bytes=len(content), uploaded_by=actor, uploaded_at=_now()))
+                s.flush()
+            if program_id is not None and s.get(FileLinkRow, (sha, program_id)) is None:
+                s.add(FileLinkRow(sha256=sha, program_id=program_id))
         return sha
+
+    def file_programs(self, sha: str) -> list[str]:
+        with self.db.session() as s:
+            return list(s.execute(select(FileLinkRow.program_id)
+                                  .where(FileLinkRow.sha256 == sha)).scalars())
+
+    # -- programme members ---------------------------------------------------------------
+
+    def members(self, program_id: str) -> list[ProgramMemberRow]:
+        with self.db.session() as s:
+            return list(s.execute(select(ProgramMemberRow)
+                                  .where(ProgramMemberRow.program_id == program_id)
+                                  .order_by(ProgramMemberRow.added_at)).scalars())
+
+    def member_programs(self, principal_id: str) -> set[str]:
+        with self.db.session() as s:
+            return set(s.execute(select(ProgramMemberRow.program_id)
+                                 .where(ProgramMemberRow.principal_id == principal_id)).scalars())
+
+    def remove_member(self, program_id: str, principal_id: str) -> None:
+        with self.db.session() as s:
+            row = s.get(ProgramMemberRow, (program_id, principal_id))
+            if row is None:
+                raise NotFound(f"{principal_id} is not a member of {program_id}")
+            s.delete(row)
 
     def file_meta(self, sha: str) -> FileRow:
         with self.db.session() as s:

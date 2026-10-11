@@ -25,6 +25,7 @@ from hos.kernel.errors import LedgerIntegrityError
 
 __all__ = [
     "GENESIS_HASH",
+    "LEDGER_SCHEME",
     "Ledger",
     "LedgerBackend",
     "LedgerEntry",
@@ -33,6 +34,8 @@ __all__ = [
 ]
 
 GENESIS_HASH = "0" * 64
+#: Hashing scheme for new entries (see LedgerEntry.scheme); scheme-1 entries keep theirs.
+LEDGER_SCHEME = 2
 
 
 def _default(o: Any) -> Any:
@@ -66,9 +69,14 @@ class LedgerEntry:
     prev_hash: str
     entry_hash: str
     reason: str | None = None
+    scheme: int = 1
+    """1: the hash covers the whole body. 2 (every entry written since docs/15 P0.3): the hash
+    covers the previous hash and a digest of the rest of the body, so an entry can be shown to
+    a third party as (prev_hash, content_digest, entry_hash) without its content and the chain
+    still recomputes."""
 
     def body(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "seq": self.seq,
             "recorded_at": self.recorded_at,
             "actor_id": self.actor_id,
@@ -80,10 +88,37 @@ class LedgerEntry:
             "prev_hash": self.prev_hash,
             "reason": self.reason,
         }
+        if self.scheme != 1:
+            d["scheme"] = self.scheme
+        return d
 
     @staticmethod
     def compute_hash(body: dict[str, Any]) -> str:
+        """Scheme 1: SHA-256 of the whole canonical body."""
         return hashlib.sha256(canonical_json(body).encode()).hexdigest()
+
+    @staticmethod
+    def content_digest_of(body: dict[str, Any]) -> str:
+        """Scheme 2: SHA-256 of the body without ``prev_hash``."""
+        return hashlib.sha256(canonical_json(
+            {k: v for k, v in body.items() if k != "prev_hash"}).encode()).hexdigest()
+
+    @staticmethod
+    def chain_hash(prev_hash: str, content_digest: str) -> str:
+        """Scheme 2: the entry hash from the previous hash and the content digest."""
+        return hashlib.sha256(canonical_json({"scheme": 2, "prev_hash": prev_hash,
+                                              "content_digest": content_digest}).encode()
+                              ).hexdigest()
+
+    @staticmethod
+    def hash_of(body: dict[str, Any]) -> str:
+        """The entry hash a body commits to, under its own scheme."""
+        if body.get("scheme", 1) == 2:
+            return LedgerEntry.chain_hash(body["prev_hash"], LedgerEntry.content_digest_of(body))
+        return LedgerEntry.compute_hash(body)
+
+    def content_digest(self) -> str:
+        return self.content_digest_of(self.body())
 
     def to_dict(self) -> dict[str, Any]:
         d = self.body()
@@ -156,10 +191,11 @@ class Ledger:
                 "payload_sha256": hashlib.sha256(payload_json.encode()).hexdigest(),
                 "prev_hash": prev,
                 "reason": reason,
+                "scheme": LEDGER_SCHEME,
             }
             entry = LedgerEntry(
                 payload=normalised_payload,
-                entry_hash=LedgerEntry.compute_hash(body),
+                entry_hash=LedgerEntry.hash_of(body),
                 **body,
             )
             self._backend.append(entry)
@@ -177,7 +213,7 @@ class Ledger:
                 raise LedgerIntegrityError(f"chain broken at entry {e.seq}: prev_hash mismatch")
             if hashlib.sha256(canonical_json(e.payload).encode()).hexdigest() != e.payload_sha256:
                 raise LedgerIntegrityError(f"payload of entry {e.seq} was altered")
-            if LedgerEntry.compute_hash(e.body()) != e.entry_hash:
+            if LedgerEntry.hash_of(e.body()) != e.entry_hash:
                 raise LedgerIntegrityError(f"entry {e.seq} hash does not match its contents")
             prev = e.entry_hash
             expected_seq += 1

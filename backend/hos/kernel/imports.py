@@ -118,7 +118,8 @@ class ImportService:
         if not section:
             raise KernelError(f"requirement {requirement_id} has no CTD section; state one")
         ctd_title(section)
-        sha = self.k.repo.store_file(report, filename=filename, media_type=_media_type(filename),
+        sha = self.k.repo.store_file(report, program_id=program_id, filename=filename,
+                                     media_type=_media_type(filename),
                                    actor=actor.id)
         sid = f"stu_{uuid.uuid4().hex[:12]}"
         now = utc_now()
@@ -156,8 +157,8 @@ class ImportService:
         row = self._draft_import(actor, study_id)
         if not content:
             raise KernelError("dataset file is empty")
-        sha = self.k.repo.store_file(content, filename=filename, media_type=_media_type(filename),
-                                   actor=actor.id)
+        sha = self.k.repo.store_file(content, program_id=row.program_id, filename=filename,
+                                     media_type=_media_type(filename), actor=actor.id)
         rec = dict(row.import_record or {})
         rec["datasets"] = [*rec.get("datasets", []),
                            {"sha256": sha, "filename": filename, "description": description,

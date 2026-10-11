@@ -93,6 +93,10 @@ def _approval_roles_ok(sigs: list[dict[str, Any]], glp: bool) -> tuple[bool, str
     return ok, "responsible_scientist or study_director approval"
 
 
+#: Exactly what a redacted chain line holds; anything more is not from Hakase.
+_REDACTED_KEYS = {"seq", "scheme", "redacted", "prev_hash", "content_digest", "entry_hash"}
+
+
 def verify_bundle(content: bytes) -> VerificationReport:
     rep = VerificationReport()
     try:
@@ -130,15 +134,25 @@ def verify_bundle(content: bytes) -> VerificationReport:
              if line.strip()]
     prev, seq_ok, link_ok, hash_ok = GENESIS_HASH, True, True, True
     by_seq: dict[int, dict[str, Any]] = {}
+    redacted = 0
     for i, c in enumerate(chain, start=1):
-        body = {k: v for k, v in c.items() if k != "entry_hash"}
         seq_ok &= c["seq"] == i
         link_ok &= c["prev_hash"] == prev
-        hash_ok &= LedgerEntry.compute_hash(body) == c["entry_hash"]
+        if c.get("redacted"):
+            # another programme's entry: its hash must follow from the previous hash and its
+            # content digest (scheme 2), so it cannot be altered to hide a change here
+            redacted += 1
+            hash_ok &= set(c) == _REDACTED_KEYS and c.get("scheme") == 2 and \
+                LedgerEntry.chain_hash(
+                c["prev_hash"], c["content_digest"]) == c["entry_hash"]
+        else:
+            body = {k: v for k, v in c.items() if k != "entry_hash"}
+            hash_ok &= LedgerEntry.hash_of(body) == c["entry_hash"]
         prev = c["entry_hash"]
         by_seq[c["seq"]] = c
     head = vm.get("ledger", {}).get("head")
-    rep.add("ledger", f"chain of {len(chain)} entries recomputes to the recorded head",
+    shown = f" ({redacted} from other programmes redacted)" if redacted else ""
+    rep.add("ledger", f"chain of {len(chain)} entries{shown} recomputes to the recorded head",
             seq_ok and link_ok and hash_ok and prev == head,
             "" if prev == head else f"computed head {prev[:12]} vs recorded {str(head)[:12]}")
     entries = [json.loads(line) for line in

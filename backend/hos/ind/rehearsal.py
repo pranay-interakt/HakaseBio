@@ -40,10 +40,15 @@ def _existing_parameters(kernel: Any, program_id: str, requirement_id: str) -> d
     return {}
 
 
-def _role_holders(kernel: Any) -> dict[str, list[str]]:
+def _role_holders(kernel: Any, program_id: str) -> dict[str, list[str]]:
+    """People who hold each role among those who can see the programme (its organisation
+    and its members); nobody else's name is revealed."""
+    program = kernel.repo.program(program_id)
+    members = {m.principal_id for m in kernel.repo.members(program_id)}
     out: dict[str, list[str]] = {}
     for row in kernel.repo.principals():
-        if row.kind != PrincipalKind.HUMAN.value:
+        if row.kind != PrincipalKind.HUMAN.value or (
+                row.organisation != program.organisation and row.id not in members):
             continue
         for role in row.roles:
             out.setdefault(role, []).append(row.name)
@@ -63,7 +68,7 @@ def rehearse(kernel: Any, actor: Principal, program_id: str,
     compound: CompoundInfo | None = None
     if compound_id or compounds:
         compound = kernel.compound_info(compound_id or compounds[0].id)
-    holders = _role_holders(kernel)
+    holders = _role_holders(kernel, program_id)
 
     items: list[dict[str, Any]] = []
     durations: dict[str, float | None] = {}

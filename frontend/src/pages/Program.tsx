@@ -14,7 +14,7 @@ import type {
   Study,
 } from "../types";
 
-type Tab = "studyset" | "compounds" | "studies" | "readiness" | "module4" | "whatif" | "rehearsal";
+type Tab = "studyset" | "compounds" | "studies" | "readiness" | "module4" | "whatif" | "rehearsal" | "access";
 
 const TIMING_ORDER = [
   "before_first_in_human",
@@ -54,6 +54,7 @@ export function Program({ id, go, me }: { id: string; go: (hash: string) => void
             ["module4", "Module 4"],
             ["whatif", "What-if"],
             ["rehearsal", "Rehearsal"],
+            ["access", "Access"],
           ] as [Tab, string][]
         ).map(([t, l]) => (
           <button key={t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>
@@ -72,6 +73,7 @@ export function Program({ id, go, me }: { id: string; go: (hash: string) => void
       {tab === "module4" && <Module4 id={id} />}
       {tab === "whatif" && <WhatIf p={p} />}
       {tab === "rehearsal" && <RehearsalView p={p} />}
+      {tab === "access" && <ProgramAccess id={id} me={me} onErr={setErr} />}
     </div>
   );
 }
@@ -649,6 +651,93 @@ function Module4({ id }: { id: string }) {
             </>
           )}
         </>
+      )}
+    </Section>
+  );
+}
+
+interface Members {
+  organisation: string | null;
+  members: { principal_id: string; name: string; organisation: string | null; added_by: string; added_at: string }[];
+}
+
+/** Who can see this programme: its organisation, plus guests (e.g. a CRO) added on the record. */
+function ProgramAccess({ id, me, onErr }: { id: string; me: Principal; onErr: (e: unknown) => void }) {
+  const [m, setM] = useState<Members | null>(null);
+  const [pid, setPid] = useState("");
+  const [reason, setReason] = useState("");
+  const [removeReason, setRemoveReason] = useState("");
+  const load = useCallback(() => api.get<Members>(`/programs/${id}/members`).then(setM).catch(onErr), [id, onErr]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (!m) return null;
+  const owner = me.kind === "human" && (me.organisation ?? null) === m.organisation;
+  async function act(fn: () => Promise<unknown>) {
+    try {
+      await fn();
+      setPid("");
+      setReason("");
+      setRemoveReason("");
+      load();
+    } catch (e) {
+      onErr(e);
+    }
+  }
+  return (
+    <Section title="Access">
+      <p className="small">
+        Everyone in <strong>{m.organisation ?? "the default organisation"}</strong> can see this programme. People from
+        other organisations see it only when added here; each change is recorded with its reason.
+      </p>
+      {m.members.length === 0 ? (
+        <p className="muted small">No guests.</p>
+      ) : (
+        <table className="small">
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Organisation</th>
+              <th>Added</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {m.members.map((g) => (
+              <tr key={g.principal_id}>
+                <td>
+                  {g.name} <span className="muted">({g.principal_id})</span>
+                </td>
+                <td>{g.organisation ?? "default"}</td>
+                <td>
+                  {g.added_at.slice(0, 10)} by {g.added_by}
+                </td>
+                <td>
+                  {owner && (
+                    <button
+                      disabled={!removeReason.trim()}
+                      onClick={() => act(() => api.post(`/programs/${id}/members/${g.principal_id}/remove`, { reason: removeReason }))}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {owner && m.members.length > 0 && (
+        <input placeholder="reason for removing a guest *" value={removeReason} onChange={(e) => setRemoveReason(e.target.value)} />
+      )}
+      {owner && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <input style={{ width: 180 }} placeholder="user id" value={pid} onChange={(e) => setPid(e.target.value)} />
+          <input style={{ flex: 1 }} placeholder="reason (e.g. CRO running the Ames study) *" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <button disabled={!pid.trim() || !reason.trim()} onClick={() => act(() => api.post(`/programs/${id}/members`, { principal_id: pid, reason }))}>
+            Give access
+          </button>
+        </div>
       )}
     </Section>
   );

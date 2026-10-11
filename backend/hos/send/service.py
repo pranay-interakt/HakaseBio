@@ -84,7 +84,8 @@ def _send_export(kernel: Any, actor: Principal, study_id: str, spec: SendExportS
                               "manifest": pkg.manifest, "package_sha256": None,
                               "spec": spec.model_dump(mode="json")}
     if pkg.content is not None:
-        sha = kernel.repo.store_file(pkg.content, filename=f"{spec.facts.studyid}_send.zip",
+        sha = kernel.repo.store_file(pkg.content, program_id=row.program_id,
+                                     filename=f"{spec.facts.studyid}_send.zip",
                                      media_type="application/zip", actor=actor.id)
         record["package_sha256"] = sha
     kernel.repo.add_artifact(study_id, "send_export", record, actor=actor.id)

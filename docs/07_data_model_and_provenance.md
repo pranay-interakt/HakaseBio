@@ -124,6 +124,18 @@ raises `LedgerIntegrityError` on a sequence gap, a broken link, an altered paylo
 whose hash does not match its contents. Backends: `MemoryLedgerBackend` (tests) and
 `SqlLedgerBackend` (`hos/db/store.py`, table `ledger`).
 
+**Hashing schemes.** Scheme 1, used for entries written before docs/15 P0.3, hashes the whole
+body. Scheme 2, used for every new entry, hashes the previous hash together with a digest of the
+rest of the body:
+
+`entry_hash = SHA-256({"scheme": 2, "prev_hash", "content_digest"})`
+
+So an entry can be shown to a third party as (`prev_hash`, `content_digest`, `entry_hash`)
+without its content, and the chain still recomputes. A Module 4 bundle shows other programmes'
+scheme-2 entries only in that redacted form. Scheme-1 entries are shown in full, since redacting
+them would break the chain. The verifier recomputes both schemes and refuses a redacted line
+that carries anything more.
+
 **Atomic with the state it records** (docs/15 P0.1). Every kernel operation that writes is an
 `@atomic` unit of work (`hos/kernel/uow.py`, `Database.transaction`). Its state changes,
 artefacts and ledger entry share one database transaction, so either all commit or none does.
@@ -144,6 +156,18 @@ include the four legal attestors (`STUDY_DIRECTOR`, `QUALITY_ASSURANCE`,
 principals, roles the principal does not hold, and empty statements. A `Signature` binds signer
 id and name, role, meaning (authorship / review / approval / responsibility / QA compliance),
 subject id, **subject hash** (SHA-256 of the exact record signed), UTC time and statement.
+
+**Access** (docs/15 P0.3).
+- A programme belongs to its creator's organisation (`programs.organisation`; None is the default
+  organisation). It is visible to that organisation and to guests added through
+  `program_members`, such as a CRO. Adding or removing a guest needs a person of the owning
+  organisation and a reason, and is ledgered.
+- Every API route that names a programme, study, compound, file or ledger subject checks access
+  before its handler runs, and answers 404 when the caller is out of scope. Files reach
+  programmes through `file_links`, because identical bytes can belong to more than one
+  programme. Lists are filtered the same way.
+- An organisation's administrator lists and registers principals in that organisation only.
+- A test walks every route with another organisation's ids.
 
 ## 7.8 Persistence
 

@@ -194,7 +194,7 @@ class SqlLedgerBackend:
             seq=r.seq, recorded_at=r.recorded_at, actor_id=r.actor_id, actor_kind=r.actor_kind,
             action=r.action, subject_type=r.subject_type, subject_id=r.subject_id,
             payload=r.payload, payload_sha256=r.payload_sha256, prev_hash=r.prev_hash,
-            entry_hash=r.entry_hash, reason=r.reason,
+            entry_hash=r.entry_hash, reason=r.reason, scheme=r.scheme or 1,
         )
 
     def append(self, entry: LedgerEntry) -> None:
@@ -205,6 +205,7 @@ class SqlLedgerBackend:
                 subject_type=entry.subject_type, subject_id=entry.subject_id,
                 payload=entry.payload, payload_sha256=entry.payload_sha256,
                 prev_hash=entry.prev_hash, entry_hash=entry.entry_hash, reason=entry.reason,
+                scheme=entry.scheme,
             ))
 
     def last(self) -> LedgerEntry | None:

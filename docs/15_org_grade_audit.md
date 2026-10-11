@@ -72,7 +72,9 @@ Director. The account exists, `history("bob") == []`, and the ledger verifies.
 - Tests that edit a study row with raw SQL, delete a ledger tail, and rewrite the chain. Each
   must be detected.
 
-### P0.3 No tenant isolation
+### P0.3 No tenant isolation — **fixed**
+*Programmes belong to organisations, guests are added on the record, every scoped route is checked (a test walks all of them), and Module 4 bundles redact other programmes' ledger entries with the scheme-2 hash; see `docs/07` §7.6–7.7 and `backend/tests/api/test_tenancy.py`.*
+
 `Principal.organisation` is stored but never used for authorisation. Any authenticated user can
 list and read every programme, study, artefact, file (`/api/files/{sha}`), report and ledger
 history in the system. A sponsor and its CROs, or two sponsors, cannot share one deployment.
@@ -129,7 +131,9 @@ removed.
 - Tests for each operation, plus a test that a deactivated signer's existing signatures
   still verify.
 
-### P1.3 Unauthenticated bootstrap
+### P1.3 Unauthenticated bootstrap — **fixed**
+*Setup needs a one-time token printed in the server log at start-up, or `HOS_BOOTSTRAP_TOKEN`.*
+
 `POST /api/setup` makes the first caller administrator. On a freshly deployed server that is a
 race.
 

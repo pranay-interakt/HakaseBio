@@ -43,8 +43,11 @@ Integrity guarantees enforced in code, each covered by tests:
 - **Human attestation.** NOAELs and other expert judgements are signed determinations by the role
   that owns them. GLP approval needs Study Director plus QA signatures on the current report.
   Every signature re-verifies the password (21 CFR 11.200).
-- **Tamper evidence.** Every state change is a hash-chained ledger entry, and rejected uploads are
-  recorded too.
+- **Tamper evidence.** Every state change is a hash-chained ledger entry, committed in the same
+  transaction as the change itself, and rejected uploads are recorded too.
+- **Programme access.** A programme is visible only to its organisation and to guests (such as
+  a CRO) added on the record. Exported bundles redact other programmes' ledger entries, and the
+  chain still verifies.
 
 Every citation, guideline section and physiological constant was checked against its primary
 source. The records are in [`docs/research/`](docs/research/), and anything that could not be
