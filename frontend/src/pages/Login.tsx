@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, setToken } from "../api";
-import { ErrorBox } from "../components/common";
+import { ApiError, api, setToken } from "../api";
+import { ErrorBox, Logo } from "../components/common";
 import type { Principal } from "../types";
 
 export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
@@ -26,7 +26,10 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
       setToken(r.token);
       onLogin(r.principal);
     } catch (e) {
-      setErr(e);
+      // one message for every refused sign-in, so the page never hints whether a user id exists
+      setErr(e instanceof ApiError && (e.status === 401 || e.status === 403)
+        ? new Error("Sign-in failed. Check your user id and password.")
+        : e);
     }
   }
 
@@ -41,8 +44,10 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
 
   return (
     <div className="login">
-      <h1>Hakase OS</h1>
-      <p className="muted">Preclinical operating system: every number carries its provenance.</p>
+      <div className="login-logo">
+        <Logo height={44} />
+      </div>
+      <p className="muted">Preclinical development: every number carries its provenance.</p>
       {initialised === false && (
         <p>First run: create the administrator account. Human signatures require a password of 12+ characters.</p>
       )}

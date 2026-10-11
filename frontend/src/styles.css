@@ -167,3 +167,14 @@ details.card summary { cursor: pointer; color: var(--muted); }
 .send-animals input[type="number"] { min-width: 64px; }
 .send-animals input:not([type]) { min-width: 150px; }
 .send-endpoints select, .send-endpoints input { min-width: 110px; }
+.logo { display: inline-flex; align-items: center; }
+.logo img { display: block; width: auto; }
+.logo-on-dark { display: none !important; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-on-light { display: none !important; }
+  :root:not([data-theme="light"]) .logo-on-dark { display: block !important; }
+}
+:root[data-theme="dark"] .logo-on-light { display: none !important; }
+:root[data-theme="dark"] .logo-on-dark { display: block !important; }
+.brand { display: inline-flex; align-items: center; }
+.login-logo { margin-bottom: 10px; }

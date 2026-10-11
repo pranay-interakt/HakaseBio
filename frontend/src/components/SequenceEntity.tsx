@@ -306,7 +306,7 @@ export function SequenceEntityView({ c, p, reload, onErr }: {
             {d.chains.map((ch) => (
               <tr key={ch.name}>
                 <td>{ch.name}</td>
-                <td>{ch.role}</td>
+                <td>{ch.role.replace(/_/g, " ")}</td>
                 <td>{ch.copies}</td>
                 <td>{ch.residues}</td>
                 <td>

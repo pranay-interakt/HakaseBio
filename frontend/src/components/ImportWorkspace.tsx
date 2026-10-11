@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { Principal, Study, StudySummary } from "../types";
-import { Section } from "./common";
+import { roleLabel, Section } from "./common";
 import { QuantityView } from "./QuantityView";
 
 type Run = <T>(fn: () => Promise<T>) => Promise<void>;
@@ -263,7 +263,7 @@ export function ImportWorkspace({ s, me, siblings, busy, run }: { s: Study; me: 
         <ul className="small">
           {s.signatures.filter((g) => g.subject_hash === info.import_hash).map((g, i) => (
             <li key={i}>
-              {g.signer_name} — {g.role} ({g.meaning}), {g.signed_at.slice(0, 19)}Z
+              {g.signer_name} — {roleLabel(g.role)} ({g.meaning.replace(/_/g, " ")}), {g.signed_at.slice(0, 19)}Z
             </li>
           ))}
         </ul>

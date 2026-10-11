@@ -4,6 +4,8 @@ import { useMemo, type ReactNode } from "react";
 import { ApiError } from "../api";
 import { isQuantity, type Table } from "../types";
 import { CitationLine, QuantityView } from "./QuantityView";
+import logoOnDark from "../assets/hakase-logo-on-dark.png";
+import logoOnLight from "../assets/hakase-logo-on-light.png";
 
 export function ErrorBox({ error }: { error: unknown }) {
   if (!error) return null;
@@ -132,4 +134,30 @@ export function StateTag({ state, simulated }: { state: string; simulated?: bool
       {simulated && <span className="badge badge-simulated"> SIMULATED</span>}
     </span>
   );
+}
+
+/** The Hakase AI logo; the variant follows the colour scheme (styles.css .logo-*). */
+export function Logo({ height }: { height: number }) {
+  return (
+    <span className="logo" style={{ height }}>
+      <img className="logo-on-light" src={logoOnLight} alt="Hakase AI" style={{ height }} />
+      <img className="logo-on-dark" src={logoOnDark} alt="Hakase AI" style={{ height }} />
+    </span>
+  );
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  study_director: "Study Director",
+  quality_assurance: "Quality Assurance",
+  attending_veterinarian: "Attending Veterinarian",
+  qualified_person: "Qualified Person",
+  responsible_scientist: "Responsible Scientist",
+  scientist: "Scientist",
+  program_lead: "Programme Lead",
+  admin: "Administrator",
+};
+
+/** A role as people read it (study_director -> Study Director). */
+export function roleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
 }

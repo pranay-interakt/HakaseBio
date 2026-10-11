@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { ErrorBox, Section } from "../components/common";
+import { ErrorBox, roleLabel, Section } from "../components/common";
 import type { Program } from "../types";
 
 interface Change {
@@ -159,7 +159,7 @@ export function RehearsalView({ p }: { p: Program }) {
           </p>
           {res.summary.unassigned_determinations.length > 0 && (
             <p className="small qc-warn">
-              Nobody holds the role for: {res.summary.unassigned_determinations.map((d) => `${d.determination} (${d.role})`).join(", ")}
+              Nobody holds the role for: {res.summary.unassigned_determinations.map((d) => `${d.determination} (${roleLabel(d.role)})`).join(", ")}
             </p>
           )}
           <table>
@@ -190,7 +190,7 @@ export function RehearsalView({ p }: { p: Program }) {
                     )}
                     {i.determinations?.map((d) => (
                       <div key={d.label}>
-                        {d.label}: {d.assigned_to.length ? d.assigned_to.join(", ") : <span className="qc-warn">no {d.role}</span>}
+                        {d.label}: {d.assigned_to.length ? d.assigned_to.join(", ") : <span className="qc-warn">no {roleLabel(d.role)}</span>}
                       </div>
                     ))}
                   </td>

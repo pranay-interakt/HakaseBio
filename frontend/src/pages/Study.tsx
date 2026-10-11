@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
-import {
-  Citations,
-  DataTable,
-  ErrorBox,
-  Lifecycle,
-  Markdown,
-  Section,
-  StateTag,
-} from "../components/common";
+import { Citations, DataTable, ErrorBox, Lifecycle, Markdown, roleLabel, Section, StateTag } from "../components/common";
 import { ImportWorkspace } from "../components/ImportWorkspace";
 import { QuantityView } from "../components/QuantityView";
-import { SchemaForm } from "../components/SchemaForm";
+import { SchemaForm, StructureHint } from "../components/SchemaForm";
 import { SendExport } from "../components/SendExport";
 import type { Citation, Driver, LedgerEntry, Principal, Study as StudyT, StudySummary } from "../types";
 
@@ -361,7 +353,9 @@ function DispatchSection({ s, driver, busy, run }: { s: StudyT; driver: Driver; 
           <div className="field">
             <label className="field-label">Generator parameters (JSON per the driver schema) *</label>
             <textarea rows={6} value={simJson} onChange={(e) => setSimJson(e.target.value)} />
-            <pre className="small muted">{JSON.stringify(driver.simulation_parameters_schema?.properties ?? {}, null, 1).slice(0, 800)}</pre>
+            {driver.simulation_parameters_schema && (
+              <StructureHint s={driver.simulation_parameters_schema} root={driver.simulation_parameters_schema} />
+            )}
           </div>
           <div className="field">
             <label className="field-label">Seed *</label>
@@ -651,12 +645,12 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
           <div key={d.key} className="determination">
             <div>
               <strong>{d.label}</strong> {d.required_for_approval && <span className="tag tag-required">required</span>}{" "}
-              <span className="muted small">role: {d.role}</span>
+              <span className="muted small">signed by the {roleLabel(d.role)}</span>
             </div>
             <div className="muted small">{d.guidance}</div>
             {rec && (
               <div className="signed">
-                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} ({rec.role}),{" "}
+                {rec.quantity ? <QuantityView q={rec.quantity} /> : <span className="tag">{rec.category}</span>} — {rec.signer_name} ({roleLabel(rec.role)}),{" "}
                 {rec.signed_at.slice(0, 19)}Z. Rationale:{" "}
                 {rec.rationale}
               </div>
@@ -706,7 +700,7 @@ function DeterminationsSection({ s, me, busy, run }: { s: StudyT; me: Principal;
               </div>
             )}
             {s.state === "analyzed" && !canSign && !rec && (
-              <div className="muted small">Awaiting a {d.role.replace("_", " ")}.</div>
+              <div className="muted small">Awaiting the {roleLabel(d.role)}.</div>
             )}
           </div>
         );
@@ -739,7 +733,7 @@ function ReportSection({ s, me, busy, run }: { s: StudyT; me: Principal; busy: b
       <ul>
         {current.map((g, i) => (
           <li key={i}>
-            {g.signer_name} — {g.role} ({g.meaning}), {g.signed_at.slice(0, 19)}Z: “{g.statement}”
+            {g.signer_name} — {roleLabel(g.role)} ({g.meaning.replace(/_/g, " ")}), {g.signed_at.slice(0, 19)}Z: “{g.statement}”
           </li>
         ))}
       </ul>

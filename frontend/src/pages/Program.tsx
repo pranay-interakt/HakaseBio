@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import { Citations, ErrorBox, Section, StateTag } from "../components/common";
+import { Citations, ErrorBox, roleLabel, Section, StateTag } from "../components/common";
 import { QuantityView } from "../components/QuantityView";
 import { SequenceEntityView, SequenceRegistration } from "../components/SequenceEntity";
 import { RehearsalView, WhatIf } from "./ProgramPlanning";
@@ -155,7 +155,7 @@ function PeptideRouting({ p, me, reload, onErr }: {
         {ctx.peptide_origin === "chemical_synthesis" &&
           (det ? (
             <>
-              Signed by {det.signature.signer_name} ({det.signature.role}) on {det.signature.signed_at.slice(0, 10)}: S6(R1)
+              Signed by {det.signature.signer_name} ({roleLabel(det.signature.role)}) on {det.signature.signed_at.slice(0, 10)}: S6(R1)
               principles <strong>{det.applies ? "apply" : "do not apply"}</strong>. “{det.rationale}”
             </>
           ) : (
@@ -499,7 +499,7 @@ function ReadinessView({ id }: { id: string }) {
           </div>
           <div className="stat">
             <div className="stat-v">{s.percent_runnable_in_hos ?? "—"}%</div>
-            <div className="stat-l">runnable end-to-end in HOS</div>
+            <div className="stat-l">runnable end-to-end in Hakase</div>
           </div>
         </div>
         {s.conditional_pending_facts.length > 0 && (
@@ -520,7 +520,7 @@ function ReadinessView({ id }: { id: string }) {
                 <td>
                   {i.name}
                   {!i.driver_available && i.status === "missing" && (
-                    <div className="muted small">no installed driver: run outside HOS</div>
+                    <div className="muted small">no installed driver: run outside Hakase</div>
                   )}
                 </td>
                 <td>
@@ -632,7 +632,7 @@ function Module4({ id }: { id: string }) {
                 <strong>{t.section}</strong> {t.title}
                 {t.reports.map((r) => (
                   <div key={r.study_id} className="small">
-                    ↳ <a href={`#/study/${r.study_id}`}>{r.title}</a> · {r.signatures.map((s) => `${s.role}: ${s.signer}`).join(", ")}
+                    ↳ <a href={`#/study/${r.study_id}`}>{r.title}</a> · {r.signatures.map((s) => `${roleLabel(s.role)}: ${s.signer}`).join(", ")}
                   </div>
                 ))}
               </li>

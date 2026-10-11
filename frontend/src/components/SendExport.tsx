@@ -1147,7 +1147,7 @@ function TsForm({
   return (
     <div>
       <p className="small muted">
-        Trial Summary parameters HOS cannot take from the record. FDA-desired
+        Trial Summary parameters Hakase cannot take from the record. FDA-desired
         parameters (TCG v6.3 Appendix C) need a value, or a null flavor with a
         reason; the reason goes into the nSDRG draft.
       </p>

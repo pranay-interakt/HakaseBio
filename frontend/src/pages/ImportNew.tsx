@@ -67,7 +67,7 @@ export function ImportNew({ programId, requirementId, go }: { programId: string;
         </p>
       )}
       <div className="note small">
-        Use this for a study run outside HOS (at a CRO, before HOS, or of a type without a driver). The report is stored by
+        Use this for a study run outside Hakase (at a CRO, before Hakase, or of a type without a driver). The report is stored by
         its SHA-256. Every value you transcribe needs the page or table it came from, and the import is signed by the
         responsible people (Study Director and QA for a GLP study). Readiness counts it as <em>imported</em>, never as
         driver-run.

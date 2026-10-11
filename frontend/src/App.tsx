@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError, UNAUTHORIZED_EVENT, api, getToken, setToken } from "./api";
+import { Logo, roleLabel } from "./components/common";
 import { Login } from "./pages/Login";
 import { Program } from "./pages/Program";
 import { ImportNew } from "./pages/ImportNew";
@@ -80,10 +81,9 @@ export function App() {
   return (
     <>
       <header className="topbar">
-        <a href="#/" className="brand">
-          Hakase OS
+        <a href="#/" className="brand" aria-label="Hakase AI home">
+          <Logo height={26} />
         </a>
-        <span className="muted small">preclinical operating system</span>
         <span className="spacer" />
         {ledger && (
           <span
@@ -99,7 +99,7 @@ export function App() {
           </span>
         )}
         <span className="small">
-          {me.name} ({me.roles.join(", ")})
+          {me.name} ({me.roles.map(roleLabel).join(", ")})
         </span>
         <button
           onClick={async () => {

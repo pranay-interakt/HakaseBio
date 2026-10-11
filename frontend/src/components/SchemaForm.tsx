@@ -46,7 +46,7 @@ function typeLabel(s: JsonSchema, root: JsonSchema): string {
 }
 
 /** The keys a JSON field expects, read from the schema, so nested lists are not guesswork. */
-function StructureHint({ s, root }: { s: JsonSchema; root: JsonSchema }) {
+export function StructureHint({ s, root }: { s: JsonSchema; root: JsonSchema }) {
   const target = resolve(s.type === "array" && s.items ? s.items : s, root);
   if (!target.properties) return null;
   const req = new Set(target.required ?? []);
