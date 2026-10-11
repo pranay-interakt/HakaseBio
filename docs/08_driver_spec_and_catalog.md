@@ -1,6 +1,6 @@
 # 08 — Driver Specification & Catalogue
 
-> Status: implemented in `backend/hos/drivers/`. ABI version **1.1** (1.1 adds `post_data_inputs`; drivers written for 1.0 load unchanged).
+> Status: implemented in `backend/hos/drivers/`. ABI version **1.2** (1.1 adds `post_data_inputs`; 1.2 adds the Module 2.6 summary hooks `summary_facts` and `summary_tables`; drivers written for 1.0 or 1.1 load unchanged, because the new hooks default to nothing).
 
 ## 8.1 Model
 
@@ -37,7 +37,16 @@ interpret(analysis, params, context) -> Interpretation
 expert_determinations(params) -> [ExpertDetermination]
 report(protocol, data, analysis, interpretation, determinations) -> StudyReport
 simulation_parameters_model() / simulate(params, compound, sim, seed, ref) -> SimulatedDataset
+summary_facts(params) -> SummaryFacts | None       CTD 2.6 descriptive cells: test system, route,
+                                                   duration, doses, animals, organ systems (ABI 1.2)
+summary_tables(params, results) -> [SummaryTable]  CTD 2.6 content tables (ICH M4S(R2) Appendix B);
+                                                   cells reference stored quantities by key (ABI 1.2)
 ```
+
+The summary hooks read only the validated parameters and the stored results: descriptive text
+is the parameters as entered, and every number is a `ValueRef` to a stored quantity, so the
+Module 2 summaries never recompute or restate a value. The conformance kit checks that every
+reference resolves to a stored quantity.
 
 ### Ingest contract (base class, every driver)
 

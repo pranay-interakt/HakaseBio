@@ -24,7 +24,7 @@ Read [`CLAUDE.md`](CLAUDE.md) before writing code. The plan of record and status
 | drivers | microsomal metabolic stability · hERG patch clamp · repeat-dose toxicity (OECD TG 407/408/409, Dunnett) · bioanalytical validation (ICH M10) · toxicokinetics (ICH S3A) · in vivo PK (NCA) · plasma protein binding · Ames (OECD TG 471) · dose range-finding · in vitro potency · CNS, respiratory and QT/cardiovascular safety pharmacology (ICH S7A/S7B) · peptide stability in blood, serum or plasma | `backend/hos/drivers/*` |
 | devices | execution targets: external lab (CRO dispatch bundle), in-house lab, simulation | `backend/hos/kernel/execution` |
 | external data | ChEMBL and PubChem clients, cached, honest failure | `backend/hos/data_sources` |
-| output | IND readiness report, CTD Module 4 (ICH M4S(R2)) assembler, verification bundles | `backend/hos/ind`, `backend/hos/verify` |
+| output | IND readiness report, CTD Module 2.4 overview and 2.6 nonclinical summaries (drafted, every number sourced, signed by a named author), CTD Module 4 (ICH M4S(R2)) assembler, verification bundles | `backend/hos/ind`, `backend/hos/verify` |
 | data standards | SEND export: SENDIG v3.1.1, SEND CT, Define-XML 2.1, SAS XPORT v5, FDA pre-export checks | `backend/hos/send` |
 | entities | peptides and antibodies by sequence (FASTA) or HELM 2.04, average mass from cited residue masses, engineered mutations, surrogates | `backend/hos/core/sequence.py`, `backend/hos/kernel/entities.py` |
 | syscalls | REST API (FastAPI, OpenAPI), re-authenticated e-signatures | `backend/hos/api` |

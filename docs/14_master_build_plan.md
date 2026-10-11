@@ -106,7 +106,16 @@ version FDA's Study Data Standards Catalog requires at build time, and validate 
 Technical Rejection Criteria before export. Verify the current required versions from the FDA
 catalog; do not assume.
 
-### P6. Nonclinical summaries
+### P6. Nonclinical summaries — **built**
+
+*Implemented in `hos/ind/summaries.py` (the ICH M4S(R2) 2.4 and 2.6 structure and the Appendix B
+table numbers, transcribed from the official guideline; tables and drafted written-summary text)
+and `hos/ind/documents.py` (versioned programme document, ledgered and reconciled). Drivers
+describe their own studies through two ABI 1.2 hooks, `summary_facts` and `summary_tables`.
+Migration 0003 adds `program_documents`. API: `/api/programs/{id}/summaries` (list, draft),
+`.../{version}` (read), `.../{version}/sections/{section}` (author's text), `.../{version}/sign`,
+`.../{version}/markdown`. The frontend has a Module 2 tab. Details:
+`docs/research/m2_summaries.md`.*
 
 Draft CTD Module 2.6 tabulated summaries and a 2.4 overview from approved and imported studies.
 Every number links to its source; the agent drafts; a named human signs.

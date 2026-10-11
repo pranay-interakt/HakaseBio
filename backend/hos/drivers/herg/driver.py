@@ -48,6 +48,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 
@@ -212,6 +216,45 @@ class HergPatchClampDriver(StudyDriver):
         return HergSimulation
 
     # -- design ----------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=(
+                f"{p.cell_line}, {p.platform} patch clamp at "
+                f"{fmt_param(p.recording_temperature_C)} °C"
+            ),
+            method_of_administration="in vitro",
+            doses=", ".join(fmt_param(c) for c in p.test_concentrations_uM) + " µM",
+            gender_and_number=f"{p.cells_per_concentration} cells per concentration",
+            organ_systems="Cardiovascular (hERG / IKr, in vitro)",
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Supporting safety-pharmacology table (2.6.3.4): hERG inhibition."""
+        q = results.get("quantities", {})
+        rows = tuple(
+            (label, ValueRef(k))
+            for k, label in (
+                ("ic50", "IC50"),
+                ("hill", "Hill slope"),
+                ("free_cmax", "Free Cmax used for the margin"),
+                ("margin", "Safety margin (IC50 / free Cmax)"),
+            )
+            if k in q
+        )
+        return (
+            SummaryTable(
+                template="2.6.3.4",
+                title="Safety pharmacology: hERG current inhibition",
+                columns=("Result", "Value"),
+                rows=rows,
+            ),
+        )
 
     def design(
         self,

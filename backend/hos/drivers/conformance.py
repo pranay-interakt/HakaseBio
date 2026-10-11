@@ -30,6 +30,8 @@ from hos.drivers.base import (
     DataOrigin,
     IngestError,
     StudyDriver,
+    SummaryFacts,
+    SummaryTable,
 )
 
 __all__ = ["ConformanceCheck", "ConformanceReport", "check_driver"]
@@ -192,6 +194,20 @@ def check_driver(
 
                 res = check("analysis of simulated data is tainted and inadmissible", sim_analysis)
                 if res is not None:
+
+                    def summaries() -> str:
+                        facts = driver.summary_facts(params)
+                        assert facts is None or isinstance(facts, SummaryFacts)
+                        stored = json.loads(json.dumps(res.to_dict()))
+                        tables = driver.summary_tables(params, stored)
+                        keys = set(stored["quantities"])
+                        for t in tables:
+                            assert isinstance(t, SummaryTable)
+                            missing = [k for k in t.refs() if k not in keys]
+                            assert not missing, f"{t.title}: no stored quantity {missing[:3]}"
+                        return f"{len(tables)} table(s), {sum(len(t.rows) for t in tables)} rows"
+
+                    check("Module 2.6 summaries reference only stored results (ABI 1.2)", summaries)
                     interp = check(
                         "interpret() statements are all cited",
                         lambda: driver.interpret(res, params),

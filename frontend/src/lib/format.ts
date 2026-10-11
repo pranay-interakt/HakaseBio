@@ -158,6 +158,10 @@ export const ACTIONS: Record<string, string> = {
   "study.send_exported": "SEND package exported",
   "study.send_export_refused": "SEND export refused",
   "system.schema_upgraded": "Database schema upgraded",
+  "program.summary_drafted": "Module 2 summaries drafted",
+  "program.summary_revised": "Module 2 summaries revised",
+  "program.summary_signed": "Module 2 summaries signed",
+  "ind.module4_assembled": "Module 4 assembled",
 };
 
 export const modalityLabel = lookup(MODALITIES);

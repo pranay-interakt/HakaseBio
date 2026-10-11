@@ -58,6 +58,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.drivers.repeat_dose_tox.analysis import dose_eq
@@ -266,6 +270,43 @@ class InVivoQTTelemetryDriver(StudyDriver):
         return {"high_clinical_cmax": _p(params).concentration_unit}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=f"{p.species.replace('_', ' ').capitalize()} ({p.strain}), conscious telemetry",
+            method_of_administration=f"{p.route} ({p.vehicle})",
+            duration_of_dosing="single dose per period (Latin-square crossover)",
+            doses="vehicle, " + ", ".join(fmt_param(d) for d in p.dose_levels_mg_per_kg) + " mg/kg",
+            gender_and_number=f"{p.animals} animals ({'/'.join(p.sexes)}), each receiving every treatment",
+            organ_systems="Cardiovascular (ECG, heart rate"
+            + (", blood pressure)" if p.blood_pressure else ")"),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Supporting safety-pharmacology table (2.6.3.4): exposure at each dose."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows = tuple(
+            (
+                f"{d:g} mg/kg",
+                ValueRef(f"cmax.{d:g}") if f"cmax.{d:g}" in q else "—",
+                ValueRef(f"multiple.{d:g}") if f"multiple.{d:g}" in q else "—",
+            )
+            for d in p.dose_levels_mg_per_kg
+        )
+        return (
+            SummaryTable(
+                template="2.6.3.4",
+                title="Safety pharmacology: cardiovascular telemetry, exposure at each dose",
+                columns=("Dose", "Cmax", "Multiple of the clinical Cmax"),
+                rows=rows,
+            ),
+        )
 
     def design(
         self,

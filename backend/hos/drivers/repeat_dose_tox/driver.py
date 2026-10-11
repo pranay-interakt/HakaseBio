@@ -50,7 +50,11 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
     Support,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.drivers.repeat_dose_tox.analysis import compare_groups, dose_eq
@@ -266,6 +270,78 @@ class RepeatDoseToxicityDriver(StudyDriver):
         return s
 
     # -- design ----------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        rec = (
+            f"; {p.recovery_duration_days}-day recovery ({p.recovery_animals_per_sex}/sex, "
+            "control and top dose)"
+            if p.recovery
+            else ""
+        )
+        return SummaryFacts(
+            test_system=f"{p.species.capitalize()} ({p.strain})",
+            method_of_administration=f"{p.route} ({p.vehicle})",
+            duration_of_dosing=f"{p.dosing_duration_days} days{rec}",
+            doses=", ".join(fmt_param(d) for d in p.groups()) + " mg/kg/day (0 = control)",
+            gender_and_number=(
+                f"{p.animals_per_sex_per_group}M + {p.animals_per_sex_per_group}F per group"
+            ),
+            # pivotal: the definitive GLP studies ICH M3 specifies (M4S(R2) 2.6.6.3)
+            listed_in=("2.6.7.1", "2.6.7.7" if p.glp else "2.6.7.6"),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Noteworthy findings: the dose groups the protocol's Dunnett test flagged. Pivotal
+        (2.6.7.7) for a GLP study, non-pivotal (2.6.7.6) otherwise (M4S(R2) 2.6.6.3)."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        found = []
+        for key in q:
+            if key.startswith("finding|") and key.endswith("|p"):
+                _, endpoint, sex, phase, tp, dose, _ = key.split("|")
+                found.append((endpoint, sex, phase, tp, float(dose), key[: -len("|p")]))
+        rows = tuple(
+            (
+                endpoint,
+                sex,
+                phase,
+                tp,
+                f"{dose:g} mg/kg/day",
+                ValueRef(f"{base}|mean"),
+                ValueRef(f"{base}|pct_vs_control") if f"{base}|pct_vs_control" in q else "n/a",
+                ValueRef(f"{base}|p"),
+            )
+            for endpoint, sex, phase, tp, dose, base in sorted(found)
+        )
+        return (
+            SummaryTable(
+                template="2.6.7.7" if p.glp else "2.6.7.6",
+                title="Noteworthy findings: dose groups that differ from control",
+                columns=(
+                    "Endpoint",
+                    "Sex",
+                    "Phase",
+                    "Timepoint",
+                    "Dose",
+                    "Group mean",
+                    "% vs control",
+                    "Dunnett p",
+                ),
+                rows=rows,
+                notes=(
+                    f"Differences flagged by the protocol's two-sided Dunnett test at alpha "
+                    f"{p.alpha:g}. Whether a finding is adverse is the Study Director's "
+                    "determination (the NOAEL).",
+                    "Laid out by finding rather than one column per dose group; ICH M4S(R2) "
+                    "lets applicants adapt the template.",
+                ),
+            ),
+        )
 
     def design(
         self,

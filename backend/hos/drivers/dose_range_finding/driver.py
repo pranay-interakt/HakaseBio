@@ -52,6 +52,8 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    fmt_param,
     tabulate,
 )
 from hos.drivers.repeat_dose_tox.analysis import compare_groups, dose_eq
@@ -172,6 +174,11 @@ class DRFSimulation(BaseModel):
     deaths: list[DeathTruth] = Field(default_factory=list)
 
 
+def _sexes(sexes: list[str], n: int) -> str:
+    """ "5M + 5F per group" from the protocol's sexes and group size."""
+    return " + ".join(f"{n}{s}" for s in sexes) + " per group"
+
+
 def _p(params: BaseModel) -> DRFParams:
     if not isinstance(params, DRFParams):
         raise TypeError("expected DRFParams")
@@ -210,6 +217,22 @@ class DoseRangeFindingDriver(StudyDriver):
         return out
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=f"{p.species.capitalize()} ({p.strain})",
+            method_of_administration=f"{p.route} ({p.vehicle})",
+            duration_of_dosing=f"{p.dosing_duration_days} days",
+            doses=", ".join(fmt_param(d) for d in p.groups())
+            + " mg/kg/day"
+            + (" (0 = control)" if p.include_control else ""),
+            gender_and_number=_sexes(list(p.sexes), p.animals_per_sex_per_group),
+            # range-finding studies are always non-pivotal (M4S(R2) Appendix B, 2.6.7.6 note 1)
+            listed_in=("2.6.7.1", "2.6.7.6"),
+        )
 
     def design(
         self,

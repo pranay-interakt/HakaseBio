@@ -50,6 +50,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 
@@ -204,6 +208,50 @@ class InVitroPotencyDriver(StudyDriver):
         return {"glp": requirement.glp}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system="; ".join(f"{a.target} ({a.species}, {a.assay_format})" for a in p.assays),
+            method_of_administration="in vitro",
+            doses="; ".join(
+                f"{a.assay_id}: {fmt_param(min(a.concentrations))} to "
+                f"{fmt_param(max(a.concentrations))} {p.concentration_unit}"
+                for a in p.assays
+            ),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Primary pharmacodynamics (template 2.6.3.2, optional in M4S(R2))."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows: list[tuple[Any, ...]] = [
+            (
+                a.assay_id,
+                a.target,
+                a.role.replace("_", " "),
+                ValueRef(f"potency.{a.assay_id}.{TEST}")
+                if f"potency.{a.assay_id}.{TEST}" in q
+                else "—",
+                ValueRef(f"hill.{a.assay_id}.{TEST}") if f"hill.{a.assay_id}.{TEST}" in q else "—",
+            )
+            for a in p.assays
+        ]
+        for k in sorted(x for x in q if x.startswith("relative_potency.")):
+            _, off, on = k.split(".", 2)
+            rows.append((f"{off} vs {on}", "relative potency", "", ValueRef(k), ""))
+        return (
+            SummaryTable(
+                template="2.6.3.2",
+                title="Primary pharmacodynamics: in vitro potency of the test article",
+                columns=("Assay", "Target", "Role", "Potency (IC50/EC50)", "Hill slope"),
+                rows=tuple(rows),
+            ),
+        )
 
     def design(
         self,

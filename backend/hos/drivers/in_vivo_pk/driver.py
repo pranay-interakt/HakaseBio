@@ -47,6 +47,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.kernel.attestation import Role
@@ -227,6 +231,67 @@ class InVivoPKDriver(StudyDriver):
         return ()
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        routes = list(dict.fromkeys(f"{g.route} ({g.formulation})" for g in p.groups))
+        return SummaryFacts(
+            test_system=f"{p.species.capitalize()} ({p.strain})",
+            method_of_administration="; ".join(routes),
+            duration_of_dosing="single dose",
+            doses=", ".join(f"{g.group_id}: {fmt_param(g.dose)} {p.dose_unit}" for g in p.groups),
+            gender_and_number=", ".join(f"{g.group_id}: {g.animals}{g.sex}" for g in p.groups),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Absorption after a single dose (template 2.6.5.3): one column per dose group."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        ids = [g.group_id for g in p.groups]
+        rows: list[tuple[Any, ...]] = [
+            ("Species", *[f"{p.species} ({p.strain})" for _ in p.groups]),
+            ("Gender (M/F) / Number of animals", *[f"{g.sex} / {g.animals}" for g in p.groups]),
+            ("Vehicle/Formulation", *[g.formulation for g in p.groups]),
+            ("Method of administration", *[g.route for g in p.groups]),
+            ("Dose", *[f"{fmt_param(g.dose)} {p.dose_unit}" for g in p.groups]),
+            ("Sample", *[p.matrix.replace("_", " ") for _ in p.groups]),
+            ("Analyte", *[p.analyte for _ in p.groups]),
+            ("Assay", *[p.bioanalytical_technique.replace("_", " ") for _ in p.groups]),
+        ]
+        for key, label in (
+            ("cmax", "Cmax"),
+            ("tmax", "Tmax"),
+            ("auc_last", "AUClast"),
+            ("auc_inf", "AUCinf"),
+            ("half_life", "t1/2"),
+            ("cl", "CL"),
+            ("vz", "Vz"),
+            ("vss", "Vss"),
+        ):
+            cells = [f"mean.{key}.{g}" for g in ids]
+            if any(c in q for c in cells):
+                rows.append((label, *(ValueRef(c) if c in q else "—" for c in cells)))
+        for key in sorted(k for k in q if k.startswith("F.")):
+            _, ev, iv = key.split(".", 2)
+            rows.append(
+                (f"Bioavailability F (vs {iv})", *(ValueRef(key) if g == ev else "—" for g in ids))
+            )
+        return (
+            SummaryTable(
+                template="2.6.5.3",
+                title=f"Pharmacokinetics: absorption after a single dose ({p.analyte})",
+                columns=("", *ids),
+                rows=tuple(rows),
+                notes=(
+                    "Group means; SD and individual parameters are in the study report. "
+                    "Feeding condition is not recorded by this study type.",
+                ),
+            ),
+        )
 
     def design(
         self,

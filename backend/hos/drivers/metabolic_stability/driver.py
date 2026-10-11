@@ -54,6 +54,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 
@@ -182,6 +186,44 @@ class MetabolicStabilityDriver(StudyDriver):
         return {"species": sp} if sp else {}
 
     # -- design ----------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system="liver microsomes: " + ", ".join(str(s) for s in p.species),
+            method_of_administration=f"in vitro incubation ({p.cofactor})",
+            doses=(
+                f"{fmt_param(p.substrate_concentration_uM)} µM substrate; "
+                f"{fmt_param(p.protein_concentration_mg_per_mL)} mg/mL protein"
+            ),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """In vitro metabolism (template 2.6.5.10): parent depletion by species."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        keys = ("t_half", "clint_app", "clint_in_vivo", "clh")
+        rows = tuple(
+            (str(sp), *(ValueRef(f"{sp}.{k}") if f"{sp}.{k}" in q else "—" for k in keys))
+            for sp in p.species
+            if any(f"{sp}.{k}" in q for k in keys)
+        )
+        return (
+            SummaryTable(
+                template="2.6.5.10",
+                title="Pharmacokinetics: metabolic stability in liver microsomes",
+                columns=("Species", "t1/2", "CLint,app", "CLint (scaled)", "Hepatic CL"),
+                rows=rows,
+                notes=(
+                    "Parent depletion only: metabolites were not profiled, so the template's "
+                    "metabolite rows do not apply.",
+                ),
+            ),
+        )
 
     def design(
         self,

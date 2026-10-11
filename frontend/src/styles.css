@@ -399,3 +399,12 @@ details > summary { cursor: pointer; }
   .hide-narrow { display: none; }
   .sf-map-row { grid-template-columns: 1fr; }
 }
+
+/* ---- Module 2 summaries ----------------------------------------------------------------- */
+.m2-layout { grid-template-columns: minmax(0, 1fr) 250px; }
+.m2-section { padding: 10px 0 14px; border-bottom: 1px solid var(--line-2); }
+.m2-section:last-child { border-bottom: none; }
+.m2-section h4 { margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+p.drafted { line-height: 1.65; }
+.author-text { white-space: pre-wrap; border-left: 3px solid var(--accent); padding: 6px 12px; background: var(--panel-2); border-radius: 0 6px 6px 0; }
+.page-toc button.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }

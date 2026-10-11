@@ -10,7 +10,8 @@ close that:
   match their registration; each study's state follows from its last state event; protocol,
   data, analysis and report match the hashes their events recorded and recompute from the
   stored content; every signature and determination appears in its own event; artefacts
-  recompute to their stored hashes.
+  recompute to their stored hashes; every version of a programme document (the Module 2
+  summaries) matches its event, and its signatures and status follow its signing event.
 * **Anchor.** After each write, a checkpoint (sequence, head hash, time) is appended to a log
   kept outside the database: by default next to the file store, in production a write-once
   location (``HOS_ANCHOR_DIR``). With ``HOS_ANCHOR_KEY`` set, each checkpoint carries an HMAC.
@@ -241,6 +242,29 @@ def reconcile(kernel: Any) -> list[Finding]:
         for a in repo.artifacts(s.id):
             if content_hash(a.content) != a.content_hash:
                 bad(s.id, "artefacts recompute to their stored hashes", f"{a.kind} v{a.version}")
+
+    for d in repo.all_documents():
+        subject = f"{d.program_id}/{d.kind}/v{d.version}"
+        events = [
+            e
+            for e in by_subject[d.program_id]
+            if e.payload.get("kind") == d.kind and e.payload.get("version") == d.version
+        ]
+        made = _last(events, "program.summary_drafted", "program.summary_revised")
+        if made is None:
+            bad(subject, "document version has its event", "no drafted or revised event")
+        elif (
+            made.payload.get("content_hash") != d.content_hash
+            or content_hash(d.content) != d.content_hash
+        ):
+            bad(subject, "document matches its event and recomputes", "content differs")
+        signed = [
+            e.payload.get("signature") for e in events if e.action == "program.summary_signed"
+        ]
+        if sorted(map(content_hash, d.signatures or [])) != sorted(map(content_hash, signed)):
+            bad(subject, "document signatures are exactly those recorded", "signatures differ")
+        if (d.status == "signed") != bool(signed):
+            bad(subject, "document status follows its signature", f"status {d.status}")
     return out
 
 

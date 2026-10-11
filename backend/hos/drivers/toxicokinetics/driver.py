@@ -58,6 +58,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.kernel.attestation import Role
@@ -212,6 +216,11 @@ class ToxicokineticsSimulation(BaseModel):
     isr_sd_log: float = Field(ge=0, lt=1)
 
 
+def _sexes(sexes: list[str], n: int) -> str:
+    """ "5M + 5F per group" from the protocol's sexes and group size."""
+    return " + ".join(f"{n}{s}" for s in sexes) + " per group"
+
+
 def _p(params: BaseModel) -> ToxicokineticsParams:
     if not isinstance(params, ToxicokineticsParams):
         raise TypeError("expected ToxicokineticsParams")
@@ -299,6 +308,57 @@ class ToxicokineticsDriver(StudyDriver):
                 "3.9"
             )
         return notes
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=f"{p.species.capitalize()} ({p.strain}); {p.matrix.replace('_', ' ')}",
+            method_of_administration=p.route,
+            duration_of_dosing="profiles on study day " + ", ".join(str(d) for d in p.profile_days),
+            doses=", ".join(fmt_param(d) for d in p.dose_levels) + f" {p.dose_unit}",
+            gender_and_number=_sexes(list(p.sexes), p.animals_per_sex_per_group)
+            + (" (satellite groups)" if p.satellite_groups else ""),
+            # supportive toxicokinetics are tabulated in 2.6.7.2 (M4S(R2) Appendix B)
+            listed_in=("2.6.7.2",),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Exposure by dose, sex and profile day (template 2.6.7.3)."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows = []
+        for dose in p.dose_levels:
+            for sex in p.sexes:
+                for day in p.profile_days:
+                    keys = [
+                        f"mean.{m}.{dose:g}.{sex}.day{day}" for m in ("cmax", "auc_tau", "auc_last")
+                    ]
+                    if not any(k in q for k in keys):
+                        continue
+                    rows.append(
+                        (
+                            f"{dose:g} {p.dose_unit}",
+                            sex,
+                            f"day {day}",
+                            *(ValueRef(k) if k in q else "—" for k in keys),
+                        )
+                    )
+        return (
+            SummaryTable(
+                template="2.6.7.3",
+                title=f"Toxicokinetics: {p.analyte} in {p.species} {p.matrix.replace('_', ' ')}",
+                columns=("Dose", "Sex", "Day", "Cmax (mean)", "AUCτ (mean)", "AUClast (mean)"),
+                rows=tuple(rows),
+                notes=(
+                    f"Supports {p.parent_study}. Means as computed in the study; SD and "
+                    "individual values are in the study report.",
+                ),
+            ),
+        )
 
     def design(
         self,

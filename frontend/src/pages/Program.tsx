@@ -29,8 +29,9 @@ import type {
   StudySummary,
 } from "../types";
 import { RehearsalView, WhatIf } from "./ProgramPlanning";
+import { ProgramSummaries } from "./ProgramSummaries";
 
-const TABS = ["overview", "studyset", "compounds", "studies", "readiness", "module4", "whatif", "rehearsal", "access"] as const;
+const TABS = ["overview", "studyset", "compounds", "studies", "readiness", "module2", "module4", "whatif", "rehearsal", "access"] as const;
 type Tab = (typeof TABS)[number];
 const ACTIVE = ["proposed", "designed", "planned", "dispatched", "data_received", "analyzed", "reported", "import_draft"];
 
@@ -48,6 +49,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
     compounds: "Compounds",
     studies: "Studies",
     readiness: "IND readiness",
+    module2: "Module 2",
     module4: "Module 4",
     whatif: "What-if",
     rehearsal: "Rehearsal",
@@ -84,6 +86,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
           { id: "compounds", label: "Compounds", count: p.compounds.length },
           { id: "studies", label: "Studies", count: p.studies.length },
           { id: "readiness", label: "IND readiness" },
+          { id: "module2", label: "Module 2" },
           { id: "module4", label: "Module 4" },
           { id: "whatif", label: "What-if" },
           { id: "rehearsal", label: "Rehearsal" },
@@ -97,6 +100,7 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
       {active === "compounds" && <Compounds p={p} reload={load} onErr={setErr} />}
       {active === "studies" && <Studies p={p} />}
       {active === "readiness" && <ReadinessView id={id} />}
+      {active === "module2" && <ProgramSummaries programId={id} me={me} />}
       {active === "module4" && <Module4 id={id} />}
       {active === "whatif" && <WhatIf p={p} reload={load} />}
       {active === "rehearsal" && <RehearsalView p={p} />}

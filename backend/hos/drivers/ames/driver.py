@@ -48,6 +48,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.kernel.attestation import Role
@@ -308,6 +312,67 @@ class AmesDriver(StudyDriver):
         return {"glp": requirement.glp, "guideline": "oecd_tg471"}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system="bacterial strains " + ", ".join(p.strains),
+            method_of_administration=(
+                f"{p.method.replace('_', ' ')}, with and without {p.metabolic_activation}"
+            ),
+            doses=", ".join(fmt_param(c) for c in p.concentrations)
+            + f" {p.concentration_unit}/plate",
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Genotoxicity in vitro (template 2.6.7.8): mean revertants per plate."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        order = {s: i for i, s in enumerate(p.strains)}
+        found = []
+        for k in q:
+            if not k.startswith("mean."):
+                continue
+            _, exp, strain, s9, label = k.split(".", 4)
+            try:
+                rank, conc = 1, float(label)
+            except ValueError:
+                rank, conc = (0 if label == "vehicle" else 2), 0.0
+            found.append((exp, order.get(strain, 99), s9, rank, conc, strain, label, k))
+        rows = tuple(
+            (
+                exp,
+                strain,
+                "with S9" if s9 == "plus" else "without S9",
+                label if rank != 1 else f"{conc:g} {p.concentration_unit}/plate",
+                ValueRef(k),
+                ValueRef(f) if (f := f"fold.{exp}.{strain}.{s9}.{label}") in q else "—",
+            )
+            for exp, _, s9, rank, conc, strain, label, k in sorted(found)
+        )
+        return (
+            SummaryTable(
+                template="2.6.7.8",
+                title="Genotoxicity in vitro: bacterial reverse mutation (OECD TG 471)",
+                columns=(
+                    "Experiment",
+                    "Strain",
+                    "Metabolic activation",
+                    "Treatment",
+                    "Mean revertants/plate",
+                    "Fold over vehicle",
+                ),
+                rows=rows,
+                notes=(
+                    f"{p.plates_per_dose} plates per dose; incubation "
+                    f"{fmt_param(p.incubation_hours)} h at {fmt_param(p.incubation_temperature_c)} °C.",
+                ),
+            ),
+        )
 
     def design(
         self,

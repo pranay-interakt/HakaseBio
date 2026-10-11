@@ -192,6 +192,11 @@ class Kernel:
         self.registry = registry or default_registry()
         self.ledger = Ledger(SqlLedgerBackend(self.db))
         self.imports = ImportService(self)
+        # CTD Module 2 nonclinical summaries (docs/14 P6); imported here because hos.ind
+        # builds on the kernel's records
+        from hos.ind.documents import SummaryService
+
+        self.summaries = SummaryService(self)
         # checkpoints of the ledger head outside the database (docs/15 P0.2)
         self.anchors = AnchorLog.default(self.files.root.parent)
         if before is not None and before != self.schema_revision:

@@ -15,6 +15,7 @@ from hos.db.models import (
     FileLinkRow,
     FileRow,
     PrincipalRow,
+    ProgramDocumentRow,
     ProgramMemberRow,
     ProgramRow,
     SessionRow,
@@ -277,6 +278,36 @@ class Repository:
             if kind:
                 q = q.where(ArtifactRow.kind == kind)
             return list(s.execute(q.order_by(ArtifactRow.id)).scalars())
+
+    # -- programme documents (docs/14 P6) -----------------------------------------------
+
+    def documents(self, program_id: str, kind: str) -> list[ProgramDocumentRow]:
+        """Every version, oldest first."""
+        with self.db.session() as s:
+            q = (
+                select(ProgramDocumentRow)
+                .where(ProgramDocumentRow.program_id == program_id)
+                .where(ProgramDocumentRow.kind == kind)
+                .order_by(ProgramDocumentRow.version)
+            )
+            return list(s.execute(q).scalars())
+
+    def all_documents(self) -> list[ProgramDocumentRow]:
+        with self.db.session() as s:
+            return list(
+                s.execute(select(ProgramDocumentRow).order_by(ProgramDocumentRow.id)).scalars()
+            )
+
+    def sign_document(self, row_id: int, signatures: list[dict[str, Any]]) -> ProgramDocumentRow:
+        """The one change a version takes: its signature, which also fixes it."""
+        with self.db.session() as s:
+            r = s.get(ProgramDocumentRow, row_id)
+            if r is None:
+                raise NotFound(f"no document version {row_id}")
+            r.signatures = signatures
+            r.status = "signed"
+            s.flush()
+            return r
 
     def artifacts_page(
         self, study_id: str, kind: str | None, limit: int, offset: int

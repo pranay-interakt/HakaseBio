@@ -55,6 +55,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 
@@ -237,6 +241,47 @@ class PeptideStabilityDriver(StudyDriver):
         return {"glp": requirement.glp}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system="; ".join(
+                f"{c.species} {c.matrix.replace('_', ' ')}" for c in p.conditions
+            ),
+            method_of_administration=f"in vitro incubation at {fmt_param(p.temperature_c)} °C",
+            doses=f"{fmt_param(p.peptide_concentration)} {p.concentration_unit}",
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Proteolytic stability in blood, serum or plasma (template 2.6.5.10)."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows = tuple(
+            (
+                c.id,
+                c.species,
+                c.matrix.replace("_", " "),
+                ValueRef(f"t_half.{c.id}") if f"t_half.{c.id}" in q else "—",
+                ValueRef(f"remaining_last.{c.id}") if f"remaining_last.{c.id}" in q else "—",
+            )
+            for c in p.conditions
+        )
+        return (
+            SummaryTable(
+                template="2.6.5.10",
+                title="Pharmacokinetics: stability in blood, serum or plasma",
+                columns=("Condition", "Species", "Matrix", "t1/2", "Remaining at last time"),
+                rows=rows,
+                notes=(
+                    "Intact peptide by the stated quantification; degradation products were "
+                    "not profiled.",
+                ),
+            ),
+        )
 
     def design(
         self,

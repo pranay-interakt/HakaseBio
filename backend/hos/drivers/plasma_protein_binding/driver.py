@@ -53,6 +53,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.kernel.attestation import Role
@@ -190,6 +194,42 @@ class PlasmaProteinBindingDriver(StudyDriver):
         return {"glp": requirement.glp}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system="; ".join(f"{sp}: {m}" for sp, m in p.matrices.items()),
+            method_of_administration=f"in vitro, equilibrium dialysis ({p.device})",
+            doses=", ".join(fmt_param(c) for c in p.test_concentrations)
+            + f" {p.concentration_unit}",
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Plasma protein binding (template 2.6.5.6)."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows = tuple(
+            (sp, f"{c:g} {p.concentration_unit}", ValueRef(k))
+            for sp in p.matrices
+            for c in p.test_concentrations
+            if (k := f"fu.TEST.{sp}.{c:g}") in q
+        )
+        return (
+            SummaryTable(
+                template="2.6.5.6",
+                title="Pharmacokinetics: plasma protein binding (equilibrium dialysis)",
+                columns=("Species", "Concentration tested", "Fraction unbound (fu)"),
+                rows=rows,
+                notes=(
+                    "Shown as the measured fraction unbound rather than the template's "
+                    "% bound, so no value is derived here.",
+                ),
+            ),
+        )
 
     def design(
         self,

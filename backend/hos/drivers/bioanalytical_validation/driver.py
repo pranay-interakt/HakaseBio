@@ -51,6 +51,10 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    SummaryTable,
+    ValueRef,
+    fmt_param,
     tabulate,
 )
 from hos.kernel.attestation import Role
@@ -257,6 +261,49 @@ class BioanalyticalValidationDriver(StudyDriver):
         return {"glp": requirement.glp}
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=f"{p.analyte} in {p.matrix}",
+            method_of_administration=p.technique,
+            doses=(
+                f"calibration {fmt_param(min(p.calibration_levels))} to "
+                f"{fmt_param(max(p.calibration_levels))} {p.concentration_unit}"
+            ),
+        )
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Analytical methods and validation (template 2.6.5.2, optional in M4S(R2))."""
+        p = _p(params)
+        q = results.get("quantities", {})
+        rows: list[tuple[Any, ...]] = [
+            (
+                lvl,
+                f"{fmt_param(getattr(p.qc_levels, lvl))} {p.concentration_unit}",
+                ValueRef(f"ap.{lvl}.between_run_accuracy")
+                if f"ap.{lvl}.between_run_accuracy" in q
+                else "—",
+                ValueRef(f"ap.{lvl}.between_run_cv") if f"ap.{lvl}.between_run_cv" in q else "—",
+            )
+            for lvl in ("LLOQ", "LQC", "MQC", "HQC")
+        ]
+        return (
+            SummaryTable(
+                template="2.6.5.2",
+                title=f"Analytical method validation: {p.analyte} in {p.matrix}",
+                columns=("Level", "Nominal", "Between-run accuracy (%)", "Between-run CV (%)"),
+                rows=tuple(rows),
+                notes=(
+                    f"{p.technique}; {p.regression_model} regression, weighting {p.weighting} "
+                    "(ICH M10).",
+                ),
+            ),
+        )
 
     def design(
         self,

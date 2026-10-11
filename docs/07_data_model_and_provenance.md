@@ -217,7 +217,9 @@ subject id, **subject hash** (SHA-256 of the exact record signed), UTC time and 
 ## 7.8 Persistence
 
 `hos/db/models.py` (SQLAlchemy 2.x). Tables: `principals`, `programs`, `compounds`, `studies`,
-`files`, `ledger`. A compound has a `kind`:
+`files`, `ledger`, and `program_documents` (versions of the CTD Module 2 nonclinical summaries:
+each save is a new row, a signed version is fixed, and the integrity check reconciles every
+version's content hash and signatures with its ledger events). A compound has a `kind`:
 - `small_molecule` compounds are registered by SMILES, with an RDKit profile;
 - `sequence` compounds are peptides or antibodies registered by one-letter chains or a HELM
   string (`hos/kernel/entities.py`, docs/14 P4). The entity stores the registered spec, a

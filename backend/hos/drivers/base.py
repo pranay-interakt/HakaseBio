@@ -79,14 +79,18 @@ __all__ = [
     "StudyDriver",
     "StudyPlan",
     "StudyReport",
+    "SummaryFacts",
+    "SummaryTable",
     "Support",
     "Table",
+    "ValueRef",
     "canonical_hash",
     "parse_return_file",
 ]
 
 #: Version of the driver ABI. The registry refuses drivers built for a different major.
-DRIVER_ABI = "1.1"  # 1.1 adds post_data_inputs (backward compatible)
+DRIVER_ABI = "1.2"  # 1.1 adds post_data_inputs; 1.2 adds the Module 2.6 summary hooks
+# (summary_facts, summary_tables). Both are backward compatible: the defaults return nothing.
 
 #: Metadata key written into every simulated file. Ingest forces SIMULATED origin when present.
 SIMULATION_MARKER = "hos-simulated"
@@ -849,6 +853,84 @@ class Table:
         }
 
 
+# ---------------------------------------------------------------------------
+# CTD Module 2.6 summaries (ABI 1.2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryFacts:
+    """How a study is described in the CTD Module 2.6 tabulated summaries (ICH M4S(R2)
+    Appendix B): the descriptive cells, read from the validated parameters as entered, never
+    estimated. ``None`` means the fact does not apply to this kind of study."""
+
+    test_system: str
+    method_of_administration: str | None = None
+    duration_of_dosing: str | None = None
+    doses: str | None = None
+    gender_and_number: str | None = None
+    organ_systems: str | None = None
+    #: The Appendix B tables that list this study. Empty: the overview table of its CTD
+    #: section (2.6.3.1, 2.6.5.1 or 2.6.7.1), plus 2.6.3.4 for safety pharmacology.
+    listed_in: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "listed_in": list(self.listed_in),
+            "test_system": self.test_system,
+            "method_of_administration": self.method_of_administration,
+            "duration_of_dosing": self.duration_of_dosing,
+            "doses": self.doses,
+            "gender_and_number": self.gender_and_number,
+            "organ_systems": self.organ_systems,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ValueRef:
+    """A summary-table cell holding the stored result quantity named ``key`` (a key of the
+    study's ``results["quantities"]``): the number keeps its provenance and links back."""
+
+    key: str
+
+
+SummaryCell = ValueRef | str | int | None
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryTable:
+    """A content table of the CTD Module 2.6 tabulated summaries, filled from one study's
+    stored results. ``template`` is the ICH M4S(R2) Appendix B table number; ``notes`` record
+    any departure from the template (M4S(R2) lets applicants modify the format)."""
+
+    template: str
+    title: str
+    columns: tuple[str, ...]
+    rows: tuple[tuple[SummaryCell, ...], ...]
+    notes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for r in self.rows:
+            if len(r) != len(self.columns):
+                raise DriverError(
+                    f"summary table {self.title!r}: row width {len(r)} != {len(self.columns)}"
+                )
+            for c in r:
+                if isinstance(c, (bool, float)):
+                    raise DriverError(
+                        f"summary table {self.title!r} contains a bare float "
+                        f"{c!r}; reference the stored quantity instead"
+                    )
+
+    def refs(self) -> list[str]:
+        return [c.key for r in self.rows for c in r if isinstance(c, ValueRef)]
+
+
+def fmt_param(x: float) -> str:
+    """A parameter as entered (30.0 -> "30"), for descriptive summary cells; not a result."""
+    return f"{x:g}"
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisResult:
     """Provenance-typed output of a driver's analysis."""
@@ -1091,6 +1173,21 @@ class StudyDriver(ABC):
     def components_covered(self, requirement_id: str, params: BaseModel) -> tuple[str, ...]:
         """The parts a study with these parameters actually covers (default: all declared)."""
         return self.components_for(requirement_id)
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        """The study's descriptive cells in the Module 2.6 tabulated summaries. ``None``: it
+        appears in the overview tables with its title, facility and location only."""
+        return None
+
+    def summary_tables(
+        self, params: BaseModel, results: Mapping[str, Any]
+    ) -> tuple[SummaryTable, ...]:
+        """Content tables of the Module 2.6 tabulated summaries, filled from the stored
+        ``results`` (``AnalysisResult.to_dict()``). Cells reference stored quantities by key;
+        nothing is recomputed. Default: none."""
+        return ()
 
     # -- identity / probe ------------------------------------------------------
 

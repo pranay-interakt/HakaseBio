@@ -50,6 +50,8 @@ from hos.drivers.base import (
     ReportSection,
     StudyDriver,
     StudyPlan,
+    SummaryFacts,
+    fmt_param,
     tabulate,
 )
 from hos.drivers.repeat_dose_tox.analysis import compare_groups, dose_eq
@@ -202,6 +204,11 @@ class CNSSimulation(BaseModel):
     observations: list[ObservationTruth] = Field(min_length=1)
 
 
+def _sexes(sexes: list[str], n: int) -> str:
+    """ "5M + 5F per group" from the protocol's sexes and group size."""
+    return " + ".join(f"{n}{s}" for s in sexes) + " per group"
+
+
 def _p(params: BaseModel) -> CNSParams:
     if not isinstance(params, CNSParams):
         raise TypeError("expected CNSParams")
@@ -241,6 +248,19 @@ class SafetyPharmCNSDriver(StudyDriver):
         return out
 
     # -- design ----------------------------------------------------------------------
+
+    # -- CTD Module 2.6 summaries (ABI 1.2) --------------------------------------
+
+    def summary_facts(self, params: BaseModel) -> SummaryFacts | None:
+        p = _p(params)
+        return SummaryFacts(
+            test_system=f"{p.species.capitalize()} ({p.strain})",
+            method_of_administration=f"{p.route} ({p.vehicle})",
+            duration_of_dosing="single dose",
+            doses="vehicle, " + ", ".join(fmt_param(d) for d in p.dose_levels_mg_per_kg) + " mg/kg",
+            gender_and_number=_sexes(list(p.sexes), p.animals_per_sex_per_group),
+            organ_systems=f"Central nervous system ({p.method.replace('_', ' ')})",
+        )
 
     def design(
         self,

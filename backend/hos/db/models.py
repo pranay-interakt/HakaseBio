@@ -14,6 +14,7 @@ __all__ = [
     "FileRow",
     "LedgerRow",
     "PrincipalRow",
+    "ProgramDocumentRow",
     "ProgramRow",
     "SimulatedFileRow",
     "StudyRow",
@@ -207,3 +208,26 @@ class WriterLockRow(Base):
     __tablename__ = "writer_lock"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
     writes: Mapped[int] = mapped_column(BigInteger)
+
+
+class ProgramDocumentRow(Base):
+    """Versions of a programme-level document: the CTD Module 2 nonclinical overview and
+    summaries (docs/14 P6). Every save is a new row; a signed version is never edited."""
+
+    __tablename__ = "program_documents"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    program_id: Mapped[str] = mapped_column(ForeignKey("programs.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16))  # draft | signed
+    content: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    supersedes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signatures: Mapped[list] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_program_document_version", "program_id", "kind", "version", unique=True),
+    )

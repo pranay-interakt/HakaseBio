@@ -203,6 +203,15 @@ class SignBody(BaseModel):
     password: str
 
 
+class SummaryDraftBody(BaseModel):
+    reason: str | None = None
+
+
+class SummarySectionBody(BaseModel):
+    text: str
+    reason: str | None = None
+
+
 class ApproveBody(BaseModel):
     password: str
 
@@ -823,6 +832,89 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         from hos.ind import assemble_module4
 
         return assemble_module4(k, actor, program_id)
+
+    # -- CTD Module 2 nonclinical summaries (docs/14 P6) ---------------------------------
+    @app.get("/api/programs/{program_id}/summaries", dependencies=[Depends(program_access)])
+    def summaries(
+        program_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
+    ) -> dict[str, Any]:
+        return {
+            "versions": k.summaries.versions(program_id),
+            "latest": k.summaries.view(program_id),
+        }
+
+    @app.get(
+        "/api/programs/{program_id}/summaries/{version}", dependencies=[Depends(program_access)]
+    )
+    def summary_version(
+        program_id: str,
+        version: int,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> dict[str, Any] | None:
+        return k.summaries.view(program_id, version)
+
+    @app.post("/api/programs/{program_id}/summaries", dependencies=[Depends(program_access)])
+    def draft_summaries(
+        program_id: str,
+        body: SummaryDraftBody,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> dict[str, Any]:
+        return k.summaries.draft(actor, program_id, reason=body.reason)
+
+    @app.put(
+        "/api/programs/{program_id}/summaries/{version}/sections/{section}",
+        dependencies=[Depends(program_access)],
+    )
+    def revise_summary(
+        program_id: str,
+        version: int,
+        section: str,
+        body: SummarySectionBody,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> dict[str, Any]:
+        return k.summaries.revise(actor, program_id, version, section, body.text, body.reason)
+
+    @app.post(
+        "/api/programs/{program_id}/summaries/{version}/sign",
+        dependencies=[Depends(program_access)],
+    )
+    def sign_summaries(
+        program_id: str,
+        version: int,
+        body: SignBody,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> dict[str, Any]:
+        signer = reauth(k, actor, body.password)
+        return k.summaries.sign(
+            signer,
+            program_id,
+            version,
+            role=body.role,
+            meaning=body.meaning,
+            statement=body.statement,
+        )
+
+    @app.get(
+        "/api/programs/{program_id}/summaries/{version}/markdown",
+        dependencies=[Depends(program_access)],
+    )
+    def summary_markdown(
+        program_id: str,
+        version: int,
+        actor: Principal = Depends(current),
+        k: Kernel = Depends(get_kernel),
+    ) -> Response:
+        return Response(
+            k.summaries.markdown(program_id, version),
+            media_type="text/markdown",
+            headers={
+                "Content-Disposition": attachment(f"{program_id}_m2_nonclinical_v{version}.md")
+            },
+        )
 
     @app.post("/api/programs/{program_id}/compounds", dependencies=[Depends(program_access)])
     def add_compound(
