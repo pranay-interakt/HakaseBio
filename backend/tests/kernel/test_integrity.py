@@ -70,7 +70,8 @@ def test_a_genuine_record_reconciles_and_is_anchored(k):  # noqa: F811
 
 @pytest.mark.parametrize(("table", "edit", "check"), [
     ("studies", "state='reported'", "state follows from its last event"),
-    ("principals", "roles='[\"admin\", \"study_director\"]'", "principal matches its registration"),
+    ("principals", "roles='[\"admin\", \"study_director\"]'",
+     "principal matches its registration and role changes"),
     ("compounds", "smiles='CCO'", "structure matches its registration"),
 ])
 def test_direct_edits_to_rows_are_detected(k, table, edit, check):  # noqa: F811

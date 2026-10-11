@@ -108,7 +108,9 @@ history in the system. A sponsor and its CROs, or two sponsors, cannot share one
 
 ## P1 — Part 11 access control and identity
 
-### P1.1 No lockout or throttling on login and signature re-authentication
+### P1.1 No lockout or throttling on login and signature re-authentication — **fixed**
+*Lockout after `HOS_LOCKOUT_ATTEMPTS` failures at sign-in or signature, administrator unlock (ledgered), per-address throttling; `backend/tests/api/test_identity.py`.*
+
 Failures are ledgered, but nothing limits them (21 CFR 11.300(d)).
 
 **Fix:**
@@ -119,7 +121,9 @@ Failures are ledgered, but nothing limits them (21 CFR 11.300(d)).
 **Acceptance:**
 - A lockout test covering login and every signing endpoint.
 
-### P1.2 No user lifecycle
+### P1.2 No user lifecycle — **fixed**
+*Deactivate/reactivate, roles, unlock, password reset with forced change, self-service change; all ledgered with reasons; Users page in the UI.*
+
 There are no endpoints or kernel methods to deactivate a principal, change roles, change or
 reset a password, or force a password change (11.300(b)). A departed Study Director cannot be
 removed.
@@ -146,7 +150,9 @@ race.
 **Acceptance:**
 - The test without the token returns 403.
 
-### P1.4 Sessions are process memory
+### P1.4 Sessions are process memory — **fixed**
+*Database sessions (token hashes) with absolute and idle timeouts and revocation; revocable agent keys; sign-in and sign-out ledgered.*
+
 Tokens are lost on restart and are not shared between workers (`uvicorn --workers 2` breaks
 auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on restart.
 

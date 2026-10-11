@@ -74,12 +74,25 @@ def reconcile(kernel: Any) -> list[Finding]:
         out.append(Finding(subject, check, detail))
 
     for p in repo.principals():
-        ev = _last(by_subject[p.id], "principal.registered")
+        events = by_subject[p.id]
+        ev = _last(events, "principal.registered")
         if ev is None:
             bad(p.id, "principal has its registration event", "no principal.registered")
-        elif ev.payload.get("principal") != kernel.get_principal(p.id).to_dict():
-            bad(p.id, "principal matches its registration", "roles, name, kind or "
-                "organisation differ from the recorded registration")
+            continue
+        expected = dict(ev.payload.get("principal") or {})
+        active = True
+        for e in events:                       # replay the lifecycle after registration
+            if e.action == "principal.roles_changed":
+                expected["roles"] = e.payload.get("roles")
+            elif e.action == "principal.deactivated":
+                active = False
+            elif e.action == "principal.reactivated":
+                active = True
+        if expected != kernel.get_principal(p.id).to_dict():
+            bad(p.id, "principal matches its registration and role changes", "roles, name, "
+                "kind or organisation differ from the recorded history")
+        if (p.active is not False) != active:
+            bad(p.id, "active state replays from its events", "active flag differs")
 
     for prog in repo.programs():
         events = by_subject[prog.id]

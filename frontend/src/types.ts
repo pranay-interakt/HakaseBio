@@ -86,6 +86,8 @@ export interface Principal {
   kind: "human" | "agent" | "system";
   roles: string[];
   organisation?: string | null;
+  /** Set after an administrator's password reset; nothing else is allowed until changed. */
+  must_change_password?: boolean;
 }
 
 export interface Requirement {

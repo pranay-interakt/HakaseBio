@@ -17,6 +17,7 @@ from hos.db.models import (
     PrincipalRow,
     ProgramMemberRow,
     ProgramRow,
+    SessionRow,
     SimulatedFileRow,
     StudyRow,
 )
@@ -53,6 +54,40 @@ class Repository:
             if r is None:
                 raise NotFound(f"no principal {principal_id!r}")
             return r
+
+    def update_principal(self, principal_id: str, **fields: Any) -> PrincipalRow:
+        with self.db.session() as s:
+            r = s.get(PrincipalRow, principal_id)
+            if r is None:
+                raise NotFound(f"no principal {principal_id!r}")
+            for k, v in fields.items():
+                setattr(r, k, v)
+            return r
+
+    # -- sessions and agent keys (only token hashes are stored) ---------------------------
+
+    def session(self, token_hash: str) -> SessionRow | None:
+        with self.db.session() as s:
+            return s.get(SessionRow, token_hash)
+
+    def update_session(self, token_hash: str, **fields: Any) -> None:
+        with self.db.session() as s:
+            r = s.get(SessionRow, token_hash)
+            if r is not None:
+                for k, v in fields.items():
+                    setattr(r, k, v)
+
+    def revoke_sessions(self, principal_id: str, kind: str | None = None) -> int:
+        now = _now()
+        with self.db.session() as s:
+            q = select(SessionRow).where(SessionRow.principal_id == principal_id,
+                                         SessionRow.revoked_at.is_(None))
+            if kind is not None:
+                q = q.where(SessionRow.kind == kind)
+            rows = list(s.execute(q).scalars())
+            for r in rows:
+                r.revoked_at = now
+            return len(rows)
 
     def principals(self) -> list[PrincipalRow]:
         with self.db.session() as s:

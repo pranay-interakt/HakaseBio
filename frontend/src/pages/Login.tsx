@@ -20,12 +20,12 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
 
   async function login() {
     try {
-      const r = await api.post<{ token: string; principal: Principal }>("/auth/login", {
+      const r = await api.post<{ token: string; principal: Principal; must_change_password: boolean }>("/auth/login", {
         principal_id: pid,
         password: pw,
       });
       setToken(r.token);
-      onLogin(r.principal);
+      onLogin({ ...r.principal, must_change_password: r.must_change_password });
     } catch (e) {
       // one message for every refused sign-in, so the page never hints whether a user id exists
       setErr(e instanceof ApiError && (e.status === 401 || e.status === 403)

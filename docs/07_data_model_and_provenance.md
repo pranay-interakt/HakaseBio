@@ -192,6 +192,22 @@ subject id, **subject hash** (SHA-256 of the exact record signed), UTC time and 
 - An organisation's administrator lists and registers principals in that organisation only.
 - A test walks every route with another organisation's ids.
 
+**Identity** (21 CFR 11.300; docs/15 P1).
+- *Sessions* (`sessions` table) store only the SHA-256 of the token. They have an absolute
+  timeout (`HOS_SESSION_HOURS`, default 8) and an idle timeout (`HOS_SESSION_IDLE_MINUTES`,
+  default 30), and can be revoked server-side, so they survive restarts and are shared between
+  workers. Agents get revocable keys (`HOS_AGENT_KEY_DAYS`, default 90). Sign-in and sign-out
+  are ledgered.
+- *Lockout.* Consecutive failed attempts, at sign-in or at a signature's re-authentication,
+  lock the account at `HOS_LOCKOUT_ATTEMPTS` (default 5) until an administrator unlocks it.
+  Only someone who supplies the correct password is told the account is locked. Sign-in is
+  also throttled per client address (`HOS_LOGIN_ATTEMPTS_PER_MINUTE`, default 10).
+- *Lifecycle.* An administrator of the user's organisation can deactivate or reactivate a user,
+  change roles, unlock, and reset a password. A reset forces a change at the next sign-in, and
+  nothing else is allowed until then. Each action carries a reason and is ledgered, and
+  reconciliation replays role changes and deactivations. A deactivated user can neither sign
+  in nor sign; their earlier signatures keep verifying.
+
 ## 7.8 Persistence
 
 `hos/db/models.py` (SQLAlchemy 2.x). Tables: `principals`, `programs`, `compounds`, `studies`,

@@ -6,6 +6,7 @@ import { Program } from "./pages/Program";
 import { ImportNew } from "./pages/ImportNew";
 import { Programs } from "./pages/Programs";
 import { Study } from "./pages/Study";
+import { ChangePassword, Users } from "./pages/Users";
 import type { Principal } from "./types";
 
 function useHash(): string {
@@ -70,12 +71,26 @@ export function App() {
 
   if (!checked) return null;
   if (!me) return <Login onLogin={setMe} />;
+  const signOut = async () => {
+    await api.post("/auth/logout").catch(() => undefined);
+    setToken(null);
+    setMe(null);
+  };
+  if (me.must_change_password)
+    return (
+      <main className="login">
+        <ChangePassword forced onDone={() => setMe({ ...me, must_change_password: false })} />
+        <button onClick={signOut}>Sign out</button>
+      </main>
+    );
 
   const parts = hash.replace(/^#\/?/, "").split("/");
   let page;
   if (parts[0] === "program" && parts[1]) page = <Program id={parts[1]} go={go} me={me} />;
   else if (parts[0] === "study" && parts[1]) page = <Study id={parts[1]} me={me} />;
   else if (parts[0] === "import" && parts[1] && parts[2]) page = <ImportNew programId={parts[1]} requirementId={parts[2]} go={go} />;
+  else if (parts[0] === "users" && me.roles.includes("admin")) page = <Users me={me} />;
+  else if (parts[0] === "password") page = <div className="page"><ChangePassword forced={false} onDone={() => go("#/")} /></div>;
   else page = <Programs go={go} />;
 
   return (
@@ -98,18 +113,16 @@ export function App() {
                 : "verification unavailable"}
           </span>
         )}
-        <span className="small">
-          {me.name} ({me.roles.map(roleLabel).join(", ")})
-        </span>
-        <button
-          onClick={async () => {
-            await api.post("/auth/logout").catch(() => undefined);
-            setToken(null);
-            setMe(null);
-          }}
-        >
-          Sign out
-        </button>
+        {me.roles.includes("admin") && (
+          <a href="#/users" className="small">
+            Users
+          </a>
+        )}
+        <a href="#/password" className="small" title="Change password">
+          {me.name}
+        </a>
+        <span className="small muted">({me.roles.map(roleLabel).join(", ")})</span>
+        <button onClick={signOut}>Sign out</button>
       </header>
       <main>{page}</main>
     </>

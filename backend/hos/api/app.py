@@ -15,9 +15,9 @@ import logging
 import os
 import secrets
 import threading
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -30,7 +30,6 @@ from hos import __version__
 from hos.core.citations import CITATIONS
 from hos.core.descriptors import InvalidStructureError
 from hos.core.methods import METHODS
-from hos.core.provenance import utc_now
 from hos.core.reference_params import REFERENCE_PARAMETERS, REGISTRY_VERSION
 from hos.core.regulatory import ProgramContext, Timing
 from hos.drivers.base import IngestError
@@ -49,37 +48,27 @@ from hos.kernel.kernel import Kernel
 
 __all__ = ["app", "create_app"]
 
-SESSION_TTL = timedelta(hours=8)
-
-
 _log = logging.getLogger(__name__)
 
-class Sessions:
-    """In-process bearer-token store (single API process)."""
 
-    def __init__(self) -> None:
-        self._tokens: dict[str, tuple[str, datetime]] = {}
+class LoginThrottle:
+    """At most ``limit`` sign-in attempts per client address per minute (21 CFR 11.300(d)); an
+    in-process guard in front of the per-account lockout."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self._seen: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
-    def issue(self, principal_id: str, ttl: timedelta = SESSION_TTL) -> str:
-        tok = secrets.token_urlsafe(32)
+    def allow(self, address: str) -> bool:
+        now = time.monotonic()
         with self._lock:
-            self._tokens[tok] = (principal_id, utc_now() + ttl)
-        return tok
-
-    def resolve(self, token: str) -> str | None:
-        with self._lock:
-            entry = self._tokens.get(token)
-            if entry is None:
-                return None
-            if entry[1] < utc_now():
-                del self._tokens[token]
-                return None
-            return entry[0]
-
-    def revoke(self, token: str) -> None:
-        with self._lock:
-            self._tokens.pop(token, None)
+            recent = [t for t in self._seen.get(address, []) if now - t < 60.0]
+            if len(recent) >= self.limit:
+                self._seen[address] = recent
+                return False
+            self._seen[address] = [*recent, now]
+            return True
 
 
 # ---- request bodies ---------------------------------------------------------------
@@ -115,6 +104,21 @@ class ProgramBody(BaseModel):
 
 class ContextChangeBody(BaseModel):
     changes: dict[str, Any]
+    reason: str
+
+
+class PasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class RolesBody(BaseModel):
+    roles: list[Role]
+    reason: str
+
+
+class ResetPasswordBody(BaseModel):
+    new_password: str
     reason: str
 
 
@@ -293,7 +297,8 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                if o]
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"],
                        allow_headers=["*"])
-    state: dict[str, Any] = {"kernel": kernel, "sessions": Sessions()}
+    state: dict[str, Any] = {"kernel": kernel}
+    throttle = LoginThrottle(int(os.environ.get("HOS_LOGIN_ATTEMPTS_PER_MINUTE", "10")))
 
     def get_kernel() -> Kernel:
         if state["kernel"] is None:
@@ -301,14 +306,17 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         k: Kernel = state["kernel"]
         return k
 
-    def current(authorization: str | None = Header(default=None),
+    def current(request: Request, authorization: str | None = Header(default=None),
                 k: Kernel = Depends(get_kernel)) -> Principal:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(401, "missing bearer token")
-        pid = state["sessions"].resolve(authorization.split(" ", 1)[1])
-        if pid is None:
+        p = k.resolve_session(authorization.split(" ", 1)[1])
+        if p is None:
             raise HTTPException(401, "invalid or expired token")
-        return k.get_principal(pid)
+        if k.repo.principal(p.id).must_change_password and \
+                request.url.path not in ("/api/me", "/api/auth/password", "/api/auth/logout"):
+            raise PermissionDenied("change your password before continuing")
+        return p
 
     def reauth(k: Kernel, actor: Principal, password: str) -> Principal:
         """21 CFR 11.200: verify the signer's credentials at the moment of signing."""
@@ -427,26 +435,40 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         return p.to_dict()
 
     @app.post("/api/auth/login")
-    def login(body: LoginBody, k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
-        p = k.authenticate(body.principal_id, body.password)
-        return {"token": state["sessions"].issue(p.id), "principal": p.to_dict()}
+    def login(body: LoginBody, request: Request,
+              k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        if not throttle.allow(request.client.host if request.client else "unknown"):
+            raise HTTPException(429, "too many sign-in attempts; wait a minute")
+        token, p = k.login(body.principal_id, body.password)
+        return {"token": token, "principal": p.to_dict(),
+                "must_change_password": bool(k.repo.principal(p.id).must_change_password)}
 
     @app.post("/api/auth/logout")
-    def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
+    def logout(authorization: str | None = Header(default=None),
+               k: Kernel = Depends(get_kernel)) -> dict[str, str]:
         if authorization and authorization.lower().startswith("bearer "):
-            state["sessions"].revoke(authorization.split(" ", 1)[1])
+            k.logout(authorization.split(" ", 1)[1])
         return {"status": "logged out"}
 
+    @app.post("/api/auth/password")
+    def change_password(body: PasswordBody, actor: Principal = Depends(current),
+                        k: Kernel = Depends(get_kernel)) -> dict[str, str]:
+        k.change_password(actor, current_password=body.current_password,
+                          new_password=body.new_password)
+        return {"status": "password changed"}
+
     @app.get("/api/me")
-    def me(actor: Principal = Depends(current)) -> dict[str, Any]:
-        return actor.to_dict()
+    def me(actor: Principal = Depends(current),
+           k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return {**actor.to_dict(),
+                "must_change_password": bool(k.repo.principal(actor.id).must_change_password)}
 
     @app.get("/api/principals")
     def principals(actor: Principal = Depends(current),
                    k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         if Role.ADMIN not in actor.roles:
             raise PermissionDenied("only an administrator can list users")
-        return [k.get_principal(r.id).to_dict() for r in k.repo.principals()
+        return [k.principal_admin_view(r.id) for r in k.repo.principals()
                 if actor.organisation is None or r.organisation == actor.organisation]
 
     @app.post("/api/principals")
@@ -459,15 +481,36 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     @app.post("/api/principals/{principal_id}/agent-token")
     def agent_token(principal_id: str, actor: Principal = Depends(current),
                     k: Kernel = Depends(get_kernel)) -> dict[str, str]:
-        if Role.ADMIN not in actor.roles:
-            raise PermissionDenied("only an administrator can issue agent tokens")
-        target = k.get_principal(principal_id)
-        if actor.organisation not in (None, target.organisation):
-            raise NotFound(f"no principal {principal_id}")
-        if target.kind is not PrincipalKind.AGENT:
-            raise PermissionDenied("tokens are issued to agents; humans log in")
-        k.record_event(actor, "principal.agent_token_issued", "principal", principal_id, {})
-        return {"token": state["sessions"].issue(principal_id)}
+        return {"token": k.issue_agent_key(actor, principal_id)}
+
+    @app.post("/api/principals/{principal_id}/roles")
+    def change_roles(principal_id: str, body: RolesBody, actor: Principal = Depends(current),
+                     k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.change_roles(actor, principal_id, body.roles, reason=body.reason)
+
+    @app.post("/api/principals/{principal_id}/deactivate")
+    def deactivate(principal_id: str, body: ReasonRequiredBody,
+                   actor: Principal = Depends(current),
+                   k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.set_principal_active(actor, principal_id, active=False, reason=body.reason)
+
+    @app.post("/api/principals/{principal_id}/reactivate")
+    def reactivate(principal_id: str, body: ReasonRequiredBody,
+                   actor: Principal = Depends(current),
+                   k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.set_principal_active(actor, principal_id, active=True, reason=body.reason)
+
+    @app.post("/api/principals/{principal_id}/unlock")
+    def unlock(principal_id: str, body: ReasonRequiredBody, actor: Principal = Depends(current),
+               k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.unlock_principal(actor, principal_id, reason=body.reason)
+
+    @app.post("/api/principals/{principal_id}/reset-password")
+    def reset_password(principal_id: str, body: ResetPasswordBody,
+                       actor: Principal = Depends(current),
+                       k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return k.reset_password(actor, principal_id, new_password=body.new_password,
+                                reason=body.reason)
 
     # -- reference data -------------------------------------------------------------------
     @app.get("/api/reference/citations")

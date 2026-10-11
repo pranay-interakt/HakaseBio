@@ -21,9 +21,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import secrets
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -35,7 +38,14 @@ from hos.core.quantity import Quantity
 from hos.core.regulatory import Modality, PeptideOrigin, ProgramContext, derive_study_set
 from hos.core.regulatory.context import AMINO_ACID_MODALITIES
 from hos.core.regulatory.engine import RequirementStatus, StudyRequirement
-from hos.db.models import CompoundRow, PrincipalRow, ProgramMemberRow, ProgramRow, StudyRow
+from hos.db.models import (
+    CompoundRow,
+    PrincipalRow,
+    ProgramMemberRow,
+    ProgramRow,
+    SessionRow,
+    StudyRow,
+)
 from hos.db.repository import Repository, content_hash
 from hos.db.store import CommitThenRaise, Database, FileStore, SqlLedgerBackend
 from hos.drivers.base import (
@@ -49,6 +59,7 @@ from hos.drivers.base import (
 )
 from hos.drivers.registry import DriverRegistry, default_registry
 from hos.kernel.attestation import (
+    SYSTEM,
     Principal,
     PrincipalKind,
     Role,
@@ -115,6 +126,36 @@ PROGRAM_DETERMINATIONS = {"s6_principles_apply": "s6_determination"}
 
 
 
+@dataclass(frozen=True, slots=True)
+class AuthPolicy:
+    """Access-control policy (21 CFR 11.300). Operational settings, not scientific values: each
+    has a stated default and an environment override."""
+
+    session_hours: float = 8.0
+    session_idle_minutes: float = 30.0
+    lockout_attempts: int = 5
+    agent_key_days: float = 90.0
+
+    @classmethod
+    def from_env(cls) -> AuthPolicy:
+        def num(name: str, default: float) -> float:
+            v = os.environ.get(name)
+            return float(v) if v else default
+        return cls(session_hours=num("HOS_SESSION_HOURS", 8.0),
+                   session_idle_minutes=num("HOS_SESSION_IDLE_MINUTES", 30.0),
+                   lockout_attempts=int(num("HOS_LOCKOUT_ATTEMPTS", 5)),
+                   agent_key_days=num("HOS_AGENT_KEY_DAYS", 90.0))
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _aware(dt: datetime) -> datetime:
+    """SQLite returns naive datetimes; every stored time is UTC."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 #: A hash of a random secret, checked when a principal has none, so a refusal costs the same
 #: time whether or not the id exists (no user enumeration by timing).
 _DUMMY_HASH = _hash_password(secrets.token_hex(16))
@@ -126,7 +167,9 @@ def _new_id(prefix: str) -> str:
 
 class Kernel:
     def __init__(self, db: Database | None = None, files: FileStore | None = None,
-                 registry: DriverRegistry | None = None) -> None:
+                 registry: DriverRegistry | None = None,
+                 auth_policy: AuthPolicy | None = None) -> None:
+        self.auth_policy = auth_policy or AuthPolicy.from_env()
         self.db = db or Database()
         self.db.create_all()
         self.files = files or FileStore()
@@ -189,7 +232,9 @@ class Kernel:
     @atomic
     def authenticate(self, principal_id: str, password: str) -> Principal:
         """Verify a human's credentials. Used at login and again at every signature
-        (21 CFR 11.200 re-authentication)."""
+        (21 CFR 11.200 re-authentication). Consecutive failures lock the account
+        (11.300(d)) until an administrator unlocks it. Every refusal reads the same, except
+        that someone holding the correct password learns the account is locked."""
         try:
             row = self.repo.principal(principal_id)
         except NotFound:
@@ -198,13 +243,183 @@ class Kernel:
             _check_password(password, _DUMMY_HASH)
             raise PermissionDenied("invalid credentials") from None
         stored = row.signing_secret_hash if row.kind == PrincipalKind.HUMAN.value else None
-        if not _check_password(password, stored or _DUMMY_HASH) or not stored:
-            self.ledger.record(actor_id=principal_id, actor_kind="unknown",
-                               action="auth.failed", subject_type="principal",
-                               subject_id=principal_id)
-            # the failed attempt stays on the record although the call fails
-            raise CommitThenRaise(PermissionDenied("invalid credentials"))
-        return self._principal(row)
+        correct = _check_password(password, stored or _DUMMY_HASH) and bool(stored)
+        if correct and row.active is not False and row.locked_at is None:
+            if row.failed_attempts:
+                self.repo.update_principal(principal_id, failed_attempts=0)
+            return self._principal(row)
+        if correct and row.locked_at is not None:
+            raise PermissionDenied("this account is locked after repeated failed attempts; an "
+                                   "administrator can unlock it")
+        if correct:
+            raise PermissionDenied("invalid credentials")         # deactivated
+        attempts = (row.failed_attempts or 0) + 1
+        self.repo.update_principal(principal_id, failed_attempts=attempts)
+        self.ledger.record(actor_id=principal_id, actor_kind="unknown",
+                           action="auth.failed", subject_type="principal",
+                           subject_id=principal_id)
+        if row.locked_at is None and row.kind == PrincipalKind.HUMAN.value and \
+                attempts >= self.auth_policy.lockout_attempts:
+            self.repo.update_principal(principal_id, locked_at=utc_now())
+            self._record(SYSTEM, "principal.locked", "principal", principal_id,
+                         {"failed_attempts": attempts})
+        # the failed attempt (and any lock) stays on the record although the call fails
+        raise CommitThenRaise(PermissionDenied("invalid credentials"))
+
+    # ======================================================================
+    # sessions and agent keys (21 CFR 11.300; docs/15 P1.4)
+    # ======================================================================
+
+    @atomic
+    def login(self, principal_id: str, password: str) -> tuple[str, Principal]:
+        """A new session: stored as the token's hash, with absolute and idle timeouts."""
+        p = self.authenticate(principal_id, password)
+        token = secrets.token_urlsafe(32)
+        now = utc_now()
+        self.repo.add(SessionRow(token_hash=_token_hash(token), principal_id=p.id,
+                                 kind="session", created_at=now, last_seen_at=now,
+                                 expires_at=now + timedelta(
+                                     hours=self.auth_policy.session_hours)))
+        self._record(p, "auth.login", "principal", p.id, {})
+        return token, p
+
+    @atomic
+    def resolve_session(self, token: str) -> Principal | None:
+        """The principal behind a live token, or None (unknown, revoked, expired, idle too
+        long, or the principal deactivated)."""
+        row = self.repo.session(_token_hash(token))
+        now = utc_now()
+        if row is None or row.revoked_at is not None or _aware(row.expires_at) < now:
+            return None
+        last = _aware(row.last_seen_at)
+        if row.kind == "session" and \
+                now - last > timedelta(minutes=self.auth_policy.session_idle_minutes):
+            return None
+        principal = self.repo.principal(row.principal_id)
+        if principal.active is False:
+            return None
+        if now - last > timedelta(seconds=60):        # keep idle tracking without a write per call
+            self.repo.update_session(row.token_hash, last_seen_at=now)
+        return self._principal(principal)
+
+    @atomic
+    def logout(self, token: str) -> None:
+        row = self.repo.session(_token_hash(token))
+        if row is None or row.revoked_at is not None:
+            return
+        self.repo.update_session(row.token_hash, revoked_at=utc_now())
+        self._record(self.get_principal(row.principal_id), "auth.logout", "principal",
+                     row.principal_id, {})
+
+    @atomic
+    def issue_agent_key(self, actor: Principal, agent_id: str) -> str:
+        """A long-lived, revocable key for an agent principal; only its hash is kept."""
+        target = self._administered(actor, agent_id)
+        if target.kind != PrincipalKind.AGENT.value:
+            raise PermissionDenied("keys are issued to agents; humans sign in")
+        token = secrets.token_urlsafe(32)
+        now = utc_now()
+        self.repo.add(SessionRow(token_hash=_token_hash(token), principal_id=agent_id,
+                                 kind="agent_key", created_at=now, last_seen_at=now,
+                                 expires_at=now + timedelta(
+                                     days=self.auth_policy.agent_key_days)))
+        self._record(actor, "principal.agent_token_issued", "principal", agent_id,
+                     {"expires_days": self.auth_policy.agent_key_days})
+        return token
+
+    # ======================================================================
+    # user lifecycle (21 CFR 11.300(b); docs/15 P1.2)
+    # ======================================================================
+
+    def _administered(self, actor: Principal, principal_id: str) -> PrincipalRow:
+        """The principal, if ``actor`` administers it (its organisation, or the platform)."""
+        if Role.ADMIN not in actor.roles or actor.kind is not PrincipalKind.HUMAN:
+            raise PermissionDenied("only an administrator can manage users")
+        row = self.repo.principal(principal_id)
+        if actor.organisation not in (None, row.organisation):
+            raise NotFound(f"no principal {principal_id!r}")
+        return row
+
+    def principal_admin_view(self, principal_id: str) -> dict[str, Any]:
+        row = self.repo.principal(principal_id)
+        return {**self._principal(row).to_dict(), "active": row.active is not False,
+                "locked": row.locked_at is not None,
+                "must_change_password": bool(row.must_change_password),
+                "created_at": row.created_at.isoformat()}
+
+    @atomic
+    def set_principal_active(self, actor: Principal, principal_id: str, *, active: bool,
+                             reason: str) -> dict[str, Any]:
+        """Deactivate or reactivate. A deactivated principal can neither sign in nor sign;
+        its earlier signatures stay valid."""
+        self._administered(actor, principal_id)
+        if not reason.strip():
+            raise KernelError("a reason is required")
+        if principal_id == actor.id and not active:
+            raise KernelError("administrators cannot deactivate themselves")
+        self.repo.update_principal(principal_id, active=active)
+        if not active:
+            self.repo.revoke_sessions(principal_id)
+        self._record(actor, "principal.reactivated" if active else "principal.deactivated",
+                     "principal", principal_id, {}, reason=reason)
+        return self.principal_admin_view(principal_id)
+
+    @atomic
+    def change_roles(self, actor: Principal, principal_id: str, roles: Sequence[Role], *,
+                     reason: str) -> dict[str, Any]:
+        row = self._administered(actor, principal_id)
+        if not reason.strip():
+            raise KernelError("a reason is required")
+        if row.kind != PrincipalKind.HUMAN.value and any(r.is_legal_attestor for r in roles):
+            raise PermissionDenied("legal attestation roles can only be held by humans")
+        if principal_id == actor.id and Role.ADMIN not in roles:
+            raise KernelError("administrators cannot remove their own administrator role")
+        new = sorted(r.value for r in roles)
+        self.repo.update_principal(principal_id, roles=new)
+        self._record(actor, "principal.roles_changed", "principal", principal_id,
+                     {"roles": new}, reason=reason)
+        return self.principal_admin_view(principal_id)
+
+    @atomic
+    def unlock_principal(self, actor: Principal, principal_id: str, *,
+                         reason: str) -> dict[str, Any]:
+        self._administered(actor, principal_id)
+        if not reason.strip():
+            raise KernelError("a reason is required")
+        self.repo.update_principal(principal_id, locked_at=None, failed_attempts=0)
+        self._record(actor, "principal.unlocked", "principal", principal_id, {}, reason=reason)
+        return self.principal_admin_view(principal_id)
+
+    @atomic
+    def reset_password(self, actor: Principal, principal_id: str, *, new_password: str,
+                       reason: str) -> dict[str, Any]:
+        """A temporary password the user must change at the next sign-in; sessions end."""
+        row = self._administered(actor, principal_id)
+        if row.kind != PrincipalKind.HUMAN.value:
+            raise KernelError("only people have passwords")
+        if not reason.strip():
+            raise KernelError("a reason is required")
+        if len(new_password) < _MIN_PASSWORD:
+            raise PermissionDenied(f"passwords have at least {_MIN_PASSWORD} characters")
+        self.repo.update_principal(principal_id, signing_secret_hash=_hash_password(new_password),
+                                   must_change_password=True, failed_attempts=0,
+                                   locked_at=None)
+        self.repo.revoke_sessions(principal_id)
+        self._record(actor, "principal.password_reset", "principal", principal_id, {},
+                     reason=reason)
+        return self.principal_admin_view(principal_id)
+
+    @atomic
+    def change_password(self, actor: Principal, *, current_password: str,
+                        new_password: str) -> None:
+        self.authenticate(actor.id, current_password)
+        if len(new_password) < _MIN_PASSWORD:
+            raise PermissionDenied(f"passwords have at least {_MIN_PASSWORD} characters")
+        if new_password == current_password:
+            raise KernelError("choose a different password")
+        self.repo.update_principal(actor.id, signing_secret_hash=_hash_password(new_password),
+                                   must_change_password=False)
+        self._record(actor, "principal.password_changed", "principal", actor.id, {})
 
     # ======================================================================
     # access (docs/15 P0.3)
