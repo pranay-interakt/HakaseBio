@@ -1,0 +1,7 @@
+{
+ "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/AAAAAAAAAAAAAA-UHFFFAOYSA-N/property/MolecularFormula,MolecularWeight,ExactMass,XLogP,TPSA,HBondDonorCount,HBondAcceptorCount,IUPACName,SMILES,ConnectivitySMILES,InChIKey/JSON",
+ "captured_at": "2026-10-11T06:58:27.957840+00:00",
+ "status_code": 404,
+ "body": "{\n  \"Fault\": {\n    \"Code\": \"PUGREST.NotFound\",\n    \"Message\": \"No CID found\",\n    \"Details\": [\n      \"No CID found that matches the given InChI key\"\n    ]\n  }\n}\n",
+ "body_sha256": "838fee6fe52f387ee0e552541b837866589239f48fedaa1fb96efa208b0b7173"
+}

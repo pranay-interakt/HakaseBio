@@ -28,7 +28,7 @@ include = ["hos*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers -m 'not live'"
 markers = [
   "live: tests that require outbound network to external scientific APIs",
 ]
