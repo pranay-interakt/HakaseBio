@@ -25,6 +25,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy.exc import OperationalError
 
 from hos import __version__
 from hos.core.citations import CITATIONS
@@ -400,6 +401,11 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         app.add_exception_handler(exc_t, lambda r, e: _err(409, e))
     app.add_exception_handler(IngestError, lambda r, e: _err(422, e, errors=list(e.errors)))
     app.add_exception_handler(LedgerIntegrityError, lambda r, e: _err(500, e))
+    # another writer held the lock too long, or the database is down; the unit of work
+    # changed nothing. The driver's message (SQL, parameters) is not for clients.
+    app.add_exception_handler(OperationalError, lambda r, e: JSONResponse(
+        status_code=503, content={"error": "Unavailable", "detail": "the database is busy "
+                                  "or unavailable; nothing was changed, try again shortly"}))
     for exc_t in (DriverError, KernelError, InvalidStructureError, ValueError):
         app.add_exception_handler(exc_t, lambda r, e: _err(400, e))
 

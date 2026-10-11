@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from hos.db import cli
 from hos.db.migrate import BASELINE, current_revision, head_revision, schema_drift
-from hos.db.models import Base
+from hos.db.migrations.baseline import METADATA as BASELINE_TABLES
 from hos.db.store import Database, FileStore
 from hos.kernel.attestation import PrincipalKind, Role
 from hos.kernel.kernel import Kernel
@@ -36,7 +36,7 @@ def _old_database(url):
     """The schema as released before study import and sessions existed (created the way
     releases then did, with create_all and no migration history)."""
     eng = Database(url).engine
-    Base.metadata.create_all(eng)
+    BASELINE_TABLES.create_all(eng)
     with eng.begin() as c:
         for t in ("sessions", "program_members", "file_links"):
             c.execute(sa.text(f"DROP TABLE {t}"))
@@ -73,18 +73,22 @@ def test_an_explicit_upgrade_can_be_required(tmp_path, monkeypatch):
     assert k.schema_revision == head_revision()
 
 
-def test_an_upgrade_of_a_database_holding_records_is_ledgered(tmp_path, monkeypatch):
+def test_an_upgrade_of_a_database_holding_records_is_ledgered(tmp_path):
+    from alembic import command
+
+    from hos.db.migrate import _config
     url = _url(tmp_path)
     k = Kernel(db=Database(url), files=FileStore(tmp_path / "o"))
     k.register_principal(None, principal_id="admin", name="A", kind=PrincipalKind.HUMAN,
                          roles=[Role.ADMIN], password=PW)
-    # pretend the database was one revision behind
-    monkeypatch.setattr(Database, "upgrade", lambda self: ("0000", head_revision()))
+    with k.db.engine.begin() as conn:            # the database as the previous release left it
+        command.downgrade(_config(conn), "0001")
     k2 = Kernel(db=Database(url), files=FileStore(tmp_path / "o"))
     last = k2.ledger.last()
     assert (last.action, last.actor_id, last.payload) == (
-        "system.schema_upgraded", "system", {"from": "0000", "to": head_revision()})
+        "system.schema_upgraded", "system", {"from": "0001", "to": head_revision()})
     assert k2.integrity()["valid"]
+    assert Kernel(db=Database(url), files=FileStore(tmp_path / "o")).ledger.last() == last
 
 
 def test_the_command_line(tmp_path, monkeypatch, capsys):

@@ -11,7 +11,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -34,6 +34,8 @@ class Database:
         self.url = url or os.environ.get(
             "HOS_DATABASE_URL", f"sqlite:///{default_data_dir() / 'hos.sqlite3'}"
         )
+        #: how long a unit of work waits for another writer before giving up
+        self.write_wait_seconds = float(os.environ.get("HOS_WRITE_WAIT_SECONDS", "30"))
         kwargs = {}
         if self.url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
@@ -44,7 +46,8 @@ class Database:
                 cur = dbapi_conn.cursor()
                 cur.execute("PRAGMA foreign_keys=ON")
                 cur.execute("PRAGMA journal_mode=WAL")
-                cur.execute("PRAGMA busy_timeout=5000")  # wait for another writer's lock
+                # wait this long for another writer (process) to finish
+                cur.execute(f"PRAGMA busy_timeout={int(self.write_wait_seconds * 1000)}")
                 cur.close()
         self._factory = sessionmaker(self.engine, expire_on_commit=False, future=True)
         self._uow: ContextVar[Session | None] = ContextVar(f"hos_uow_{id(self)}", default=None)
@@ -96,8 +99,11 @@ class Database:
         commit together or not at all: every :meth:`session` opened inside joins this one,
         nested calls join too, and only the outermost commits. Writers are serialised within
         the process, so ledger sequence numbers are allocated one writer at a time; across
-        processes the ledger's primary key on ``seq`` refuses a second entry with the same
-        number, which rolls that writer's whole change back.
+        processes and hosts the first statement of every unit of work updates the single
+        ``writer_lock`` row, and that row lock is held until commit (docs/15 P2.6). Every read
+        a unit of work makes therefore sees all earlier commits: no lost updates, no ledger
+        sequence number allocated twice. A writer that waits longer than
+        ``HOS_WRITE_WAIT_SECONDS`` (default 30) gives up and changes nothing.
 
         Raising :class:`CommitThenRaise` commits what was recorded (a refused login, a
         rejected upload) and then raises the wrapped error."""
@@ -108,6 +114,7 @@ class Database:
             s = self._factory()
             token = self._uow.set(s)
             try:
+                self._take_writer_lock(s)
                 yield s
                 s.commit()
             except CommitThenRaise as ctr:
@@ -119,6 +126,14 @@ class Database:
             finally:
                 self._uow.reset(token)
                 s.close()
+
+    def _take_writer_lock(self, s: Session) -> None:
+        if self.engine.dialect.name == "postgresql":
+            s.execute(text(f"SET LOCAL lock_timeout = '{int(self.write_wait_seconds * 1000)}ms'"))
+        done = s.execute(text("UPDATE writer_lock SET writes = writes + 1 WHERE id = 1"))
+        if getattr(done, "rowcount", 0) != 1:
+            raise RuntimeError("the writer_lock row is missing: the database was changed "
+                               "outside its migrations")
 
 
 class CommitThenRaise(Exception):
@@ -181,6 +196,9 @@ class SqlLedgerBackend:
         )
 
     def append(self, entry: LedgerEntry) -> None:
+        if not self.db.in_transaction():
+            # outside a unit of work the sequence number could be taken twice (docs/15 P2.6)
+            raise RuntimeError("ledger entries are written only inside Database.transaction()")
         with self.db.session() as s:
             s.add(LedgerRow(
                 seq=entry.seq, recorded_at=entry.recorded_at, actor_id=entry.actor_id,

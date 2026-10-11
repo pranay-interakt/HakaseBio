@@ -163,9 +163,15 @@ that carries anything more.
 `@atomic` unit of work (`hos/kernel/uow.py`, `Database.transaction`). Its state changes,
 artefacts and ledger entry share one database transaction, so either all commit or none does.
 - Nested operations join the outer unit; only the outermost commits.
-- Writers are serialised within the process. Across processes, the primary key on `seq` refuses
-  a second entry with the same number, which rolls that writer's whole change back. SQLite
-  connections wait up to five seconds for the write lock.
+- Writers are serialised within the process, and across processes and hosts by the
+  `writer_lock` row (docs/15 P2.6): the first statement of every unit of work updates it, and
+  the row lock is held until commit. Every read inside a unit of work therefore sees all earlier
+  commits, so a read-modify-write (a signature appended to a list, the next ledger sequence
+  number) cannot lose another writer's change. A writer that waits longer than
+  `HOS_WRITE_WAIT_SECONDS` (default 30) gives up with nothing changed; the API answers 503.
+- A ledger entry can only be written inside a unit of work; the SQL backend refuses otherwise.
+- A test runs four worker processes, each with its own kernel, changing one record at once on
+  SQLite and on PostgreSQL; nothing may be lost and the chain must stay gap-free and reconcile.
 - A refusal that must stay on the record while the call fails, such as a failed login, a rejected
   upload or a refused approval, raises `CommitThenRaise`.
 - Tests make the ledger write fail before every step of a full lifecycle and check that no table

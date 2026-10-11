@@ -114,7 +114,8 @@ unless `HOS_API_DOCS=1`. Ledger checkpoints go to `HOS_ANCHOR_DIR` (default
 `$HOS_DATA_DIR/anchors`; use write-once storage in production); set `HOS_ANCHOR_KEY` to
 authenticate them. Access policy has stated defaults: `HOS_SESSION_HOURS` (8),
 `HOS_SESSION_IDLE_MINUTES` (30), `HOS_LOCKOUT_ATTEMPTS` (5), `HOS_LOGIN_ATTEMPTS_PER_MINUTE`
-(10) and `HOS_AGENT_KEY_DAYS` (90).
+(10) and `HOS_AGENT_KEY_DAYS` (90). Writers in different processes take turns; one waits up to
+`HOS_WRITE_WAIT_SECONDS` (30) before giving up with nothing changed.
 
 **First run.** Creating the administrator needs a one-time setup token, so only whoever runs the
 server can initialise it. The server prints the token in its log at start-up, or you can set

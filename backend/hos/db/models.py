@@ -17,6 +17,7 @@ __all__ = [
     "ProgramRow",
     "SimulatedFileRow",
     "StudyRow",
+    "WriterLockRow",
 ]
 
 
@@ -195,3 +196,14 @@ class SimulatedFileRow(Base):
     study_id: Mapped[str] = mapped_column(String(64))
     method_id: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WriterLockRow(Base):
+    """One row, updated first by every unit of work (docs/15 P2.6). The row lock it takes
+    serialises writers across processes and hosts, so a read-modify-write (a signature
+    appended to a list, the next ledger sequence number) never works from a stale read.
+    ``writes`` counts committed units of work."""
+
+    __tablename__ = "writer_lock"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    writes: Mapped[int] = mapped_column(BigInteger)

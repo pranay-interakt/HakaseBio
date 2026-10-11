@@ -174,8 +174,8 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
    - Adopt Alembic with a baseline revision matching the current models.
    - CI checks `alembic upgrade head` on an empty DB and that autogenerate produces no diff.
 2. **PostgreSQL is untested — fixed.** *A CI job runs the whole suite and the migration check on
-   PostgreSQL 16 (`HOS_TEST_DATABASE_URL`; each test gets a fresh schema). The cross-process
-   writer test arrives with item 6.*
+   PostgreSQL 16 (`HOS_TEST_DATABASE_URL`; each test gets a fresh schema), including the
+   cross-process writer test from item 6.*
    Every test runs on SQLite. Add a CI job that runs the suite on
    PostgreSQL 16 through a service container, including the P0.1 concurrency test across
    processes.
@@ -193,7 +193,12 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
 5. **Request limits.**
    - Maximum body size on upload and import endpoints (configurable).
    - Pagination on `/api/programs`, `/api/studies`, artefacts and ledger history.
-6. **Lost updates.** `signatures` and similar JSON lists are read-modify-written without row
+6. **Lost updates — fixed.** *Every unit of work first updates the single `writer_lock` row
+   (migration 0002) and holds that lock to commit, so writers in different processes are
+   serialised; ledger writes outside a unit of work are refused; a writer that waits past
+   `HOS_WRITE_WAIT_SECONDS` changes nothing and gets 503. A four-process test reproduced lost
+   updates on SQLite and PostgreSQL before the fix and passes on both after it.*
+   `signatures` and similar JSON lists are read-modify-written without row
    locking, so two concurrent signatures can lose one.
    - Use `SELECT … FOR UPDATE` or an optimistic `version` column.
    - Fold this into the P0.1 unit of work.
