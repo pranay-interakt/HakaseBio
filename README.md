@@ -96,14 +96,18 @@ cd backend && .venv/bin/hos-verify demo-out/module4.zip
 cd backend && HOS_DATA_DIR=./data .venv/bin/uvicorn hos.api.app:app --port 8000
 ```
 
-OpenAPI docs are served at <http://127.0.0.1:8000/docs>. Storage defaults to SQLite under
-`HOS_DATA_DIR` (default `~/.hakase_os`); set `HOS_DATABASE_URL` for PostgreSQL. On first run,
-create the administrator from the UI, or seed demo accounts (development only). The seeder
-generates a random password per account, prints them once and saves them to
+Storage defaults to SQLite under `HOS_DATA_DIR` (default `~/.hakase_os`); set
+`HOS_DATABASE_URL` for PostgreSQL. The interactive API docs (`/docs`, `/openapi.json`) are off
+unless `HOS_API_DOCS=1`.
+
+**First run.** Creating the administrator needs a one-time setup token, so only whoever runs the
+server can initialise it. The server prints the token in its log at start-up, or you can set
+`HOS_BOOTSTRAP_TOKEN` yourself. Enter it on the sign-in page, or seed demo accounts (development
+only). The seeder generates a random password per account, prints them once and saves them to
 `backend/scripts/dev_principals.local.json`, which is gitignored:
 
 ```bash
-cd backend && .venv/bin/python scripts/seed_dev.py http://127.0.0.1:8000
+cd backend && .venv/bin/python scripts/seed_dev.py http://127.0.0.1:8000 <setup-token>
 ```
 
 ### Frontend

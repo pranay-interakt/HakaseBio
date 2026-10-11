@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -20,6 +21,8 @@ import httpx
 
 from hos.core.provenance import utc_now
 from hos.data_sources.base import SourceStatus
+
+_log = logging.getLogger(__name__)
 
 __all__ = ["USER_AGENT", "CachedHttp"]
 
@@ -73,7 +76,10 @@ class CachedHttp:
             try:
                 r = self.client.get(url)
             except (httpx.TimeoutException, httpx.TransportError) as exc:
-                status, err = SourceStatus.UNREACHABLE, f"{type(exc).__name__}: {exc}"
+                # the exception text can carry DNS, proxy or host details of the server; the
+                # client gets the failure type, the server log the detail
+                _log.warning("data source request failed: %s: %s", type(exc).__name__, exc)
+                status, err = SourceStatus.UNREACHABLE, f"request failed ({type(exc).__name__})"
                 break
             if r.status_code == 200:
                 try:

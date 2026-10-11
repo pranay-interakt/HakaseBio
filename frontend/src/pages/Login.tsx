@@ -8,6 +8,7 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
   const [pid, setPid] = useState("");
   const [name, setName] = useState("");
   const [pw, setPw] = useState("");
+  const [setupToken, setSetupToken] = useState("");
   const [err, setErr] = useState<unknown>(null);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
 
   async function setup() {
     try {
-      await api.post("/setup", { principal_id: pid, name, password: pw });
+      await api.post("/setup", { principal_id: pid, name, password: pw, setup_token: setupToken });
       await login();
     } catch (e) {
       setErr(e);
@@ -56,10 +57,17 @@ export function Login({ onLogin }: { onLogin: (p: Principal) => void }) {
         <input value={pid} onChange={(e) => setPid(e.target.value)} autoComplete="username" />
       </div>
       {initialised === false && (
-        <div className="field">
-          <label className="field-label">Full name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
+        <>
+          <div className="field">
+            <label className="field-label">Full name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="field">
+            <label className="field-label">Setup token</label>
+            <input value={setupToken} onChange={(e) => setSetupToken(e.target.value)} autoComplete="off" />
+            <span className="muted small">Printed in the server log when it first starts, or set as HOS_BOOTSTRAP_TOKEN.</span>
+          </div>
+        </>
       )}
       <div className="field">
         <label className="field-label">Password</label>

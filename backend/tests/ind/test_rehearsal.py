@@ -96,15 +96,18 @@ def test_what_if_and_diff_over_http(tmp_path):
 
     from hos.api import create_app
     kern = Kernel(db=Database(f"sqlite:///{tmp_path / 'w.sqlite3'}"), files=FileStore(tmp_path / "o"))
-    c = TestClient(create_app(kern))
-    c.post("/api/setup", json={"principal_id": "admin", "name": "A", "password": PW})
+    c = TestClient(create_app(kern, bootstrap_token="t"))
+    c.post("/api/setup", json={"principal_id": "admin", "name": "A", "password": PW,
+                               "setup_token": "t"})
     h = {"Authorization": "Bearer " + c.post(
         "/api/auth/login", json={"principal_id": "admin", "password": PW}).json()["token"]}
     ctx = {"modality": "small_molecule", "indication": "chronic_non_oncology", "route": "oral",
            "intended_clinical_duration_days": 365, "max_trial_duration_days": 28}
-    d = c.post("/api/regulatory/diff", json={"a": ctx, "b": {**ctx, "max_trial_duration_days": 200}})
+    d = c.post("/api/regulatory/diff", headers=h,
+               json={"a": ctx, "b": {**ctx, "max_trial_duration_days": 200}})
     assert d.json()["summary"]["lengthened"] == 2
-    assert c.post("/api/regulatory/diff", json={"a": ctx, "b": {"modality": "x"}}).status_code == 400
+    assert c.post("/api/regulatory/diff", headers=h,
+                  json={"a": ctx, "b": {"modality": "x"}}).status_code == 400
     prog = c.post("/api/programs", headers=h, json={"name": "W", "context": ctx}).json()
     w = c.post(f"/api/programs/{prog['id']}/what-if", headers=h,
                json={"changes": {"populations": ["women_of_childbearing_potential"]}}).json()

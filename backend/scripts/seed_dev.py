@@ -52,9 +52,14 @@ def main() -> None:
     admin = accounts[0]
     c = httpx.Client(timeout=30)
     if not c.get(f"{base}/health").json()["initialised"]:
+        token = os.environ.get("HOS_BOOTSTRAP_TOKEN") or (sys.argv[2] if len(sys.argv) > 2
+                                                          else "")
+        if not token:
+            sys.exit("first run: pass the setup token printed in the server log as the second "
+                     "argument, or set HOS_BOOTSTRAP_TOKEN for both the server and this script")
         c.post(f"{base}/setup", json={
             "principal_id": admin["principal_id"], "name": admin["name"],
-            "password": passwords[admin["principal_id"]],
+            "password": passwords[admin["principal_id"]], "setup_token": token,
         }).raise_for_status()
     login = c.post(f"{base}/auth/login", json={
         "principal_id": admin["principal_id"], "password": passwords[admin["principal_id"]],

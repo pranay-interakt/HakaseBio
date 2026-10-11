@@ -64,7 +64,8 @@ def test_unreachable_source_is_honest():
     def boom(request):
         raise httpx.ConnectError("network down", request=request)
     r = PubChemClient(_http(transport=httpx.MockTransport(boom))).compound_by_inchikey(ASPIRIN)
-    assert r.status is SourceStatus.UNREACHABLE and not r.quantities and "network down" in r.error
+    assert r.status is SourceStatus.UNREACHABLE and not r.quantities
+    assert r.error == "request failed (ConnectError)"      # no raw network text to clients
 
 
 def test_rate_limit_is_reported_not_retried_forever():

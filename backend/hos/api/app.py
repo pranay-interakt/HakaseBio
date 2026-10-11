@@ -10,16 +10,21 @@ Run: ``uvicorn hos.api.app:app`` (``HOS_DATA_DIR`` / ``HOS_DATABASE_URL`` config
 
 from __future__ import annotations
 
+import hmac
+import logging
 import os
 import secrets
 import threading
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from hos import __version__
 from hos.core.citations import CITATIONS
@@ -46,6 +51,8 @@ __all__ = ["app", "create_app"]
 
 SESSION_TTL = timedelta(hours=8)
 
+
+_log = logging.getLogger(__name__)
 
 class Sessions:
     """In-process bearer-token store (single API process)."""
@@ -82,6 +89,8 @@ class SetupBody(BaseModel):
     principal_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     password: str
+    setup_token: str = Field(description="one-time token printed in the server log at start-up, "
+                             "or HOS_BOOTSTRAP_TOKEN")
 
 
 class LoginBody(BaseModel):
@@ -244,11 +253,36 @@ class CancelBody(BaseModel):
 # ---- app -----------------------------------------------------------------------------
 
 
-def create_app(kernel: Kernel | None = None) -> FastAPI:
+def _validation_errors(errors: list[Any]) -> list[str]:
+    """Field errors without the submitted values: FastAPI and pydantic echo the input, which
+    for a login or signature request includes the password."""
+    return [f"{'.'.join(str(x) for x in e.get('loc', ())) or 'request'}: {e.get('msg', '')}"
+            for e in errors]
+
+
+def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = None) -> FastAPI:
+    """``bootstrap_token`` (or HOS_BOOTSTRAP_TOKEN) is required to create the first
+    administrator; without either, a one-time token is generated and printed in the server log
+    at start-up, so only whoever runs the server can initialise it. The interactive API docs
+    are served only when HOS_API_DOCS=1."""
+    docs = os.environ.get("HOS_API_DOCS", "").lower() in ("1", "true", "yes")
+    setup_token = bootstrap_token or os.environ.get("HOS_BOOTSTRAP_TOKEN") or \
+        secrets.token_urlsafe(18)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if not (bootstrap_token or os.environ.get("HOS_BOOTSTRAP_TOKEN")) and \
+                not get_kernel().repo.principals():
+            _log.warning("First run: create the administrator with setup token %s",
+                         setup_token)
+        yield
+
     app = FastAPI(title="Hakase Operating System API", version=__version__,
                   description="Preclinical study kernel: programmes, study sets, drivers, "
                               "execution, analysis, attestation and IND assembly. Every "
-                              "scientific value carries provenance.")
+                              "scientific value carries provenance.",
+                  docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
+                  openapi_url="/openapi.json" if docs else None, lifespan=lifespan)
     origins = [o for o in os.environ.get("HOS_CORS_ORIGINS",
                                          "http://localhost:5173,http://127.0.0.1:5173").split(",")
                if o]
@@ -292,17 +326,32 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
     for exc_t in (DriverError, KernelError, InvalidStructureError, ValueError):
         app.add_exception_handler(exc_t, lambda r, e: _err(400, e))
 
+    def _invalid(code: int, exc: Any) -> JSONResponse:
+        return JSONResponse(status_code=code, content={
+            "error": "ValidationError", "detail": "the request is incomplete or not valid",
+            "errors": _validation_errors(exc.errors())})
+
+    app.add_exception_handler(RequestValidationError, lambda r, e: _invalid(422, e))
+    app.add_exception_handler(ValidationError, lambda r, e: _invalid(400, e))
+
     # -- system -------------------------------------------------------------------------
     @app.get("/api/health")
     def health(k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
-        return {"status": "ok", "version": __version__,
-                "initialised": bool(k.repo.principals()),
-                "drivers": k.registry.ids(), "reference_parameters": REGISTRY_VERSION}
+        """Public: only what the sign-in page needs."""
+        return {"status": "ok", "initialised": bool(k.repo.principals())}
+
+    @app.get("/api/system")
+    def system(actor: Principal = Depends(current),
+               k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+        return {"version": __version__, "drivers": k.registry.ids(),
+                "reference_parameters": REGISTRY_VERSION}
 
     @app.post("/api/setup")
     def setup(body: SetupBody, k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         if k.repo.principals():
             raise PermissionDenied("system already initialised")
+        if not hmac.compare_digest(body.setup_token.encode(), setup_token.encode()):
+            raise PermissionDenied("the setup token is not valid")
         p = k.register_principal(None, principal_id=body.principal_id, name=body.name,
                                  kind=PrincipalKind.HUMAN, roles=[Role.ADMIN],
                                  password=body.password)
@@ -326,6 +375,8 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
     @app.get("/api/principals")
     def principals(actor: Principal = Depends(current),
                    k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
+        if Role.ADMIN not in actor.roles:
+            raise PermissionDenied("only an administrator can list users")
         return [k.get_principal(r.id).to_dict() for r in k.repo.principals()]
 
     @app.post("/api/principals")
@@ -348,24 +399,26 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
 
     # -- reference data -------------------------------------------------------------------
     @app.get("/api/reference/citations")
-    def citations() -> dict[str, Any]:
+    def citations(actor: Principal = Depends(current)) -> dict[str, Any]:
         return {k: c.to_dict() for k, c in CITATIONS.items()}
 
     @app.get("/api/reference/methods")
-    def methods() -> dict[str, Any]:
+    def methods(actor: Principal = Depends(current)) -> dict[str, Any]:
         return {k: m.to_dict() for k, m in METHODS.items()}
 
     @app.get("/api/reference/parameters")
-    def parameters() -> dict[str, Any]:
+    def parameters(actor: Principal = Depends(current)) -> dict[str, Any]:
         return {"version": REGISTRY_VERSION,
                 "parameters": {k: p.as_quantity().to_dict() for k, p in REFERENCE_PARAMETERS.items()}}
 
     @app.get("/api/drivers")
-    def drivers(k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
+    def drivers(actor: Principal = Depends(current),
+                k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
         return [d.describe() for d in k.registry]
 
     @app.get("/api/drivers/{driver_id}")
-    def driver(driver_id: str, k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
+    def driver(driver_id: str, actor: Principal = Depends(current),
+               k: Kernel = Depends(get_kernel)) -> dict[str, Any]:
         return k.registry.get(driver_id).describe()
 
     # -- programmes and compounds ---------------------------------------------------------
@@ -699,13 +752,14 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
     @app.get("/api/requirements/{requirement_id}/import-fields")
-    def import_fields_for(requirement_id: str) -> list[dict[str, Any]]:
+    def import_fields_for(requirement_id: str,
+                          actor: Principal = Depends(current)) -> list[dict[str, Any]]:
         from hos.kernel.import_specs import import_fields
         return [f.to_dict() for f in import_fields(requirement_id)]
 
     # -- regulatory compiler diff and rehearsal (docs/14 P10) --------------------------------
     @app.post("/api/regulatory/diff")
-    def regulatory_diff(body: DiffBody) -> dict[str, Any]:
+    def regulatory_diff(body: DiffBody, actor: Principal = Depends(current)) -> dict[str, Any]:
         from hos.core.regulatory.diff import diff_contexts
         try:
             a, b = ProgramContext.from_dict(body.a), ProgramContext.from_dict(body.b)
@@ -752,6 +806,10 @@ def create_app(kernel: Kernel | None = None) -> FastAPI:
     @app.get("/api/ledger/{subject_id}")
     def ledger(subject_id: str, actor: Principal = Depends(current),
                k: Kernel = Depends(get_kernel)) -> list[dict[str, Any]]:
+        if subject_id != actor.id and Role.ADMIN not in actor.roles and \
+                subject_id in {r.id for r in k.repo.principals()}:
+            raise PermissionDenied("a user's own history is visible to that user and "
+                                   "administrators")
         return k.history(subject_id)
 
     return app

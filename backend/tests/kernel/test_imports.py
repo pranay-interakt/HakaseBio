@@ -192,8 +192,9 @@ def test_import_over_http(tmp_path):
     pw = "correct horse battery staple"
     kern = Kernel(db=Database(f"sqlite:///{tmp_path / 'h.sqlite3'}"),
                   files=FileStore(tmp_path / "o"))
-    c = TestClient(create_app(kern))
-    c.post("/api/setup", json={"principal_id": "admin", "name": "A", "password": pw})
+    c = TestClient(create_app(kern, bootstrap_token="t"))
+    c.post("/api/setup", json={"principal_id": "admin", "name": "A", "password": pw,
+                               "setup_token": "t"})
     adm = {"Authorization": "Bearer " + c.post(
         "/api/auth/login", json={"principal_id": "admin", "password": pw}).json()["token"]}
     c.post("/api/principals", headers=adm, json={
@@ -206,7 +207,8 @@ def test_import_over_http(tmp_path):
         "intended_clinical_duration_days": 365, "max_trial_duration_days": 28}}).json()
     cmp_ = c.post(f"/api/programs/{prog['id']}/compounds", headers=h,
                   json={"name": "x", "smiles": "CCO"}).json()
-    assert c.get("/api/requirements/genotox.ames/import-fields").json()[0]["key"] == "overall_call"
+    assert c.get("/api/requirements/genotox.ames/import-fields",
+                 headers=h).json()[0]["key"] == "overall_call"
     r = c.post(f"/api/programs/{prog['id']}/imports", headers=h, content=REPORT, params={
         "compound_id": cmp_["id"], "requirement_id": "genotox.ames", "filename": "ames.pdf",
         "title": "Ames test", "laboratory": "Lab", "report_date": "2026-05-01", "glp": "false"})

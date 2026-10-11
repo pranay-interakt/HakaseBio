@@ -112,6 +112,11 @@ def _check_password(password: str, stored: str) -> bool:
 PROGRAM_DETERMINATIONS = {"s6_principles_apply": "s6_determination"}
 
 
+#: A hash of a random secret, checked when a principal has none, so a refusal costs the same
+#: time whether or not the id exists (no user enumeration by timing).
+_DUMMY_HASH = _hash_password(secrets.token_hex(16))
+
+
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
@@ -175,9 +180,12 @@ class Kernel:
         try:
             row = self.repo.principal(principal_id)
         except NotFound:
+            # spend the same scrypt work as a real check, so timing does not reveal which ids
+            # exist
+            _check_password(password, _DUMMY_HASH)
             raise PermissionDenied("invalid credentials") from None
-        if row.kind != PrincipalKind.HUMAN.value or not row.signing_secret_hash or \
-                not _check_password(password, row.signing_secret_hash):
+        stored = row.signing_secret_hash if row.kind == PrincipalKind.HUMAN.value else None
+        if not _check_password(password, stored or _DUMMY_HASH) or not stored:
             self.ledger.record(actor_id=principal_id, actor_kind="unknown",
                                action="auth.failed", subject_type="principal",
                                subject_id=principal_id)
