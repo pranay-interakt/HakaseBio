@@ -312,6 +312,7 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=m3, section="M3(R2) sections 1.5, 4",
             rationale="Dose selection for the pivotal repeat-dose studies",
             glp=False, species=("rat", "dog"), ctd_section="4.2.3.2",
+            driver_id="dose_range_finding",
         ))
         out.append(_req(
             id="tox.repeat_dose_rodent", name="Repeat-dose toxicity (rodent)",

@@ -314,6 +314,24 @@ is a new registry version; it never silently alters past results.
 - The call follows TG 471 ¶35–37: a concentration-related and/or reproducible increase, with
   biological relevance first and statistics only as an aid. It is a Study Director determination.
 
+## 4.17 Dose range-finding and high-dose selection  [`tox.incidence`, `tox.exposure_margin_m3r2`]
+
+- Group comparisons reuse the repeat-dose analysis (§4.11). The statistical test is a protocol
+  choice: "none" (descriptive) or Dunnett with a stated α.
+- Per-group incidence tables follow OECD TG 407 ¶50: animals at start, unscheduled deaths with
+  their time, and animals showing each sign. M3(R2) §4: lethality should not be an intended
+  endpoint, so any death is reported as a concern.
+- M3(R2) §1.5 facts are stated when they apply:
+  - the top dose against the 1000 mg/kg/day limit dose;
+  - the exposure margin at the top dose (group-mean AUC, or Cmax per Note 1) against the 50-fold
+    statement;
+  - the exception (1000 mg/kg/day under a 10-fold margin **and** a clinical dose above 1 g/day →
+    limit by 10-fold margin, 2000 mg/kg/day or the MFD).
+
+  Exposures and the clinical dose are inputs with their own provenance.
+- M3(R2) does not define the MTD. The protocol states the MTD criteria. The MTD, the high-dose
+  basis and the recommended doses are Study Director determinations.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

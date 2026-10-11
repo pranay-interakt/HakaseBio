@@ -248,6 +248,21 @@ METHODS: Final[dict[str, Method]] = dict(
            "concentration (exact or Poisson-sampled)", ("oecd_tg471",),
            limits=("for software verification and workflow demonstration only; "
                    "never admissible as evidence",)),
+        _m("tox.incidence",
+           "Per-group counts of animals at start, unscheduled deaths and animals showing each "
+           "clinical sign", ("oecd_tg407",),
+           assumptions=("tabulated as OECD TG 407 paragraph 50 describes for each test group",)),
+        _m("tox.exposure_margin_m3r2",
+           "Exposure margin: animal group-mean exposure at the top dose / clinical exposure",
+           ("ich_m3r2",),
+           assumptions=("'exposure' generally means group mean AUC; Cmax may be more appropriate "
+                        "for acute cardiovascular or CNS effects (M3(R2) Note 1)",),
+           limits=("both exposures are inputs with their own provenance",)),
+        _m("sim.drf_declared_effects",
+           "Simulated dose range-finding data from declared endpoint effects, clinical-sign "
+           "incidences and deaths", ("oecd_tg407",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("tk.dose_normalised", "Exposure divided by the administered dose",
            ("ich_s3a", "cdisc_pk_terms")),
         _m("tk.group_summary",

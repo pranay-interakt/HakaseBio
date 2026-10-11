@@ -327,6 +327,39 @@ The kit checks:
   - Each TG 471 design rule refused with its paragraph.
   - Historical-range and top-dose flags.
 
+### `dose_range_finding` v1.0.0 — dose range-finding / MTD (ICH M3(R2) §1.5, §4)
+
+- **Serves.** `tox.dose_range_finding`, CTD 4.2.3.2.
+- **Research note.** `docs/research/drivers/dose_range_finding.md`.
+- **Design.** Required inputs:
+  - species and strain, route and vehicle;
+  - control (optional), dose levels, sexes, animals per sex, dosing days;
+  - numeric endpoints and their timepoints;
+  - the statistics choice with its basis;
+  - the MTD criteria with their basis;
+  - the exposure metric (AUC or Cmax) for margins.
+- **Return data.** Long format:
+  - numeric endpoint rows at protocol timepoints;
+  - clinical-sign and mortality rows with the observation and the day observed.
+- **Analysis.**
+  - The group comparison shared with `repeat_dose_toxicity`. It was refactored into
+    `repeat_dose_tox/analysis.py`, and the repeat-dose analysis and report hashes were checked
+    byte-identical before and after.
+  - Incidence and clinical-sign tables.
+  - The exposure margin at the top dose when exposures are supplied.
+  - The M3(R2) §1.5 statements.
+- **Determinations.** All by the Study Director:
+  - MTD (or not established);
+  - basis for the pivotal high dose (MTD / limit dose / exposure saturation / MFD / 50-fold
+    margin);
+  - recommended high dose (required);
+  - recommended mid and low doses (optional).
+- **Known-value tests.**
+  - % vs control equals the declared effect.
+  - The table equals the shared function's output.
+  - Incidence counts.
+  - Each M3(R2) §1.5 statement triggered only by its conditions.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

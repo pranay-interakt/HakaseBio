@@ -67,3 +67,23 @@ Page numbers below are the printed page numbers of the guideline body.
 
 1. ICH (2009). *M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals.* Step 4, 11 June 2009. Sections 1.5, 4; Note 1. https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf
 2. Robinson S, Delongeas JL, Donald E, Dreher D, Festag M, Kervyn S, Lampo A, Nahas K, Nogues V, Ockert D, Quinn K, Old S, Pickersgill N, Somers K, Stark C, Stei P, Waterson L, Chapman K. A European pharmaceutical company initiative challenging the regulatory requirement for acute toxicity studies in pharmaceutical drug development. *Regul Toxicol Pharmacol.* 2008;50(3):345–352. DOI: 10.1016/j.yrtph.2007.11.009 *(bibliographic + abstract only)*.
+
+## Implementation record (driver `dose_range_finding` v1.0.0, 2026-10-11)
+
+- **Incidence format.** OECD TG 407 ¶50 (read in `oecd407.txt` from the Step 3 protocol
+  research): data "summarised in tabular form showing for each test group the number of animals
+  at the start of the test, the number of animals found dead during the test or euthanised for
+  humane reasons and the time of any death or euthanasia, the number showing signs of toxicity,
+  a description of the signs".
+- **M3(R2) §1.5 statements as encoded.**
+  - Limit dose: 1000 mg/kg/day.
+  - 50-fold margin: "generally also considered acceptable as the maximum dose"; for US Phase III,
+    dose-limiting toxicity "generally should be identified in at least one species".
+  - Exception: under a 10-fold margin at 1000 mg/kg/day **and** a clinical dose above 1 g/day →
+    the 10-fold margin, 2000 mg/kg/day or the MFD, whichever is lower.
+
+  Each is stated as a fact when its conditions hold. None selects a dose.
+- **Not built.**
+  - Within-animal dose escalation (non-rodent MTD phase). Each animal stays in one dose group.
+  - Exposure-saturation analysis. Saturation is a possible basis for the high dose but is a
+    determination; toxicokinetics (A2) reports dose proportionality.

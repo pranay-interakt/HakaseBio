@@ -26,14 +26,10 @@ from itertools import pairwise
 from typing import Any, Literal
 
 import numpy as np
-import scipy
 from pydantic import BaseModel, Field, field_validator, model_validator
-from scipy import stats
 
 from hos.core import units as U
 from hos.core.citations import cite
-from hos.core.methods import method
-from hos.core.provenance import Uncertainty
 from hos.core.qc import QCFinding, QCStatus, QCVerdict
 from hos.core.quantity import Quantity
 from hos.core.regulatory.context import Modality, ProgramContext
@@ -57,6 +53,7 @@ from hos.drivers.base import (
     Support,
     tabulate,
 )
+from hos.drivers.repeat_dose_tox.analysis import compare_groups, dose_eq
 from hos.drivers.repeat_dose_tox.guidelines import (
     GUIDELINES,
     M3R2_LIMIT_DOSE_MG_KG_DAY,
@@ -65,10 +62,6 @@ from hos.drivers.repeat_dose_tox.guidelines import (
 )
 from hos.kernel.attestation import Role
 
-_SOFTWARE = {"scipy": scipy.__version__, "numpy": np.__version__}
-#: scipy.stats.dunnett integrates the multivariate t distribution by randomised quasi-Monte
-#: Carlo; a fixed seed makes p-values reproducible to the last digit (determinism rule).
-DUNNETT_QMC_SEED = 0
 Category = Literal["body_weight", "food_consumption", "haematology", "clinical_chemistry",
                    "urinalysis", "organ_weight", "other"]
 
@@ -178,8 +171,7 @@ class RepeatDoseSimulation(BaseModel):
     endpoints: dict[str, EndpointTruth]
 
 
-def _dose_eq(a: float, b: float) -> bool:
-    return abs(a - b) <= 1e-9 * max(1.0, abs(b))
+_dose_eq = dose_eq
 
 
 class RepeatDoseToxicityDriver(StudyDriver):
@@ -433,80 +425,11 @@ class RepeatDoseToxicityDriver(StudyDriver):
     def _analyze(self, data: IngestedData, params: BaseModel, compound: CompoundInfo,
                  inputs: Mapping[str, Quantity]) -> AnalysisResult:
         p = _p(params)
-        summ_m, dun_m = method("stats.group_summary"), method("stats.dunnett")
-        prov_note = f"file sha256 {data.file_sha256[:16]}"
-        cells: dict[tuple[str, str, str, str], dict[float, list[float]]] = defaultdict(
-            lambda: defaultdict(list))
-        for r in data.records:
-            spec = p.endpoint(r["endpoint"])
-            v = U.convert(r["value"], r["unit"], spec.unit) if r["unit"] != spec.unit else r["value"]
-            dose = next(d for d in p.groups() if _dose_eq(d, r["dose"]))
-            cells[(r["endpoint"], r["sex"], r["phase"], r["timepoint"])][dose].append(float(v))
-
-        rows: list[tuple[Any, ...]] = []
-        q: dict[str, Quantity] = {}
+        cmp_ = compare_groups(data.records, endpoint_unit=lambda e: p.endpoint(e).unit,
+                              groups=p.groups(), alpha=p.alpha,
+                              prov_note=f"file sha256 {data.file_sha256[:16]}")
+        rows, q, notes, n_sig = cmp_.rows, cmp_.quantities, cmp_.notes, cmp_.n_significant
         findings: list[QCFinding] = []
-        notes: list[str] = []
-        n_sig = 0
-        for key in sorted(cells):
-            endpoint, sex, phase, tp = key
-            spec = p.endpoint(endpoint)
-            groups = cells[key]
-            ctrl = groups.get(0.0, [])
-            treated = [d for d in sorted(groups) if d > 0 and len(groups[d]) >= 2]
-            skipped = [d for d in sorted(groups) if d > 0 and len(groups[d]) < 2]
-            if skipped:
-                notes.append(f"{endpoint}/{sex}/{phase}/{tp}: groups {skipped} have n < 2, "
-                             "not tested")
-            if len(ctrl) < 2 or not treated:
-                notes.append(f"{endpoint}/{sex}/{phase}/{tp}: control n < 2 or no testable "
-                             "group; no comparison")
-                pvals: dict[float, float | None] = {}
-            else:
-                res = stats.dunnett(*[np.asarray(groups[d]) for d in treated],
-                                    control=np.asarray(ctrl), alternative="two-sided",
-                                    rng=np.random.default_rng(DUNNETT_QMC_SEED))
-                pvals = {d: float(pv) for d, pv in zip(treated, res.pvalue, strict=True)}
-            cmean = float(np.mean(ctrl)) if ctrl else None
-            label = f"{endpoint} ({sex}, {phase}, {tp})"
-            for d in sorted(groups):
-                vals = groups[d]
-                mean = Quantity.computed(
-                    float(np.mean(vals)), spec.unit, method=summ_m, software=_SOFTWARE,
-                    uncertainty=Uncertainty(kind="sd", sd=float(np.std(vals, ddof=1)), n=len(vals))
-                    if len(vals) > 1 else None,
-                    label=f"{label} mean at {d:g} mg/kg/day", notes=prov_note)
-                dose_q = Quantity.user_supplied(d, "mg/kg/day", actor="study protocol",
-                                                label="dose")
-                if d == 0:
-                    rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, "control",
-                                 "control", "control"))
-                    continue
-                pct: Any = "n/a"
-                if cmean not in (None, 0.0):
-                    assert cmean is not None
-                    pct = Quantity.computed(100.0 * (mean.require() - cmean) / abs(cmean),
-                                            "percent", method=summ_m, software=_SOFTWARE,
-                                            label=f"{label} % vs control at {d:g}")
-                pv = pvals.get(d)
-                if pv is None:
-                    rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, pct,
-                                 "not tested", "-"))
-                    continue
-                pq = Quantity.computed(pv, "dimensionless", method=dun_m, software=_SOFTWARE,
-                                       label=f"{label} Dunnett p at {d:g}",
-                                       notes=f"two-sided; {len(treated)} groups vs control; "
-                                             f"QMC seed {DUNNETT_QMC_SEED}")
-                sig = pv < p.alpha
-                rows.append((endpoint, sex, phase, tp, dose_q, len(vals), mean, pct, pq,
-                             "yes" if sig else "no"))
-                if sig:
-                    n_sig += 1
-                    base = f"finding|{endpoint}|{sex}|{phase}|{tp}|{d:g}"
-                    q[f"{base}|p"] = pq
-                    q[f"{base}|mean"] = mean
-                    if isinstance(pct, Quantity):
-                        q[f"{base}|pct_vs_control"] = pct
         table = tabulate(
             "Dose-group comparisons with control (Dunnett, two-sided)",
             ("endpoint", "sex", "phase", "timepoint", "dose", "n", "mean (SD)", "% vs control",
