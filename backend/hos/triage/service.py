@@ -1,4 +1,4 @@
-"""Running and recording in silico triage, as ``kernel.triage``.
+"""Running and recording in silico triage, as ``kernel.triage`` (docs/04 section 4.26).
 
 A run screens one compound and stores the result as a new version, with its content hash
 written to the ledger in the same unit of work (docs/15 P0.1), so what was known when a
@@ -27,6 +27,7 @@ from hos.kernel.errors import NotFound
 from hos.kernel.uow import atomic
 from hos.triage.alerts import screen_alerts
 from hos.triage.herg import screen_herg
+from hos.triage.reference import load_reference
 from hos.triage.types import Signal, TriageReport
 
 __all__ = ["ACTION", "TriageService"]
@@ -38,6 +39,9 @@ ACTION = "compound.triaged"
 class TriageService:
     def __init__(self, kernel: Any) -> None:
         self.k = kernel
+        #: reference sets live beside the file store, under the same data directory the
+        #: anchors use, so a kernel built on a temporary directory is self-contained
+        self.data_dir = kernel.files.root.parent
 
     # -- reading -------------------------------------------------------------------------------
 
@@ -95,8 +99,13 @@ class TriageService:
     def _screens(self, row: Any, chembl: ChEMBLClient | None) -> tuple[Signal, ...]:
         smiles = row.smiles or ""
         signals: list[Signal] = list(screen_alerts(smiles))
-        if chembl is not None:
-            signals.append(screen_herg(smiles, chembl, inchikey=row.inchikey or ""))
+        # the installed reference set, when there is one, is what the endpoint screens read
+        # across; without it they fall back to searching the source live
+        reference = load_reference("herg_ic50", self.data_dir)
+        if reference is not None or chembl is not None:
+            signals.append(
+                screen_herg(smiles, chembl, inchikey=row.inchikey or "", reference=reference)
+            )
         return tuple(signals)
 
     @atomic

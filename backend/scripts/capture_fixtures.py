@@ -21,12 +21,15 @@ from hos.data_sources import CachedHttp, ChEMBLClient, PubChemClient
 from hos.data_sources.http import USER_AGENT
 from hos.triage.herg import HergParams, screen_herg
 from hos.triage.readacross import ReadAcrossParams
+from hos.triage.reference import build_herg_reference
 from tests.fixtures.transport import fixture_path
 
 #: Dofetilide's canonical SMILES exactly as ChEMBL serves it for CHEMBL473.
 DOFETILIDE_SMILES = "CN(CCOc1ccc(NS(C)(=O)=O)cc1)CCc1ccc(NS(C)(=O)=O)cc1"
 #: Paracetamol's canonical SMILES as ChEMBL serves it for CHEMBL112.
 PARACETAMOL_SMILES = "CC(=O)Nc1ccc(O)cc1"
+#: Page size for the recorded page of the reference build (tests/triage/test_reference.py).
+REFERENCE_PAGE = 300
 #: The neighbourhood tests/triage/test_herg.py asserts against.
 TRIAGE_PARAMS = HergParams(
     read_across=ReadAcrossParams(min_similarity=0.5, max_analogues=5, min_analogues=3),
@@ -86,6 +89,10 @@ def main() -> None:
     # paracetamol: no measured hERG value and no measured analogue near enough, so the
     # screen abstains rather than estimating
     screen_herg(PARACETAMOL_SMILES, ch, TRIAGE_PARAMS, inchikey="RZVAJINKPMORJF-UHFFFAOYSA-N")
+
+    # one real page of the hERG reference build, so tests exercise the builder on the
+    # source's own records rather than on values typed by hand
+    build_herg_reference(ch, page_size=REFERENCE_PAGE, max_pages=1)
 
 
 if __name__ == "__main__":

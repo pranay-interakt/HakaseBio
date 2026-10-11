@@ -12,7 +12,7 @@ Three rules hold for everything in this module:
   It never fills the gap with a default, an average or a plausible-looking value.
 * Nothing here is evidence. A triage report informs a decision about what to run next;
   it is never written into a study record, counted towards readiness, or exported in a
-  submission. See ``docs/16_in_silico_triage.md``.
+  submission. See ``docs/04_scientific_foundations.md`` section 4.26.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""In silico triage: decision support before a study is commissioned (docs/16).
+"""In silico triage: decision support before a study is commissioned (docs/04 section 4.26).
 
 Screens a compound and reports what is already known or can be estimated from measured
 data — published structural alerts, a measured endpoint value, or a read-across estimate

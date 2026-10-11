@@ -21,6 +21,7 @@ dependencies = [
 [project.scripts]
 hos-verify = "hos.verify.cli:main"
 hos-db = "hos.db.cli:main"
+hos-triage-reference = "hos.triage.cli:main"
 
 [project.optional-dependencies]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]

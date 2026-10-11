@@ -586,6 +586,16 @@ into a study record, not counted towards IND readiness, and not carried into a s
   Potencies are averaged as pIC50. No safety margin is computed: a margin needs a clinical exposure
   (ICH S7B; Redfern 2003), which does not exist at triage.
 
+- **Reference sets** — a read-across estimate searches the compounds *measured for that
+  endpoint*, not a whole chemical database: searching everything finds mostly structures nobody
+  tested, and the estimate abstains almost always. A set is built by a recorded operator command
+  (`hos-triage-reference build herg`, docs/16), stored under the data directory, and identified by
+  a snapshot id computed from its contents and the build logic's version. Every estimate records
+  the snapshot id it used, so the number reproduces exactly after a rebuild. Excluded on build and
+  counted, never silently dropped: bounded results, records the source flags as doubtful,
+  unconvertible units, unparseable structures. A set derived from ChEMBL carries ChEMBL's
+  CC BY-SA 3.0 terms, recorded in the set; it is a local build artefact and is not redistributed.
+
 **No accuracy is claimed** for any triage signal. A sensitivity, specificity or error figure may be
 stated only from a pre-registered, held-out validation published for that endpoint; until then the
 product states that none exists.

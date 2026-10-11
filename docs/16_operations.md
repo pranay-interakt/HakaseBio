@@ -151,3 +151,24 @@ verifies the chain, every anchor and the reconciliation of stored state.
 - A database restored to an earlier point than the newest anchor reports "chain reaches every
   checkpoint". That is the expected sign of lost transactions, not of tampering. Record the
   restore as a deviation.
+
+## In silico triage reference sets
+
+The triage screens (docs/04 section 4.26) read across the compounds measured for an endpoint. That
+set is built from a public source by an operator, not by the application, and not in cloud CI
+(whose tests run against recorded responses):
+
+```bash
+hos-triage-reference build herg   # ~13 paged requests to ChEMBL; about a minute
+hos-triage-reference show herg    # what is installed, and where it came from
+```
+
+The set is written to `$HOS_DATA_DIR/triage_reference/<endpoint>.json` and is picked up without a
+restart. Until one is installed, the hERG screen falls back to searching the source live, which
+finds the nearest structures overall rather than the nearest measured ones and so abstains far more
+often; with no source reachable either, it abstains and says so.
+
+Rebuild when the source has moved on. A rebuild gives a new snapshot id, so earlier results stay
+attributable to the set they were computed from. The set derived from ChEMBL carries ChEMBL's
+CC BY-SA 3.0 terms: it is a local build artefact, backed up with the data directory, and not
+redistributed.

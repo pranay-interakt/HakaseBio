@@ -148,3 +148,21 @@ def test_a_programme_view_gives_the_latest_per_compound(k):  # noqa: F811
     latest = k.triage.program_latest(pid)
     assert set(latest) == {cid, other["id"]}
     assert latest[cid]["version"] == 2
+
+
+def test_an_installed_reference_set_is_used_and_recorded(k):  # noqa: F811
+    """A set installed under the kernel's data directory is what the endpoint screens read,
+    and the snapshot id it used is part of the stored report."""
+    import httpx
+
+    from hos.triage.reference import build_herg_reference, save_reference
+
+    ch = ChEMBLClient(CachedHttp(client=httpx.Client(transport=replay_transport())))
+    reference = build_herg_reference(ch, page_size=300, max_pages=1).reference
+    save_reference(reference, k.files.root.parent)
+
+    sci, _, cid = _compound(k, PARACETAMOL, "paracetamol")
+    report = k.triage.run(sci, cid)  # no client passed: the set makes the screen offline
+    herg = next(s for s in report["signals"] if s["id"] == "herg.read_across")
+    assert herg["outcome"] == "not_predictable"  # paracetamol has no near measured analogue
+    assert reference.snapshot_id in herg["quantity"]["provenance"]["reason"]

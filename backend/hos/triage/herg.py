@@ -43,6 +43,7 @@ from hos.core.quantity import Quantity
 from hos.data_sources.base import SourceStatus
 from hos.data_sources.chembl import HERG_TARGET, ChEMBLClient
 from hos.triage.readacross import ReadAcrossParams, fingerprint, read_across, tanimoto
+from hos.triage.reference import ReferenceSet
 from hos.triage.types import Analogue, Outcome, Signal
 
 __all__ = ["SIGNAL_ID", "HergParams", "screen_herg"]
@@ -96,25 +97,46 @@ def _usable(q: Quantity) -> bool:
     )
 
 
-def _unavailable(reason: str) -> Signal:
+def _unavailable(reason: str, *, snapshot_id: str | None = None) -> Signal:
+    full = f"{reason} (reference set {snapshot_id})" if snapshot_id else reason
     return Signal(
         id=SIGNAL_ID,
         title=_TITLE,
         outcome=Outcome.NOT_PREDICTABLE,
         summary="No estimate: " + reason,
-        quantity=Quantity.unavailable(_UNIT, reason=reason, label="hERG IC50 (not predicted)"),
+        quantity=Quantity.unavailable(_UNIT, reason=full, label="hERG IC50 (not predicted)"),
         limits=_LIMITS,
         citations=(cite("shah2016"), cite("helman2019"), cite("rogers2010"), cite("davies2015")),
         reason=reason,
     )
 
 
-def _measured_signal(cid: str, pic50s: list[float], name: str | None) -> Signal:
-    """The compound's own measured hERG IC50: reported, not estimated."""
+def _measured_signal(
+    cid: str,
+    pic50s: list[float],
+    name: str | None,
+    *,
+    n_measurements: int | None = None,
+    snapshot_id: str | None = None,
+) -> Signal:
+    """The compound's own measured hERG IC50: reported, not estimated.
+
+    ``pic50s`` is either every measurement (searched live) or the one aggregated value a
+    reference set holds, in which case ``n_measurements`` says how many are behind it.
+    """
+    n = n_measurements if n_measurements is not None else len(pic50s)
     mid = median(pic50s)
     value = 10.0 ** (9.0 - mid)
-    low = 10.0 ** (9.0 - max(pic50s))
-    high = 10.0 ** (9.0 - min(pic50s))
+    spread = (
+        Uncertainty(
+            kind="range",
+            lower=10.0 ** (9.0 - max(pic50s)),
+            upper=10.0 ** (9.0 - min(pic50s)),
+            n=n,
+        )
+        if len(pic50s) > 1
+        else None
+    )
     quantity = Quantity.literature(
         value,
         _UNIT,
@@ -122,12 +144,13 @@ def _measured_signal(cid: str, pic50s: list[float], name: str | None) -> Signal:
         citation=cite("davies2015"),
         source_record_id=cid,
         source_url=f"https://www.ebi.ac.uk/chembl/compound_report_card/{cid}/",
-        uncertainty=Uncertainty(kind="range", lower=low, upper=high, n=len(pic50s)),
-        label=f"hERG IC50 ({HERG_TARGET}), median of {len(pic50s)} measurement(s)",
+        uncertainty=spread,
+        label=f"hERG IC50 ({HERG_TARGET}), median of {n} measurement(s)",
         notes=(
-            "median of the exact, unflagged IC50 values ChEMBL holds for this structure, "
-            "taken on the pIC50 scale; assays and laboratories differ, and the range shown "
-            "is that spread, not an experimental error"
+            "median of the exact, unflagged IC50 values published for this structure, taken "
+            "on the pIC50 scale; assays and laboratories differ, and any range shown is that "
+            "spread, not an experimental error"
+            + (f"; reference set {snapshot_id}" if snapshot_id else "")
         ),
     )
     return Signal(
@@ -135,7 +158,7 @@ def _measured_signal(cid: str, pic50s: list[float], name: str | None) -> Signal:
         title=_TITLE,
         outcome=Outcome.MEASURED,
         summary=(
-            f"Already measured: {len(pic50s)} hERG IC50 value(s) published for this "
+            f"Already measured: {n} hERG IC50 value(s) published for this "
             f"structure, median {value:,.0f} nM. No estimate is needed."
         ),
         quantity=quantity,
@@ -145,6 +168,71 @@ def _measured_signal(cid: str, pic50s: list[float], name: str | None) -> Signal:
             "no safety margin is implied: a margin needs a clinical exposure",
         ),
         citations=(cite("davies2015"),),
+    )
+
+
+def _predicted_signal(
+    pic50: float,
+    *,
+    low_pic50: float,
+    high_pic50: float,
+    nearest: float | None,
+    used: list[Analogue],
+    ra: ReadAcrossParams,
+    source: str,
+    snapshot_id: str | None = None,
+    retrieved_at: str | None = None,
+    excluded: int = 0,
+) -> Signal:
+    """One estimate, built the same way whichever set the analogues came from."""
+    estimate = 10.0 ** (9.0 - pic50)
+    notes = [
+        f"similarity-weighted over {len(used)} analogue(s) measured against "
+        f"{HERG_TARGET}, averaged as pIC50",
+        f"analogues drawn from {source}",
+        f"neighbourhood {ra.to_dict()}",
+    ]
+    if excluded:
+        notes.append(f"{excluded} measurement(s) excluded as bounded, flagged or unconvertible")
+    software = {}
+    if snapshot_id:
+        software["reference_set"] = snapshot_id
+    if retrieved_at:
+        software["chembl_retrieved_at"] = retrieved_at
+    quantity = Quantity.predicted(
+        estimate,
+        _UNIT,
+        method=method(_METHOD),
+        applicability=ApplicabilityCheck(
+            in_domain=True,
+            descriptor_ranges_checked=("ECFP4 Tanimoto similarity to measured analogues",),
+            distance_metric="ECFP4 Tanimoto, nearest analogue",
+            distance_value=nearest,
+        ),
+        inputs=[a.value for a in used],
+        uncertainty=Uncertainty(
+            kind="range",
+            # a higher pIC50 is a lower IC50, so the bounds swap on conversion
+            lower=10.0 ** (9.0 - high_pic50),
+            upper=10.0 ** (9.0 - low_pic50),
+            n=len(used),
+        ),
+        label="hERG IC50, read across measured analogues",
+        notes="; ".join(notes),
+        software=software,
+    )
+    return Signal(
+        id=SIGNAL_ID,
+        title=_TITLE,
+        outcome=Outcome.PREDICTED,
+        summary=(
+            f"Estimated hERG IC50 {estimate:,.0f} nM from {len(used)} measured analogue(s)"
+            + (f" (nearest similarity {nearest:.2f})." if nearest is not None else ".")
+        ),
+        quantity=quantity,
+        analogues=tuple(used),
+        limits=_LIMITS,
+        citations=(cite("shah2016"), cite("helman2019"), cite("rogers2010"), cite("davies2015")),
     )
 
 
@@ -170,20 +258,102 @@ def _own_measurements(
     return cid, values, name if isinstance(name, str) else None
 
 
+def _from_reference(
+    mol: Chem.Mol, reference: ReferenceSet, params: HergParams, inchikey: str
+) -> Signal:
+    """Report or estimate from the installed reference set, without reaching a network.
+
+    The set holds the compounds measured for this endpoint, so the nearest structures in it
+    are the nearest *measured* structures — which is what a read-across needs.
+    """
+    ra = params.read_across
+    key = inchikey or Chem.MolToInchiKey(mol)
+    scored = []
+    for compound, fp in reference.fingerprints():
+        if compound.inchikey == key:  # the compound itself: measured, not estimated
+            return _measured_signal(
+                compound.identifier,
+                [compound.value],
+                compound.name,
+                n_measurements=compound.n_measurements,
+                snapshot_id=reference.snapshot_id,
+            )
+        scored.append((tanimoto(fingerprint(mol), fp), compound))
+
+    scored.sort(key=lambda sc: (-sc[0], sc[1].identifier))
+    considered = scored[: params.max_lookups]
+    analogues = [
+        Analogue(
+            identifier=c.identifier,
+            name=c.name,
+            smiles=c.smiles,
+            similarity=sim,
+            value=Quantity.literature(
+                10.0 ** (9.0 - c.value),
+                _UNIT,
+                source_name=reference.source,
+                citation=cite("davies2015"),
+                source_record_id=c.identifier,
+                label=f"hERG IC50, median of {c.n_measurements} measurement(s)",
+            ),
+            n_measurements=c.n_measurements,
+            source_url=f"https://www.ebi.ac.uk/chembl/compound_report_card/{c.identifier}/",
+        )
+        for sim, c in considered
+    ]
+    result = read_across([a.similarity for a in analogues], [c.value for _, c in considered], ra)
+    if result.value is None:
+        assert result.reason is not None
+        return _unavailable(result.reason, snapshot_id=reference.snapshot_id)
+    used = [analogues[i] for i in result.used]
+    assert result.low is not None and result.high is not None
+    return _predicted_signal(
+        result.value,
+        low_pic50=result.low,
+        high_pic50=result.high,
+        nearest=result.nearest_similarity,
+        used=used,
+        ra=ra,
+        snapshot_id=reference.snapshot_id,
+        source=(
+            f"{len(reference.compounds)} compounds measured for this endpoint in {reference.source}"
+        ),
+    )
+
+
 def screen_herg(
-    smiles: str, chembl: ChEMBLClient, params: HergParams | None = None, *, inchikey: str = ""
+    smiles: str,
+    chembl: ChEMBLClient | None = None,
+    params: HergParams | None = None,
+    *,
+    inchikey: str = "",
+    reference: ReferenceSet | None = None,
 ) -> Signal:
     """Report a measured hERG IC50 if one exists, else read across measured analogues.
 
     The order matters: a compound that has been measured is reported as measured, and
     nothing is estimated for it. Only when no measurement exists is an estimate attempted,
     and only when enough near analogues carry measured values.
+
+    Given a ``reference`` set the whole screen runs offline against that snapshot, and the
+    snapshot id is recorded with the answer. Without one it falls back to searching the
+    source live, which finds the nearest structures overall rather than the nearest measured
+    ones and so abstains far more often. The caller decides which — the screen never reads
+    the filesystem itself, so what it answers depends only on what it was given.
     """
     p = params or HergParams()
     ra = p.read_across
     mol = Chem.MolFromSmiles(smiles) if smiles.strip() else None
     if mol is None:
         return _unavailable("the compound has no parseable structure to find analogues for")
+
+    if reference is not None:
+        return _from_reference(mol, reference, p, inchikey)
+    if chembl is None:
+        return _unavailable(
+            "no reference set of measured compounds is installed for this endpoint and no "
+            "source is available to search"
+        )
 
     own = _own_measurements(chembl, inchikey)
     if own is not None:
@@ -294,44 +464,14 @@ def screen_herg(
 
     used = [analogues[i] for i in result.used]
     assert result.low is not None and result.high is not None
-    estimate = 10.0 ** (9.0 - result.value)
-    quantity = Quantity.predicted(
-        estimate,
-        _UNIT,
-        method=method(_METHOD),
-        applicability=ApplicabilityCheck(
-            in_domain=True,
-            descriptor_ranges_checked=("ECFP4 Tanimoto similarity to measured analogues",),
-            distance_metric="ECFP4 Tanimoto, nearest analogue",
-            distance_value=result.nearest_similarity,
-        ),
-        inputs=[a.value for a in used],
-        uncertainty=Uncertainty(
-            kind="range",
-            # a higher pIC50 is a lower IC50, so the bounds swap on conversion
-            lower=10.0 ** (9.0 - result.high),
-            upper=10.0 ** (9.0 - result.low),
-            n=len(used),
-        ),
-        label="hERG IC50, read across measured analogues",
-        notes=(
-            f"similarity-weighted over {len(used)} analogue(s) from ChEMBL target "
-            f"{HERG_TARGET}; averaged as pIC50; "
-            f"{excluded} measurement(s) excluded as bounded, flagged or unconvertible; "
-            f"neighbourhood {ra.to_dict()}"
-        ),
-        software={"chembl_retrieved_at": found.retrieved_at or ""},
-    )
-    return Signal(
-        id=SIGNAL_ID,
-        title=_TITLE,
-        outcome=Outcome.PREDICTED,
-        summary=(
-            f"Estimated hERG IC50 {estimate:,.0f} nM from {len(used)} measured analogue(s) "
-            f"(nearest similarity {result.nearest_similarity:.2f})."
-        ),
-        quantity=quantity,
-        analogues=tuple(used),
-        limits=_LIMITS,
-        citations=(cite("shah2016"), cite("helman2019"), cite("rogers2010"), cite("davies2015")),
+    return _predicted_signal(
+        result.value,
+        low_pic50=result.low,
+        high_pic50=result.high,
+        nearest=result.nearest_similarity,
+        used=used,
+        ra=ra,
+        retrieved_at=found.retrieved_at,
+        excluded=excluded,
+        source=f"structures retrieved live from {found.source}",
     )

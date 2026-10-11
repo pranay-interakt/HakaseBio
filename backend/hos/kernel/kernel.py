@@ -197,7 +197,7 @@ class Kernel:
         from hos.ind.documents import SummaryService
 
         self.summaries = SummaryService(self)
-        # in silico triage (docs/16): decision support, never evidence
+        # in silico triage (docs/04 section 4.26): decision support, never evidence
         from hos.triage.service import TriageService
 
         self.triage = TriageService(self)

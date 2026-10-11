@@ -235,7 +235,7 @@ class ProgramDocumentRow(Base):
 
 
 class TriageReportRow(Base):
-    """A versioned in silico triage report for one compound (docs/16).
+    """A versioned in silico triage report for one compound (docs/04 section 4.26).
 
     Decision support only: rows here are never read into a study, a readiness count or a
     submission. Every version is kept, so what was known when a study was commissioned can

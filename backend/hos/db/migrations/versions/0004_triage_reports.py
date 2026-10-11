@@ -1,4 +1,4 @@
-"""In silico triage reports, versioned per compound (docs/16).
+"""In silico triage reports, versioned per compound (docs/04 section 4.26).
 
 Revision ID: 0004
 Revises: 0003

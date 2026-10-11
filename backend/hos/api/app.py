@@ -986,7 +986,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
             k, actor, compound_id, pubchem=PubChemClient(http), chembl=ChEMBLClient(http)
         )
 
-    # -- in silico triage (docs/16): decision support, never evidence ---------------------
+    # -- in silico triage (docs/04 s4.26): decision support, never evidence --------------
     @app.post("/api/compounds/{compound_id}/triage", dependencies=[Depends(compound_access)])
     def run_triage(
         compound_id: str, actor: Principal = Depends(current), k: Kernel = Depends(get_kernel)
