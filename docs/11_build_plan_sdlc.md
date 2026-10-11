@@ -39,7 +39,7 @@ the kernel facade imports drivers through the registry only; API imports the fac
 | 6 | hERG + repeat-dose tox drivers | conformance + known-value tests; Dunnett per endpoint; NOAEL only by signed human determination | Done |
 | 7 | ChEMBL / PubChem clients | documented APIs, cache, honest UNAVAILABLE; dated real fixtures; `@pytest.mark.live` | Done |
 | 8 | IND assembler | Module 4 skeleton from completed studies; readiness (done/in progress/missing/conditional); refuses simulated | Done |
-| 9 | FastAPI | full flow, OpenAPI, re-auth signatures | Planned |
+| 9 | FastAPI | full flow, OpenAPI, re-auth signatures | Done |
 | 10 | Frontend | full flow; provenance badges; no science in browser | Planned |
 | 11 | Demo + README run instructions | end-to-end script; demo data real or labelled SIMULATED | Planned |
 | 1 | Docs 07–13 | each describes implemented behaviour; updated as steps land | 07, 11, 13 done |
