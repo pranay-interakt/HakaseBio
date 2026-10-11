@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getToken, setToken } from "./api";
+import { ApiError, UNAUTHORIZED_EVENT, api, getToken, setToken } from "./api";
 import { Login } from "./pages/Login";
 import { Program } from "./pages/Program";
 import { ImportNew } from "./pages/ImportNew";
@@ -21,7 +21,19 @@ export function App() {
   const hash = useHash();
   const [me, setMe] = useState<Principal | null>(null);
   const [checked, setChecked] = useState(false);
-  const [ledger, setLedger] = useState<{ valid: boolean; entries: number } | null>(null);
+  // "failed" only when the server reports a broken hash chain; any other error is "unavailable"
+  const [ledger, setLedger] = useState<{ status: "verified" | "failed" | "unavailable"; entries: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const signedOut = () => {
+      setMe(null);
+      setLedger(null);
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, signedOut);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, signedOut);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -40,8 +52,12 @@ export function App() {
     const verify = () =>
       api
         .get<{ valid: boolean; entries: number }>("/ledger/verify")
-        .then(setLedger)
-        .catch(() => setLedger({ valid: false, entries: 0 }));
+        .then((r) => setLedger({ status: r.valid ? "verified" : "failed", entries: r.entries }))
+        .catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 401) return;
+          const failed = e instanceof ApiError && e.kind === "LedgerIntegrityError";
+          setLedger({ status: failed ? "failed" : "unavailable", entries: 0 });
+        });
     verify();
     window.addEventListener("hos:changed", verify);
     return () => window.removeEventListener("hos:changed", verify);
@@ -70,8 +86,16 @@ export function App() {
         <span className="muted small">preclinical operating system</span>
         <span className="spacer" />
         {ledger && (
-          <span className={ledger.valid ? "ledger ok" : "ledger bad"} title="hash-chained audit ledger">
-            ledger {ledger.valid ? `verified · ${ledger.entries} entries` : "INTEGRITY FAILURE"}
+          <span
+            className={ledger.status === "verified" ? "ledger ok" : ledger.status === "failed" ? "ledger bad" : "ledger"}
+            title="hash-chained audit ledger"
+          >
+            ledger{" "}
+            {ledger.status === "verified"
+              ? `verified · ${ledger.entries} entries`
+              : ledger.status === "failed"
+                ? "INTEGRITY FAILURE"
+                : "verification unavailable"}
           </span>
         )}
         <span className="small">

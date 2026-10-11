@@ -6,12 +6,18 @@ const TOKEN_KEY = "hos.token";
 export class ApiError extends Error {
   status: number;
   errors: string[];
-  constructor(status: number, message: string, errors: string[] = []) {
+  /** Server-side exception name, e.g. "LedgerIntegrityError". */
+  kind: string | null;
+  constructor(status: number, message: string, errors: string[] = [], kind: string | null = null) {
     super(message);
     this.status = status;
     this.errors = errors;
+    this.kind = kind;
   }
 }
+
+/** Fired when the server no longer accepts the session token; the app returns to sign-in. */
+export const UNAUTHORIZED_EVENT = "hos:unauthorized";
 
 export function getToken(): string | null {
   try {
@@ -47,9 +53,14 @@ async function request<T>(method: string, path: string, body?: unknown, raw?: Bo
     const d = (typeof data === "object" && data !== null ? data : {}) as {
       detail?: unknown;
       errors?: string[];
+      error?: string;
     };
     const msg = typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail ?? data);
-    throw new ApiError(res.status, msg, d.errors ?? []);
+    if (res.status === 401 && path !== "/auth/login") {
+      setToken(null);
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    throw new ApiError(res.status, msg, d.errors ?? [], d.error ?? null);
   }
   return data as T;
 }
