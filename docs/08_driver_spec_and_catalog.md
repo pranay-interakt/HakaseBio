@@ -184,6 +184,47 @@ The kit checks:
   the weighted fit against an independent closed-form weighted regression; M10's ISR formula and
   sample-count rule.
 
+### `toxicokinetics` v1.0.0 — ICH S3A, with ISR per ICH M10 section 5
+
+- **Serves.** `tox.toxicokinetics`, CTD 4.2.3.2. M4S(R2) files "supportive toxicokinetics
+  evaluations" with the repeat-dose study. GLP-capable.
+- **Modalities.** Small molecules, peptides and monoclonal antibodies.
+- **Research note.** `docs/research/drivers/toxicokinetics.md`.
+- **Design.** Every value is a required input:
+  - parent toxicity study, species and strain, route and administration (extravascular or IV
+    infusion; IV bolus would need C0 back-extrapolation and is refused);
+  - analyte and matrix, bioanalytical technique and the validation report;
+  - LLOQ, dose groups, whether control samples are assayed (S3A Note 8), sexes (one sex needs a
+    justification, S3A §3.5), animals and satellite groups;
+  - dosing interval and profile days, monitor or profile design (S3A Note 1);
+  - sampling times with their justification (S3A §3.3) — a profile starts at a time-0 pre-dose
+    sample;
+  - trapezoidal rule with its basis (M13A §2.2.2.2), and the declared BLQ rule;
+  - optionally, the dose-proportionality acceptance interval θL/θH and confidence level with
+    their basis.
+- **Return data.** One row per sample:
+  - animal, sex, dose, study day, nominal and actual time;
+  - concentration or BLQ — a quantified value below the LLOQ is rejected, since the calibration
+    range starts at the LLOQ (M10 §3.2.4);
+  - an optional ISR repeat value.
+- **Analysis.**
+  - Per animal and day: Cmax, Tmax, Tlast, AUC(0-t) and AUC(0-τ).
+  - Per dose × sex × day: mean (SD) and median (range), plus dose-normalised Cmax and AUC.
+  - Power-model β1 with its confidence interval against the acceptance interval.
+  - Observed ratios between profile days.
+  - Exposure multiples over a stated human Cmax and AUC.
+  - ISR against M10 §5.
+  - Flags for quantifiable control or day-1 pre-dose samples (M10 §3.3.4 / §4.3.4).
+- **Determinations.** Both are categorical and signed by the Study Director:
+  - exposure adequacy (adequate / not adequate), required;
+  - steady state by the last profile day (established / not established), optional.
+- **Known-value tests.**
+  - Linear trapezoid by hand.
+  - Exact log-down integration of an exponential.
+  - The published acceptance intervals of Braeckman 2022 and Shang 2022.
+  - β1 and its standard error against `scipy.stats.linregress`.
+  - Exact recovery of declared exposure, β1 and day ratios from a noise-free generator.
+
 ## 8.4 Writing a new driver
 
 1. Subclass `StudyDriver`. Set the identity and match-table attributes, and implement the hooks.

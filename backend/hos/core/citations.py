@@ -109,6 +109,54 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "Di L, Kerns EH. Drug-Like Properties: Concepts, Structure Design and Methods "
            "from ADME to Toxicity Optimization. 2nd ed. Academic Press; 2016.",
            year=2016, doi="10.1016/C2013-0-18378-X"),
+        # ---- pharmacokinetics / toxicokinetics ---------------------------------
+        _c("fda_ba_2022",
+           "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs "
+           "or INDs - General Considerations. Guidance for Industry. April 2022.",
+           year=2022, url="https://www.fda.gov/media/121311/download"),
+        _c("ich_m13a",
+           "ICH Harmonised Guideline M13A: Bioequivalence for Immediate-Release Solid Oral "
+           "Dosage Forms. Final version, adopted 23 July 2024.",
+           year=2024,
+           url="https://database.ich.org/sites/default/files/ICH_M13A_Step4_Final_Guideline_"
+               "2024_0723.pdf"),
+        _c("cdisc_pk_terms",
+           "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), "
+           "published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+           year=2026,
+           url="https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"),
+        _c("certara_phoenix_nca",
+           "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial "
+           "area calculation. 2020. (Vendor documentation; a secondary source for the "
+           "trapezoidal equations.)",
+           year=2020,
+           url="https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"),
+        _c("purves1992",
+           "Purves RD. Optimum numerical integration methods for estimation of "
+           "area-under-the-curve (AUC) and area-under-the-moment-curve (AUMC). "
+           "J Pharmacokinet Biopharm. 1992;20(3):211-226.",
+           year=1992, doi="10.1007/BF01062525"),
+        _c("smith2000",
+           "Smith BP, Vandenhende FR, DeSante KA, Farid NA, Welch PA, Callaghan JT, Forgue ST. "
+           "Confidence interval criteria for assessment of dose proportionality. Pharm Res. "
+           "2000;17(10):1278-1283.",
+           year=2000, doi="10.1023/A:1026451721686"),
+        _c("hummel2009",
+           "Hummel J, McKendrick S, Brindley C, French R. Exploratory assessment of dose "
+           "proportionality: review of current approaches and proposal for a practical "
+           "criterion. Pharm Stat. 2009;8(1):38-49.",
+           year=2009, doi="10.1002/pst.326"),
+        _c("braeckman2022",
+           "Braeckman R, Guenther S, Mickle TC, Barrett AC, Smith A, Oh C. Dose proportionality "
+           "and steady-state pharmacokinetics of serdexmethylphenidate/dexmethylphenidate, a "
+           "novel prodrug combination to treat attention-deficit/hyperactivity disorder. "
+           "J Child Adolesc Psychopharmacol. 2022;32(5):288-295.",
+           year=2022, doi="10.1089/cap.2022.0015"),
+        _c("shang2022",
+           "Shang H, Dai X, Li M, Kai Y, Liu Z, Wang M, Li Q, Gu Y, Liu C, Si D. Absolute "
+           "bioavailability, dose proportionality, and tissue distribution of rotundic acid in "
+           "rats based on validated LC-QqQ-MS/MS method. J Pharm Anal. 2022;12(2):278-286.",
+           year=2022, doi="10.1016/j.jpha.2021.03.008"),
         # ---- pharmacology / curve fitting ------------------------------------
         _c("delean1978",
            "DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal "

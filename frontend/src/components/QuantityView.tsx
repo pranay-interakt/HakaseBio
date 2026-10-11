@@ -154,10 +154,16 @@ export function QuantityView({ q, showLabel = false }: { q: Quantity; showLabel?
           <span className="qty-val">
             {fmt(q.value)}
             {unitText(q.unit)}
-            {u && u.kind === "ci95" && u.lower !== null && (
+            {u && /^ci\d+$/.test(u.kind) && u.lower !== null && (
               <span className="muted">
                 {" "}
-                (95% CI {fmt(u.lower)}–{fmt(u.upper)})
+                ({u.kind.slice(2)}% CI {fmt(u.lower)}–{fmt(u.upper)})
+              </span>
+            )}
+            {u && u.kind === "range" && u.lower !== null && (
+              <span className="muted">
+                {" "}
+                (range {fmt(u.lower)}–{fmt(u.upper)})
               </span>
             )}
             {u && u.kind === "sd" && u.sd !== null && <span className="muted"> ± {fmt(u.sd)} SD</span>}

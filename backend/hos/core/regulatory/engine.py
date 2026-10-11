@@ -341,15 +341,16 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
         category=StudyCategory.PHARMACOKINETICS, status=RequirementStatus.REQUIRED,
         timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_s3a"), section="S3A",
         rationale="Systemic exposure must be measured in toxicity studies to relate findings "
-                  "to exposure",
-        glp=True, ctd_section="4.2.2.2",
+                  "to exposure; reported with the toxicity study (ICH M4S(R2) 4.2.3.2, "
+                  "'including supportive toxicokinetics evaluations')",
+        glp=True, ctd_section="4.2.3.2", driver_id="toxicokinetics",
     ))
     out.append(_req(
         id="bioanalytical.validation", name="Validated bioanalytical method for TK samples",
         category=StudyCategory.BIOANALYTICAL, status=RequirementStatus.REQUIRED,
         timing=Timing.BEFORE_FIRST_IN_HUMAN, citation=cite("ich_m10"), section="M10 section 3",
         rationale="Concentrations supporting regulatory decisions require a validated method",
-        glp=True, ctd_section="4.2.2.1",
+        glp=True, ctd_section="4.2.2.1", driver_id="bioanalytical_validation",
     ))
 
     # --- genotoxicity --------------------------------------------------------

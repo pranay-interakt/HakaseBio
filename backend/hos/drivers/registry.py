@@ -32,6 +32,7 @@ BUILTIN_DRIVERS: tuple[str, ...] = (
     "hos.drivers.herg:HergPatchClampDriver",
     "hos.drivers.repeat_dose_tox:RepeatDoseToxicityDriver",
     "hos.drivers.bioanalytical_validation:BioanalyticalValidationDriver",
+    "hos.drivers.toxicokinetics:ToxicokineticsDriver",
 )
 
 _REQUIRED_ATTRS = ("id", "name", "version", "requirement_ids", "modalities", "ctd_section")

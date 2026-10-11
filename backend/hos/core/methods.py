@@ -156,6 +156,58 @@ METHODS: Final[dict[str, Method]] = dict(
         _m("bioanalysis.isr", "Incurred sample reanalysis percent difference", ("ich_m10",),
            assumptions=("% difference relative to the mean of the initial and repeat values "
                         "(M10 section 5)",)),
+        # ---- non-compartmental exposure / toxicokinetics -----------------------
+        _m("nca.cmax_tmax", "Maximum observed concentration and its time",
+           ("fda_ba_2022", "cdisc_pk_terms"),
+           assumptions=("taken directly from the data without interpolation (FDA 2022 "
+                        "III.A.9.a); the first occurrence is used when the maximum is tied",),
+           limits=("with a monitoring design (1-3 samples per interval) the observed maximum "
+                   "estimates Cmax only roughly (ICH S3A Note 1)",)),
+        _m("nca.auc_last",
+           "AUC from time zero to the last measurable concentration (trapezoidal rule as stated)",
+           ("fda_ba_2022", "ich_m13a", "certara_phoenix_nca", "purves1992"),
+           assumptions=("actual sampling times (ICH M13A 2.2.2.2)",
+                        "BLQ at or before the first quantifiable concentration = 0; later BLQ "
+                        "excluded",),
+           limits=("no extrapolation beyond the last measurable concentration",
+                   "a profile without a time-zero sample has no AUC(0-t)",)),
+        _m("nca.auc_tau", "AUC over the dosing interval, from a quantifiable end-of-interval "
+           "sample", ("fda_ba_2022", "certara_phoenix_nca", "cdisc_pk_terms"),
+           limits=("not reported when the end-of-interval sample is BLQ (no extrapolation)",)),
+        _m("tk.dose_normalised", "Exposure divided by the administered dose",
+           ("ich_s3a", "cdisc_pk_terms")),
+        _m("tk.group_summary",
+           "Group mean, SD, median and range of individual exposure parameters", ("ich_s3a",),
+           assumptions=("descriptive statistics per dose, sex and day (ICH S3A 3.9)",),
+           limits=("small groups give low precision; individual data may be more informative "
+                   "(ICH S3A 3.9)",)),
+        _m("tk.dose_proportionality_power",
+           "Power-model slope with a confidence interval against a pre-stated acceptance interval",
+           ("smith2000", "hummel2009", "braeckman2022", "shang2022"),
+           assumptions=("PK = beta0 * Dose^beta1, fitted on ln-ln scale by least squares over "
+                        "individual animals (parallel groups)",
+                        "the acceptance limits theta_L/theta_H and confidence level are stated "
+                        "before analysis",),
+           limits=("control animals and unquantifiable exposure are excluded (log of zero)",
+                   "the interval form is the exact algebraic consequence of the power model; "
+                   "Smith 2000 is cited from its abstract",)),
+        _m("tk.exposure_ratio_days",
+           "Observed ratio of group mean exposure on a later profile day to the first",
+           ("cdisc_pk_terms", "ich_s3a"),
+           limits=("an observed ratio; it is an accumulation ratio at steady state only if "
+                   "steady state is established, which is a judgement (CDISC ARAUC)",)),
+        _m("tk.exposure_multiple",
+           "Animal exposure divided by the stated human exposure", ("ich_s3a",),
+           assumptions=("the human exposure is an input with its own provenance (measured or "
+                        "predicted) and the same matrix and analyte",),
+           limits=("total, not unbound, exposure unless both inputs are unbound "
+                   "(ICH S3A section 2)",)),
+        _m("sim.tk_power_profile",
+           "Simulated concentrations from a declared reference profile scaled by the power "
+           "model, with declared day and sex factors and log-normal variability",
+           ("smith2000",),
+           limits=("for software verification and workflow demonstration only; "
+                   "never admissible as evidence",)),
         _m("sim.bioanalytical_runs",
            "Simulated chromatographic responses from a declared linear response model with "
            "multiplicative noise", ("ich_m10",),

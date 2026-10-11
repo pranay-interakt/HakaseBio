@@ -195,6 +195,56 @@ is a new registry version; it never silently alters past results.
   stating each.
 - Citation: ICH M10 Bioanalytical Method Validation and Study Sample Analysis, Step 4, 24 May 2022.
 
+## 4.14 Non-compartmental exposure and toxicokinetics  [`nca.*`, `tk.*`]
+
+- Cmax is the maximum observed concentration, taken without interpolation (FDA *Bioavailability
+  Studies Submitted in NDAs or INDs*, April 2022, §III.A.9.a). Tmax is its time; a tied maximum
+  takes the first occurrence.
+- AUC(0-t) runs from time zero to the last measurable concentration (FDA 2022 §III.A.9.b; CDISC
+  AUCLST). The trapezoidal rule is a stated input, because ICH M13A §2.2.2.2 requires the method to
+  be reported:
+  - linear: (t2 − t1)(C1 + C2)/2;
+  - linear-up/log-down: on falling segments (t2 − t1)(C1 − C2)/ln(C1/C2), which is exact for a
+    mono-exponential decline.
+
+  The equations are from vendor documentation (Certara Phoenix 8.3), a secondary source. Purves
+  1992 (abstract) found log-trapezoid-based schemes performed well. Actual sampling times are used
+  (M13A §2.2.2.2).
+- BLQ handling is one declared rule:
+  - BLQ at or before the first quantifiable concentration is set to 0;
+  - later BLQ samples are excluded.
+
+  A profile without a time-zero sample has no AUC(0-t). AUC(0-τ) is reported only when the
+  end-of-interval sample is quantifiable, because nothing is extrapolated.
+- Monitoring designs (1–3 samples per interval, ICH S3A Note 1) report C(time) and Cmax only.
+- Group summaries are mean (SD) and median (range) per dose × sex × day (ICH S3A §3.9).
+- Dose proportionality uses the power model PK = β0·Dose^β1 (Smith et al. 2000, *Pharm Res*
+  17:1278, doi:10.1023/A:1026451721686, abstract read).
+  - **Fit.** Least squares of ln PK on ln dose over individual animals, as in Shang et al. 2022 for
+    a parallel-group rat design. With one observation per animal, a random subject effect cannot be
+    separated from residual error. The interval is a t-interval with n − 2 df.
+  - **Criterion.** The confidence interval of β1 must lie inside
+    [1 + ln θL/ln r, 1 + ln θH/ln r], with r = highest/lowest dose. This is the exact consequence of
+    requiring Rdnm = r^(β1−1) to lie in (θL, θH) (Hummel et al. 2009). It reproduces the published
+    values:
+    - [0.6781, 1.3219] for r = 2, θ = 0.8/1.25 (Braeckman et al. 2022);
+    - [0.500, 1.500] for r = 4, θ = 0.5/2 (Shang et al. 2022).
+  - **Inputs.** θL, θH and the confidence level are stated in the protocol; no source fixes them.
+  - **Transform.** The ln transform is the model's own form, which is the rationale ICH S3A §3.9
+    asks for.
+- The observed exposure ratio between profile days is a ratio of group means. It is called an
+  accumulation ratio only if the Study Director determines steady state (CDISC ARAUC is defined at
+  steady state).
+- Exposure multiple = animal group mean / stated human exposure. Human exposure is an input with
+  its own provenance.
+- ISR follows M10 §5:
+  - chromatographic: within ±20% for at least 2/3 of repeats;
+  - ligand binding: within ±30% for at least 2/3 of repeats;
+  - minimum count: 10% of the first 1000 samples plus 5% of the excess;
+  - expected at least once per species for nonclinical studies.
+- Quantifiable analyte in control or day-1 pre-dose samples is flagged, because ICH M10 §3.3.4 and
+  §4.3.4 list it as a reason for reanalysis.
+
 ## 4.12 Methods deliberately out of scope initially (added later, each with citations when built)
 
 PBPK (whole-body), QSP, population variability/Monte-Carlo, allometric interspecies PK scaling beyond

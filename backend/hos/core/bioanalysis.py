@@ -28,6 +28,7 @@ import numpy as np
 
 __all__ = [
     "M10_CHROMATOGRAPHIC",
+    "M10_LIGAND_BINDING_ISR",
     "CalibrationFit",
     "accuracy_percent",
     "bias_percent",
@@ -105,6 +106,12 @@ M10_CHROMATOGRAPHIC: dict[str, M10Criterion] = {c.key: c for c in (
                  "for at least 2/3 of the repeats"),
     M10Criterion("isr_fraction", 2 / 3, "dimensionless", "5", "at least 2/3 of the repeats"),
 )}
+
+#: ISR limit for ligand binding assays (M10 section 5: "For LBAs, the percent difference
+#: should be within ±30% for at least 2/3 of the repeats").
+M10_LIGAND_BINDING_ISR = M10Criterion(
+    "isr_limit", 30, "percent", "5",
+    "for LBAs, the percent difference should be within ±30% for at least 2/3 of the repeats")
 
 
 @dataclass(frozen=True, slots=True)

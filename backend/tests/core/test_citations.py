@@ -95,3 +95,10 @@ def test_in_vivo_adme_pk_is_due_before_phase_3_per_m3r2_section_3():
     fih = {r.id for r in ss.due_by(Timing.BEFORE_FIRST_IN_HUMAN)}
     assert {"adme.metabolic_stability", "adme.plasma_protein_binding",
             "tox.toxicokinetics"} <= fih and "adme.in_vivo_pk" not in fih
+
+
+def test_toxicokinetics_is_filed_with_the_repeat_dose_study_per_m4s():
+    # M4S(R2) Module 4 organisation: "4.2.3.2 Repeat-Dose Toxicity (... including supportive
+    # toxicokinetics evaluations)"; 4.2.2.2 is Absorption
+    tk = next(r for r in derive_study_set(SM).requirements if r.id == "tox.toxicokinetics")
+    assert tk.ctd_section == "4.2.3.2" and tk.driver_id == "toxicokinetics"

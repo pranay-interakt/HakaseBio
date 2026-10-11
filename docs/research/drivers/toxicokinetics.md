@@ -137,3 +137,31 @@ day N / day 1" label should be used. Whether steady state was reached is a judge
 5. Shang H, Dai X, Li M, Kai Y, Liu Z, Wang M, Li Q, Gu Y, Liu C, Si D. Absolute bioavailability, dose proportionality, and tissue distribution of rotundic acid in rats based on validated LC-QqQ-MS/MS method. *J Pharm Anal.* 2022;12(2):278–286. DOI: 10.1016/j.jpha.2021.03.008. PMC9091740. *(secondary reproduction; preclinical use of θ = 0.5/2.0)*
 6. CDISC SDTM PK Parameters controlled terminology, via NCI Thesaurus version 26.09d (2026-09-28): C102356 ARAUC, C102357 ARCMAX, C139129 ARAUCLST, C132435 ARAUCD, C114234 AILAMZ. https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/C102356 (and corresponding codes); browser: https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C102356
 7. Li L, Li X, Xu L, Sheng Y, Huang J, Zheng Q. Systematic evaluation of dose accumulation studies in clinical pharmacokinetics. *Curr Drug Metab.* 2013;14(5):605–615. DOI: 10.2174/13892002113149990002. PMID 23701162. *(abstract only)*
+
+## Implementation record (driver `toxicokinetics` v1.0.0, 2026-10-11)
+
+Additional primary-source checks made while building the driver:
+
+| Item | Source read | Used for |
+|---|---|---|
+| β1 acceptance interval, published value | Braeckman et al. 2022, PMC9245728, Results: "The acceptance interval for dose proportionality ... is [0.6781, 1.3219]" (R = 2, θ 0.8/1.25); Methods: power model fitted with mixed effects, 90% CI | known-value test of `acceptance_interval` |
+| β1 acceptance interval and fitting in rats | Shang et al. 2022, PMC9091740: "Linear regression of ln-transformed pharmacokinetic parameters Y (AUC0–24 and cmax) by the ln-transformed dose"; interval [1 + ln(0.5)/ln(r), 1 + ln(2.0)/ln(r)] = 0.500–1.500 for 10–40 mg/kg (Table 7) | known-value test; ln-ln least-squares fit for parallel-group designs |
+| ISR in nonclinical studies | ICH M10 §5: "For nonclinical studies within the scope of this guideline, ISR should, in general, be performed at least once per species."; LBA limit ±30% | ISR evaluation; missing ISR is a warning, not a failure |
+| Quantifiable control / pre-dose samples | ICH M10 §3.3.4 (and §4.3.4): "Identification of quantifiable analyte levels in pre-dose samples, control or placebo samples" listed as a reason for reanalysis | QC warnings |
+| Calibration range | ICH M10 §3.2.4: "The calibration range is defined by the LLOQ, which is the lowest calibration standard, and the ULOQ" | a quantified value below the LLOQ is rejected at ingest |
+| CTD placement | ICH M4S(R2), Module 4 organisation: "4.2.3.2 Repeat-Dose Toxicity (in order by species, by route, by duration; including supportive toxicokinetics evaluations)" | driver and requirement CTD section 4.2.3.2 (the regulatory engine previously said 4.2.2.2, Absorption; corrected) |
+| Control samples | ICH S3A Note 8: "Samples may be collected and then assayed if it is deemed that this may help in the interpretation of the toxicity findings, or in the validation of the assay method." | `control_group_assayed` is a stated design choice |
+
+Decisions that rest on these sources:
+
+- **Not built.**
+  - Sparse/composite NCA for destructive rodent sampling (NOT VERIFIED item 5). The driver needs
+    serial samples per animal.
+  - IV bolus C0 back-extrapolation.
+  - λz, t½ and AUCinf. These are A3 (`in_vivo_pk`); S3A Note 2 lists half-life only as "may be
+    of value".
+- **One BLQ rule.** It is declared in the protocol rather than chosen silently.
+- **AUC(0-τ) without extrapolation.** It is reported only when the end-of-interval sample is
+  quantifiable.
+- **Severity bands not encoded.** Li 2013's accumulation bands appear nowhere, in line with the
+  note above.
