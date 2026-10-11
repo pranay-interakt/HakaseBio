@@ -476,8 +476,8 @@ class Kernel:
                       "evidence_admissible": res.evidence_admissible}, reason=reason)
         return self.study_view(study_id)
 
-    def record_determination(self, actor: Principal, study_id: str, *, key: str, value: float,
-                             unit: Optional[str], rationale: str,
+    def record_determination(self, actor: Principal, study_id: str, *, key: str,
+                             value: Optional[float], unit: Optional[str], rationale: str,
                              reason: Optional[str] = None) -> dict[str, Any]:
         """Record an expert determination (e.g. a NOAEL) the driver declared. The actor must
         be a human holding the declared role; the record is signed and bound to the exact
@@ -497,16 +497,23 @@ class Kernel:
                     if d["key"] == key and d["analysis_hash"] == row.results["analysis_hash"]]
         if existing and not (reason and reason.strip()):
             raise KernelError(f"{key} is already determined; a revision requires a reason")
-        q = Quantity.user_supplied(float(value), unit, actor=actor.name, label=spec.label,
-                                   notes=f"expert determination by {actor.name} "
-                                         f"({spec.role.value}); rationale: {rationale}")
-        subject = {"study_id": study_id, "key": key, "value": float(value), "unit": unit,
+        if value is None:
+            q = Quantity.unavailable(unit, label=spec.label,
+                                     reason=f"not established (determination by {actor.name}, "
+                                            f"{spec.role.value}): {rationale}")
+            claim = f"I determine that {spec.label} is not established"
+        else:
+            q = Quantity.user_supplied(float(value), unit, actor=actor.name, label=spec.label,
+                                       notes=f"expert determination by {actor.name} "
+                                             f"({spec.role.value}); rationale: {rationale}")
+            claim = f"I determine {spec.label} = {value:g} {unit}"
+        subject = {"study_id": study_id, "key": key,
+                   "value": None if value is None else float(value), "unit": unit,
                    "rationale": rationale, "analysis_hash": row.results["analysis_hash"]}
         sig = sign(actor, role=spec.role, meaning=SignatureMeaning.RESPONSIBILITY,
                    subject_id=f"{study_id}/determination/{key}",
                    subject_hash=content_hash(subject),
-                   statement=f"I determine {spec.label} = {value:g} {unit}. Rationale: "
-                             f"{rationale}")
+                   statement=f"{claim}. Rationale: {rationale}")
         det = {"key": key, "label": spec.label, "quantity": q.to_dict(), "rationale": rationale,
                "role": spec.role.value, "signer_id": actor.id, "signer_name": actor.name,
                "signed_at": sig.signed_at, "analysis_hash": row.results["analysis_hash"],
@@ -515,7 +522,7 @@ class Kernel:
         self.repo.add_artifact(study_id, "determination", det, actor=actor.id, reason=reason)
         self.repo.update_study(study_id, determinations=keep + [det])
         self._record(actor, "study.determination_recorded", "study", study_id,
-                     {"key": key, "value": float(value), "unit": unit,
+                     {"key": key, "value": None if value is None else float(value), "unit": unit,
                       "signature": sig.to_dict()}, reason=reason)
         return self.study_view(study_id)
 
