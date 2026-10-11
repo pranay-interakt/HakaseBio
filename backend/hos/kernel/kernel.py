@@ -1271,11 +1271,15 @@ class Kernel:
     def integrity(self) -> dict[str, Any]:
         """The chain, the anchors and the reconciliation of stored state with the ledger
         (docs/15 P0.2). ``valid`` only when all three hold."""
-        entries = self.ledger.verify()
-        findings = self.anchors.verify(self.ledger) + reconcile(self)
-        return {"valid": not findings, "entries": entries, "head": self.ledger.head,
-                "anchors": len(self.anchors.checkpoints()),
-                "findings": [f.to_dict() for f in findings]}
+        # checkpoints first: each is written only after its entries committed, so all of them
+        # fall inside the snapshot taken next, and a write landing mid-check is not a finding
+        checkpoints = self.anchors.checkpoints()
+        with self.db.snapshot():
+            entries = self.ledger.verify()
+            findings = self.anchors.verify(self.ledger, checkpoints) + reconcile(self)
+            head = self.ledger.head
+        return {"valid": not findings, "entries": entries, "head": head,
+                "anchors": len(checkpoints), "findings": [f.to_dict() for f in findings]}
 
     # ======================================================================
     # internals

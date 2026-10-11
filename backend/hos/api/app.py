@@ -26,9 +26,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.exc import OperationalError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from hos import __version__
 from hos.api.limits import BodyLimit
+from hos.api.observability import (
+    RequestLog,
+    alert,
+    configure_logging,
+    request_context,
+    set_principal,
+)
 from hos.core.citations import CITATIONS
 from hos.core.descriptors import InvalidStructureError
 from hos.core.methods import METHODS
@@ -313,8 +321,10 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                                          "http://localhost:5173,http://127.0.0.1:5173").split(",")
                if o]
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"],
-                       allow_headers=["*"], expose_headers=["X-Total-Count"])
+                       allow_headers=["*"], expose_headers=["X-Total-Count", "X-Request-ID"])
     app.add_middleware(BodyLimit)              # docs/15 P2.5
+    app.add_middleware(RequestLog)             # outermost: docs/15 P2.7
+    configure_logging()
     state: dict[str, Any] = {"kernel": kernel}
     throttle = LoginThrottle(int(os.environ.get("HOS_LOGIN_ATTEMPTS_PER_MINUTE", "10")))
 
@@ -331,6 +341,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         p = k.resolve_session(authorization.split(" ", 1)[1])
         if p is None:
             raise HTTPException(401, "invalid or expired token")
+        set_principal(p.id)
         if k.repo.principal(p.id).must_change_password and \
                 request.url.path not in ("/api/me", "/api/auth/password", "/api/auth/logout"):
             raise PermissionDenied("change your password before continuing")
@@ -408,8 +419,22 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
 
     # -- error mapping -----------------------------------------------------------------
     def _err(code: int, exc: Exception, **extra: Any) -> JSONResponse:
-        return JSONResponse(status_code=code, content={"error": type(exc).__name__,
-                                                       "detail": str(exc), **extra})
+        return JSONResponse(status_code=code, content={
+            "error": type(exc).__name__, "detail": str(exc), **extra,
+            "request_id": request_context()["request_id"]})
+
+    def _http(exc: StarletteHTTPException) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, headers=exc.headers, content={
+            "detail": exc.detail, "request_id": request_context()["request_id"]})
+
+    def _ledger_failed(exc: LedgerIntegrityError) -> JSONResponse:
+        alert("ledger_integrity", str(exc))
+        return JSONResponse(status_code=500, content={
+            "error": "LedgerIntegrityError", "detail": "the audit trail failed its integrity "
+            "check; this has been reported to the administrators",
+            "request_id": request_context()["request_id"]})
+
+    app.add_exception_handler(StarletteHTTPException, lambda r, e: _http(e))
 
     app.add_exception_handler(NotFound, lambda r, e: _err(404, e))
     app.add_exception_handler(PermissionDenied, lambda r, e: _err(403, e))
@@ -417,19 +442,21 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     for exc_t in (AttestationRequired, EvidenceInadmissible, IllegalTransition):
         app.add_exception_handler(exc_t, lambda r, e: _err(409, e))
     app.add_exception_handler(IngestError, lambda r, e: _err(422, e, errors=list(e.errors)))
-    app.add_exception_handler(LedgerIntegrityError, lambda r, e: _err(500, e))
+    app.add_exception_handler(LedgerIntegrityError, lambda r, e: _ledger_failed(e))
     # another writer held the lock too long, or the database is down; the unit of work
     # changed nothing. The driver's message (SQL, parameters) is not for clients.
     app.add_exception_handler(OperationalError, lambda r, e: JSONResponse(
         status_code=503, content={"error": "Unavailable", "detail": "the database is busy "
-                                  "or unavailable; nothing was changed, try again shortly"}))
+                                  "or unavailable; nothing was changed, try again shortly",
+                                  "request_id": request_context()["request_id"]}))
     for exc_t in (DriverError, KernelError, InvalidStructureError, ValueError):
         app.add_exception_handler(exc_t, lambda r, e: _err(400, e))
 
     def _invalid(code: int, exc: Any) -> JSONResponse:
         return JSONResponse(status_code=code, content={
             "error": "ValidationError", "detail": "the request is incomplete or not valid",
-            "errors": _validation_errors(exc.errors())})
+            "errors": _validation_errors(exc.errors()),
+            "request_id": request_context()["request_id"]})
 
     app.add_exception_handler(RequestValidationError, lambda r, e: _invalid(422, e))
     app.add_exception_handler(ValidationError, lambda r, e: _invalid(400, e))
@@ -978,6 +1005,9 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         """Chain, anchors and reconciliation. Findings name subjects across programmes, so
         only administrators see them; everyone sees whether the record is intact."""
         report = k.integrity()
+        if not report["valid"]:
+            alert("ledger_integrity", "the integrity check found problems",
+                  checks=sorted({f["check"] for f in report["findings"]}))
         if Role.ADMIN not in actor.roles:
             report["findings"] = len(report["findings"])
         return report

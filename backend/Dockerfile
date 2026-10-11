@@ -23,4 +23,7 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4)"]
 # Behind the web proxy: client addresses come from X-Forwarded-For only from the addresses in
 # FORWARDED_ALLOW_IPS (uvicorn's setting; default 127.0.0.1).
-CMD ["uvicorn", "hos.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+# The API logs one structured line per request itself (docs/15 P2.7), so uvicorn's access log,
+# which would also record query strings, is off.
+CMD ["uvicorn", "hos.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", \
+     "--no-access-log"]

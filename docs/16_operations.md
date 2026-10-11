@@ -57,6 +57,10 @@ Every setting is an environment variable. The table lists them all, with their d
 | `HOS_LOGIN_ATTEMPTS_PER_MINUTE` | `10` | sign-in attempts per client address per worker |
 | `HOS_AGENT_KEY_DAYS` | `90` | agent key lifetime |
 | `HOS_API_DOCS` | off | `1` publishes `/docs` and `/openapi.json` |
+| `HOS_LOG_FORMAT` | `json` | `text` for human-readable development logs |
+| `HOS_LOG_LEVEL` | `INFO` | level for the `hos` loggers |
+| `HOS_ALERT_WEBHOOK` | none | URL that receives alerts (JSON POST): a paging service or chat webhook |
+| `HOS_INTEGRITY_INTERVAL_SECONDS` | `3600` | compose: how often the `integrity` service checks the whole record |
 | `HOS_CORS_ORIGINS` | the Vite dev server | browser origins allowed to call the API directly; empty behind the proxy |
 | `FORWARDED_ALLOW_IPS` | `127.0.0.1` | uvicorn: addresses whose `X-Forwarded-For` is trusted |
 
@@ -92,6 +96,32 @@ page.
 - `GET /api/ready` is readiness. It checks that the database answers, the database is at this
   release's schema, and the file store and anchor directory are writable. It returns 503
   otherwise. It is public and names the failed checks, never their errors.
+
+## Logs and alerts
+
+The API writes one JSON object per line to stderr.
+- Every request gets a line with its request ID, the signed-in principal, method, path, status
+  and duration.
+- Lines written while a request is handled carry the same request ID.
+- Neither query strings nor headers nor bodies are logged, so passwords and tokens never reach
+  the log, and database errors hide statement parameters.
+- Every response has an `X-Request-ID` header, and every error body has a `request_id`. A user
+  quotes it, and the operator searches the log for it.
+- An unexpected error shows the client only that ID. The traceback is logged.
+
+**Alerts.** An audit trail that fails its integrity check needs a person: the chain broken, an
+anchor missed, or stored state no longer matching its events. It is logged at CRITICAL
+(`"logger": "hos.alert"`) and sent to `HOS_ALERT_WEBHOOK` as
+`{source, event, detail, at, request_id, checks}`. The same alert is sent at most once an hour
+per process. Alerts never carry credentials or record content.
+
+The check runs in the following places:
+- whenever someone opens the app (the header shows the result) and on `GET /api/ledger/verify`;
+- every `HOS_INTEGRITY_INTERVAL_SECONDS` in the compose `integrity` service;
+- with `hos-db integrity`, which exits 1 on any finding (for cron or a Kubernetes CronJob).
+
+It reads one consistent snapshot of the database, after reading the anchors, so a write that
+lands during the check is never reported as a finding.
 
 ## Upgrades
 

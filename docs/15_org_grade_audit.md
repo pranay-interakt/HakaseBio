@@ -212,7 +212,12 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
    locking, so two concurrent signatures can lose one.
    - Use `SELECT … FOR UPDATE` or an optimistic `version` column.
    - Fold this into the P0.1 unit of work.
-7. **Observability.**
+7. **Observability — fixed.** *Request IDs (kept from the proxy when well-formed) in an
+   `X-Request-ID` header and every error body; JSON log lines with request and principal IDs,
+   no query strings, headers or bodies, database parameters hidden; unexpected errors show
+   only the ID. Integrity failures alert (CRITICAL log and `HOS_ALERT_WEBHOOK`), from the API,
+   the scheduled compose service and `hos-db integrity`; the check reads one snapshot, so
+   concurrent writes cannot raise false alarms (docs/16).*
    - Structured JSON logs with request ID and principal ID (never passwords or tokens).
    - Error responses carry the request ID.
    - Ledger errors page someone rather than returning a bare 500.

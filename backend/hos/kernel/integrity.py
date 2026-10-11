@@ -242,10 +242,11 @@ class AnchorLog:
             os.fsync(f.fileno())
         self._last = (last.seq, last.entry_hash)
 
-    def verify(self, ledger: Ledger) -> list[Finding]:
+    def verify(self, ledger: Ledger,
+               checkpoints: list[dict[str, Any]] | None = None) -> list[Finding]:
         heads = {e.seq: e.entry_hash for e in ledger.entries()}
         out: list[Finding] = []
-        for cp in self.checkpoints():
+        for cp in self.checkpoints() if checkpoints is None else checkpoints:
             if self.key is not None and not hmac.compare_digest(str(cp.get("hmac")),
                                                                 str(self._mac(cp))):
                 out.append(Finding("ledger", "checkpoint is authentic",

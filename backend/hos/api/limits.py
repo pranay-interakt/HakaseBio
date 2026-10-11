@@ -97,9 +97,12 @@ class BodyLimit:
     async def _refuse(send: Send, limit: int) -> None:
         size = (f"{limit / 1024 / 1024:g} MB" if limit >= 1024 * 1024
                 else f"{limit / 1024:g} KB")
+        from hos.api.observability import request_context
+
         body = json.dumps({"error": "PayloadTooLarge",
                            "detail": f"the request body is larger than this endpoint accepts "
-                                     f"({size}); nothing was stored"}).encode()
+                                     f"({size}); nothing was stored",
+                           "request_id": request_context()["request_id"]}).encode()
         await send({"type": "http.response.start", "status": 413,
                     "headers": [(b"content-type", b"application/json"),
                                 (b"content-length", str(len(body)).encode())]})

@@ -156,3 +156,25 @@ def test_the_report_record_hash_covers_the_rendered_text(k):  # noqa: F811
     w = _world(k)
     ev = [e for e in k.history(w["sid"]) if e["action"] == "study.reported"][-1]
     assert ev["payload"]["report_record_hash"] == content_hash(k.repo.study(w["sid"]).report)
+
+
+def test_the_check_reads_one_snapshot(k):  # noqa: F811
+    """A write landing while the integrity check runs must not show up half-seen."""
+    import threading
+
+    sci = k.get_principal("sci")
+    pid = k.create_program(sci, name="S", context=CTX)["id"]
+    n = len(k.ledger.entries())
+    with k.db.snapshot():
+        assert len(k.ledger.entries()) == n
+        other = threading.Thread(target=lambda: k.create_program(sci, name="later",
+                                                                 context=CTX))
+        other.start()
+        other.join()
+        assert len(k.ledger.entries()) == n             # committed, but after the snapshot
+        assert len(k.repo.programs()) == 1
+        with pytest.raises(RuntimeError, match="read-only"):
+            k.repo.update_program(pid, name="changed inside a snapshot")
+    assert len(k.ledger.entries()) == n + 1
+    assert k.repo.program(pid).name == "S"
+    assert k.integrity()["valid"]

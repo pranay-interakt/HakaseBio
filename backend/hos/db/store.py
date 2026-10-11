@@ -39,7 +39,10 @@ class Database:
         kwargs = {}
         if self.url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
-        self.engine: Engine = create_engine(self.url, future=True, **kwargs)
+        # statement parameters (password and token hashes among them) stay out of error
+        # messages and logs (docs/15 P2.7)
+        self.engine: Engine = create_engine(self.url, future=True, hide_parameters=True,
+                                            **kwargs)
         if self.url.startswith("sqlite"):
             @event.listens_for(self.engine, "connect")
             def _pragmas(dbapi_conn: Any, _: Any) -> None:  # pragma: no cover - driver hook
@@ -50,7 +53,14 @@ class Database:
                 cur.execute(f"PRAGMA busy_timeout={int(self.write_wait_seconds * 1000)}")
                 cur.close()
         self._factory = sessionmaker(self.engine, expire_on_commit=False, future=True)
+
+        @event.listens_for(self._factory, "before_flush")
+        def _read_only(session: Session, *_: Any) -> None:
+            if session.info.get("snapshot"):
+                raise RuntimeError("a snapshot is read-only")
+
         self._uow: ContextVar[Session | None] = ContextVar(f"hos_uow_{id(self)}", default=None)
+        self._snap: ContextVar[Session | None] = ContextVar(f"hos_snap_{id(self)}", default=None)
         self._write_lock = threading.RLock()
 
     def upgrade(self) -> tuple[str | None, str]:
@@ -76,9 +86,11 @@ class Database:
     def session(self) -> Iterator[Session]:
         """A session. Inside :meth:`transaction` it is the unit of work's own session, which
         only the unit of work commits; otherwise a short session committed on exit."""
-        uow = self._uow.get()
+        uow = self._uow.get() or self._snap.get()
         if uow is not None:
             yield uow
+            if uow.info.get("snapshot") and (uow.new or uow.dirty or uow.deleted):
+                raise RuntimeError("a snapshot is read-only")
             return
         s = self._factory()
         try:
@@ -92,6 +104,31 @@ class Database:
 
     def in_transaction(self) -> bool:
         return self._uow.get() is not None
+
+    @contextmanager
+    def snapshot(self) -> Iterator[Session]:
+        """Read-only, consistent reads: every session opened inside sees the database as it
+        was at the first read, whatever commits meanwhile (REPEATABLE READ on PostgreSQL, one
+        read transaction on SQLite). For checks that compare tables with each other, such as
+        the integrity check, which would otherwise report a write landing mid-check."""
+        if self._uow.get() is not None or self._snap.get() is not None:
+            yield self._uow.get() or self._snap.get()  # type: ignore[misc]
+            return
+        s = self._factory()
+        s.info["snapshot"] = True
+        if self.engine.dialect.name == "postgresql":
+            s.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+        else:
+            # pysqlite starts no transaction for reads; without one each SELECT sees the
+            # latest commit
+            s.connection().exec_driver_sql("BEGIN")
+        token = self._snap.set(s)
+        try:
+            yield s
+        finally:
+            self._snap.reset(token)
+            s.rollback()
+            s.close()
 
     @contextmanager
     def transaction(self) -> Iterator[Session]:

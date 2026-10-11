@@ -142,6 +142,11 @@ jobs:
         run: |
           docker compose run --rm migrate
           docker compose exec -T api hos-db check
+      - name: Integrity check passes; the API logs structured lines with request IDs
+        run: |
+          docker compose exec -T api hos-db integrity
+          docker compose logs api | grep -q '"msg": "request"'
+          docker compose logs api | grep -q '"request_id"'
       - name: Containers run as non-root
         run: |
           test "$(docker compose exec -T api id -u)" != "0"
