@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # every branch, so work is checked before it reaches main (docs/15 P0.4)
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
 
 permissions:
