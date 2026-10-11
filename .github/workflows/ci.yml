@@ -34,8 +34,10 @@ jobs:
           pip install --require-hashes -r requirements-dev.lock
           pip install --no-deps -e .
           pip check
-      - name: Lint (ruff)
-        run: ruff check hos tests scripts
+      - name: Lint and format (ruff)
+        run: |
+          ruff check hos tests scripts
+          ruff format --check hos tests scripts
       - name: Type check (mypy)
         run: mypy hos
       - name: Migrations (empty database to head; no drift from the models)

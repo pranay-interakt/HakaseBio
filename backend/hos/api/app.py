@@ -13,12 +13,14 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import re
 import secrets
 import threading
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -56,7 +58,7 @@ from hos.kernel.errors import (
 )
 from hos.kernel.kernel import Kernel
 
-__all__ = ["app", "create_app"]
+__all__ = ["app", "attachment", "create_app"]
 
 _log = logging.getLogger(__name__)
 
@@ -280,6 +282,15 @@ def _validation_errors(errors: list[Any]) -> list[str]:
         f"{'.'.join(str(x) for x in e.get('loc', ())) or 'request'}: {e.get('msg', '')}"
         for e in errors
     ]
+
+
+def attachment(filename: str) -> str:
+    """``Content-Disposition`` for a user-supplied filename (RFC 6266, docs/15 P3). An ASCII
+    ``filename`` with quotes, separators and control characters replaced, for old clients, and
+    the exact name UTF-8 percent-encoded in ``filename*`` (RFC 8187)."""
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].strip() or "download"
+    fallback = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" .")[:200] or "download"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
 class Page:
@@ -938,7 +949,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         return Response(
             k.dispatch_bundle(study_id),
             media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{study_id}_dispatch.zip"'},
+            headers={"Content-Disposition": attachment(f"{study_id}_dispatch.zip")},
         )
 
     @app.get("/api/studies/{study_id}/template", dependencies=[Depends(study_access)])
@@ -1128,7 +1139,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
         return Response(
             k.files.get(sha),
             media_type=meta.media_type,
-            headers={"Content-Disposition": f'attachment; filename="{meta.filename}"'},
+            headers={"Content-Disposition": attachment(meta.filename)},
         )
 
     # -- audit ----------------------------------------------------------------------------
@@ -1277,9 +1288,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     ) -> Response:
         content, filename, media = k.imports.import_report_file(study_id)
         return Response(
-            content,
-            media_type=media,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            content, media_type=media, headers={"Content-Disposition": attachment(filename)}
         )
 
     @app.get("/api/requirements/{requirement_id}/import-fields")

@@ -222,19 +222,25 @@ auth). There is no idle timeout, and agent tokens expire after 8 h and vanish on
    - Error responses carry the request ID.
    - Ledger errors page someone rather than returning a bare 500.
 
-## P3 — Hygiene
+## P3 — Hygiene — fixed
 
-- `ruff format --check` fails on 90 files. Format once, then enforce it in CI.
-- The DOIs were spot-checked and are correct. Add a `live`-marked test that resolves every DOI
-  and URL in `CITATIONS` against Crossref and checks year and first author.
-- Deprecations:
-  - `starlette.testclient` with `httpx` (move to the replacement client);
-  - `Column.copy()` in `tests/kernel/test_imports.py`.
-- ~~Python version: CLAUDE.md says 3.11+, `requires-python` says >=3.10, and CI tests 3.11/3.12.
-  Settle on one stated floor.~~ *Fixed: 3.11 everywhere (`requires-python`, ruff, mypy, the
-  lock); the image runs 3.12.*
-- `Content-Disposition` filenames come from user input. Sanitise them, and emit RFC 6266
-  `filename*=`.
+- ~~`ruff format --check` fails on 90 files. Format once, then enforce it in CI.~~ *Fixed: one
+  formatting-only commit; CI runs `ruff format --check`.*
+- ~~Add a `live`-marked test that resolves every DOI and URL in `CITATIONS` against Crossref
+  and checks year and first author.~~ *Fixed: `tests/core/test_citations_live.py`, run weekly
+  by the `live` workflow with the ChEMBL/PubChem contract tests. On 2026-10-11, all 57 DOIs
+  and 45 URLs passed. Crossref dates OECD TG 407/408 to 2025-06-25, a metadata re-deposit:
+  both DOIs still serve the cited 2008 and 2018 editions. That exception is pinned in the
+  test, so any further change to those records fails it.*
+- ~~Deprecations: `starlette.testclient` with `httpx`; `Column.copy()`.~~ *Fixed: the test
+  client uses `httpx2`; the migration tests replaced `Column.copy()`. The suite runs with no
+  warnings.*
+- ~~Python version: settle on one stated floor.~~ *Fixed: 3.11 everywhere (`requires-python`,
+  ruff, mypy, the lock); the image runs 3.12.*
+- ~~`Content-Disposition` filenames come from user input. Sanitise them, and emit RFC 6266
+  `filename*=`.~~ *Fixed: an ASCII fallback with quotes, separators and control characters
+  replaced, plus the exact name in `filename*` (RFC 8187). A non-Latin-1 report name used to
+  fail the download.*
 
 ## Order of work
 
