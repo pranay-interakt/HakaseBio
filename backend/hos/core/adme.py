@@ -223,10 +223,16 @@ def clint_in_vitro(fit: DepletionFit, protein_concentration: Quantity) -> Quanti
     )
 
 
-#: Hallifax & Houston (2006) regression coefficients for log((1-fu)/fu) vs logP/D.
+#: Hallifax & Houston (2006) coefficients: fu,mic = 1 / (1 + C * 10^(A*X^2 + B*X + C0)).
 _HH_A, _HH_B, _HH_C = 0.072, 0.067, -1.126
-#: Lipophilicity range spanned by the Hallifax-Houston training set.
-_HH_DOMAIN = (-2.0, 7.0)
+#: Applicability domain from the independent evaluation of Gertz et al. (2008), abstract:
+#: predictions are useful for logP/D 0-3; for logP/D >= 3 fu,inc "should be experimentally
+#: confirmed ... unless the microsomal protein concentration is as low as 0.1 mg/ml, in which
+#: case a cutoff of logP/D >= 5 can be applied".
+_HH_DOMAIN_LOWER = 0.0
+_HH_DOMAIN_UPPER = 3.0
+_HH_DOMAIN_UPPER_LOW_PROTEIN = 5.0
+_HH_LOW_PROTEIN_MG_ML = 0.1
 
 
 def fu_mic_hallifax_houston(
@@ -241,25 +247,28 @@ def fu_mic_hallifax_houston(
     microsomal protein concentration in mg/mL (Hallifax & Houston 2006).
 
     This is a **prediction**, not a measurement: the returned quantity carries
-    ``PREDICTED`` provenance and an applicability-domain check against the
-    lipophilicity range of the model's training set.
+    ``PREDICTED`` provenance and an applicability-domain check. The domain is the one
+    reported by the independent evaluation of Gertz et al. (2008): logP/D 0-3, extended
+    to logP/D < 5 when the protein concentration is 0.1 mg/mL or lower.
     """
     x = lipophilicity.require()
     c = protein_concentration.magnitude_in("mg/mL")
     if c <= 0:
         raise QuantityError("microsomal protein concentration must be positive")
 
-    lo, hi = _HH_DOMAIN
-    in_domain = lo <= x <= hi
+    lo = _HH_DOMAIN_LOWER
+    hi = _HH_DOMAIN_UPPER_LOW_PROTEIN if c <= _HH_LOW_PROTEIN_MG_ML else _HH_DOMAIN_UPPER
+    in_domain = lo <= x < hi
     applicability = ApplicabilityCheck(
         in_domain=in_domain,
-        descriptor_ranges_checked=("logP/logD",),
+        descriptor_ranges_checked=("logP/logD", "microsomal protein concentration"),
         reason=None if in_domain else (
-            f"lipophilicity {x:.2f} is outside the model's fitted range "
-            f"[{lo}, {hi}]; the predicted binding is an extrapolation"
+            f"lipophilicity {x:.2f} at {c:g} mg/mL protein is outside the range [{lo:g}, {hi:g}) "
+            "in which Gertz et al. (2008) found the equation reliable; measure fu,inc "
+            "experimentally (e.g. equilibrium dialysis)"
         ),
-        distance_metric="logP distance outside fitted range",
-        distance_value=0.0 if in_domain else float(min(abs(x - lo), abs(x - hi))),
+        distance_metric="logP/D units outside the evaluated range",
+        distance_value=0.0 if in_domain else float(lo - x if x < lo else x - hi),
     )
     ratio = c * (10.0 ** (_HH_A * x * x + _HH_B * x + _HH_C))
     fu = 1.0 / (1.0 + ratio)

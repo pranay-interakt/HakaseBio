@@ -73,9 +73,10 @@ METHODS: Final[dict[str, Method]] = dict(
            assumptions=("first-order depletion", "no significant non-specific binding unless corrected"),
            limits=("scaled per mg microsomal protein; hepatocyte data require a different scalar",)),
         _m("adme.fu_mic_predicted", "Predicted microsomal unbound fraction from lipophilicity",
-           ("hallifax2006",),
+           ("hallifax2006", "gertz2008"),
            assumptions=("binding is driven by lipophilicity at the stated microsomal concentration",),
-           limits=("a regression model; outside its fitted logP range the estimate is unreliable",)),
+           limits=("reliable for logP/D 0-3 (below 5 at <= 0.1 mg/mL protein) per Gertz 2008; "
+                   "outside that range fu,mic should be measured",)),
         _m("adme.clint_invivo", "Scaling of in vitro intrinsic clearance to the whole liver",
            ("obach1999", "barter2007", "houston1994"),
            assumptions=("microsomal protein per gram liver and liver weight are population means",)),

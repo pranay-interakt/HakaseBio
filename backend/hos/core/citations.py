@@ -70,6 +70,11 @@ CITATIONS: Final[dict[str, Citation]] = dict(
            "assessment of current prediction methodology with recommendation for "
            "improvement. Drug Metab Dispos. 2006;34(4):724-726.",
            year=2006, doi="10.1124/dmd.105.007658"),
+        _c("gertz2008",
+           "Gertz M, Kilford PJ, Houston JB, Galetin A. Drug lipophilicity and microsomal "
+           "protein concentration as determinants in the prediction of the fraction unbound "
+           "in microsomal incubations. Drug Metab Dispos. 2008;36(3):535-542.",
+           year=2008, doi="10.1124/dmd.107.018713"),
         _c("riley2005",
            "Riley RJ, McGinnity DF, Austin RP. A unified model for predicting human "
            "hepatic, metabolic clearance from in vitro intrinsic clearance data in "

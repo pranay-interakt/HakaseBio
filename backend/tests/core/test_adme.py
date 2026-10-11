@@ -120,3 +120,19 @@ def test_unverified_reference_scalar_is_flagged():
     clint = clint_in_vitro(fit_depletion(_series()), PROT)
     iv = scale_clint_to_liver(clint, "dog")
     assert "reference_value_requires_verification" in iv.qc_flags
+
+
+def test_fu_mic_domain_follows_gertz_2008():
+    # Gertz 2008: reliable for logP/D 0-3; cutoff 5 when protein <= 0.1 mg/mL
+    lp = lambda v: Quantity.computed(v, "dimensionless", method=method("descr.clogp"))
+    low_p = Quantity.user_supplied(0.1, "mg/mL", actor="setup")
+    assert fu_mic_hallifax_houston(lp(2.0), PROT).provenance.applicability.in_domain
+    assert not fu_mic_hallifax_houston(lp(3.5), PROT).provenance.applicability.in_domain
+    assert fu_mic_hallifax_houston(lp(3.5), low_p).provenance.applicability.in_domain
+    assert not fu_mic_hallifax_houston(lp(-0.5), PROT).provenance.applicability.in_domain
+
+
+def test_fu_mic_hallifax_equation_value():
+    # fu = 1 / (1 + 0.5 * 10^(0.072*4 + 0.067*2 - 1.126)) at logP 2, 0.5 mg/mL
+    fu = fu_mic_hallifax_houston(Quantity.computed(2.0, "dimensionless", method=method("descr.clogp")), PROT)
+    assert fu.value == pytest.approx(1 / (1 + 0.5 * 10 ** (0.072 * 4 + 0.067 * 2 - 1.126)), rel=1e-12)

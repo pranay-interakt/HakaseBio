@@ -11,7 +11,7 @@ from hos.core.regulatory.engine import RequirementStatus
 JOURNAL_KEYS = (
     "wildman1999", "ertl2000", "lipinski2001", "veber2002", "bickerton2012", "obach1999",
     "wilkinson1975", "houston1994", "hallifax2006", "riley2005", "davies1993", "barter2007",
-    "delean1978", "redfern2003", "dunnett1955",
+    "delean1978", "redfern2003", "dunnett1955", "gertz2008",
 )
 
 
