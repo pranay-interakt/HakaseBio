@@ -238,6 +238,13 @@ class Kernel:
         if existing:
             if actor is None or Role.ADMIN not in actor.roles:
                 raise PermissionDenied("only an administrator can register principals")
+            # An agent may hold no attestation role (below), but it must not be able to
+            # create a person who does and choose their password: that would hand software
+            # a credential that passes re-authentication and signs a GxP record
+            # (CLAUDE.md rules 8 and 9; 21 CFR 11.100(b)). Every other user-management
+            # path already requires a human administrator (``_administered``).
+            if actor.kind is not PrincipalKind.HUMAN:
+                raise PermissionDenied("only a human administrator can register principals")
         elif kind is not PrincipalKind.HUMAN or Role.ADMIN not in roles:
             raise PermissionDenied("the first principal must be a human administrator")
         if any(p.id == principal_id for p in existing):

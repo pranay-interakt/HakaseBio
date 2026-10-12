@@ -110,3 +110,101 @@ def test_reduced_safety_factor_requires_justification():
 def test_missing_noael_yields_unavailable_mrsd():
     p = project_starting_dose({"rat": Quantity.unavailable("mg/kg", reason="not reported")})
     assert not p.mrsd_per_kg.is_available
+
+
+# ---- FDA 2005 guard rails: the rules that stop a starting dose being talked up ----------
+
+
+def test_no_species_at_all_is_refused_not_guessed():
+    with pytest.raises(QuantityError, match="at least one species"):
+        project_starting_dose({})
+
+
+def test_choosing_a_species_other_than_the_most_sensitive_needs_a_reason():
+    """FDA 2005: the most sensitive species governs unless a justification is recorded."""
+    noaels = {
+        "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
+        "dog": Quantity.measured(10.0, "mg/kg", source_name="d"),
+    }
+    with pytest.raises(QuantityError, match="documented reason"):
+        project_starting_dose(noaels, override_species="rat")
+
+
+def test_an_override_is_applied_and_recorded_as_a_finding():
+    noaels = {
+        "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
+        "dog": Quantity.measured(10.0, "mg/kg", source_name="d"),
+    }
+    p = project_starting_dose(
+        noaels,
+        override_species="rat",
+        override_reason="dog findings judged not relevant to humans (documented)",
+    )
+    assert p.mrsd_per_kg.value == pytest.approx(100 * 6 / 37 / 10)  # the rat HED governs
+    codes = {f.code for f in p.qc.findings}
+    assert "most_sensitive_species_overridden" in codes
+    # the justification travels with the result, not just in someone's head
+    assert any("documented" in (f.message or "") for f in p.qc.findings)
+
+
+def test_an_override_to_a_species_without_a_usable_hed_is_refused():
+    noaels = {
+        "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
+        "dog": Quantity.unavailable("mg/kg", reason="study not run"),
+    }
+    with pytest.raises(QuantityError, match="no usable HED"):
+        project_starting_dose(noaels, override_species="dog", override_reason="preferred species")
+
+
+def test_an_increased_safety_factor_without_its_trigger_is_flagged():
+    """A larger factor is allowed, but FDA 2005 expects the trigger to be recorded."""
+    p = project_starting_dose(
+        {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")}, safety_factor=30.0
+    )
+    assert p.mrsd_per_kg.value == pytest.approx(100 * 6 / 37 / 30)
+    assert "increased_safety_factor_unjustified" in {f.code for f in p.qc.findings}
+
+
+def test_a_justified_safety_factor_change_is_not_flagged():
+    p = project_starting_dose(
+        {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")},
+        safety_factor=30.0,
+        safety_factor_justification="steep dose-response in the pivotal study (FDA 2005 VII)",
+    )
+    assert "increased_safety_factor_unjustified" not in {f.code for f in p.qc.findings}
+    assert p.safety_factor.value == 30.0
+
+
+def test_a_non_positive_safety_factor_is_refused():
+    with pytest.raises(QuantityError, match="must be positive"):
+        project_starting_dose(
+            {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")}, safety_factor=0.0
+        )
+
+
+def test_a_single_species_is_flagged_against_ich_m3r2():
+    p = project_starting_dose({"rat": Quantity.measured(100.0, "mg/kg", source_name="r")})
+    assert "single_species_only" in {f.code for f in p.qc.findings}
+
+
+def test_the_derivation_states_every_step_including_an_unavailable_species():
+    p = project_starting_dose(
+        {
+            "rat": Quantity.measured(100.0, "mg/kg", source_name="r"),
+            "dog": Quantity.unavailable("mg/kg", reason="study not run"),
+        }
+    )
+    steps = " | ".join(p.derivation_steps())
+    assert "HED unavailable" in steps and "study not run" in steps
+    assert "most sensitive species = rat" in steps
+    assert "safety factor" in steps and "60 kg adult" in steps
+
+
+def test_the_derivation_states_the_pad_judgement_without_making_it():
+    p = project_starting_dose(
+        {"rat": Quantity.measured(100.0, "mg/kg", source_name="r")},
+        pad=Quantity.measured(0.2, "mg/kg", source_name="PD model"),
+    )
+    steps = " | ".join(p.derivation_steps())
+    assert "below the MRSD" in steps
+    assert "decision for the responsible scientist" in steps

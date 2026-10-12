@@ -56,6 +56,8 @@ SIM = dict(
     qt_noise_sd_ms=0,
     rr_change_by_dose_ms=[0, 30, 80],
     qtc_change_by_dose_ms=[0, 4, 12],
+    # the scenario's declared truth for a conscious beagle; the generator has no defaults
+    bp_baseline_mmhg=(135.0, 75.0, 95.0),
     bp_change_by_dose_mmhg=[0, 0, -8],
     cmax_by_dose=[200, 700, 2100],
     pk_sample_time_h=2,

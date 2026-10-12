@@ -23,6 +23,7 @@ from hos.core.regulatory import ProgramContext, Timing, derive_study_set
 from hos.core.regulatory.engine import RequirementStatus
 from hos.drivers.base import CompoundInfo, canonical_hash
 from hos.kernel.attestation import Principal, PrincipalKind
+from hos.kernel.errors import KernelError
 from hos.kernel.inputs import input_quantity
 from hos.kernel.lifecycle import StudyState
 
@@ -75,8 +76,15 @@ def rehearse(
     ss = derive_study_set(ctx)
     compounds = kernel.repo.compounds(program_id)
     compound: CompoundInfo | None = None
-    if compound_id or compounds:
-        compound = kernel.compound_info(compound_id or compounds[0].id)
+    if compound_id:
+        # the id comes from the request body, so it is checked against this programme the
+        # same way ``create_study`` checks it; otherwise a caller could rehearse against —
+        # and confirm the existence of — another organisation's compound
+        if compound_id not in {c.id for c in compounds}:
+            raise KernelError("compound does not belong to this programme")
+        compound = kernel.compound_info(compound_id)
+    elif compounds:
+        compound = kernel.compound_info(compounds[0].id)
     holders = _role_holders(kernel, program_id)
 
     items: list[dict[str, Any]] = []

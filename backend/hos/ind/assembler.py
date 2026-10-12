@@ -263,21 +263,47 @@ def Quantity_value_in(q: dict[str, Any], unit: str) -> float:
 
 
 def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
+    """The first-in-human starting dose from the programme's attested NOAELs (FDA 2005).
+
+    Two rules keep this honest, because every NOAEL left out of the set raises the
+    resulting dose:
+
+    * A sex-specific NOAEL counts. A study's NOAEL for dose-setting is driven by the more
+      sensitive sex, and :func:`keep` already takes the lowest per species, so including
+      both sexes can only lower the projection. The sex is carried into the source list.
+    * A NOAEL that was *not established* — the lowest dose tested was already adverse —
+      has no number to project from, but it is the most safety-relevant thing the
+      programme knows. It is recorded in ``excluded`` and rendered with the derivation
+      rather than passed over.
+    """
     noaels: dict[str, Quantity] = {}
-    sources = []
+    sources: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
 
     def keep(species: str, val: Quantity) -> None:
         # keep the most sensitive (lowest) NOAEL per species
         if species not in noaels or val.require() < noaels[species].require():
             noaels[species] = val
 
+    def drop(study_id: str, species: Any, reason: str, sex: Any = None) -> None:
+        excluded.append({"study_id": study_id, "species": species, "sex": sex, "reason": reason})
+
     for s in studies:
         if s.origin == "import":
             for v in (s.import_record or {}).get("values", []):
                 q = v.get("quantity")
-                if v.get("withdrawn") or v["key"] != "noael" or not q or not v.get("species"):
+                if v["key"] != "noael":
                     continue
-                if v.get("sex") not in (None, "combined"):
+                if v.get("withdrawn"):
+                    drop(s.id, v.get("species"), "the value was withdrawn", v.get("sex"))
+                    continue
+                if not q or not v.get("species"):
+                    drop(
+                        s.id,
+                        v.get("species"),
+                        "the transcribed value names no species or carries no quantity",
+                        v.get("sex"),
+                    )
                     continue
                 val = Quantity.user_supplied(
                     Quantity_value_in(q, "mg/kg/day"),
@@ -292,6 +318,7 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
                     {
                         "study_id": s.id,
                         "species": v["species"],
+                        "sex": v.get("sex") or "combined",
                         "noael": q["value"],
                         "unit": q["unit"],
                         "signer": "import (see study signatures)",
@@ -304,7 +331,18 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
             continue
         species = (s.parameters or {}).get("species")
         det = next((d for d in s.determinations or [] if d["key"] == "noael"), None)
-        if not species or det is None or not (det.get("quantity") or {}).get("available"):
+        if det is None:
+            continue  # the Study Director has not determined a NOAEL for this study yet
+        if not species:
+            drop(s.id, None, "the study records no species")
+            continue
+        if not (det.get("quantity") or {}).get("available"):
+            drop(
+                s.id,
+                species,
+                "NOAEL not established: the Study Director determined no dose without an "
+                "adverse effect, so this species contributes no value to project from",
+            )
             continue
         q = det["quantity"]
         val = Quantity.user_supplied(
@@ -325,12 +363,31 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
             }
         )
     if not noaels:
-        return None
+        if not excluded:
+            return None
+        # nothing to project from, but the programme knows why — say so rather than
+        # dropping the section
+        return {
+            "basis": "FDA 2005 MRSD guidance",
+            "sources": sources,
+            "excluded": excluded,
+            "projection": None,
+            "unavailable_reason": "no species contributed a NOAEL to project from",
+        }
+    for sp in noaels:
+        if sp not in _KM_SPECIES:
+            drop(
+                "-",
+                sp,
+                f"FDA 2005 gives no Km factor for {sp}, so its NOAEL cannot be converted "
+                "to a human equivalent dose",
+            )
     known = {sp: q for sp, q in noaels.items() if sp in _KM_SPECIES}
     if not known:
         return {
             "basis": "FDA 2005 MRSD guidance",
             "sources": sources,
+            "excluded": excluded,
             "projection": None,
             "unavailable_reason": "no NOAEL for a species with an FDA 2005 Km factor",
         }
@@ -339,6 +396,7 @@ def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:
         "basis": "FDA 2005 MRSD guidance; NOAELs as attested by the Study Director",
         "unit_note": "daily NOAELs (mg/kg/day) are treated as mg/kg single daily doses",
         "sources": sources,
+        "excluded": excluded,
         "projection": proj.to_dict(),
     }
 
@@ -553,9 +611,22 @@ def _index_markdown(pkg: dict[str, Any]) -> str:
     if pkg["refused_studies"]:
         out += ["", "## Refused (not admissible as evidence)"]
         out += [f"- {r['study_id']}: {r['reason']}" for r in pkg["refused_studies"]]
-    if pkg["dose_projection"] and pkg["dose_projection"].get("projection"):
+    if pkg["dose_projection"]:
+        dp = pkg["dose_projection"]
         out += ["", "## First-in-human dose projection (FDA 2005)"]
-        out += [f"- {s}" for s in pkg["dose_projection"]["projection"]["derivation"]]
+        if dp.get("projection"):
+            out += [f"- {s}" for s in dp["projection"]["derivation"]]
+        else:
+            out += [f"- No dose projected: {dp.get('unavailable_reason', 'not available')}"]
+        if dp.get("excluded"):
+            # every NOAEL left out raises the projected dose, so each omission is stated
+            out += ["", "### NOAELs not used in this projection"]
+            out += [
+                f"- {e['species'] or 'unknown species'}"
+                + (f" ({e['sex']})" if e.get("sex") and e["sex"] != "combined" else "")
+                + f", study {e['study_id']}: {e['reason']}"
+                for e in dp["excluded"]
+            ]
     out += ["", "## 4.3 Literature references"]
     out += [f"- [{r['key']}] {r['text']}" for r in pkg["literature_references"]]
     return "\n".join(out) + "\n"

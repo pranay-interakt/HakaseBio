@@ -214,3 +214,75 @@ def test_an_organisation_administrator_works_inside_it(api):  # noqa: F811
     )
     assert r.status_code == 200 and r.json()["organisation"] == "Org A"
     assert c.get("/api/ledger/b_sci", headers=a_adm).status_code == 403
+
+
+def test_a_body_id_from_another_organisation_is_refused(api):  # noqa: F811
+    """An id in a request body is scoped like one in the path.
+
+    ``program_access`` guards the path, so a body field naming another organisation's
+    compound would otherwise run the drivers against it — and tell the caller whether it
+    exists, which the compound route deliberately hides.
+    """
+    c = api
+    adm = _login(c, "admin")
+    a = _user(c, adm, "a_sci2", "Org A")
+    b = _user(c, adm, "b_sci2", "Org B")
+    a_compound = _org_a_world(c, a)["compound_id"]
+    b_prog = c.post("/api/programs", headers=b, json={"name": "B-1", "context": CTX}).json()["id"]
+
+    assert c.get(f"/api/compounds/{a_compound}", headers=b).status_code == 404  # hidden
+    foreign = c.post(
+        f"/api/programs/{b_prog}/rehearsal", headers=b, json={"compound_id": a_compound}
+    )
+    missing = c.post(
+        f"/api/programs/{b_prog}/rehearsal", headers=b, json={"compound_id": "cmp_nope"}
+    )
+    assert foreign.status_code == 400, foreign.text
+    assert "does not belong to this programme" in foreign.text
+    # the same answer either way: no oracle for which ids exist elsewhere
+    assert missing.status_code == foreign.status_code
+    assert missing.json()["detail"] == foreign.json()["detail"]
+
+
+def test_an_agent_administrator_cannot_create_a_person_who_signs(api):  # noqa: F811
+    """CLAUDE.md rules 8 and 9: software must not be able to manufacture a signer.
+
+    An agent holding ``admin`` may not take any other user-management action; registering
+    a human — and choosing their password — would hand it a credential that passes
+    re-authentication and signs a GxP record.
+    """
+    c = api
+    adm = _login(c, "admin")
+    assert (
+        c.post(
+            "/api/principals",
+            headers=adm,
+            json={
+                "principal_id": "bot_admin",
+                "name": "Bot",
+                "kind": "agent",
+                "roles": ["admin", "scientist"],
+            },
+        ).status_code
+        == 200
+    )
+    token = c.post("/api/principals/bot_admin/agent-token", headers=adm).json()["token"]
+    bot = {"Authorization": f"Bearer {token}"}
+
+    r = c.post(
+        "/api/principals",
+        headers=bot,
+        json={
+            "principal_id": "ghost_director",
+            "name": "Ghost",
+            "kind": "human",
+            "roles": ["study_director", "quality_assurance"],
+            "password": PW,
+        },
+    )
+    assert r.status_code == 403, r.text
+    assert "human administrator" in r.text
+    # and the person was never created, so there is no credential to sign with
+    signin = c.post("/api/auth/login", json={"principal_id": "ghost_director", "password": PW})
+    assert signin.status_code != 200, signin.text
+    assert "ghost_director" not in {p["id"] for p in c.get("/api/principals", headers=adm).json()}

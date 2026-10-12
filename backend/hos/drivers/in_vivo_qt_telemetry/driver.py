@@ -208,8 +208,20 @@ class TelemetrySimulation(BaseModel):
     rr_change_by_dose_ms: list[float]
     qtc_change_by_dose_ms: list[float]
     positive_control_qtc_change_ms: float = 0.0
-    bp_baseline_mmhg: tuple[float, float, float] = (120.0, 70.0, 90.0)
+    #: Baselines have no defaults. A physiological value the user did not state is one the
+    #: simulator would be inventing, and it would then be analysed as if it were data.
+    bp_baseline_mmhg: tuple[float, float, float] | None = Field(
+        default=None, description="systolic, diastolic, mean arterial (mmHg), for this species"
+    )
     bp_change_by_dose_mmhg: list[float] | None = None
+    pr_baseline_ms: float | None = Field(
+        default=None, gt=0, description="PR interval baseline (ms), for this species"
+    )
+    qrs_baseline_ms: float | None = Field(
+        default=None, gt=0, description="QRS duration baseline (ms), for this species"
+    )
+    pr_change_by_dose_ms: list[float] | None = None
+    qrs_change_by_dose_ms: list[float] | None = None
     cmax_by_dose: list[float] = Field(description="plasma concentration at the sampled time")
     pk_sample_time_h: float = Field(gt=0)
 
@@ -971,6 +983,26 @@ class InVivoQTTelemetryDriver(StudyDriver):
         ):
             if len(v) != nd:
                 raise ValueError(f"{name} needs one value per dose")
+        # A simulated endpoint needs a declared truth. Without one the generator would be
+        # inventing a physiological value, and the analysis would then run over it as if it
+        # were data (CLAUDE.md rules 0 and 2).
+        if p.blood_pressure and s.bp_baseline_mmhg is None:
+            raise ValueError(
+                "the protocol measures blood pressure, so the simulated truth must state "
+                "bp_baseline_mmhg (systolic, diastolic, mean arterial) for this species"
+            )
+        if p.measure_pr_qrs and (s.pr_baseline_ms is None or s.qrs_baseline_ms is None):
+            raise ValueError(
+                "the protocol measures PR and QRS, so the simulated truth must state "
+                "pr_baseline_ms and qrs_baseline_ms for this species"
+            )
+        for name, maybe in (
+            ("pr_change_by_dose_ms", s.pr_change_by_dose_ms),
+            ("qrs_change_by_dose_ms", s.qrs_change_by_dose_ms),
+            ("bp_change_by_dose_mmhg", s.bp_change_by_dose_mmhg),
+        ):
+            if maybe is not None and len(maybe) != nd:
+                raise ValueError(f"{name} needs one value per dose")
         treatments = p.treatments()
         rows: list[dict[str, Any]] = []
         for ai, a in enumerate(s.animals):
@@ -990,6 +1022,16 @@ class InVivoQTTelemetryDriver(StudyDriver):
                 d_bp = (
                     s.bp_change_by_dose_mmhg[di]
                     if di is not None and s.bp_change_by_dose_mmhg
+                    else 0.0
+                )
+                # no declared change means the truth is "no effect on this endpoint", which
+                # is a statement the user made, not a value the generator chose
+                d_pr = (
+                    s.pr_change_by_dose_ms[di] if di is not None and s.pr_change_by_dose_ms else 0.0
+                )
+                d_qrs = (
+                    s.qrs_change_by_dose_ms[di]
+                    if di is not None and s.qrs_change_by_dose_ms
                     else 0.0
                 )
                 base_times = p.post_dose_times_h if p.baseline == "time_matched" else [-0.5]
@@ -1021,8 +1063,14 @@ class InVivoQTTelemetryDriver(StudyDriver):
                             "plasma_concentration": None,
                         }
                         if p.measure_pr_qrs:
-                            row.update(pr=100.0, qrs=50.0)
+                            assert s.pr_baseline_ms is not None  # checked before generating
+                            assert s.qrs_baseline_ms is not None
+                            row.update(
+                                pr=s.pr_baseline_ms + (d_pr if post else 0.0),
+                                qrs=s.qrs_baseline_ms + (d_qrs if post else 0.0),
+                            )
                         if p.blood_pressure:
+                            assert s.bp_baseline_mmhg is not None  # checked before generating
                             sb, db, mb = s.bp_baseline_mmhg
                             e = d_bp if post else 0.0
                             row.update(sbp=sb + e, dbp=db + e, map=mb + e)
