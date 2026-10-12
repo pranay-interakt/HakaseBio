@@ -81,7 +81,7 @@ export function Users({ me }: { me: Principal }) {
             A deactivated user can neither sign in nor sign; their earlier signatures stay valid.
           </span>
         </div>
-        {users === null ? (
+        {users === null && !err ? (
           <Loading />
         ) : (
           <div className="table-wrap">
@@ -311,7 +311,7 @@ function ManageUser({ u, me, act }: { u: UserRow; me: Principal; act: Act }) {
               act(
                 () => api.post(`/principals/${u.id}/reset-password`, { new_password: temp, reason }),
                 "Temporary password set; it must be changed at next sign-in",
-              ).then(() => setTemp(""))
+              ).then((ok) => ok && setTemp(""))
             }
           >
             Reset password

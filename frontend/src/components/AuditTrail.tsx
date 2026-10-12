@@ -1,9 +1,14 @@
 // A subject's audit trail (study, programme, compound), newest first. Each entry is shown as
 // recorded; the actor's name is looked up when the trail is read.
-import { useEffect, useState } from "react";
+//
+// A failed read is never shown as an empty trail. This is the screen a reviewer opens to
+// check that a record is attributable, so "no entries" has to mean the record has none —
+// not that the request did not arrive.
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { actionLabel, fmtDateTime, shortHash } from "../lib/format";
 import type { LedgerEntry } from "../types";
+import { ErrorBox } from "./common";
 import { Collapsible, Loading } from "./ui";
 
 export function AuditTrail({
@@ -16,15 +21,32 @@ export function AuditTrail({
   title?: string;
 }) {
   const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
-  useEffect(() => {
+  const [err, setErr] = useState<unknown>(null);
+  const load = useCallback(() => {
+    setErr(null);
+    setEntries(null);
     api
       .getAll<LedgerEntry>(`/ledger/${id}`)
       .then(setEntries)
-      .catch(() => setEntries([]));
+      .catch((e) => setErr(e));
   }, [id]);
+  useEffect(load, [load]);
+
+  const count = entries ? ` (${entries.length})` : "";
   return (
-    <Collapsible id="sec-audit" title={`${title}${entries ? ` (${entries.length})` : ""}`} defaultOpen={open}>
-      {entries === null ? (
+    <Collapsible id="sec-audit" title={`${title}${err ? "" : count}`} defaultOpen={open}>
+      {err ? (
+        <>
+          <ErrorBox error={err} />
+          <div className="muted small">
+            The audit trail could not be read, so it is not shown. This is not a statement that the record has no
+            history.{" "}
+            <button className="ghost small" onClick={load}>
+              Try again
+            </button>
+          </div>
+        </>
+      ) : entries === null ? (
         <Loading />
       ) : entries.length === 0 ? (
         <div className="muted small">No entries.</div>

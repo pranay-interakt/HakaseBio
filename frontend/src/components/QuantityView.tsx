@@ -50,7 +50,7 @@ export function CitationLine({ c }: { c: Citation }) {
 
 export function ProvenanceBadge({ q }: { q: Quantity }) {
   const kind = q.provenance.kind;
-  const tainted = q.qc_flags.includes("derived_from_simulated_data");
+  const tainted = (q.qc_flags ?? []).includes("derived_from_simulated_data");
   return (
     <span className={`badge badge-${tainted ? "simulated" : kind}`} title={q.provenance.notes ?? ""}>
       {tainted && kind !== "simulated" ? `${KIND_LABEL[kind]} · from SIMULATED` : KIND_LABEL[kind]}
@@ -141,10 +141,10 @@ export function Derivation({ q }: { q: Quantity }) {
           {q.uncertainty.n !== null && ` n=${q.uncertainty.n}`}
         </div>
       )}
-      {q.qc_flags.length > 0 && (
+      {(q.qc_flags ?? []).length > 0 && (
         <div>
           <strong>QC flags:</strong>{" "}
-          {q.qc_flags.map((f) => (
+          {(q.qc_flags ?? []).map((f) => (
             <span key={f} className="flag">
               {f}
             </span>
@@ -222,9 +222,16 @@ export function QuantityView({
   showLabel?: boolean;
   compact?: boolean;
 }) {
-  const tainted = q.qc_flags.includes("derived_from_simulated_data");
+  // Records are append-only, so a value stored by an earlier version of the system keeps
+  // the shape it had then. Render what such a value does carry rather than failing — a
+  // thrown error here blanks the whole page.
+  if (!q || typeof q !== "object" || !q.provenance) {
+    return <span className="muted">{q === null || q === undefined ? "—" : String(q)}</span>;
+  }
+  const flags = q.qc_flags ?? [];
+  const tainted = flags.includes("derived_from_simulated_data");
   const kind = q.provenance.kind;
-  const flagged = q.qc_flags.filter((f) => f !== "derived_from_simulated_data").length > 0;
+  const flagged = flags.filter((f) => f !== "derived_from_simulated_data").length > 0;
   return (
     <button
       className={`qty qty-btn${compact ? " compact" : ""}`}
@@ -249,7 +256,7 @@ export function QuantityView({
         </>
       )}
       {flagged && (
-        <span className="flag-dot" title={q.qc_flags.join(", ")}>
+        <span className="flag-dot" title={flags.join(", ")}>
           ⚑
         </span>
       )}

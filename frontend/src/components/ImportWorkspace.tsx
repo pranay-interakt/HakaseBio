@@ -316,8 +316,8 @@ export function ImportWorkspace({
               {rec.proposals.map((pr) => (
                 <tr key={pr.id} className={pr.status !== "proposed" ? "dim" : ""}>
                   <td>
-                    {pr.label ?? pr.key}: {pr.value !== null ? `${pr.value} ${pr.unit ?? ""}` : pr.category}{" "}
-                    {pr.species ?? ""}
+                    {pr.label ?? pr.key}:{" "}
+                    {pr.value !== null ? `${pr.value} ${pr.unit ?? "(no unit given)"}` : pr.category} {pr.species ?? ""}
                     {pr.excerpt && <div className="muted small">“{pr.excerpt}”</div>}
                   </td>
                   <td className="small">p. {pr.page}</td>

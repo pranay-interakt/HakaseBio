@@ -56,8 +56,15 @@ async function getAll<T>(path: string): Promise<T[]> {
   for (;;) {
     const { data, headers } = await send<T[]>("GET", `${path}${sep}limit=1000&offset=${out.length}`);
     out.push(...data);
-    const total = Number(headers.get("X-Total-Count") ?? out.length);
-    if (data.length === 0 || out.length >= total) return out;
+    if (data.length === 0) return out;
+    const header = headers.get("X-Total-Count");
+    if (header === null) {
+      // without the total there is no way to know whether more pages exist. Keep asking
+      // until a page comes back short, rather than presenting one page as the whole list.
+      if (data.length < 1000) return out;
+      continue;
+    }
+    if (out.length >= Number(header)) return out;
   }
 }
 

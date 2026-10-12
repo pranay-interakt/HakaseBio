@@ -169,11 +169,15 @@ export function Program({ id, tab, me }: { id: string; tab: string | null; me: P
 
 function Overview({ p }: { p: ProgramT }) {
   const [r, setR] = useState<Readiness | null>(null);
+  const [readinessErr, setReadinessErr] = useState<unknown>(null);
   useEffect(() => {
+    setReadinessErr(null);
     api
       .get<Readiness>(`/programs/${p.id}/readiness?milestone=before_first_in_human`)
       .then(setR)
-      .catch(() => setR(null));
+      // without this the headline stat shows "…" and the section below spins for ever,
+      // which reads as "still loading" rather than "this could not be read"
+      .catch((e) => setReadinessErr(e));
   }, [p.id]);
   const ctx = p.context;
   const names = requirementNames(p);
@@ -186,7 +190,7 @@ function Overview({ p }: { p: ProgramT }) {
     <>
       <div className="stats">
         <div className="stat">
-          <div className="stat-v">{s ? `${s.covered} / ${s.required_for_milestone}` : "…"}</div>
+          <div className="stat-v">{s ? `${s.covered} / ${s.required_for_milestone}` : readinessErr ? "—" : "…"}</div>
           <div className="stat-l">required before first-in-human, covered</div>
           {s && s.required_for_milestone > 0 && (
             <div className="bar">
@@ -227,7 +231,9 @@ function Overview({ p }: { p: ProgramT }) {
         title="Due before first-in-human, not started"
         right={<a href={href.program(p.id, "studyset")}>Open study set</a>}
       >
-        {r === null ? (
+        {readinessErr ? (
+          <ErrorBox error={readinessErr} />
+        ) : r === null ? (
           <Loading />
         ) : missing.length === 0 ? (
           <Empty title="Nothing outstanding">
@@ -972,12 +978,16 @@ function Module4({ id, studies }: { id: string; studies: StudySummary[] }) {
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   useEffect(() => {
+    setLoadFailed(false);
     api
       .get<Module4Pkg | null>(`/programs/${id}/module4`)
       .then(setPkg)
+      // null means "never assembled"; a failed read must not claim that, since a package
+      // with its bundle and hashes may well exist
       .catch((e) => {
-        setPkg(null);
+        setLoadFailed(true);
         setErr(e);
       });
   }, [id]);
@@ -1007,8 +1017,8 @@ function Module4({ id, studies }: { id: string; studies: StudySummary[] }) {
         }
       >
         <ErrorBox error={err} onDismiss={() => setErr(null)} />
-        {pkg === undefined && <Loading />}
-        {pkg === null && (
+        {pkg === undefined && !loadFailed && <Loading />}
+        {pkg === null && !loadFailed && (
           <Empty title="Not assembled yet">
             Assembling builds the Module 4 tree, a verification bundle and the FIH dose projection.
           </Empty>

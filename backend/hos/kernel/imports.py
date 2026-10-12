@@ -366,6 +366,13 @@ class ImportService:
         row = self._draft_import(actor, study_id)
         if not page or not page.strip():
             raise KernelError("a proposed value must cite the report page or table")
+        if value is not None and not (unit or "").strip():
+            # a human reads this proposal before attesting to it; a number without its unit
+            # cannot be checked against the report, and confirming one is refused anyway
+            raise KernelError(
+                "a proposed numeric value must carry its unit as reported, so the person "
+                "confirming it can check it against the report"
+            )
         self._spec_for(row, key)  # validates the key
         prop = {
             "id": _rid("prop"),

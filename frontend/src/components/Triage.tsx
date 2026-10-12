@@ -22,7 +22,9 @@ interface Analogue {
   identifier: string;
   name: string | null;
   smiles: string;
-  similarity: number;
+  /** The ECFP4 Tanimoto similarity with the method that computed it. Reports stored before
+   * it carried provenance hold a bare number, and those versions are kept for ever. */
+  similarity: Quantity | number;
   value: Quantity;
   n_measurements: number;
   source_url: string | null;
@@ -130,7 +132,13 @@ function SignalCard({ s }: { s: Signal }) {
                       (a.name ?? a.identifier)
                     )}
                   </td>
-                  <td className="num">{a.similarity.toFixed(2)}</td>
+                  <td className="num">
+                    {typeof a.similarity === "number" ? (
+                      a.similarity.toFixed(2)
+                    ) : (
+                      <QuantityView q={a.similarity} compact />
+                    )}
+                  </td>
                   <td className="num">{a.n_measurements}</td>
                   <td>
                     <QuantityView q={a.value} compact />
@@ -186,13 +194,16 @@ export function TriagePanel({
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
+    setErr(null);
     api
       .get<Report | null>(`/compounds/${compoundId}/triage`)
-      .then(setReport)
+      // null means "never screened"; a failure must not borrow that meaning, or the panel
+      // would assert the compound has no triage when the request merely failed
       .catch((e) => {
-        setReport(null);
         setErr(e);
-      });
+        return undefined;
+      })
+      .then((r) => setReport(r ?? (r === null ? null : undefined)));
   }, [compoundId]);
   useEffect(load, [load]);
 
@@ -218,7 +229,7 @@ export function TriagePanel({
   const body = (
     <>
       <ErrorBox error={err} onDismiss={() => setErr(null)} />
-      {report === undefined ? (
+      {err ? null : report === undefined ? (
         <Loading />
       ) : report === null ? (
         <Empty title="Not screened yet">
@@ -322,10 +333,12 @@ export function ProgramTriage({ programId, compounds }: { programId: string; com
 
   async function screen(ids: string[]) {
     setErr(null);
+    let done = 0;
     for (const id of ids) {
       setBusy(id);
       try {
         await api.post(`/compounds/${id}/triage`);
+        done += 1;
       } catch (e) {
         setErr(e);
         break;
@@ -333,7 +346,9 @@ export function ProgramTriage({ programId, compounds }: { programId: string; com
     }
     setBusy("");
     load();
-    toast("Triage recorded");
+    // a green confirmation after a failed batch would contradict the error above it
+    if (done === ids.length) toast(`Triage recorded for ${done} compound${done === 1 ? "" : "s"}`);
+    else if (done > 0) toast(`Stopped after ${done} of ${ids.length}`, "bad");
   }
 
   const signal = (id: string, sid: string) => (reports ?? {})[id]?.signals.find((s) => s.id === sid);

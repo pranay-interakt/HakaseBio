@@ -90,11 +90,22 @@ class Analogue:
     source_url: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        # the similarity is the whole justification for using this analogue, so it crosses
+        # the boundary as a quantity with its method, like every other computed value
+        from hos.core.methods import method
+        from hos.core.quantity import Quantity
+
+        similarity = Quantity.computed(
+            round(self.similarity, 4),
+            "dimensionless",
+            method=method("triage.read_across"),
+            label="ECFP4 Tanimoto similarity to the query structure",
+        )
         return {
             "identifier": self.identifier,
             "name": self.name,
             "smiles": self.smiles,
-            "similarity": round(self.similarity, 4),
+            "similarity": similarity.to_dict(),
             "value": self.value.to_dict(),
             "n_measurements": self.n_measurements,
             "source_url": self.source_url,

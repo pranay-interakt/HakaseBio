@@ -74,7 +74,12 @@ export function WhatIf({ p, reload }: { p: Program; reload: () => void }) {
           setRes(r);
           setErr(null);
         })
-        .catch(setErr);
+        // clear the previous comparison: leaving it on screen would show the old result
+        // against the newly typed facts, which is the one thing this screen must not do
+        .catch((e) => {
+          setRes(null);
+          setErr(e);
+        });
     }, 450);
     return () => window.clearTimeout(t);
   }, [changes, n, p.id]);
@@ -239,7 +244,14 @@ const OUTCOME_TONE: Record<string, string> = {
 
 const driverCache: Record<string, Promise<Driver>> = {};
 function loadDriver(id: string): Promise<Driver> {
-  driverCache[id] ??= api.get<Driver>(`/drivers/${id}`);
+  // a rejected promise is not nullish, so caching one would poison this driver id for the
+  // life of the page: every later attempt would re-resolve the same failure
+  if (!(id in driverCache)) {
+    driverCache[id] = api.get<Driver>(`/drivers/${id}`).catch((e) => {
+      delete driverCache[id];
+      throw e;
+    });
+  }
   return driverCache[id];
 }
 
