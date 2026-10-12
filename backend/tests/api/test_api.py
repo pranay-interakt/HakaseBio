@@ -273,7 +273,10 @@ def test_what_clients_cannot_see(api):
     # users are listed only to administrators; a user's history only to them and admins
     assert c.get("/api/principals", headers=h).status_code == 403
     assert c.get("/api/principals", headers=adm).status_code == 200
-    assert c.get("/api/ledger/admin", headers=h).status_code == 403
+    # another user's history answers like a record that does not exist, so the refusal
+    # cannot be used to confirm who exists
+    assert c.get("/api/ledger/admin", headers=h).status_code == 404
+    assert c.get("/api/ledger/no_such_person", headers=h).status_code == 404
     assert c.get("/api/ledger/sci", headers=h).status_code == 200
     # reference data and system details need a session; the API docs are off by default
     assert c.get("/api/drivers").status_code == 401

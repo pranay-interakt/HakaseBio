@@ -213,7 +213,10 @@ def test_an_organisation_administrator_works_inside_it(api):  # noqa: F811
         },
     )
     assert r.status_code == 200 and r.json()["organisation"] == "Org A"
-    assert c.get("/api/ledger/b_sci", headers=a_adm).status_code == 403
+    # an administrator of another organisation gets the same answer as for an id that does
+    # not exist: user ids are chosen by people, so a distinct refusal would confirm them
+    assert c.get("/api/ledger/b_sci", headers=a_adm).status_code == 404
+    assert c.get("/api/ledger/nobody_at_all", headers=a_adm).status_code == 404
 
 
 def test_a_body_id_from_another_organisation_is_refused(api):  # noqa: F811

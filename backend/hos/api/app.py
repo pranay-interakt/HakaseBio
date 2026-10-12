@@ -470,11 +470,13 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
                 target.organisation,
             )
             if subject_id != actor.id and not admin_of:
-                raise PermissionDenied(
-                    "a user's own history is visible to that user and administrators"
-                )
+                # the same answer as an id that does not exist: user ids are chosen by
+                # people, so a distinct refusal would confirm who works elsewhere
+                raise _hidden("record", subject_id)
             return
-        file_access(subject_id, actor, k)
+        # no ledger entry is ever keyed by a file hash, so there is nothing further to
+        # check: an id that matches no record we can see is simply not found
+        raise _hidden("record", subject_id)
 
     # -- error mapping -----------------------------------------------------------------
     def _err(code: int, exc: Exception, **extra: Any) -> JSONResponse:

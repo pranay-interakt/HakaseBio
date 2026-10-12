@@ -28,12 +28,23 @@ def enrich_compound(
     row = kernel.repo.compound(compound_id)
     if not row.inchikey:
         raise ValueError("compound has no InChIKey; cannot query external databases")
-    pc = (pubchem or PubChemClient()).compound_by_inchikey(row.inchikey)
-    kernel.attach_external_record(actor, compound_id, "pubchem", pc.to_dict())
+
+    # Fetch everything first, then write once. Each source result carries its own status,
+    # so a source being unreachable is recorded rather than raised — but a failure part
+    # way through the writes would otherwise leave some records attached and others not,
+    # with a ledger trail to match.
     ch = chembl or ChEMBLClient()
+    pc = (pubchem or PubChemClient()).compound_by_inchikey(row.inchikey)
     mol = ch.molecule_by_inchikey(row.inchikey)
-    kernel.attach_external_record(actor, compound_id, "chembl", mol.to_dict())
+    fetched: list[tuple[str, dict[str, Any]]] = [
+        ("pubchem", pc.to_dict()),
+        ("chembl", mol.to_dict()),
+    ]
     if include_herg and mol.ok:
-        herg = ch.herg_ic50(mol.records[0]["chembl_id"])
-        kernel.attach_external_record(actor, compound_id, "chembl_herg_ic50", herg.to_dict())
+        fetched.append(("chembl_herg_ic50", ch.herg_ic50(mol.records[0]["chembl_id"]).to_dict()))
+
+    # one unit of work: the records and their ledger events commit together (docs/15 P0.1)
+    with kernel.db.transaction():
+        for source, record in fetched:
+            kernel.attach_external_record(actor, compound_id, source, record)
     return kernel.compound_view(compound_id)
