@@ -594,6 +594,10 @@ class ImportService:
             raise KernelError("superseding requires a reason")
         row = self._import_row(study_id)
         by = self.k.repo.study(by_study_id)
+        if by.program_id != row.program_id:
+            # answer as for an id that does not exist, so the refusal cannot be used to
+            # confirm which studies another organisation holds
+            raise NotFound(f"no study {by_study_id!r}")
         if by.origin == "import" or by.state != StudyState.APPROVED.value:
             raise KernelError("an import is superseded only by an approved driver-run study")
         if (by.program_id, by.requirement_id) != (row.program_id, row.requirement_id):

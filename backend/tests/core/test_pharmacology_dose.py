@@ -112,6 +112,27 @@ def test_missing_noael_yields_unavailable_mrsd():
     assert not p.mrsd_per_kg.is_available
 
 
+def test_a_parameter_resting_on_its_fit_bound_is_flagged():
+    """A value that has come to rest on a fitting bound is a limit of the fit, not a
+    result the data determined, and must not be reported as if it were."""
+    steep = _curve(1.0)
+    steep = MeasurementSeries(
+        x=steep.x,
+        y=tuple(four_parameter_logistic(CONC, 0.0, 100.0, 1.0, 25.0)),
+        x_unit="uM",
+        y_unit="percent",
+        provenance=Provenance.measured(source_name="QPatch"),
+    )
+    f = fit_hill(steep, min_r2=0.5)
+    assert f.hill_slope.value == pytest.approx(10.0)  # the bound
+    assert "hill_slope_at_fit_bound" in f.hill_slope.qc_flags
+
+
+def test_an_ordinary_fit_is_not_flagged_as_bounded():
+    f = fit_hill(_curve(2.5), min_r2=0.9)
+    assert not any("at_fit_bound" in flag for flag in f.hill_slope.qc_flags)
+
+
 # ---- FDA 2005 guard rails: the rules that stop a starting dose being talked up ----------
 
 

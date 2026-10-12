@@ -232,11 +232,15 @@ class AmesParams(BaseModel):
                 "preincubation outside 'usually for 20 min. or more at 30-37 °C' (TG 471 "
                 "paragraph 28)"
             )
+        # TG 471 paragraph 20 asks for "approximately half-log" spacing; "approximately"
+        # has no numeric form in the guideline, so the 5% allowance below is this system's
+        # reading of it and is stated as such rather than attributed to TG 471
         ratios = [b / a for a, b in pairwise(self.concentrations)]
         if any(r > 10**0.5 * 1.05 for r in ratios):
             out.append(
                 "spacing wider than approximately half-log (√10) in places (TG 471 "
-                "paragraph 20, initial experiment)"
+                "paragraph 20, initial experiment); 'approximately' read here as within 5%, "
+                "which the guideline does not quantify"
             )
         if self.plates_per_dose == 2:
             out.append(f"duplicate plating: {self.duplicate_plating_justification}")

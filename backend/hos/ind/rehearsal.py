@@ -199,13 +199,20 @@ def rehearse(
 
     # critical path over cited prerequisites and known durations
     finish: dict[str, tuple[float, list[str], list[str]]] = {}
+    dropped_prerequisites: dict[str, list[str]] = {}
 
     def walk(rid: str, seen: frozenset[str]) -> tuple[float, list[str], list[str]]:
         if rid in finish:
             return finish[rid]
         best: tuple[float, list[str], list[str]] = (0.0, [], [])
         for pre in prereqs.get(rid, []):
-            if pre in seen or pre not in durations:
+            if pre in seen:
+                continue
+            if pre not in durations:
+                # a conditional requirement never reaches ``durations``, so a study that
+                # depends on it would silently lose that edge; it is a prerequisite whose
+                # duration is unknown, which is what the path reports
+                dropped_prerequisites.setdefault(rid, []).append(pre)
                 continue
             cand = walk(pre, seen | {rid})
             if cand[0] > best[0] or (cand[0] == best[0] and len(cand[1]) > len(best[1])):
@@ -247,6 +254,13 @@ def rehearse(
             "requirements": crit[1],
             "known_duration_days": crit[0],
             "unknown_durations_on_path": crit[2],
+            "prerequisites_not_on_the_path": sorted(
+                {
+                    f"{rid} needs {pre}"
+                    for rid, pres in dropped_prerequisites.items()
+                    for pre in pres
+                }
+            ),
             "determined": bool(crit[1]),
             "note": (
                 "durations are the drivers' own protocol durations; studies whose duration "

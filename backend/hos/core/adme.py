@@ -457,11 +457,16 @@ def extraction_ratio(
 
 
 def classify_extraction(e: Quantity) -> str:
-    """Conventional low/intermediate/high banding of the extraction ratio.
+    """Low / intermediate / high banding of the hepatic extraction ratio.
 
-    The <0.3 / 0.3-0.7 / >0.7 bands are the long-standing convention in hepatic
-    clearance analysis (Wilkinson & Shand 1975 and subsequent usage). This is a
-    descriptive label, not a regulatory classification.
+    Wilkinson & Shand (1975) give the well-stirred relationship between extraction,
+    clearance and blood flow, and the behaviour at each end of the range: a low-extraction
+    drug's clearance is governed by intrinsic clearance and binding, a high-extraction
+    drug's by hepatic blood flow. They do **not** state the <0.3 / 0.3-0.7 / >0.7
+    boundaries used here. Those are a presentational convention of this system for
+    grouping a continuous value, not a threshold taken from the cited work and not a
+    regulatory criterion; the extraction ratio itself is the result, and it is reported
+    with the band.
     """
     if not e.is_available:
         return "undetermined"

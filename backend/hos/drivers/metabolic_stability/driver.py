@@ -10,7 +10,7 @@ well-stirred hepatic clearance (Wilkinson & Shand 1975) -> extraction ratio.
 Every scientific design value (substrate and protein concentration, temperature, buffer,
 cofactor, timepoints) and every acceptance criterion is a parameter stated by the user,
 with the basis of the acceptance criteria recorded. The driver supplies no defaults for
-them; cited recommendations are offered separately (``recommendations.py``).
+them: a value the user did not state is one the driver would be inventing.
 """
 
 from __future__ import annotations
@@ -786,8 +786,11 @@ class MetabolicStabilityDriver(StudyDriver):
                 out.append(
                     InterpretiveStatement(
                         f"Predicted hepatic extraction in {sp} is {band} (Eh = {eh.require():.2f}).",
-                        "Eh = CLh/Qh with the well-stirred model; conventional bands <0.3 low, "
-                        "0.3-0.7 intermediate, >0.7 high",
+                        "Eh = CLh/Qh with the well-stirred model (Wilkinson & Shand 1975). "
+                        "The band boundaries (<0.3 low, 0.3-0.7 intermediate, >0.7 high) are a "
+                        "presentational convention of this system for grouping a continuous "
+                        "value, not a threshold stated by the cited work and not a regulatory "
+                        "criterion; the extraction ratio itself is the result",
                         ("wilkinson1975", "obach1999"),
                         "concern" if band == "high" else "info",
                     )

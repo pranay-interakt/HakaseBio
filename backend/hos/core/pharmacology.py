@@ -157,6 +157,24 @@ def fit_hill(
     ic50_se = float(perr[2]) if perr is not None and np.isfinite(perr[2]) else None
     hill_se = float(perr[3]) if perr is not None and np.isfinite(perr[3]) else None
 
+    # A parameter that has come to rest on a fitting bound is not a fitted value: the data
+    # wanted to go further. Reporting it unmarked would present the bound as the answer.
+    for name, value, lo, hi in (
+        ("hill_slope", hill_v, bounds[0][3], bounds[1][3]),
+        ("ic50", ic50_v, bounds[0][2], bounds[1][2]),
+    ):
+        if math.isclose(value, lo, rel_tol=1e-6) or math.isclose(value, hi, rel_tol=1e-6):
+            findings.append(
+                QCFinding(
+                    code=f"{name}_at_fit_bound",
+                    status=QCStatus.WARN,
+                    message=f"the fitted {name.replace('_', ' ')} reached the bound the fit "
+                    "is constrained to, so it is a limit of the fit rather than a value the "
+                    "data determined",
+                    observed=value,
+                )
+            )
+
     extrapolated = not (lo_c <= ic50_v <= hi_c)
     if extrapolated:
         findings.append(
