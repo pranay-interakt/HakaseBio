@@ -38,7 +38,17 @@ def test_a_run_is_stored_as_a_version_and_recorded(k):  # noqa: F811
 
     report = k.triage.run(sci, cid)
     assert report["version"] == 1 and report["created_by"] == "sci"
-    assert [s["id"] for s in report["signals"]] == ["alerts.brenk", "alerts.pains", "alerts.nih"]
+    # every screen answers, including the one that cannot reach a source: a missing signal
+    # would leave the report silently short rather than saying why
+    assert [s["id"] for s in report["signals"]] == [
+        "alerts.brenk",
+        "alerts.pains",
+        "alerts.nih",
+        "herg.read_across",
+    ]
+    herg = report["signals"][-1]
+    assert herg["outcome"] == "not_predictable"
+    assert "no reference set" in herg["reason"]
     assert (
         content_hash(
             {

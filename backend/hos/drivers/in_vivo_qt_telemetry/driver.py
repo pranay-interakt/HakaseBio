@@ -628,6 +628,17 @@ class InVivoQTTelemetryDriver(StudyDriver):
         ):
             pairs = [(float(r["qtc"]), float(r["rr"])) for r in rows if r["qtc"] is not None]
             if len(pairs) < 3:
+                # the check that validates the correction cannot run; an omitted row would
+                # read as "nothing to flag" rather than "this was never tested"
+                findings.append(
+                    QCFinding(
+                        f"independence.{scope.split()[0]}",
+                        QCStatus.WARN,
+                        f"QTc-RR independence not assessed for {scope}: {len(pairs)} matched "
+                        "pair(s), at least 3 are needed; whether the correction removed the "
+                        "heart-rate dependence is therefore unknown (E14/S7B Q&A 3.3)",
+                    )
+                )
                 continue
             ri = rr_independence([x for x, _ in pairs], [y for _, y in pairs])
             sq = Quantity.computed(

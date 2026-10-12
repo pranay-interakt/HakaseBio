@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import uuid
@@ -93,6 +94,7 @@ WORK_ROLES = frozenset(
     {Role.SCIENTIST, Role.RESPONSIBLE_SCIENTIST, Role.STUDY_DIRECTOR, Role.PROGRAM_LEAD, Role.ADMIN}
 )
 
+_log = logging.getLogger(__name__)
 _MIN_PASSWORD = 12
 _SCRYPT = dict(n=2**14, r=8, p=1)
 
@@ -1702,11 +1704,26 @@ class Kernel:
         s = self.repo.study(study_id)
         driver = self.registry.get(s.driver_id) if s.driver_id in self.registry else None
         params = None
+        parameter_errors: list[str] = []
         if driver is not None:
             try:
                 params = driver.validate_parameters(s.parameters)
-            except ValidationError:
+            except ValidationError as exc:
+                # without this the view simply omits expected_inputs, selection_inputs and
+                # expert_determinations, which reads as "this study needs none" rather than
+                # "its stored parameters no longer validate"
                 params = None
+                parameter_errors = [
+                    f"{'.'.join(str(x) for x in e['loc']) or 'parameters'}: {e['msg']}"
+                    for e in exc.errors()
+                ]
+                _log.warning(
+                    "study %s parameters do not validate against %s@%s: %s",
+                    study_id,
+                    s.driver_id,
+                    s.driver_version,
+                    "; ".join(parameter_errors),
+                )
         prog = self.repo.program(s.program_id)
         requirement = next(
             (
@@ -1756,6 +1773,8 @@ class Kernel:
                 "version": driver.version,
                 "ctd_section": driver.ctd_section,
             }
+            if parameter_errors:
+                view["parameters_invalid"] = parameter_errors
             if params is not None:
                 view["expected_inputs"] = self._declared_inputs(driver, params, s)
                 view["selection_inputs"] = (

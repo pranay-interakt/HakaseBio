@@ -393,7 +393,9 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
 
     # --- general toxicology --------------------------------------------------
     if s9:
-        weeks = max(ctx.max_trial_duration_days / 7.0, 4.0)
+        # S9 scopes the study to the clinical schedule; it states no minimum duration, so
+        # none is imposed here (CLAUDE.md rule 4: no threshold the guideline does not give)
+        weeks = ctx.max_trial_duration_days / 7.0
         out.append(
             _req(
                 id="tox.repeat_dose",
@@ -403,8 +405,10 @@ def _small_molecule_rules(ctx: ProgramContext) -> list[StudyRequirement]:
                 timing=Timing.BEFORE_FIRST_IN_HUMAN,
                 citation=cite("ich_s9"),
                 section="S9 sections 2.4, 3.3",
-                rationale="Studies matching the clinical schedule support first-in-human; 3-month "
-                "studies generally support further development and marketing",
+                rationale="S9 sections 2.4 and 3.3: the repeat-dose study follows the clinical "
+                "schedule, so its duration here is the longest planned trial dosing "
+                f"({ctx.max_trial_duration_days} days); 3-month studies generally support "
+                "further development and marketing",
                 glp=True,
                 species=("rat", "dog"),
                 duration_weeks=round(weeks, 1),
@@ -855,10 +859,15 @@ def _biologic_rules(ctx: ProgramContext) -> list[StudyRequirement]:
             timing=Timing.BEFORE_FIRST_IN_HUMAN,
             citation=s6,
             section="S6(R1) section 4.4; Addendum section 3.2",
-            rationale=f"Duration generally 1-3 months; 6 months supports chronic use ({sp_note})",
+            rationale="S6(R1) section 4.4: duration follows the intended clinical use — "
+            "generally 1 to 3 months, with 6 months supporting chronic use. S6(R1) gives no "
+            "threshold that fixes one of those, so the duration is set by the programme "
+            f"rather than derived here ({sp_note})",
             glp=True,
             species=species,
-            duration_weeks=26.0 if ctx.intended_clinical_duration_days > 91 else 13.0,
+            # deliberately unset: see the rationale. A requirement with no duration is
+            # reported as such and the Study Director states it.
+            duration_weeks=None,
             driver_id="repeat_dose_toxicity",
             ctd_section="4.2.3.2",
             pending_fact=None if species else "pharmacologically relevant species",

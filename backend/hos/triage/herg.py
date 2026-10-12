@@ -183,6 +183,8 @@ def _predicted_signal(
     snapshot_id: str | None = None,
     retrieved_at: str | None = None,
     excluded: int = 0,
+    unreadable: int = 0,
+    partial_set: bool = False,
 ) -> Signal:
     """One estimate, built the same way whichever set the analogues came from."""
     estimate = 10.0 ** (9.0 - pic50)
@@ -194,6 +196,13 @@ def _predicted_signal(
     ]
     if excluded:
         notes.append(f"{excluded} measurement(s) excluded as bounded, flagged or unconvertible")
+    if unreadable:
+        notes.append(f"{unreadable} retrieved structure(s) could not be read and were not used")
+    if partial_set:
+        notes.append(
+            "the reference set is incomplete: its build stopped at its page limit, so these "
+            "may not be the nearest measured analogues"
+        )
     software = {}
     if snapshot_id:
         software["reference_set"] = snapshot_id
@@ -315,6 +324,7 @@ def _from_reference(
         used=used,
         ra=ra,
         snapshot_id=reference.snapshot_id,
+        partial_set=reference.truncated,
         source=(
             f"{len(reference.compounds)} compounds measured for this endpoint in {reference.source}"
         ),
@@ -376,15 +386,18 @@ def screen_herg(
 
     # recompute similarity locally, so the weighting is this system's own computation
     candidates: list[tuple[float, dict[str, object]]] = []
+    unreadable = 0
     for rec in found.records:
         smi = rec.get("canonical_smiles")
         cid = rec.get("chembl_id")
         if not isinstance(smi, str) or not isinstance(cid, str):
+            unreadable += 1
             continue
         if inchikey and rec.get("standard_inchi_key") == inchikey:
             continue  # never predict a compound from itself
         cand = Chem.MolFromSmiles(smi)
         if cand is None:
+            unreadable += 1
             continue
         sim = tanimoto(query_fp, fingerprint(cand))
         if sim >= ra.min_similarity:
@@ -474,4 +487,5 @@ def screen_herg(
         retrieved_at=found.retrieved_at,
         excluded=excluded,
         source=f"structures retrieved live from {found.source}",
+        unreadable=unreadable,
     )

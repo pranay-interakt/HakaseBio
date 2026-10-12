@@ -781,14 +781,30 @@ def build_summaries(kernel: Any, program_id: str) -> dict[str, Any]:
 
 
 def _fmt_quantity(q: dict[str, Any] | None) -> str:
+    """A value as the submitted document should carry it: the number, its provenance kind,
+    and any QC flag.
+
+    The driver-level report already renders all three (``hos.drivers.base``). This is the
+    document that goes to the agency, so a predicted value, a value resting on a reference
+    constant that has not been traced, or one outside its model's applicability domain must
+    not read here as a plain measured number.
+    """
     if not q:
         return "—"
     if not q.get("available", True) or q.get("value") is None:
-        return "unavailable"
+        reason = ((q.get("provenance") or {}).get("reason")) or q.get("reason")
+        return f"unavailable ({reason})" if reason else "unavailable"
     v = float(q["value"])
     shown = f"{v:.4g}"
     unit = q.get("unit", "")
-    return shown if unit in ("", "dimensionless") else f"{shown} {unit}"
+    out = shown if unit in ("", "dimensionless") else f"{shown} {unit}"
+    kind = (q.get("provenance") or {}).get("kind") or q.get("kind")
+    if kind:
+        out += f" _{kind}_"
+    flags = q.get("qc_flags") or []
+    if flags:
+        out += f" [{', '.join(str(f) for f in flags)}]"
+    return out
 
 
 def _cell_md(c: Any) -> str:

@@ -29,8 +29,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import zipfile
 from typing import Any
+
+from pydantic import ValidationError
 
 from hos.core import units as U
 from hos.core.dose import project_starting_dose
@@ -81,7 +84,15 @@ def _study_components(kernel: Any, study: Any, requirement_id: str) -> list[str]
         driver = kernel.registry.get(study.driver_id)
         try:
             params = driver.validate_parameters(study.parameters or {})
-        except Exception:  # noqa: BLE001 - an undesigned study covers nothing
+        except ValidationError:
+            return []  # an undesigned study covers nothing
+        except Exception:  # noqa: BLE001 - a driver defect must not silently drop coverage
+            _log.exception(
+                "driver %s could not read the parameters of study %s; it is reported as "
+                "covering nothing, which understates readiness rather than overstating it",
+                driver.id,
+                study.id,
+            )
             return []
         return list(driver.components_covered(requirement_id, params))
     return []
@@ -260,6 +271,9 @@ _KM_SPECIES = {p.split(".", 1)[1] for p in REFERENCE_PARAMETERS if p.startswith(
 def Quantity_value_in(q: dict[str, Any], unit: str) -> float:
     """Magnitude of a serialised quantity in ``unit`` (dimensional conversion via pint)."""
     return U.convert(float(q["value"]), q["unit"], unit)
+
+
+_log = logging.getLogger(__name__)
 
 
 def _dose_projection(kernel: Any, studies: list[Any]) -> dict[str, Any] | None:

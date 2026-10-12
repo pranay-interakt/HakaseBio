@@ -110,11 +110,15 @@ class ReferenceSet:
     build_version: str
     compounds: tuple[MeasuredCompound, ...]
     excluded: dict[str, int]
+    #: True when the build stopped at its page limit with more records to read. A partial
+    #: set is not the set of compounds measured for the endpoint, so every answer drawn
+    #: from it says so.
+    truncated: bool = False
 
     @property
     def snapshot_id(self) -> str:
         """Content hash of the set's contents and the logic that built it."""
-        parts = [self.build_version, self.endpoint, self.scale]
+        parts = [self.build_version, self.endpoint, self.scale, f"truncated={self.truncated}"]
         parts += sorted(f"{c.identifier}:{c.value:.6f}:{c.n_measurements}" for c in self.compounds)
         return "ref_" + hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
@@ -130,6 +134,7 @@ class ReferenceSet:
             "retrieved_at": self.retrieved_at,
             "build_version": self.build_version,
             "snapshot_id": self.snapshot_id,
+            "truncated": self.truncated,
             "excluded": self.excluded,
             "compounds": [c.to_dict() for c in self.compounds],
         }
@@ -148,6 +153,7 @@ class ReferenceSet:
             build_version=str(d["build_version"]),
             compounds=tuple(MeasuredCompound.from_dict(c) for c in d["compounds"]),
             excluded=dict(d.get("excluded") or {}),
+            truncated=bool(d.get("truncated", False)),
         )
 
     def fingerprints(self) -> tuple[tuple[MeasuredCompound, frozenset[int]], ...]:
@@ -190,9 +196,15 @@ def load_reference(endpoint: str, data_dir: Path | None = None) -> ReferenceSet 
     path = reference_path(endpoint, data_dir)
     try:
         stamp = path.stat().st_mtime
-    except OSError:
+    except FileNotFoundError:
         _LOADED.pop(str(path), None)
-        return None
+        return None  # no set installed, which is a state the screens report honestly
+    except OSError as exc:
+        # a permissions or path problem is not the same as "none installed": the operator
+        # needs to know the set is there but unreadable
+        raise RuntimeError(
+            f"the {endpoint} reference set at {path} could not be read: {exc}"
+        ) from exc
     hit = _LOADED.get(str(path))
     if hit is not None and hit[0] == stamp:
         return hit[1]
@@ -224,6 +236,7 @@ class BuildReport:
             "compounds": len(self.reference.compounds),
             "records_read": self.records,
             "pages": self.pages,
+            "complete": not self.reference.truncated,
             "excluded": self.reference.excluded,
             "retrieved_at": self.reference.retrieved_at,
             "licence": self.reference.licence,
@@ -329,5 +342,6 @@ def build_herg_reference(
         build_version=BUILD_VERSION,
         compounds=tuple(compounds),
         excluded=excluded,
+        truncated=next_url is not None,
     )
     return BuildReport(reference=reference, pages=pages, records=records)

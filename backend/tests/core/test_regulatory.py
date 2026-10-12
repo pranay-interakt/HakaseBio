@@ -130,3 +130,50 @@ def test_every_requirement_is_cited():
     for ss in (_sm(), _sm(indication=Indication.ADVANCED_CANCER)):
         for r in ss.requirements:
             assert r.citation.text and r.section and r.rationale
+
+
+# ---- a duration the guideline does not state is not invented ---------------------------
+
+
+def _ctx(**kw):
+    base = dict(
+        modality=Modality.SMALL_MOLECULE,
+        indication=Indication.CHRONIC_NON_ONCOLOGY,
+        route=Route.ORAL,
+        intended_clinical_duration_days=365,
+        max_trial_duration_days=28,
+    )
+    return ProgramContext(**{**base, **kw})
+
+
+def _req(ctx, rid):
+    return next((r for r in derive_study_set(ctx).requirements if r.id == rid), None)
+
+
+def test_s9_repeat_dose_follows_the_clinical_schedule_with_no_invented_floor():
+    """ICH S9 scopes the study to the clinical schedule and states no minimum duration."""
+    short = _req(
+        _ctx(indication=Indication.ADVANCED_CANCER, max_trial_duration_days=7), "tox.repeat_dose"
+    )
+    assert short is not None and short.duration_weeks == pytest.approx(1.0)
+    longer = _req(
+        _ctx(indication=Indication.ADVANCED_CANCER, max_trial_duration_days=56), "tox.repeat_dose"
+    )
+    assert longer is not None and longer.duration_weeks == pytest.approx(8.0)
+    assert "S9 sections 2.4 and 3.3" in short.rationale
+
+
+def test_s6_biologic_duration_is_left_to_the_programme():
+    """S6(R1) gives a range, not a threshold, so no single duration is asserted under it."""
+    r = _req(
+        _ctx(
+            modality=Modality.MONOCLONAL_ANTIBODY,
+            route=Route.INTRAVENOUS,
+            pharmacologically_relevant_species=("cynomolgus monkey",),
+        ),
+        "tox.repeat_dose",
+    )
+    assert r is not None
+    assert r.duration_weeks is None
+    assert "set by the programme" in r.rationale
+    assert r.citation.key == "ich_s6r1"

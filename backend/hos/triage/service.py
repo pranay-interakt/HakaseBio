@@ -102,10 +102,12 @@ class TriageService:
         # the installed reference set, when there is one, is what the endpoint screens read
         # across; without it they fall back to searching the source live
         reference = load_reference("herg_ic50", self.data_dir)
-        if reference is not None or chembl is not None:
-            signals.append(
-                screen_herg(smiles, chembl, inchikey=row.inchikey or "", reference=reference)
-            )
+        # always ask: with neither a set nor a client the screen answers NOT_PREDICTABLE
+        # with the reason, which is a result. Omitting the signal would instead leave the
+        # report silently one entry short.
+        signals.append(
+            screen_herg(smiles, chembl, inchikey=row.inchikey or "", reference=reference)
+        )
         return tuple(signals)
 
     @atomic

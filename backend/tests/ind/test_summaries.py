@@ -335,3 +335,40 @@ def test_the_api(tmp_path):
     assert md.status_code == 200 and md.text.startswith("# Nonclinical overview and summaries")
     listing = c.get(base, headers=sci).json()
     assert [x["status"] for x in listing["versions"]][-1] == "signed"
+
+
+def test_the_submitted_document_carries_provenance_and_qc_flags():
+    """CTD Module 2 goes to the agency: a predicted value, one outside its applicability
+    domain, or one resting on an untraced constant must not read as a plain measurement."""
+    from hos.ind.summaries import _fmt_quantity
+
+    measured = _fmt_quantity(
+        {
+            "value": 12.345,
+            "unit": "mL/min/kg",
+            "available": True,
+            "provenance": {"kind": "measured"},
+        }
+    )
+    assert measured == "12.35 mL/min/kg _measured_"
+
+    flagged = _fmt_quantity(
+        {
+            "value": 0.42,
+            "unit": "dimensionless",
+            "available": True,
+            "provenance": {"kind": "predicted"},
+            "qc_flags": ["out_of_applicability_domain"],
+        }
+    )
+    assert "_predicted_" in flagged and "out_of_applicability_domain" in flagged
+
+    gap = _fmt_quantity(
+        {
+            "value": None,
+            "available": False,
+            "unit": "mg/kg",
+            "provenance": {"kind": "unavailable", "reason": "no time-zero sample"},
+        }
+    )
+    assert gap == "unavailable (no time-zero sample)"  # the reason, not a bare word
