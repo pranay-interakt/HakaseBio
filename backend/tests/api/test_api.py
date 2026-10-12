@@ -303,3 +303,60 @@ def test_first_run_token_is_logged_and_works(tmp_path, monkeypatch, caplog):
             ).status_code
             == 200
         )
+
+
+def test_a_conflict_is_409_and_a_bad_request_is_400(api):
+    """A client must be able to tell "reload and look" from "fix and resend".
+
+    A duplicate or a step taken out of order is a conflict; a malformed request is not.
+    """
+    c = api
+    adm = _login(c, "admin")
+    assert (
+        c.post(
+            "/api/principals",
+            headers=adm,
+            json={
+                "principal_id": "sc_sci",
+                "name": "Sam",
+                "kind": "human",
+                "roles": ["scientist", "responsible_scientist", "study_director"],
+                "password": PW,
+            },
+        ).status_code
+        == 200
+    )
+    h = _login(c, "sc_sci")
+    prog = c.post("/api/programs", headers=h, json={"name": "SC-1", "context": CTX}).json()["id"]
+    body = {"name": "aspirin", "smiles": "CC(=O)Oc1ccccc1C(=O)O"}
+    first = c.post(f"/api/programs/{prog}/compounds", headers=h, json=body)
+    assert first.status_code == 200
+
+    duplicate = c.post(f"/api/programs/{prog}/compounds", headers=h, json=body)
+    assert duplicate.status_code == 409, duplicate.text
+    assert "already registered" in duplicate.text
+
+    malformed = c.post(f"/api/programs/{prog}/compounds", headers=h, json={"name": "x"})
+    assert malformed.status_code == 422  # a missing field is still a validation error
+
+    sid = c.post(
+        "/api/studies",
+        headers=h,
+        json={
+            "program_id": prog,
+            "compound_id": first.json()["id"],
+            "requirement_id": "adme.metabolic_stability",
+        },
+    ).json()["id"]
+    # signing a study that has not been reported is a state conflict, not a bad request
+    out_of_order = c.post(
+        f"/api/studies/{sid}/sign",
+        headers=h,
+        json={
+            "role": "study_director",
+            "meaning": "approval",
+            "statement": "approve",
+            "password": PW,
+        },
+    )
+    assert out_of_order.status_code == 409, out_of_order.text

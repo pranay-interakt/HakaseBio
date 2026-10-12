@@ -23,7 +23,7 @@ from hos.db.models import ProgramDocumentRow
 from hos.db.repository import content_hash
 from hos.ind.summaries import build_summaries, render_markdown
 from hos.kernel.attestation import Principal, PrincipalKind, Role, SignatureMeaning, sign
-from hos.kernel.errors import KernelError, NotFound, PermissionDenied
+from hos.kernel.errors import Conflict, KernelError, NotFound, PermissionDenied
 from hos.kernel.uow import atomic
 
 __all__ = ["KIND", "SIGNING_ROLES", "SummaryService"]
@@ -85,6 +85,10 @@ class SummaryService:
     def view(self, program_id: str, version: int | None = None) -> dict[str, Any] | None:
         rows = self._versions(program_id)
         if not rows:
+            # asking for a specific version of a document that does not exist is a
+            # not-found, the same answer as asking for a version that is out of range
+            if version is not None:
+                raise NotFound(f"no version {version} of the nonclinical summaries")
             return None
         if version is None:
             return self._view(rows[-1])
@@ -95,7 +99,8 @@ class SummaryService:
 
     def markdown(self, program_id: str, version: int) -> str:
         doc = self.view(program_id, version)
-        assert doc is not None
+        if doc is None:  # unreachable while ``version`` is required, but never assert here
+            raise NotFound(f"no version {version} of the nonclinical summaries")
         return render_markdown(doc)
 
     # -- writing -------------------------------------------------------------------------------
@@ -223,7 +228,7 @@ class SummaryService:
             raise KernelError("only the latest version can be signed")
         latest = rows[-1]
         if latest.status != "draft":
-            raise KernelError("this version is already signed")
+            raise Conflict("this version is already signed")
         missing = _missing(latest.content)
         if missing:
             raise KernelError("the author's text is still missing in: " + "; ".join(missing))

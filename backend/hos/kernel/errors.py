@@ -25,6 +25,15 @@ class NotFound(KernelError):
     """A referenced entity does not exist."""
 
 
+class Conflict(KernelError):
+    """The request is well formed but the record is not in a state that allows it.
+
+    Distinct from a malformed request: the caller should reload and look, not correct and
+    resend. Covers a duplicate ("already exists", "already a member") and a step taken out
+    of order ("only a reported study can be signed").
+    """
+
+
 class EvidenceInadmissible(KernelError):
     """Simulated or unavailable data was offered where evidence is required."""
 

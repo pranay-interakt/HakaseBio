@@ -73,6 +73,7 @@ from hos.kernel.entities import SequenceEntity, biologic_compound_info
 from hos.kernel.entities import derive as derive_entity
 from hos.kernel.errors import (
     AttestationRequired,
+    Conflict,
     DriverError,
     EvidenceInadmissible,
     KernelError,
@@ -250,7 +251,7 @@ class Kernel:
         elif kind is not PrincipalKind.HUMAN or Role.ADMIN not in roles:
             raise PermissionDenied("the first principal must be a human administrator")
         if any(p.id == principal_id for p in existing):
-            raise KernelError(f"principal {principal_id!r} already exists")
+            raise Conflict(f"principal {principal_id!r} already exists")
         if actor is not None and actor.organisation is not None:
             # an organisation's administrator works inside that organisation only
             if organisation not in (None, actor.organisation):
@@ -592,9 +593,9 @@ class Kernel:
             raise KernelError("a reason is required to give access")
         target = self.get_principal(principal_id)
         if target.organisation == program.organisation:
-            raise KernelError(f"{principal_id} already has access through its organisation")
+            raise Conflict(f"{principal_id} already has access through its organisation")
         if principal_id in {m.principal_id for m in self.repo.members(program_id)}:
-            raise KernelError(f"{principal_id} is already a member")
+            raise Conflict(f"{principal_id} is already a member")
         self.repo.add(
             ProgramMemberRow(
                 program_id=program_id,
@@ -777,7 +778,7 @@ class Kernel:
         profile = compute_profile(smiles)
         for c in self.repo.compounds(program_id):
             if c.inchikey and c.inchikey == profile.inchikey:
-                raise KernelError(
+                raise Conflict(
                     f"structure already registered in this programme as {c.name} ({c.id})"
                 )
         cid = _new_id("cmp")
@@ -862,7 +863,7 @@ class Kernel:
         )
         for c in existing:
             if c.kind == "sequence" and (c.entity or {}).get("fingerprint") == fingerprint:
-                raise KernelError(f"this sequence is already registered as {c.name} ({c.id})")
+                raise Conflict(f"this sequence is already registered as {c.name} ({c.id})")
         cid = _new_id("cmp")
         record = {
             "spec": spec.model_dump(mode="json"),
@@ -1250,7 +1251,7 @@ class Kernel:
             StudyState.CANCELLED,
             StudyState.FAILED,
         ):
-            raise KernelError(f"inputs cannot change in state {row.state}")
+            raise Conflict(f"inputs cannot change in state {row.state}")
         driver = self._driver(row)
         params = self._validate(driver, row.parameters)
         declared = self._declared_inputs(driver, params, row)
@@ -1333,7 +1334,7 @@ class Kernel:
         analysis it interprets. The API layer re-authenticates before calling this."""
         row = self.repo.study(study_id)
         if StudyState(row.state) is not StudyState.ANALYZED:
-            raise KernelError("determinations are recorded on an analysed study")
+            raise Conflict("determinations are recorded on an analysed study")
         driver = self._driver(row)
         params = self._validate(driver, row.parameters)
         spec = self._determination_spec(driver, params, key)
@@ -1502,7 +1503,7 @@ class Kernel:
             and s.get("role") == Role.STUDY_DIRECTOR.value
             for s in row.signatures or []
         ):
-            raise KernelError("the Study Director has already signed this protocol version")
+            raise Conflict("the Study Director has already signed this protocol version")
         sig = sign(
             actor,
             role=Role.STUDY_DIRECTOR,
@@ -1548,7 +1549,7 @@ class Kernel:
         """Sign the current report. The API layer re-authenticates before calling this."""
         row = self.repo.study(study_id)
         if StudyState(row.state) is not StudyState.REPORTED or not row.report_hash:
-            raise KernelError("only a reported study can be signed")
+            raise Conflict("only a reported study can be signed")
         sig = sign(
             actor,
             role=role,

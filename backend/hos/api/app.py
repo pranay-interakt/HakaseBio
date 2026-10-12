@@ -48,6 +48,7 @@ from hos.drivers.base import IngestError
 from hos.kernel.attestation import Principal, PrincipalKind, Role, SignatureMeaning
 from hos.kernel.errors import (
     AttestationRequired,
+    Conflict,
     DriverError,
     EvidenceInadmissible,
     IllegalTransition,
@@ -511,7 +512,7 @@ def create_app(kernel: Kernel | None = None, *, bootstrap_token: str | None = No
     app.add_exception_handler(NotFound, lambda r, e: _err(404, e))
     app.add_exception_handler(PermissionDenied, lambda r, e: _err(403, e))
     exc_t: type[Exception]
-    for exc_t in (AttestationRequired, EvidenceInadmissible, IllegalTransition):
+    for exc_t in (AttestationRequired, Conflict, EvidenceInadmissible, IllegalTransition):
         app.add_exception_handler(exc_t, lambda r, e: _err(409, e))
     app.add_exception_handler(IngestError, lambda r, e: _err(422, e, errors=list(e.errors)))
     app.add_exception_handler(LedgerIntegrityError, lambda r, e: _ledger_failed(e))

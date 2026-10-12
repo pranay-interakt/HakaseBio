@@ -27,7 +27,7 @@ from hos.db.models import StudyRow
 from hos.db.repository import content_hash
 from hos.ind.ctd import ctd_title
 from hos.kernel.attestation import Principal, PrincipalKind, Role, SignatureMeaning, sign
-from hos.kernel.errors import AttestationRequired, KernelError, NotFound, PermissionDenied
+from hos.kernel.errors import AttestationRequired, Conflict, KernelError, NotFound, PermissionDenied
 from hos.kernel.import_specs import ImportField, import_fields
 from hos.kernel.lifecycle import StudyState, assert_transition
 from hos.kernel.uow import atomic
@@ -644,7 +644,7 @@ class ImportService:
         self.k._require_worker(actor)
         row = self._import_row(study_id)
         if StudyState(row.state) is not StudyState.IMPORT_DRAFT:
-            raise KernelError("the import is no longer a draft; values cannot change")
+            raise Conflict("the import is no longer a draft; values cannot change")
         # signatures bind to import_hash(), so any change after signing makes them stale
         return row
 
