@@ -6,27 +6,6 @@ from content_core import engines_grid, DRIVERS, MOD_ORDER
 
 DATA = pathlib.Path(__file__).parent / "data"
 
-TEAM = [
-    ("Manasa Kondamadugu", "Chief Executive Officer", "manasa-kondamadugu", "https://www.linkedin.com/in/dr-manasa-kondamadugu/"),
-    ("Pranay Dinavahi", "Chief Technology Officer", "pranay-dinavahi", "https://www.linkedin.com/in/pranay-dinavahi/"),
-    ("Aino Tsukamoto", "Chief Financial Officer", "aino-tsukamoto", "https://www.linkedin.com/in/aino-tsukamoto-720537183/"),
-    ("Rashmi Gurnani", "Scientific Advisor", "rashmi-gurnani", "https://www.linkedin.com/in/rashmigurnani/"),
-    ("Aditya Tallapragada", "Advisor", "aditya-tallapragada", "https://www.linkedin.com/in/adityakt/"),
-    ("Nobuaki Shiotsuki", "Advisor", "nobuaki-shiotsuki", "https://www.linkedin.com/in/nobuaki-shiotsuki/"),
-    ("Sai Kumar Gogula", "Biomedical Data Scientist", "sai-kumar-gogula", "https://www.linkedin.com/in/sai-kumar-gogula/"),
-]
-
-def _people(c: Ctx, people) -> str:
-    return "".join(f'''<li class="person">
-  <div class="person-photo"><img src="{c.asset(f"assets/img/team/{slug}.webp")}" alt="Portrait of {e(n)}" width="480" height="480" loading="lazy" decoding="async"></div>
-  <strong>{e(n)}</strong><span class="role">{e(r)}</span>
-  <a href="{e(li)}" rel="noopener">LinkedIn {ARROW_OUT}</a>
-</li>''' for n, r, slug, li in people)
-
-def team_html(c: Ctx) -> str:
-    return (f'<div class="team-group"><p class="kicker">Leadership</p><ul class="team team--lead">{_people(c, TEAM[:3])}</ul></div>'
-            f'<div class="team-group"><p class="kicker">Advisors and team</p><ul class="team">{_people(c, TEAM[3:])}</ul></div>')
-
 def form_html(form_id, subject, fields, button, help_text):
     out = []
     for f in fields:
@@ -65,15 +44,6 @@ def form_html(form_id, subject, fields, button, help_text):
 </div>'''
 
 # ---------------------------------------------------------------- INVESTORS
-INVESTOR_FAQ = [
-    ("Do you run labs?", "No. BioSim works with contract labs and in-house teams. Owning animal facilities is capital-heavy and slow to scale; orchestrating them is not."),
-    ("Does the AI make regulatory decisions?", "No. Models draft, rank and check. A named person makes and signs every scientific decision. Simulated values never enter a submission, and any predicted value is labelled as predicted."),
-    ("What is built today?", "The study planning engine across nine drug types, study prioritisation, study drivers from lab assays to GLP toxicology, the signed audit trail, Module 4 assembly and SEND export."),
-    ("Why can’t a CRO or an incumbent do this?", "A contract lab sells its own capacity, so it cannot credibly route work to competitors. Document tools stop at the paperwork. BioSim is lab-neutral and built around a traceable record from the first plan to the IND."),
-    ("What is KESTREL?", "Our kill-early study sequencer. It orders a programme’s studies so that, if the candidate is going to fail, it fails as early and as cheaply as possible, using cited detection rates and the programme’s own costs, inside the order the guidelines require. It is decision support; the sponsor’s team decides what to commission."),
-    ("What is HAIOps?", "Hakase’s operating discipline for AI in regulated healthcare work: traceability, quantified confidence, human authority over safety decisions, applicability monitoring, model governance and integrity of evidence. BioSim is built to it."),
-    ("How do you make money?", "Per drug programme, priced against the services budget a sponsor already has for preclinical work. A readiness review, the entry point, is priced per study reviewed."),
-]
 
 def investors(c: Ctx):
     events = [
@@ -119,27 +89,14 @@ def investors(c: Ctx):
 </div></section>
 
 <section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">The problem</p><h2 class="h2">The path to a first human dose is slow and fragmented.</h2></div>
-  <ul class="values">
-    <li class="value"><h3 class="h3">Fragmented</h3><p>A single programme runs studies across several contract labs. Each returns its own reports and data formats, and the sponsor stitches them together.</p></li>
-    <li class="value"><h3 class="h3">Manual</h3><p>Study plans, protocols and FDA datasets are assembled by hand. Errors often surface late, at submission.</p></li>
-    <li class="value"><h3 class="h3">Hard to defend</h3><p>Every figure in a submission has to trace back to the raw data behind it. Spreadsheets and PDFs make that chain hard to show.</p></li>
-  </ul>
-</div></section>
-
-<section class="section"><div class="wrap">
   <div class="head"><p class="kicker">Why now</p><h2 class="h2">The rules for reaching first-in-human are changing.</h2><p class="lead">Each change rewards a plan that is cited, versioned and right the first time, and a record that can be checked.</p></div>
   <ol class="timeline">{tl}</ol>
-</div></section>
-
-<section class="section band"><div class="wrap">
-  <div class="head"><p class="kicker">What exists today</p><h2 class="h2">Built before it was funded.</h2></div>
-  <ul class="points">
-    <li><h3 class="h3">The planning engine</h3><p>Derives the full study plan for nine drug types from ICH, FDA and WHO guidance, each study cited to its section.</p></li>
-    <li><h3 class="h3">The study workflow</h3><p>Study drivers from lab assays to GLP toxicology: protocols, data checks, analysis and signed reports.</p></li>
-    <li><h3 class="h3">The submission</h3><p>IND readiness, Module 4 and SEND export, with an audit trail and signatures that can be verified offline.</p></li>
-  </ul>
-  <p style="margin-top:40px"><a class="textlink" href="{c.url('/product/inside/')}">What is inside BioSim {ARROW}</a></p>
+  <div style="margin-top:40px">{sources([
+      ("FDA press announcement on year-one progress against its April 2025 Roadmap to Reducing Animal Testing in Preclinical Safety Studies, 20 April 2026.", "https://www.fda.gov/news-events/press-announcements/fda-achieves-year-1-goals-reducing-animal-testing-drug-development"),
+      ("Federal Register 91(53), 19 March 2026. Draft guidance: General Considerations for the Use of New Approach Methodologies in Drug Development.", "https://www.govinfo.gov/content/pkg/FR-2026-03-19/pdf/2026-05390.pdf"),
+      ("RAPS. FDA to test new approach to expediting Phase 1 trials, 15 September 2026.", "https://www.raps.org/resource/fda-to-test-new-approach-to-expediting-phase-1-trials.html"),
+      ("PharmTech. FDA finalizes rule recognizing non-animal testing methods, 22 September 2026.", "https://www.pharmtech.com/view/the-fda-finalizes-rule-recognizing-non-animal-testing-methods-building-on-year-long-reduction-push"),
+  ])}</div>
 </div></section>
 
 <section class="section"><div class="wrap">
@@ -151,49 +108,14 @@ def investors(c: Ctx):
   </ul>
 </div></section>
 
-<section class="section section--card"><div class="wrap">
-  <div class="head"><p class="kicker">Landscape</p><h2 class="h2">Others cover one part of the path. None covers all of it.</h2></div>
-  <div class="table-wrap"><table class="data">
-    <thead><tr><th scope="col">Category</th><th scope="col">What it covers</th><th scope="col">What it leaves out</th></tr></thead>
-    <tbody>
-      <tr><td>Contract lab portals</td><td>The work inside one lab</td><td>Neutral routing across labs</td></tr>
-      <tr><td>SEND tools</td><td>Dataset conversion and checks</td><td>Study planning and execution</td></tr>
-      <tr><td>Regulatory writing tools</td><td>Documents and submission drafts</td><td>The studies behind the documents</td></tr>
-      <tr><td>R&amp;D data platforms</td><td>Notebooks, registries, data plumbing</td><td>A regulatory plan through to Module 4</td></tr>
-      <tr><td>Lab marketplaces</td><td>An introduction to a vendor</td><td>Everything after the introduction</td></tr>
-      <tr class="is-us"><td>Hakase BioSim</td><td colspan="2">The whole path from candidate to IND, lab-neutral, with every result traceable</td></tr>
-    </tbody>
-  </table></div>
-</div></section>
-
-<section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">This round</p><h2 class="h2">The round funds paid design-partner programmes.</h2><p class="lead">Size, terms, milestones and the data room are shared with the deck.</p></div>
-</div></section>
-
-<section class="section section--card" id="team"><div class="wrap">
-  <div class="head"><p class="kicker">Team</p><h2 class="h2">The people behind Hakase AI.</h2></div>
-  {team_html(c)}
-</div></section>
-
 <section class="section section--tint" id="request"><div class="wrap split">
-  <div class="split-aside"><p class="kicker">Request</p><h2 class="h2">Request the deck.</h2><p>Tell us about your fund. We will reply with the deck, the round details and a time for a live walkthrough on a real programme.</p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p></div>
+  <div class="split-aside"><p class="kicker">Request</p><h2 class="h2">Request the deck.</h2><p>Tell us about your fund. We reply with the deck, the round’s size, terms and milestones, the data room, and a time for a live walkthrough on a real programme.</p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p></div>
   {form_html("investor", "Investor deck request", [("text", "name", "Name", True), ("text", "organisation", "Fund or firm", True), ("email", "email", "Email", True), ("select", "focus", "Stage focus", False, ["Pre-seed and seed", "Series A", "Growth", "Strategic"]), ("textarea", "message", "Note", False)], "Request the deck", "This prepares an email to us. Nothing is sent until you send it.")}
-</div></section>
-
-<section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">Questions</p><h2 class="h2">Questions investors ask first.</h2></div>
-  {faq_html(INVESTOR_FAQ)}
-  <div style="margin-top:48px">{sources([
-      ("FDA press announcement on year-one progress against its April 2025 Roadmap to Reducing Animal Testing in Preclinical Safety Studies, 20 April 2026.", "https://www.fda.gov/news-events/press-announcements/fda-achieves-year-1-goals-reducing-animal-testing-drug-development"),
-      ("Federal Register 91(53), 19 March 2026. Draft guidance: General Considerations for the Use of New Approach Methodologies in Drug Development.", "https://www.govinfo.gov/content/pkg/FR-2026-03-19/pdf/2026-05390.pdf"),
-      ("RAPS. FDA to test new approach to expediting Phase 1 trials, 15 September 2026.", "https://www.raps.org/resource/fda-to-test-new-approach-to-expediting-phase-1-trials.html"),
-      ("PharmTech. FDA finalizes rule recognizing non-animal testing methods, 22 September 2026.", "https://www.pharmtech.com/view/the-fda-finalizes-rule-recognizing-non-animal-testing-methods-building-on-year-long-reduction-push"),
-  ])}</div>
 </div></section>
 '''
     return page(c, title="Investors · Hakase BioSim",
                 description="Hakase BioSim is building the software layer for preclinical drug development: from drug candidate to IND, lab-neutral and traceable. Request the deck.",
-                body=body, trail=[("Investors", "/investors/")], ld=[faq_ld(INVESTOR_FAQ)])
+                body=body, trail=[("Investors", "/investors/")])
 
 # ---------------------------------------------------------------- CONTACT
 CONTACT_FAQ = [
