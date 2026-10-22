@@ -38,17 +38,6 @@
     window.addEventListener("resize", request);
   }
 
-  // Pipeline bars grow in once, when the table first scrolls into view
-  var pipes = document.querySelectorAll(".pipe");
-  if (!("IntersectionObserver" in window) || still) {
-    pipes.forEach(function (p) { p.classList.add("is-in"); });
-  } else {
-    var seen = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("is-in"); seen.unobserve(en.target); } });
-    }, { rootMargin: "0px 0px -15% 0px" });
-    pipes.forEach(function (p) { seen.observe(p); });
-  }
-
   // Request forms: compose the message for the visitor's own email app.
   // Nothing is sent from this page; the visitor sends it, or copies it.
   document.querySelectorAll("form[data-compose]").forEach(function (form) {
