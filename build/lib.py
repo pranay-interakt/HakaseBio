@@ -1,11 +1,14 @@
 """Shared layout, components and URL handling for the Hakase BioSim site."""
 from __future__ import annotations
-import html, json, posixpath, re
+import hashlib, html, json, posixpath, re
 
-import os
+import os, pathlib
 SITE = os.environ.get("SITE_URL", "https://hakase.bio").rstrip("/")
 BASE = os.environ.get("SITE_BASE", "/")  # path under which the site is served, e.g. /biosim/
 SITE_NAME = "Hakase BioSim"
+# a stamp on the stylesheet and script links, so a change is never hidden by a cached copy
+_SRC = pathlib.Path(__file__).parent.parent / "src/assets"
+ASSET_V = hashlib.sha1((_SRC / "css/site.css").read_bytes() + (_SRC / "js/site.js").read_bytes()).hexdigest()[:8]
 EMAIL = "info@hakase.ai"
 LINKEDIN = "https://www.linkedin.com/company/hakase-ai/"
 X_URL = "https://x.com/HakaseAI_"
@@ -58,7 +61,7 @@ ARROW_OUT = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="fa
 
 def hakase_img(c: Ctx, h=15, alt="Hakase", cls="", on_dark=False) -> str:
     w = round(4.2215 * h)  # the wordmark's aspect ratio
-    name = "hakase-logo-dark" if on_dark else "hakase-logo"
+    name = "hakase-ai-logo-dark" if on_dark else "hakase-ai-logo"
     src = c.asset(f"assets/img/{name}.webp"); src2 = c.asset(f"assets/img/{name}@2x.webp")
     return f'<img class="{cls}" src="{src}" srcset="{src} 1x, {src2} 2x" alt="{e(alt)}" width="{w}" height="{h}">'
 
@@ -163,7 +166,7 @@ def sources(items, title="Sources") -> str:
 # ---------- JSON-LD ----------
 ORG = {
     "@type": "Organization", "@id": f"{PARENT}/#organization", "name": "Hakase AI", "url": PARENT,
-    "logo": f"{SITE}{BASE.rstrip('/')}/assets/img/hakase-logo.png", "email": EMAIL, "sameAs": [LINKEDIN, X_URL],
+    "logo": f"{SITE}{BASE.rstrip('/')}/assets/img/hakase-ai-logo.png", "email": EMAIL, "sameAs": [LINKEDIN, X_URL],
 }
 ROOT = SITE + BASE.rstrip("/")
 WEBSITE = {"@type": "WebSite", "@id": f"{ROOT}/#website", "url": f"{ROOT}/", "name": SITE_NAME, "publisher": {"@id": f"{PARENT}/#organization"}, "inLanguage": "en-GB"}
@@ -221,8 +224,8 @@ def page(c: Ctx, *, title, description, body, trail=None, ld=None, og_type="webs
 <link rel="manifest" href="{c.asset('site.webmanifest')}">
 <link rel="preload" href="{c.asset('assets/fonts/newsreader.woff2')}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{c.asset('assets/fonts/schibsted-grotesk-var.woff2')}" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="{c.asset('assets/css/site.css')}">
-<script defer src="{c.asset('assets/js/site.js')}"></script>
+<link rel="stylesheet" href="{c.asset('assets/css/site.css')}?v={ASSET_V}">
+<script defer src="{c.asset('assets/js/site.js')}?v={ASSET_V}"></script>
 <script type="application/ld+json">{ld_json}</script>'''
     opening = re.match(r'\s*<section class="(?:hero|intro) (?:hero|intro)--(band|photo)', body)
     content = f'''{header(c, opening and opening.group(1))}

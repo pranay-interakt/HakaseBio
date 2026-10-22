@@ -85,7 +85,7 @@ def render_og(out: pathlib.Path, pages):
     import html as H, re
 
     import base64
-    LOGO64 = base64.b64encode((SRC / "assets/img/hakase-logo@2x.png").read_bytes()).decode()
+    LOGO64 = base64.b64encode((SRC / "assets/img/hakase-ai-logo@2x.png").read_bytes()).decode()
     logo = f'<img src="data:image/png;base64,{LOGO64}" alt="" style="height:44px;width:auto">'
     f64 = lambda n: base64.b64encode((SRC / "assets/fonts" / n).read_bytes()).decode()
     NEWS, MONO, SANS = f64("newsreader.woff2"), f64("dm-mono-500.woff2"), f64("schibsted-grotesk-var.woff2")

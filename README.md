@@ -44,7 +44,7 @@ Lighthouse scores for the home and investors pages: 98–99 performance, 100 acc
 - **Forms.** The demo form (`/contact/`) and the investor form (`/investors/#request`) prepare an email to info@hakase.ai in the visitor's own mail app, so nothing is stored. To collect submissions directly, point them at Formspree, Netlify Forms or your own endpoint.
 - **Legal pages.** Privacy and terms link to hakase.ai/privacy/ and hakase.ai/terms/. Check that those pages exist and cover this site.
 - **Hero image.** `build/hero_image.py` makes `src/assets/img/hero-protein*.webp` from `build/assets/hero-protein-source.webp`; rerun it after changing either.
-- **Branding.** The header and footer use the Hakase logo (`src/assets/img/hakase-logo*.png/webp`). BioSim is named as the product on the homepage. The favicon is the Hakase “h” with its cap.
+- **Branding.** The header and footer use the Hakase logo (`src/assets/img/hakase-ai-logo*.png/webp`). BioSim is named as the product on the homepage. The favicon is the Hakase “h” with its cap.
 
 ## Design
 
