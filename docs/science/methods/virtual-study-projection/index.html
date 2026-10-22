@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Virtual-study projection methods · Hakase BioSim</title>
+<meta name="description" content="Virtual-study projection methods in BioSim: Interval-censored critical effect exposure from a study&#x27;s NOAEL and LOAEL, Duration extrapolation of a critical ef">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/virtual-study-projection/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Virtual-study projection methods · Hakase BioSim">
+<meta property="og:description" content="Virtual-study projection methods in BioSim: Interval-censored critical effect exposure from a study&#x27;s NOAEL and LOAEL, Duration extrapolation of a critical ef">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/virtual-study-projection/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--virtual-study-projection.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Virtual-study projection methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Virtual-study projection","item":"https://hakase-ai.github.io/biosim/science/methods/virtual-study-projection/"}]},{"@type":"TechArticle","headline":"Virtual-study projection methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.)","Slob W. Dose-response modeling of continuous endpoints. Toxicol Sci. 2002;66(2):298-312.","European Chemicals Agency. Guidance on information requirements and chemical safety assessment, Chapter R.8: Characterisation of dose [concentration]-response for human health. Version 2.1, November 2012. (Default duration extrapolation assessment factors: subacute to subchronic 3, subchronic to chronic 2.)","Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11.","U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.","Pharmaceuticals and Medical Devices Agency (Japan). Review Report: Alaglio Oral 1.5 g (aminolevulinic acid hydrochloride). 25 January 2013. (Rat 4-week and 13-week and dog 4-week oral toxicity studies with toxicokinetics.)","U.S. Food and Drug Administration. Clinical Pharmacology and Biopharmaceutics Review, NDA 208630 (Gleolan). 2017. (Dose-ranging study MC-ALS.8-I: relative to 0.2 mg/kg, AUC rose 6.2-fold at 2 mg/kg and 49.9-fold at 20 mg/kg.)","Wachowska M, Muchowicz A, Firczuk M, et al. Aminolevulinic acid (ALA) as a prodrug in photodynamic therapy of cancer. Molecules. 2011;16(5):4140-4164.","Yang X, Palasuberniam P, Kraus D, Chen B. Aminolevulinic acid-based tumor detection and therapy: molecular mechanisms and strategies for enhancement. Int J Mol Sci. 2015;16(10):25865-25880.","ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.","Horn CC, Kimball BA, Wang H, et al. Why can't rodents vomit? A comparative behavioral, anatomical, and physiological study. PLoS One. 2013;8(4):e60537.","ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.","U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.)"]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Virtual-study projection</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Virtual-study projection methods.</h1>
+    <p class="lead">8 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="virtual-critical_exposure_interval">
+  <p class="method-id">virtual.critical_exposure_interval · version 1.0.0</p>
+  <h2>Interval-censored critical effect exposure from a study&#x27;s NOAEL and LOAEL</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the true threshold for the endpoint lies above the exposure at the NOAEL and at or below the exposure at the lowest adverse dose</li></ul></div><div><h3>Limits</h3><ul><li>a NOAEL is bounded by the dose spacing of the study that produced it; the interval, not a point, is the inferential object</li><li>an interval is open above when the top dose produced no adverse effect</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.) <a href="https://www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf" rel="noopener">www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf</a></li><li>Slob W. Dose-response modeling of continuous endpoints. Toxicol Sci. 2002;66(2):298-312. <a href="https://doi.org/10.1093/toxsci/66.2.298" rel="noopener">doi.org/10.1093/toxsci/66.2.298</a></li></ul></div>
+</article><article class="method" id="virtual-duration_extrapolation">
+  <p class="method-id">virtual.duration_extrapolation · version 1.0.0</p>
+  <h2>Duration extrapolation of a critical effect level by default assessment factors</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>default factors: 14 to 28 days 1.5, 28 to 90 days 3, 90 days to chronic 2</li></ul></div><div><h3>Limits</h3><ul><li>defaults are regulatory conventions, not compound-specific measurements</li><li>no factor is applied for shortening a duration; the shorter study&#x27;s level is carried unchanged and flagged</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>European Chemicals Agency. Guidance on information requirements and chemical safety assessment, Chapter R.8: Characterisation of dose [concentration]-response for human health. Version 2.1, November 2012. (Default duration extrapolation assessment factors: subacute to subchronic 3, subchronic to chronic 2.) <a href="https://echa.europa.eu/documents/10162/13632/information_requirements_r8_en.pdf" rel="noopener">echa.europa.eu/documents/10162/13632/information_requirements_r8_en.pdf</a></li></ul></div>
+</article><article class="method" id="virtual-exposure_allometric">
+  <p class="method-id">virtual.exposure_allometric · version 1.0.0</p>
+  <h2>Interspecies exposure projection by allometric clearance scaling</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>clearance scales with body weight to the power 0.75</li></ul></div><div><h3>Limits</h3><ul><li>used only when observed toxicokinetics are absent in the target species</li><li>observed fold-error against measured values is reported with every projection</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11. <a href="https://doi.org/10.2165/00003088-199936010-00001" rel="noopener">doi.org/10.2165/00003088-199936010-00001</a></li><li>U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005. <a href="https://www.fda.gov/media/72309/download" rel="noopener">www.fda.gov/media/72309/download</a></li></ul></div>
+</article><article class="method" id="virtual-exposure_from_dose">
+  <p class="method-id">virtual.exposure_from_dose · version 1.0.0</p>
+  <h2>Systemic exposure at a dose from observed dose-normalised toxicokinetics</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>exposure is proportional to dose over the interpolated range</li><li>the dose-normalised value is taken from toxicokinetics in the same study design (species, strain, route, vehicle) wherever one exists</li></ul></div><div><h3>Limits</h3><ul><li>linearity is checked against the observed dose levels and the value is refused outside the observed range by more than fivefold</li><li>saturable metabolite formation (for example ALA to PpIX) is not linear and is handled by its own metabolite relation, never by this one</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Pharmaceuticals and Medical Devices Agency (Japan). Review Report: Alaglio Oral 1.5 g (aminolevulinic acid hydrochloride). 25 January 2013. (Rat 4-week and 13-week and dog 4-week oral toxicity studies with toxicokinetics.) <a href="https://www.pmda.go.jp/files/000153482.pdf" rel="noopener">www.pmda.go.jp/files/000153482.pdf</a></li></ul></div>
+</article><article class="method" id="virtual-exposure_from_reported_ratio">
+  <p class="method-id">virtual.exposure_from_reported_ratio · version 1.0.0</p>
+  <h2>Absolute exposure reconstructed from a reported dose-ratio and an anchor value</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the ratio and the anchor come from the same study population and assay</li></ul></div><div><h3>Limits</h3><ul><li>the reconstructed value inherits the precision of the reported ratio, which is usually given to two significant figures</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>U.S. Food and Drug Administration. Clinical Pharmacology and Biopharmaceutics Review, NDA 208630 (Gleolan). 2017. (Dose-ranging study MC-ALS.8-I: relative to 0.2 mg/kg, AUC rose 6.2-fold at 2 mg/kg and 49.9-fold at 20 mg/kg.) <a href="https://www.accessdata.fda.gov/drugsatfda_docs/nda/2017/208630Orig1s000ClinPharmR.pdf" rel="noopener">www.accessdata.fda.gov/drugsatfda_docs/nda/2017/208630Orig1s000ClinPharmR.pdf</a></li></ul></div>
+</article><article class="method" id="virtual-ppix_accumulation">
+  <p class="method-id">virtual.ppix_accumulation · version 1.0.0</p>
+  <h2>Protoporphyrin IX accumulation from exogenous 5-aminolevulinic acid</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>exogenous ALA bypasses haem feedback inhibition of ALA synthase so PpIX accumulates where ferrochelatase capacity is exceeded</li></ul></div><div><h3>Limits</h3><ul><li>PpIX formation is saturable: a tenfold ALA dose raised human PpIX exposure about threefold, so PpIX is never scaled linearly with ALA dose</li><li>tissue PpIX is not predicted; only the plasma relation that was measured</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Wachowska M, Muchowicz A, Firczuk M, et al. Aminolevulinic acid (ALA) as a prodrug in photodynamic therapy of cancer. Molecules. 2011;16(5):4140-4164. <a href="https://doi.org/10.3390/molecules16054140" rel="noopener">doi.org/10.3390/molecules16054140</a></li><li>Yang X, Palasuberniam P, Kraus D, Chen B. Aminolevulinic acid-based tumor detection and therapy: molecular mechanisms and strategies for enhancement. Int J Mol Sci. 2015;16(10):25865-25880. <a href="https://doi.org/10.3390/ijms161025865" rel="noopener">doi.org/10.3390/ijms161025865</a></li></ul></div>
+</article><article class="method" id="virtual-species_projection">
+  <p class="method-id">virtual.species_projection · version 1.0.0</p>
+  <h2>Cross-species projection of an endpoint&#x27;s critical exposure</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>for an endpoint with no cited species difference, the critical systemic exposure is conserved across species</li><li>an endpoint that a species physiologically cannot express is excluded for that species rather than projected into it</li></ul></div><div><h3>Limits</h3><ul><li>exposure conservation is an assumption, not a law; its observed fold-error on the programme&#x27;s own validation set is reported with every projection</li><li>a species-specific sensitivity factor is applied only where a cited mechanism supports it</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009. <a href="https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/M3_R2__Guideline.pdf</a></li><li>Horn CC, Kimball BA, Wang H, et al. Why can&#x27;t rodents vomit? A comparative behavioral, anatomical, and physiological study. PLoS One. 2013;8(4):e60537. <a href="https://doi.org/10.1371/journal.pone.0060537" rel="noopener">doi.org/10.1371/journal.pone.0060537</a></li></ul></div>
+</article><article class="method" id="virtual-study_projection">
+  <p class="method-id">virtual.study_projection · version 1.0.0</p>
+  <h2>Projected findings and NOAEL of a proposed repeat-dose study</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the study reports an adverse finding at a dose whose projected exposure reaches the endpoint&#x27;s critical exposure interval</li></ul></div><div><h3>Limits</h3><ul><li>a projection of what a study would report; it is not the study and cannot substitute for it in a regulatory submission</li><li>endpoints with no cited evidence in the programme are not projected</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009. <a href="https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/M3_R2__Guideline.pdf</a></li><li>U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.) <a href="https://www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf" rel="noopener">www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

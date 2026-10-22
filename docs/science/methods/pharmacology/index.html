@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pharmacology methods · Hakase BioSim</title>
+<meta name="description" content="Pharmacology methods in BioSim: Four-parameter logistic (Hill) concentration-response fit, Molar to mass concentration (IC50 in ng/mL). Versions, assumptions,">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/pharmacology/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Pharmacology methods · Hakase BioSim">
+<meta property="og:description" content="Pharmacology methods in BioSim: Four-parameter logistic (Hill) concentration-response fit, Molar to mass concentration (IC50 in ng/mL). Versions, assumptions,">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/pharmacology/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--pharmacology.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Pharmacology methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Pharmacology","item":"https://hakase-ai.github.io/biosim/science/methods/pharmacology/"}]},{"@type":"TechArticle","headline":"Pharmacology methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102.","ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","Ridder BJ, Leishman DJ, Bridgland-Taylor M, et al. A systematic strategy for estimating hERG block potency and its implications in a new cardiac safety paradigm. Toxicol Appl Pharmacol. 2020;394:114961.","Ritz C, Baty F, Streibig JC, Gerhard D. Dose-response analysis using R. PLoS One. 2015;10(12):e0146021."]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Pharmacology</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Pharmacology methods.</h1>
+    <p class="lead">4 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="pharm-hill_4pl">
+  <p class="method-id">pharm.hill_4pl · version 1.0.0</p>
+  <h2>Four-parameter logistic (Hill) concentration-response fit</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>a single sigmoidal transition between two asymptotes</li></ul></div><div><h3>Limits</h3><ul><li>an inflection point outside the tested concentration range yields an extrapolated potency which is flagged rather than reported as measured</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102. <a href="https://doi.org/10.1152/ajpendo.1978.235.2.E97" rel="noopener">doi.org/10.1152/ajpendo.1978.235.2.E97</a></li></ul></div>
+</article><article class="method" id="pharm-molar_to_mass_concentration">
+  <p class="method-id">pharm.molar_to_mass_concentration · version 1.0.0</p>
+  <h2>Molar to mass concentration (IC50 in ng/mL)</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>molecular weight of the registered structure (free form, not a salt)</li></ul></div><div><h3>Limits</h3><p class="small muted">None stated.</p></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li></ul></div>
+</article><article class="method" id="pharm-percent_inhibition">
+  <p class="method-id">pharm.percent_inhibition · version 1.0.0</p>
+  <h2>Per-cell fractional current inhibition with background subtraction</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>residual current after a saturating selective blocker is non-hERG background (E14/S7B Q&amp;A 2.1 item 2)</li><li>drug effect measured at steady state</li></ul></div><div><h3>Limits</h3><ul><li>rundown during the recording is not corrected; vehicle controls show its magnitude</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li><li>Ridder BJ, Leishman DJ, Bridgland-Taylor M, et al. A systematic strategy for estimating hERG block potency and its implications in a new cardiac safety paradigm. Toxicol Appl Pharmacol. 2020;394:114961. <a href="https://doi.org/10.1016/j.taap.2020.114961" rel="noopener">doi.org/10.1016/j.taap.2020.114961</a></li></ul></div>
+</article><article class="method" id="pharm-relative_potency">
+  <p class="method-id">pharm.relative_potency · version 1.0.0</p>
+  <h2>Relative potency: ratio of fitted 50% effective concentrations (off-target / primary)</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the two curves are fitted independently; the standard error is the first-order delta method for a ratio of independent estimates</li></ul></div><div><h3>Limits</h3><ul><li>the ratio holds at the 50% effect level; with non-parallel curves it changes with the effect level (Ritz et al. 2015)</li><li>IC50s from assays at different substrate or ligand concentrations are not affinities; no Ki conversion is applied</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Ritz C, Baty F, Streibig JC, Gerhard D. Dose-response analysis using R. PLoS One. 2015;10(12):e0146021. <a href="https://doi.org/10.1371/journal.pone.0146021" rel="noopener">doi.org/10.1371/journal.pone.0146021</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mechanistic pharmacokinetics (PBPK) methods · Hakase BioSim</title>
+<meta name="description" content="Mechanistic pharmacokinetics (PBPK) methods in BioSim: Clearance projected between species by simple allometry on body weight, Renal clearance as glomerular f">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/mechanistic-pharmacokinetics-pbpk/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Mechanistic pharmacokinetics (PBPK) methods · Hakase BioSim">
+<meta property="og:description" content="Mechanistic pharmacokinetics (PBPK) methods in BioSim: Clearance projected between species by simple allometry on body weight, Renal clearance as glomerular f">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/mechanistic-pharmacokinetics-pbpk/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--mechanistic-pharmacokinetics-pbpk.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mechanistic pharmacokinetics (PBPK) methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Mechanistic pharmacokinetics (PBPK)","item":"https://hakase-ai.github.io/biosim/science/methods/mechanistic-pharmacokinetics-pbpk/"}]},{"@type":"TechArticle","headline":"Mechanistic pharmacokinetics (PBPK) methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["Boxenbaum H. Interspecies scaling, allometry, physiological time, and the ground plan of pharmacokinetics. J Pharmacokinet Biopharm. 1982;10(2):201-227.","Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11.","Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095.","Cao Y, Jusko WJ. Applications of minimal physiologically-based pharmacokinetic models. J Pharmacokinet Pharmacodyn. 2012;39(6):711-723.","Rowland M, Peck C, Tucker G. Physiologically-based pharmacokinetics in drug development and regulatory science. Annu Rev Pharmacol Toxicol. 2011;51:45-73.","Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.","Metropolis N, Ulam S. The Monte Carlo method. J Am Stat Assoc. 1949;44(247):335-341.","ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026.","Dormand JR, Prince PJ. A family of embedded Runge-Kutta formulae. J Comput Appl Math. 1980;6(1):19-26.","Hindmarsh AC. ODEPACK, a systematized collection of ODE solvers. In: Scientific Computing. North-Holland; 1983:55-64. (LSODA, the stiff/non-stiff switching solver exposed by SciPy as method='LSODA'.)","Amidon GL, Lennernas H, Shah VP, Crison JR. A theoretical basis for a biopharmaceutic drug classification: the correlation of in vitro drug product dissolution and in vivo bioavailability. Pharm Res. 1995;12(3):413-420.","Yu LX, Amidon GL. A compartmental absorption and transit model for estimating oral drug absorption. Int J Pharm. 1999;186(2):119-125.","Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.","Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095.","Brown RP, Delp MD, Lindstedt SL, Rhomberg LR, Beliles RP. Physiological parameter values for physiologically based pharmacokinetic models. Toxicol Ind Health. 1997;13(4):407-484.","Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205.","Obach RS, Baxter JG, Liston TE, et al. The prediction of human pharmacokinetic parameters from preclinical and in vitro metabolism data. J Pharmacol Exp Ther. 1997;283(1):46-58.","Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205."]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Mechanistic pharmacokinetics (PBPK)</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Mechanistic pharmacokinetics (PBPK) methods.</h1>
+    <p class="lead">9 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="pbpk-cl_allometric_scaling">
+  <p class="method-id">pbpk.cl_allometric_scaling · version 1.0.0</p>
+  <h2>Clearance projected between species by simple allometry on body weight</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>clearance scales with body weight to the power 0.75, so clearance per kilogram scales as body weight to the power -0.25</li><li>body weights are read from the cited physiology table, not from literals</li></ul></div><div><h3>Limits</h3><ul><li>simple allometry carries no information about the target species&#x27; enzymes or transporters, so a species-divergent metabolic route is not represented</li><li>it is used only where the target species has no measured clearance</li><li>no accuracy is claimed until a pre-registered, held-out validation is published for the projection</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Boxenbaum H. Interspecies scaling, allometry, physiological time, and the ground plan of pharmacokinetics. J Pharmacokinet Biopharm. 1982;10(2):201-227. <a href="https://doi.org/10.1007/BF01062336" rel="noopener">doi.org/10.1007/BF01062336</a></li><li>Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11. <a href="https://doi.org/10.2165/00003088-199936010-00001" rel="noopener">doi.org/10.2165/00003088-199936010-00001</a></li></ul></div>
+</article><article class="method" id="pbpk-cl_renal_filtration">
+  <p class="method-id">pbpk.cl_renal_filtration · version 1.0.0</p>
+  <h2>Renal clearance as glomerular filtration of the unbound drug</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the drug is filtered and neither secreted nor reabsorbed</li></ul></div><div><h3>Limits</h3><ul><li>a lower bound on renal clearance: active secretion raises it and tubular reabsorption lowers it, and neither is predicted here</li><li>refused for a molecule above the glomerular filtration cut-off</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095. <a href="https://doi.org/10.1023/A:1018943613122" rel="noopener">doi.org/10.1023/A:1018943613122</a></li></ul></div>
+</article><article class="method" id="pbpk-minimal_model">
+  <p class="method-id">pbpk.minimal_model · version 1.0.0</p>
+  <h2>Minimal physiologically based model: blood, liver, rapidly and slowly equilibrating tissue</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>each compartment is well stirred and perfusion-limited</li><li>hepatic elimination follows the well-stirred model on unbound blood concentration</li><li>distribution is linear: no saturable tissue binding over the simulated range</li></ul></div><div><h3>Limits</h3><ul><li>a reduced structure: it predicts plasma exposure, not tissue-specific exposure in any organ other than the liver</li><li>linear kinetics only; saturable metabolism, transporter involvement and enterohepatic recycling are not represented and are flagged when suspected</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Cao Y, Jusko WJ. Applications of minimal physiologically-based pharmacokinetic models. J Pharmacokinet Pharmacodyn. 2012;39(6):711-723. <a href="https://doi.org/10.1007/s10928-012-9280-2" rel="noopener">doi.org/10.1007/s10928-012-9280-2</a></li><li>Rowland M, Peck C, Tucker G. Physiologically-based pharmacokinetics in drug development and regulatory science. Annu Rev Pharmacol Toxicol. 2011;51:45-73. <a href="https://doi.org/10.1146/annurev-pharmtox-010510-100540" rel="noopener">doi.org/10.1146/annurev-pharmtox-010510-100540</a></li><li>Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390. <a href="https://doi.org/10.1002/cpt1975184377" rel="noopener">doi.org/10.1002/cpt1975184377</a></li></ul></div>
+</article><article class="method" id="pbpk-monte_carlo">
+  <p class="method-id">pbpk.monte_carlo · version 1.0.0</p>
+  <h2>Parameter uncertainty propagated by Monte Carlo sampling</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>each uncertain input is sampled from the distribution the caller declared, independently unless a correlation is supplied</li></ul></div><div><h3>Limits</h3><ul><li>propagates only the uncertainty that was declared; it does not discover structural error in the model</li><li>the seed is recorded so a run is reproducible exactly</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Metropolis N, Ulam S. The Monte Carlo method. J Am Stat Assoc. 1949;44(247):335-341. <a href="https://doi.org/10.1080/01621459.1949.10483310" rel="noopener">doi.org/10.1080/01621459.1949.10483310</a></li><li>ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026. <a href="https://database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf" rel="noopener">database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf</a></li></ul></div>
+</article><article class="method" id="pbpk-ode_solution">
+  <p class="method-id">pbpk.ode_solution · version 1.0.0</p>
+  <h2>Numerical solution of the compartmental system</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the system is non-stiff at the tolerances used, with LSODA as fallback</li></ul></div><div><h3>Limits</h3><ul><li>solution carries the solver tolerance; the mass-balance residual and the analytic cross-check are reported with every run</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Dormand JR, Prince PJ. A family of embedded Runge-Kutta formulae. J Comput Appl Math. 1980;6(1):19-26. <a href="https://doi.org/10.1016/0771-050X(80)90013-3" rel="noopener">doi.org/10.1016/0771-050X(80)90013-3</a></li><li>Hindmarsh AC. ODEPACK, a systematized collection of ODE solvers. In: Scientific Computing. North-Holland; 1983:55-64. (LSODA, the stiff/non-stiff switching solver exposed by SciPy as method=&#x27;LSODA&#x27;.) </li></ul></div>
+</article><article class="method" id="pbpk-oral_absorption">
+  <p class="method-id">pbpk.oral_absorption · version 1.0.0</p>
+  <h2>Oral bioavailability as the product of fraction absorbed, gut and hepatic availability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>F = Fa x Fg x Fh with first-order appearance into the portal circulation</li></ul></div><div><h3>Limits</h3><ul><li>Fa from permeability and solubility is a classification, not a measurement</li><li>no transit-time, precipitation or food-effect model; a low-solubility compound is flagged rather than assigned a number</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Amidon GL, Lennernas H, Shah VP, Crison JR. A theoretical basis for a biopharmaceutic drug classification: the correlation of in vitro drug product dissolution and in vivo bioavailability. Pharm Res. 1995;12(3):413-420. <a href="https://doi.org/10.1023/a:1016212804288" rel="noopener">doi.org/10.1023/a:1016212804288</a></li><li>Yu LX, Amidon GL. A compartmental absorption and transit model for estimating oral drug absorption. Int J Pharm. 1999;186(2):119-125. <a href="https://doi.org/10.1016/s0378-5173(99)00147-7" rel="noopener">doi.org/10.1016/s0378-5173(99)00147-7</a></li><li>Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390. <a href="https://doi.org/10.1002/cpt1975184377" rel="noopener">doi.org/10.1002/cpt1975184377</a></li></ul></div>
+</article><article class="method" id="pbpk-physiology">
+  <p class="method-id">pbpk.physiology · version 1.0.0</p>
+  <h2>Species physiological parameter scaled from a reference animal</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>the per-kilogram value is the tabulated absolute value divided by the reference body weight stated in that table&#x27;s column heading</li></ul></div><div><h3>Limits</h3><ul><li>a reference-animal mean, not a strain-, sex- or age-specific value</li><li>scaling a flow linearly with body weight within a species is an approximation; the allometric alternative is offered where a table supports it</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095. <a href="https://doi.org/10.1023/A:1018943613122" rel="noopener">doi.org/10.1023/A:1018943613122</a></li><li>Brown RP, Delp MD, Lindstedt SL, Rhomberg LR, Beliles RP. Physiological parameter values for physiologically based pharmacokinetic models. Toxicol Ind Health. 1997;13(4):407-484. <a href="https://doi.org/10.1177/074823379701300401" rel="noopener">doi.org/10.1177/074823379701300401</a></li></ul></div>
+</article><article class="method" id="pbpk-vss_oie_tozer">
+  <p class="method-id">pbpk.vss_oie_tozer · version 1.0.0</p>
+  <h2>Steady-state volume of distribution from plasma and tissue unbound fractions</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>drug distributes into plasma water, extracellular water and a remainder compartment, with binding to extravascular protein in fixed proportion to plasma</li></ul></div><div><h3>Limits</h3><ul><li>the published parameter set is human; applying it to another species requires that species&#x27; fluid volumes and is refused without them</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205. <a href="https://doi.org/10.1002/jps.2600680948" rel="noopener">doi.org/10.1002/jps.2600680948</a></li></ul></div>
+</article><article class="method" id="pbpk-vss_single_species_scaling">
+  <p class="method-id">pbpk.vss_single_species_scaling · version 1.0.0</p>
+  <h2>Steady-state volume of distribution projected between species by unbound fraction</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>tissue affinity for the unbound drug is conserved across species, so Vss/fu is the invariant</li></ul></div><div><h3>Limits</h3><ul><li>fails for a drug with a species-divergent transporter or tissue-binding protein</li><li>reported with the observed fold-error of the method on its own validation set where one exists; otherwise the projection is refused</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Obach RS, Baxter JG, Liston TE, et al. The prediction of human pharmacokinetic parameters from preclinical and in vitro metabolism data. J Pharmacol Exp Ther. 1997;283(1):46-58. </li><li>Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205. <a href="https://doi.org/10.1002/jps.2600680948" rel="noopener">doi.org/10.1002/jps.2600680948</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rule-based filters methods · Hakase BioSim</title>
+<meta name="description" content="Rule-based filters methods in BioSim: Lipinski rule-of-five violation count, Veber oral bioavailability criteria. Versions, assumptions, limits and primary re">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/rule-based-filters/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Rule-based filters methods · Hakase BioSim">
+<meta property="og:description" content="Rule-based filters methods in BioSim: Lipinski rule-of-five violation count, Veber oral bioavailability criteria. Versions, assumptions, limits and primary re">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/rule-based-filters/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--rule-based-filters.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rule-based filters methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Rule-based filters","item":"https://hakase-ai.github.io/biosim/science/methods/rule-based-filters/"}]},{"@type":"TechArticle","headline":"Rule-based filters methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Adv Drug Deliv Rev. 2001;46(1-3):3-26.","Veber DF, Johnson SR, Cheng HY, Smith BR, Ward KW, Kopple KD. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45(12):2615-2623."]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Rule-based filters</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Rule-based filters methods.</h1>
+    <p class="lead">2 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="rule-lipinski_ro5">
+  <p class="method-id">rule.lipinski_ro5 · version 1.0.0</p>
+  <h2>Lipinski rule-of-five violation count</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>an oral-absorption heuristic from a 1997 dataset; not a pass/fail gate</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Adv Drug Deliv Rev. 2001;46(1-3):3-26. <a href="https://doi.org/10.1016/S0169-409X(00)00129-0" rel="noopener">doi.org/10.1016/S0169-409X(00)00129-0</a></li></ul></div>
+</article><article class="method" id="rule-veber">
+  <p class="method-id">rule.veber · version 1.0.0</p>
+  <h2>Veber oral bioavailability criteria</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>derived from rat oral bioavailability data</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Veber DF, Johnson SR, Cheng HY, Smith BR, Ward KW, Kopple KD. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45(12):2615-2623. <a href="https://doi.org/10.1021/jm020017n" rel="noopener">doi.org/10.1021/jm020017n</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

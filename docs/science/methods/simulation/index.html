@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulation methods · Hakase BioSim</title>
+<meta name="description" content="Simulation methods in BioSim: Simulated revertant counts from declared expected values per strain, activation and concentration (exact or Poisson-sampled), Si">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/simulation/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Simulation methods · Hakase BioSim">
+<meta property="og:description" content="Simulation methods in BioSim: Simulated revertant counts from declared expected values per strain, activation and concentration (exact or Poisson-sampled), Si">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/simulation/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--simulation.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Simulation methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Simulation","item":"https://hakase-ai.github.io/biosim/science/methods/simulation/"}]},{"@type":"TechArticle","headline":"Simulation methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020.","ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.","ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.","OECD. Test No. 407: Repeated Dose 28-day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 2008.","Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.","DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102.","GraphPad Software. Equation: One phase decay. GraphPad Prism 11 Curve Fitting Guide (vendor documentation; equation form and half-life = ln(2)/K).","U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.","Thermo Fisher Scientific. Pierce RED Device Inserts User Guide (Cat. 89809, 89810). Pub. No. MAN0011571, Rev. C.0, 16 June 2023. (Manufacturer instructions; a secondary source for the fraction-unbound calculation.)","Dunnett CW. A multiple comparison procedure for comparing several treatments with a control. J Am Stat Assoc. 1955;50(272):1096-1121.","ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.","ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.","Smith BP, Vandenhende FR, DeSante KA, Farid NA, Welch PA, Callaghan JT, Forgue ST. Confidence interval criteria for assessment of dose proportionality. Pharm Res. 2000;17(10):1278-1283."]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Simulation</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Simulation methods.</h1>
+    <p class="lead">13 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="sim-ames_counts">
+  <p class="method-id">sim.ames_counts · version 1.0.0</p>
+  <h2>Simulated revertant counts from declared expected values per strain, activation and concentration (exact or Poisson-sampled)</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020. <a href="https://doi.org/10.1787/9789264071247-en" rel="noopener">doi.org/10.1787/9789264071247-en</a></li></ul></div>
+</article><article class="method" id="sim-bioanalytical_runs">
+  <p class="method-id">sim.bioanalytical_runs · version 1.0.0</p>
+  <h2>Simulated chromatographic responses from a declared linear response model with multiplicative noise</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022. <a href="https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf" rel="noopener">database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf</a></li></ul></div>
+</article><article class="method" id="sim-cns_declared">
+  <p class="method-id">sim.cns_declared · version 1.0.0</p>
+  <h2>Simulated functional-observation scores and continuous CNS measures from declared incidences and effects</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000. <a href="https://database.ich.org/sites/default/files/S7A_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7A_Guideline.pdf</a></li></ul></div>
+</article><article class="method" id="sim-drf_declared_effects">
+  <p class="method-id">sim.drf_declared_effects · version 1.0.0</p>
+  <h2>Simulated dose range-finding data from declared endpoint effects, clinical-sign incidences and deaths</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>OECD. Test No. 407: Repeated Dose 28-day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 2008. <a href="https://doi.org/10.1787/9789264070684-en" rel="noopener">doi.org/10.1787/9789264070684-en</a></li></ul></div>
+</article><article class="method" id="sim-first_order_depletion">
+  <p class="method-id">sim.first_order_depletion · version 1.0.0</p>
+  <h2>Simulated microsomal depletion from a declared first-order model with multiplicative analytical noise</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>first-order depletion at the declared half-life</li></ul></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359. <a href="https://doi.org/10.1016/S0090-9556(24)14938-0" rel="noopener">doi.org/10.1016/S0090-9556(24)14938-0</a></li></ul></div>
+</article><article class="method" id="sim-four_parameter_logistic">
+  <p class="method-id">sim.four_parameter_logistic · version 1.0.0</p>
+  <h2>Simulated concentration-response from a declared 4PL model with additive noise</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102. <a href="https://doi.org/10.1152/ajpendo.1978.235.2.E97" rel="noopener">doi.org/10.1152/ajpendo.1978.235.2.E97</a></li></ul></div>
+</article><article class="method" id="sim-peptide_decay_declared">
+  <p class="method-id">sim.peptide_decay_declared · version 1.0.0</p>
+  <h2>Simulated intact-peptide responses from declared true half-life and plateau per condition, with proportional log-normal noise</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>GraphPad Software. Equation: One phase decay. GraphPad Prism 11 Curve Fitting Guide (vendor documentation; equation form and half-life = ln(2)/K). <a href="https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_exponential_decay_1phase.htm" rel="noopener">www.graphpad.com/guides/prism/latest/curve-fitting/reg_exponential_decay_1phase.htm</a></li></ul></div>
+</article><article class="method" id="sim-pk_declared_profile">
+  <p class="method-id">sim.pk_declared_profile · version 1.0.0</p>
+  <h2>Simulated single-dose concentrations from declared true group profiles with log-normal between-animal and residual variability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022. <a href="https://www.fda.gov/media/121311/download" rel="noopener">www.fda.gov/media/121311/download</a></li></ul></div>
+</article><article class="method" id="sim-ppb_declared_fu">
+  <p class="method-id">sim.ppb_declared_fu · version 1.0.0</p>
+  <h2>Simulated equilibrium-dialysis chamber concentrations from declared true fu values with log-normal analytical variability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Thermo Fisher Scientific. Pierce RED Device Inserts User Guide (Cat. 89809, 89810). Pub. No. MAN0011571, Rev. C.0, 16 June 2023. (Manufacturer instructions; a secondary source for the fraction-unbound calculation.) <a href="https://assets.thermofisher.com/TFS-Assets/LSG/manuals/MAN0011571_RED_Device_Insert_UG.pdf" rel="noopener">assets.thermofisher.com/TFS-Assets/LSG/manuals/MAN0011571_RED_Device_Insert_UG.pdf</a></li></ul></div>
+</article><article class="method" id="sim-repeat_dose_normal">
+  <p class="method-id">sim.repeat_dose_normal · version 1.0.0</p>
+  <h2>Simulated individual-animal endpoint values from declared normal distributions</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Dunnett CW. A multiple comparison procedure for comparing several treatments with a control. J Am Stat Assoc. 1955;50(272):1096-1121. <a href="https://doi.org/10.1080/01621459.1955.10501294" rel="noopener">doi.org/10.1080/01621459.1955.10501294</a></li></ul></div>
+</article><article class="method" id="sim-respiratory_declared">
+  <p class="method-id">sim.respiratory_declared · version 1.0.0</p>
+  <h2>Simulated respiratory rate, tidal volume and oxygen saturation from declared group means and effects with normal variability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000. <a href="https://database.ich.org/sites/default/files/S7A_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7A_Guideline.pdf</a></li></ul></div>
+</article><article class="method" id="sim-telemetry_declared">
+  <p class="method-id">sim.telemetry_declared · version 1.0.0</p>
+  <h2>Simulated telemetry from declared per-animal QT-RR relationships, heart-rate and QTc effects with normal variability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005. <a href="https://database.ich.org/sites/default/files/S7B_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7B_Guideline.pdf</a></li></ul></div>
+</article><article class="method" id="sim-tk_power_profile">
+  <p class="method-id">sim.tk_power_profile · version 1.0.0</p>
+  <h2>Simulated concentrations from a declared reference profile scaled by the power model, with declared day and sex factors and log-normal variability</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>for software verification and workflow demonstration only; never admissible as evidence</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Smith BP, Vandenhende FR, DeSante KA, Farid NA, Welch PA, Callaghan JT, Forgue ST. Confidence interval criteria for assessment of dose proportionality. Pharm Res. 2000;17(10):1278-1283. <a href="https://doi.org/10.1023/A:1026451721686" rel="noopener">doi.org/10.1023/A:1026451721686</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

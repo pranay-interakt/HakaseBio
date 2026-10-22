@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Security, Part 11 and audit trail · Hakase BioSim</title>
+<meta name="description" content="21 CFR Part 11 signatures, a hash-chained audit trail, programme-level access control and container deployment: how BioSim handles regulated records.">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/security/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Security, Part 11 and audit trail · Hakase BioSim">
+<meta property="og:description" content="21 CFR Part 11 signatures, a hash-chained audit trail, programme-level access control and container deployment: how BioSim handles regulated records.">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/security/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/security.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Security, Part 11 and audit trail · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../assets/css/site.css">
+<script defer src="../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Security","item":"https://hakase-ai.github.io/biosim/security/"}]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><img class="on-light brand-logo" src="../assets/img/hakase-logo.webp" srcset="../assets/img/hakase-logo.webp 1x, ../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../assets/img/hakase-logo-dark.webp" srcset="../assets/img/hakase-logo-dark.webp 1x, ../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../product/">Product</a><a href="../science/">Science</a><a href="../modalities/">Modalities</a><a href="../investors/">Investors</a><a href="../company/">Company</a>
+      <a class="btn btn--sm" href="../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../">Home</a></li><li aria-current="page">Security</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Security and compliance</p>
+    <h1 class="h1 h1--page">Built for regulated records.</h1>
+    <p class="lead">BioSim is designed for regulated work: electronic records and signatures that follow 21 CFR Part 11, an audit trail where any rewrite is detected, and access limited to the people on each programme.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap stack">
+  <div class="block"><div><p class="kicker">Signatures</p><h2 class="h2">People sign, and sign again.</h2></div>
+    <div class="prose"><p>The legal sign-offs in nonclinical work belong to people: the GLP Study Director, quality assurance, the IACUC or attending veterinarian and, for EU GMP release, the qualified person. BioSim assembles what they need and records their signature. It never signs on their behalf.</p><p>Every signature asks for the password again, as 21 CFR 11.200 requires. GLP approval needs both the Study Director and QA signatures on the current version of the report.</p></div></div>
+  <div class="block"><div><p class="kicker">Audit trail</p><h2 class="h2">A record where any change shows.</h2></div>
+    <div class="prose"><p>Every change is an entry in an append-only, hash-chained ledger, written in the same transaction as the change itself, so any later rewrite breaks the chain and is detected. Rejected uploads are recorded too. Corrections create a new version linked to the old one, with a reason. Ledger checkpoints can be anchored to write-once storage.</p></div></div>
+  <div class="block"><div><p class="kicker">Access</p><h2 class="h2">Each programme sees only its own.</h2></div>
+    <div class="prose"><p>A programme is visible only to its organisation and to guests added on the record, such as a contract lab. Exported bundles redact other programmes’ entries, and the chain still verifies. Session length, idle timeout and sign-in lockout are set by policy.</p></div></div>
+  <div class="block"><div><p class="kicker">Deployment</p><h2 class="h2">Runs where your data needs to be.</h2></div>
+    <div class="prose"><p>BioSim ships as containers with PostgreSQL, with dependencies locked by hash and a software bill of materials for each build. Database migrations are versioned and can be run as a separate, controlled step.</p></div></div>
+  <div class="block"><div><p class="kicker">Validation</p><h2 class="h2">What stays with you.</h2></div>
+    <div class="prose"><p>Computer system validation (IQ, OQ and PQ) and the SOPs for a regulated deployment are the deploying organisation’s step. We provide a clause-by-clause traceability matrix from Part 11, Part 58 and data-integrity expectations to the code and tests that implement them.</p></div></div>
+  <div class="block"><div><p class="kicker">This website</p><h2 class="h3">No cookies, no trackers.</h2></div>
+    <div class="prose"><p>hakase.bio sets no cookies and loads nothing from third parties. Forms prepare an email in your own email app; nothing is stored by this site.</p></div></div>
+</div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">Bring your QA lead to a demo.</h2>
+  <div class="actions"><a class="btn" href="../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../science/">Science <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../product/submit/">Submit <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../contact/">Contact <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../" class="brand"><img class="on-light brand-logo" src="../assets/img/hakase-logo.webp" srcset="../assets/img/hakase-logo.webp 1x, ../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../assets/img/hakase-logo-dark.webp" srcset="../assets/img/hakase-logo-dark.webp 1x, ../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../product/">How it works</a></li><li><a href="../product/plan/">Plan</a></li><li><a href="../product/prioritise/">Prioritise</a></li><li><a href="../product/run/">Run</a></li><li><a href="../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../science/">Our approach</a></li><li><a href="../science/validation/">Validation</a></li><li><a href="../science/methods/">Methods</a></li><li><a href="../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../modalities/small-molecule/">Small molecules</a></li><li><a href="../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../modalities/peptide/">Peptides</a></li><li><a href="../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../company/">About and team</a></li><li><a href="../investors/">Investors</a></li><li><a href="./">Security</a></li><li><a href="../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

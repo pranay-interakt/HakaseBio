@@ -1,0 +1,72 @@
+[
+ {
+  "name": "Bacterial reverse mutation test (Ames, OECD TG 471)",
+  "version": "1.0.0",
+  "description": "Revertant counts by strain, metabolic activation and concentration against the concurrent and historical controls; the call is the Study Director's."
+ },
+ {
+  "name": "Bioanalytical method validation (chromatographic, ICH M10)",
+  "version": "1.0.0",
+  "description": "Full validation of a chromatographic bioanalytical method against ICH M10 section 3: calibration, accuracy and precision, selectivity, matrix effect, carry-over, dilution integrity and stability."
+ },
+ {
+  "name": "Dose range-finding / MTD study",
+  "version": "1.0.0",
+  "description": "Short parallel-group study for dose selection: group comparisons, clinical-sign and mortality incidence, M3(R2) 1.5 high-dose facts; MTD and recommended doses by the Study Director."
+ },
+ {
+  "name": "hERG (IKr) patch clamp concentration-response with safety margin",
+  "version": "1.0.0",
+  "description": "Concentration-response of hERG current inhibition per ICH E14/S7B Q&A 2.1; IC50 with CI, Hill slope, and free-exposure margin per S7B Q&A 1.2."
+ },
+ {
+  "name": "In vitro potency and selectivity (4PL)",
+  "version": "1.0.0",
+  "description": "Concentration-response potency at the primary target and off-targets by 4PL, with reference-compound checks and relative potency."
+ },
+ {
+  "name": "Single-dose pharmacokinetics in a test species (NCA)",
+  "version": "1.0.0",
+  "description": "Single-dose PK by non-compartmental analysis: Cmax, AUC, terminal phase selected by the scientist, t1/2, AUCinf, CL, Vz, Vss and absolute bioavailability."
+ },
+ {
+  "name": "In vivo QT telemetry (ICH S7B; S7A cardiovascular)",
+  "version": "1.0.0",
+  "description": "Conscious telemetry crossover: QT corrected by a justified method, change from baseline and from vehicle with CIs, exposure coverage; QTc and cardiovascular conclusions by the Study Director."
+ },
+ {
+  "name": "Liver microsomal metabolic stability (substrate depletion) with IVIVE",
+  "version": "1.0.0",
+  "description": "In vitro half-life by parent depletion in liver microsomes across species; CLint,app and well-stirred predicted hepatic clearance."
+ },
+ {
+  "name": "Peptide stability in blood, serum or plasma",
+  "version": "1.0.0",
+  "description": "Depletion of intact peptide in stated blood, serum or plasma conditions; half-life with 95% CI by the protocol's model, censoring beyond the last sample, and a plateau check for incomplete degradation."
+ },
+ {
+  "name": "Plasma protein binding by equilibrium dialysis",
+  "version": "1.0.0",
+  "description": "Fraction unbound in plasma across species by equilibrium dialysis, with the ICH M12 positive-control rule and the fu < 1% reliability flag."
+ },
+ {
+  "name": "Repeat-dose toxicity with Dunnett comparison to control",
+  "version": "1.0.0",
+  "description": "Group design checked against OECD TG 407/408/409 and ICH M3(R2); per-endpoint Dunnett comparisons; NOAEL set by the Study Director."
+ },
+ {
+  "name": "Safety pharmacology: central nervous system (ICH S7A 2.7.1)",
+  "version": "1.0.0",
+  "description": "Functional observation battery / modified Irwin covering the five S7A 2.7.1 domains; incidence by dose, sex and time; adverse CNS effect by the Study Director."
+ },
+ {
+  "name": "Safety pharmacology: respiratory system (ICH S7A 2.7.3)",
+  "version": "1.0.0",
+  "description": "Respiratory rate with tidal volume and/or oxygen saturation, minute volume derived, each dose compared with vehicle at each timepoint; adverse effect by the Study Director."
+ },
+ {
+  "name": "Toxicokinetics in a toxicity study (ICH S3A)",
+  "version": "1.0.0",
+  "description": "Systemic exposure per dose, sex and day within a toxicity study: non-compartmental Cmax and AUC, dose proportionality by the power model, observed exposure ratios between days, and incurred-sample reanalysis."
+ }
+]

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cardiovascular safety methods · Hakase BioSim</title>
+<meta name="description" content="Cardiovascular safety methods in BioSim: Change from baseline and from vehicle (within-animal, crossover): mean, 95% CI and p-value by Student&#x27;s t, Mean anima">
+<link rel="canonical" href="https://hakase-ai.github.io/biosim/science/methods/cardiovascular-safety/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hakase BioSim">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Cardiovascular safety methods · Hakase BioSim">
+<meta property="og:description" content="Cardiovascular safety methods in BioSim: Change from baseline and from vehicle (within-animal, crossover): mean, 95% CI and p-value by Student&#x27;s t, Mean anima">
+<meta property="og:url" content="https://hakase-ai.github.io/biosim/science/methods/cardiovascular-safety/">
+<meta property="og:image" content="https://hakase-ai.github.io/biosim/assets/og/science--methods--cardiovascular-safety.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Cardiovascular safety methods · Hakase BioSim">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@HakaseAI_">
+<link rel="icon" href="../../../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="../../../assets/img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../../../assets/img/apple-touch-icon.png">
+<link rel="manifest" href="../../../site.webmanifest">
+<link rel="preload" href="../../../assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../../assets/fonts/schibsted-grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+<script>(function(){var t;try{t=localStorage.getItem("hakase-theme")}catch(e){}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")})();</script>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script defer src="../../../assets/js/site.js"></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hakase.ai/#organization","name":"Hakase AI","url":"https://hakase.ai","logo":"https://hakase-ai.github.io/biosim/assets/img/hakase-logo.png","email":"info@hakase.ai","sameAs":["https://www.linkedin.com/company/hakase-ai/","https://x.com/HakaseAI_"]},{"@type":"WebSite","@id":"https://hakase-ai.github.io/biosim/#website","url":"https://hakase-ai.github.io/biosim/","name":"Hakase BioSim","publisher":{"@id":"https://hakase.ai/#organization"},"inLanguage":"en-GB"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://hakase-ai.github.io/biosim/"},{"@type":"ListItem","position":2,"name":"Science","item":"https://hakase-ai.github.io/biosim/science/"},{"@type":"ListItem","position":3,"name":"Methods","item":"https://hakase-ai.github.io/biosim/science/methods/"},{"@type":"ListItem","position":4,"name":"Cardiovascular safety","item":"https://hakase-ai.github.io/biosim/science/methods/cardiovascular-safety/"}]},{"@type":"TechArticle","headline":"Cardiovascular safety methods","author":{"@id":"https://hakase.ai/#organization"},"citation":["ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.","ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.)","Cobos Gil MA, Garcia Rubira JC. Who was the creator of Bazett's formula? Rev Esp Cardiol (Engl Ed). 2008;61(8):896-897. (Attribution caveat: the corrected-QT form is due to Taran and Szilagyi 1947.)","ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.","Fridericia LS. Die Systolendauer im Elektrokardiogramm bei normalen Menschen und bei Herzkranken. Acta Med Scand. 1920;53(1):469-486. English translation: Ann Noninvasive Electrocardiol. 2003;8(4):343-351, doi:10.1046/j.1542-474X.2003.08413.x.","Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.)","ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.","ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","Chui RW, Baublits J, Chandra FA, et al. Evaluation of moxifloxacin in canine and non-human primate telemetry assays. Clin Transl Sci. 2021;14(6):2379-2390. (Published individual-animal QT correction.)","Engwall MJ, Baublits J, Chandra FA, et al. Evaluation of levocetirizine in beagle dog and cynomolgus monkey telemetry assays. Clin Transl Sci. 2023;16(3):436-446. (Published individual-animal QT correction.)","ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.","Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.","Van de Water A, Verheyen J, Xhonneux R, Reneman RS. An improved method to correct the QT interval of the electrocardiogram for changes in heart rate. J Pharmacol Methods. 1989;22(3):207-217. (Formula from the abstract; derived in anaesthetised dogs.)","ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005."]}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../../../"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav id="site-nav" class="nav" aria-label="Primary">
+      <a href="../../../product/">Product</a><a href="../../" class="is-section">Science</a><a href="../../../modalities/">Modalities</a><a href="../../../investors/">Investors</a><a href="../../../company/">Company</a>
+      <a class="btn btn--sm" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </nav>
+    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
+  </div>
+</header>
+<main id="main">
+<section class="intro"><div class="wrap">
+  <nav aria-label="Breadcrumb"><ol class="crumbs"><li><a href="../../../">Home</a></li><li><a href="../../">Science</a></li><li><a href="../">Methods</a></li><li aria-current="page">Cardiovascular safety</li></ol></nav>
+  <div class="intro-grid">
+    <p class="kicker">Methods registry</p>
+    <h1 class="h1 h1--page">Cardiovascular safety methods.</h1>
+    <p class="lead">7 methods in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.</p>
+    
+  </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem"><article class="method" id="cv-change_from_baseline">
+  <p class="method-id">cv.change_from_baseline · version 1.0.0</p>
+  <h2>Change from baseline and from vehicle (within-animal, crossover): mean, 95% CI and p-value by Student&#x27;s t</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>each animal receives every treatment (Latin-square crossover); differences are approximately normal</li></ul></div><div><h3>Limits</h3><ul><li>one test per timepoint; no multiplicity adjustment</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li><li>Student. The probable error of a mean. Biometrika. 1908;6(1):1-25. <a href="https://doi.org/10.2307/2331554" rel="noopener">doi.org/10.2307/2331554</a></li></ul></div>
+</article><article class="method" id="cv-exposure_multiple">
+  <p class="method-id">cv.exposure_multiple · version 1.0.0</p>
+  <h2>Mean animal Cmax / stated high clinical Cmax</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>same analyte and binding basis (total or free) in both</li></ul></div><div><h3>Limits</h3><p class="small muted">None stated.</p></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li></ul></div>
+</article><article class="method" id="cv-qtc_bazett">
+  <p class="method-id">cv.qtc_bazett · version 1.0.0</p>
+  <h2>QTc by Bazett: QT / RR^(1/2), RR in seconds</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>formula as stated in Vandenberk 2016; Bazett&#x27;s 1920 paper could not be read and the corrected-QT form is attributed to Taran and Szilagyi 1947 (Cobos Gil 2008)</li></ul></div><div><h3>Limits</h3><ul><li>a fixed rate-correction coefficient (S7B Q&amp;A 3.3)</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.) <a href="https://doi.org/10.1161/JAHA.116.003264" rel="noopener">doi.org/10.1161/JAHA.116.003264</a></li><li>Cobos Gil MA, Garcia Rubira JC. Who was the creator of Bazett&#x27;s formula? Rev Esp Cardiol (Engl Ed). 2008;61(8):896-897. (Attribution caveat: the corrected-QT form is due to Taran and Szilagyi 1947.) <a href="https://doi.org/10.1016/S1885-5857(08)60243-1" rel="noopener">doi.org/10.1016/S1885-5857(08)60243-1</a></li><li>ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005. <a href="https://database.ich.org/sites/default/files/S7B_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7B_Guideline.pdf</a></li></ul></div>
+</article><article class="method" id="cv-qtc_fridericia">
+  <p class="method-id">cv.qtc_fridericia · version 1.0.0</p>
+  <h2>QTc by Fridericia: QT / RR^(1/3), RR in seconds</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>a fixed rate-correction coefficient; S7B Q&amp;A 3.3 prefers individual correction when the drug affects heart rate</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Fridericia LS. Die Systolendauer im Elektrokardiogramm bei normalen Menschen und bei Herzkranken. Acta Med Scand. 1920;53(1):469-486. English translation: Ann Noninvasive Electrocardiol. 2003;8(4):343-351, doi:10.1046/j.1542-474X.2003.08413.x. <a href="https://doi.org/10.1111/j.0954-6820.1920.tb18266.x" rel="noopener">doi.org/10.1111/j.0954-6820.1920.tb18266.x</a></li><li>Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.) <a href="https://doi.org/10.1161/JAHA.116.003264" rel="noopener">doi.org/10.1161/JAHA.116.003264</a></li><li>ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005. <a href="https://database.ich.org/sites/default/files/S7B_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7B_Guideline.pdf</a></li></ul></div>
+</article><article class="method" id="cv-qtc_individual">
+  <p class="method-id">cv.qtc_individual · version 1.0.0</p>
+  <h2>Individual-animal QT correction: QT - b_i (RR - RR_ref), b_i the slope of each animal&#x27;s QT on RR fitted on its vehicle-treatment data</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>a linear QT-RR relationship over the observed RR range in each animal</li><li>the reference RR is stated in the protocol (published implementations differ)</li></ul></div><div><h3>Limits</h3><p class="small muted">None stated.</p></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li><li>Chui RW, Baublits J, Chandra FA, et al. Evaluation of moxifloxacin in canine and non-human primate telemetry assays. Clin Transl Sci. 2021;14(6):2379-2390. (Published individual-animal QT correction.) <a href="https://doi.org/10.1111/cts.13103" rel="noopener">doi.org/10.1111/cts.13103</a></li><li>Engwall MJ, Baublits J, Chandra FA, et al. Evaluation of levocetirizine in beagle dog and cynomolgus monkey telemetry assays. Clin Transl Sci. 2023;16(3):436-446. (Published individual-animal QT correction.) <a href="https://doi.org/10.1111/cts.13454" rel="noopener">doi.org/10.1111/cts.13454</a></li></ul></div>
+</article><article class="method" id="cv-qtc_rr_independence">
+  <p class="method-id">cv.qtc_rr_independence · version 1.0.0</p>
+  <h2>QTc-RR independence: least-squares slope with 95% CI, correlation and p-value</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><ul><li>matched QTc-RR pairs as reported (S7B Q&amp;A 3.3)</li></ul></div><div><h3>Limits</h3><p class="small muted">None stated.</p></div></div>
+  <div><h3>References</h3><ul class="refs"><li>ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022. <a href="https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf" rel="noopener">database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf</a></li><li>Student. The probable error of a mean. Biometrika. 1908;6(1):1-25. <a href="https://doi.org/10.2307/2331554" rel="noopener">doi.org/10.2307/2331554</a></li></ul></div>
+</article><article class="method" id="cv-qtc_van_de_water">
+  <p class="method-id">cv.qtc_van_de_water · version 1.0.0</p>
+  <h2>QTc by Van de Water: QT - 0.087 (RR - 1000), ms</h2>
+  <div class="method-cols"><div><h3>Assumptions</h3><p class="small muted">None stated.</p></div><div><h3>Limits</h3><ul><li>derived in anaesthetised dogs (abstract)</li><li>a fixed rate-correction coefficient (S7B Q&amp;A 3.3)</li></ul></div></div>
+  <div><h3>References</h3><ul class="refs"><li>Van de Water A, Verheyen J, Xhonneux R, Reneman RS. An improved method to correct the QT interval of the electrocardiogram for changes in heart rate. J Pharmacol Methods. 1989;22(3):207-217. (Formula from the abstract; derived in anaesthetised dogs.) <a href="https://doi.org/10.1016/0160-5402(89)90015-6" rel="noopener">doi.org/10.1016/0160-5402(89)90015-6</a></li><li>ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005. <a href="https://database.ich.org/sites/default/files/S7B_Guideline.pdf" rel="noopener">database.ich.org/sites/default/files/S7B_Guideline.pdf</a></li></ul></div>
+</article></div></div></section><section class="closing"><div class="wrap">
+  <h2 class="h2" style="max-width:20em">See these methods at work on your data.</h2>
+  <div class="actions"><a class="btn" href="../../../contact/">Book a demo <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+  <div class="related"><span class="kicker">Related</span><a href="../">All methods <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../validation/">Validation <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a href="../../../glossary/">Glossary <svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 8h10M9 4.5 12.5 8 9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
+</div></section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="../../../" class="brand"><img class="on-light brand-logo" src="../../../assets/img/hakase-logo.webp" srcset="../../../assets/img/hakase-logo.webp 1x, ../../../assets/img/hakase-logo@2x.webp 2x" alt="Hakase, home" width="102" height="30"><img class="on-dark brand-logo" src="../../../assets/img/hakase-logo-dark.webp" srcset="../../../assets/img/hakase-logo-dark.webp 1x, ../../../assets/img/hakase-logo-dark@2x.webp 2x" alt="Hakase, home" width="102" height="30"></a>
+        <p class="tag">From drug candidate to IND.</p>
+        <p class="maker">BioSim, preclinical development software by <a href="https://hakase.ai" rel="noopener">Hakase AI</a>.</p>
+        <p><a href="mailto:info@hakase.ai">info@hakase.ai</a></p>
+      </div>
+      <div class="footer-col"><h2>Product</h2><ul><li><a href="../../../product/">How it works</a></li><li><a href="../../../product/plan/">Plan</a></li><li><a href="../../../product/prioritise/">Prioritise</a></li><li><a href="../../../product/run/">Run</a></li><li><a href="../../../product/submit/">Submit</a></li></ul></div><div class="footer-col"><h2>Science</h2><ul><li><a href="../../">Our approach</a></li><li><a href="../../validation/">Validation</a></li><li><a href="../">Methods</a></li><li><a href="../../../glossary/">Glossary</a></li></ul></div><div class="footer-col"><h2>Modalities</h2><ul><li><a href="../../../modalities/small-molecule/">Small molecules</a></li><li><a href="../../../modalities/monoclonal-antibody/">Monoclonal antibodies</a></li><li><a href="../../../modalities/peptide/">Peptides</a></li><li><a href="../../../modalities/">All nine</a></li></ul></div><div class="footer-col"><h2>Company</h2><ul><li><a href="../../../company/">About and team</a></li><li><a href="../../../investors/">Investors</a></li><li><a href="../../../security/">Security</a></li><li><a href="../../../contact/">Contact</a></li></ul></div>
+    </div>
+    <div class="footer-base">
+      <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
+      <p>© 2026 Hakase AI · <a href="https://hakase.ai/privacy/" rel="noopener">Privacy</a> · <a href="https://hakase.ai/terms/" rel="noopener">Terms</a> · <a href="https://www.linkedin.com/company/hakase-ai/" rel="noopener">LinkedIn</a> · <a href="https://x.com/HakaseAI_" rel="noopener">X</a></p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

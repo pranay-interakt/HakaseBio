@@ -1,0 +1,3159 @@
+{
+ "areas": [
+  {
+   "name": "ADME",
+   "slug": "adme",
+   "methods": [
+    {
+     "title": "Hepatic clearance by the well-stirred (venous equilibrium) model",
+     "id": "adme.clh_well_stirred",
+     "version": "1.0.0",
+     "assumptions": [
+      "the liver is a single well-mixed compartment",
+      "only unbound drug is available for metabolism",
+      "hepatic metabolism is the dominant clearance route"
+     ],
+     "limits": [
+      "ignores permeability limitation and transporter-mediated uptake",
+      "population-mean blood flow and binding; no inter-individual variability"
+     ],
+     "references": [
+      {
+       "text": "Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.",
+       "url": "https://doi.org/10.1002/cpt1975184377"
+      },
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      }
+     ]
+    },
+    {
+     "title": "Apparent in vitro intrinsic clearance from depletion half-life",
+     "id": "adme.clint_invitro",
+     "version": "1.0.0",
+     "assumptions": [
+      "first-order depletion",
+      "no significant non-specific binding unless corrected"
+     ],
+     "limits": [
+      "scaled per mg microsomal protein; hepatocyte data require a different scalar"
+     ],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      },
+      {
+       "text": "Houston JB. Utility of in vitro drug metabolism data in predicting in vivo metabolic clearance. Biochem Pharmacol. 1994;47(9):1469-1479.",
+       "url": "https://doi.org/10.1016/0006-2952(94)90520-7"
+      }
+     ]
+    },
+    {
+     "title": "Scaling of in vitro intrinsic clearance to the whole liver",
+     "id": "adme.clint_invivo",
+     "version": "1.0.0",
+     "assumptions": [
+      "microsomal protein per gram liver and liver weight are population means"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      },
+      {
+       "text": "Barter ZE, Bayliss MK, Beaune PH, et al. Scaling factors for the extrapolation of in vivo metabolic drug clearance from in vitro data: reaching a consensus on values of human microsomal protein and hepatocellularity per gram of liver. Curr Drug Metab. 2007;8(1):33-45.",
+       "url": "https://doi.org/10.2174/138920007779315053"
+      },
+      {
+       "text": "Houston JB. Utility of in vitro drug metabolism data in predicting in vivo metabolic clearance. Biochem Pharmacol. 1994;47(9):1469-1479.",
+       "url": "https://doi.org/10.1016/0006-2952(94)90520-7"
+      }
+     ]
+    },
+    {
+     "title": "First-order substrate depletion fit (ln-linear regression)",
+     "id": "adme.depletion_fit",
+     "version": "1.0.0",
+     "assumptions": [
+      "substrate concentration is well below Km so depletion is first-order",
+      "only the linear region of ln(fraction remaining) vs time is fitted"
+     ],
+     "limits": [
+      "an R-squared below the configured threshold, or total depletion under about 20%, makes the rate constant poorly estimable"
+     ],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      }
+     ]
+    },
+    {
+     "title": "Hepatic extraction ratio and predicted hepatic availability",
+     "id": "adme.extraction_ratio",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "hepatic first pass only; gut-wall extraction is not included"
+     ],
+     "references": [
+      {
+       "text": "Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.",
+       "url": "https://doi.org/10.1002/cpt1975184377"
+      }
+     ]
+    },
+    {
+     "title": "Unbound fraction in blood from plasma binding and blood:plasma ratio",
+     "id": "adme.fu_blood",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      }
+     ]
+    },
+    {
+     "title": "Predicted microsomal unbound fraction from lipophilicity",
+     "id": "adme.fu_mic_predicted",
+     "version": "1.0.0",
+     "assumptions": [
+      "binding is driven by lipophilicity at the stated microsomal concentration"
+     ],
+     "limits": [
+      "reliable for logP/D 0-3 (below 5 at <= 0.1 mg/mL protein) per Gertz 2008; outside that range fu,mic should be measured"
+     ],
+     "references": [
+      {
+       "text": "Hallifax D, Houston JB. Binding of drugs to hepatic microsomes: comment and assessment of current prediction methodology with recommendation for improvement. Drug Metab Dispos. 2006;34(4):724-726.",
+       "url": "https://doi.org/10.1124/dmd.105.007658"
+      },
+      {
+       "text": "Gertz M, Kilford PJ, Houston JB, Galetin A. Drug lipophilicity and microsomal protein concentration as determinants in the prediction of the fraction unbound in microsomal incubations. Drug Metab Dispos. 2008;36(3):535-542.",
+       "url": "https://doi.org/10.1124/dmd.107.018713"
+      }
+     ]
+    },
+    {
+     "title": "Parent remaining relative to the zero-time sample",
+     "id": "adme.percent_remaining",
+     "version": "1.0.0",
+     "assumptions": [
+      "response is proportional to concentration over the measured range"
+     ],
+     "limits": [
+      "a ratio of instrument responses; requires a common internal standard"
+     ],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Bioanalytical validation",
+   "slug": "bioanalytical-validation",
+   "methods": [
+    {
+     "title": "Accuracy (% of nominal) and precision (%CV) within and between runs",
+     "id": "bioanalysis.accuracy_precision",
+     "version": "1.0.0",
+     "assumptions": [
+      "between-run values combine the data from all accepted runs (M10 3.2.5.2)"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Back-calculated concentration from the run's curve",
+     "id": "bioanalysis.back_calculation",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Calibration curve by (weighted) least squares, model and weighting per procedure",
+     "id": "bioanalysis.calibration",
+     "version": "1.0.0",
+     "assumptions": [
+      "the regression model and weighting were fixed during method validation by written procedure (M10 3.2.4)"
+     ],
+     "limits": [
+      "blank and zero samples are excluded from the regression (M10 3.2.4)"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Interfering response as a percentage of the LLOQ analyte or IS response",
+     "id": "bioanalysis.interference",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Incurred sample reanalysis percent difference",
+     "id": "bioanalysis.isr",
+     "version": "1.0.0",
+     "assumptions": [
+      "% difference relative to the mean of the initial and repeat values (M10 section 5)"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Biologic",
+   "slug": "biologic",
+   "methods": [
+    {
+     "title": "Molar absorption coefficient at 280 nm of a multi-chain protein: the sum over chain copies plus 125 per inter-chain disulfide bond",
+     "id": "biologic.assembled_extinction_280",
+     "version": "1.0.0",
+     "assumptions": [
+      "absorbance in water at 280 nm; the folded, fully oxidised molecule"
+     ],
+     "limits": [
+      "non-protein chromophores, including a conjugated payload or a dye, are not counted"
+     ],
+     "references": [
+      {
+       "text": "Pace CN, Vajdos F, Fee L, Grimsley G, Gray T. How to measure and predict the molar absorption coefficient of a protein. Protein Sci. 1995;4(11):2411-2423.",
+       "url": "https://doi.org/10.1002/pro.5560041120"
+      },
+      {
+       "text": "Liu H, May K. Disulfide bond structures of IgG molecules: structural variations, chemical modifications and possible impacts to stability and biological function. MAbs. 2012;4(1):17-23.",
+       "url": "https://doi.org/10.4161/mabs.4.1.18347"
+      }
+     ]
+    },
+    {
+     "title": "Average mass of a multi-chain protein: the sum over chain copies less two hydrogen atoms per disulfide bond",
+     "id": "biologic.assembled_mass",
+     "version": "1.0.0",
+     "assumptions": [
+      "the disulfide topology is declared by the sponsor, or taken from the antibody isotype only when every chain's cysteine count matches it",
+      "Liu & May 2012 state 12 intra-chain bonds per IgG and the hinge count per subclass; the split of those 12 into four per heavy chain and two per light chain follows from the domain architecture and is not quoted from them"
+     ],
+     "limits": [
+      "glycans, C-terminal lysine processing and other post-translational modification are not included, so a glycoprotein's product mass is higher"
+     ],
+     "references": [
+      {
+       "text": "SIB Swiss Institute of Bioinformatics, ExPASy. Protein Identification Tools - Mass values used (FindMod): average and monoisotopic amino-acid residue masses and water.",
+       "url": "https://web.expasy.org/findmod/findmod_masses.html"
+      },
+      {
+       "text": "Liu H, May K. Disulfide bond structures of IgG molecules: structural variations, chemical modifications and possible impacts to stability and biological function. MAbs. 2012;4(1):17-23.",
+       "url": "https://doi.org/10.4161/mabs.4.1.18347"
+      },
+      {
+       "text": "Prohaska T, Irrgeher J, Benefield J, et al. Standard atomic weights of the elements 2021 (IUPAC Technical Report). Pure Appl Chem. 2022;94(5):573-600.",
+       "url": "https://doi.org/10.1515/pac-2019-0603"
+      }
+     ]
+    },
+    {
+     "title": "Chemical-degradation and glycosylation motifs located in a protein sequence",
+     "id": "biologic.sequence_liabilities",
+     "version": "1.0.0",
+     "assumptions": [
+      "the registered one-letter sequence is the expressed sequence",
+      "disulfide pairing is as declared by the sponsor; cysteines beyond the declared pairs are reported as free thiols",
+      "the variable/constant boundary is assigned only when a human constant-region sequence matches exactly, and is otherwise left unassigned",
+      "the canonical motif set is the one Lu et al. 2019 name for clinical-stage antibodies; the relative rates within it are the pentapeptide rates measured by Robinson & Robinson 2001, and a motif they did not measure is reported without a rate rather than ranked"
+     ],
+     "limits": [
+      "a motif is a liability only where the residue is solvent-exposed or in a binding site; neither follows from the sequence, so no motif here is a defect",
+      "Lu et al. found that counting motifs over-calls heavily: most motifs in clinical antibodies do not degrade measurably",
+      "the rates are from model pentapeptides; the formulation and the local structure decide the rate in a real product",
+      "proline after the sequon's Ser/Thr also reduces glycosylation (Gavel & von Heijne 1990); it is reported with the site rather than excluding it",
+      "does not predict aggregation, viscosity, immunogenicity or specificity"
+     ],
+     "references": [
+      {
+       "text": "Bause E. Structural requirements of N-glycosylation of proteins. Studies with proline peptides as conformational probes. Biochem J. 1983;209(2):331-336.",
+       "url": "https://doi.org/10.1042/bj2090331"
+      },
+      {
+       "text": "Gavel Y, von Heijne G. Sequence differences between glycosylated and non-glycosylated Asn-X-Thr/Ser acceptor sites: implications for protein engineering. Protein Eng. 1990;3(5):433-442.",
+       "url": "https://doi.org/10.1093/protein/3.5.433"
+      },
+      {
+       "text": "Robinson NE, Robinson AB. Molecular clocks. Proc Natl Acad Sci U S A. 2001;98(3):944-949.",
+       "url": "https://doi.org/10.1073/pnas.98.3.944"
+      },
+      {
+       "text": "Lu X, Nobrega RP, Lynaugh H, et al. Deamidation and isomerization liability analysis of 131 clinical-stage antibodies. MAbs. 2019;11(1):45-57.",
+       "url": "https://doi.org/10.1080/19420862.2018.1548233"
+      },
+      {
+       "text": "Pan H, Chen K, Chu L, Kinderman F, Apostol I, Huang G. Methionine oxidation in human IgG2 Fc decreases binding affinities to protein A and FcRn. Protein Sci. 2009;18(2):424-433.",
+       "url": "https://doi.org/10.1002/pro.45"
+      },
+      {
+       "text": "Vlasak J, Ionescu R. Fragmentation of monoclonal antibodies. MAbs. 2011;3(3):253-263.",
+       "url": "https://doi.org/10.4161/mabs.3.3.15608"
+      },
+      {
+       "text": "Liu YD, Goetze AA, Bass RB, Flynn GC. N-terminal glutamate to pyroglutamate conversion in vivo for human IgG2 antibodies. J Biol Chem. 2011;286(13):11211-11217.",
+       "url": "https://doi.org/10.1074/jbc.M110.185041"
+      },
+      {
+       "text": "Dick LW Jr, Qiu D, Mahon D, Adamo M, Cheng KC. C-terminal lysine variants in fully human monoclonal antibodies: investigation of test methods and possible causes. Biotechnol Bioeng. 2008;100(6):1132-1143.",
+       "url": "https://doi.org/10.1002/bit.21855"
+      },
+      {
+       "text": "UniProt Consortium. UniProtKB entries for the human immunoglobulin constant domains: IGHG1 P01857, IGHG2 P01859, IGHG3 P01860, IGHG4 P01861, IGKC P01834, IGLC2 P0DOY2.",
+       "url": "https://www.uniprot.org/"
+      }
+     ]
+    },
+    {
+     "title": "Amino-acid identity of a target's orthologue to the human protein, by global Needleman-Wunsch alignment scored with BLOSUM62 and BLASTP gap penalties",
+     "id": "biologic.target_identity",
+     "version": "1.0.0",
+     "assumptions": [
+      "the orthologue is the one NCBI Gene asserts for that species",
+      "identity is counted over all aligned columns, so a partial or predicted sequence scores lower rather than appearing identical over a fragment",
+      "terminal gaps are not penalised"
+     ],
+     "limits": [
+      "identity is not binding and binding is not pharmacological activity; a conformational epitope can be lost between near-identical orthologues",
+      "many non-human primate RefSeq proteins are computationally predicted (XP_ accessions) rather than curated",
+      "says nothing about target expression, tissue distribution or downstream biology in that species"
+     ],
+     "references": [
+      {
+       "text": "Needleman SB, Wunsch CD. A general method applicable to the search for similarities in the amino acid sequence of two proteins. J Mol Biol. 1970;48(3):443-453.",
+       "url": "https://doi.org/10.1016/0022-2836(70)90057-4"
+      },
+      {
+       "text": "Henikoff S, Henikoff JG. Amino acid substitution matrices from protein blocks. Proc Natl Acad Sci U S A. 1992;89(22):10915-10919.",
+       "url": "https://doi.org/10.1073/pnas.89.22.10915"
+      },
+      {
+       "text": "National Center for Biotechnology Information. NCBI Gene orthology and the NCBI Datasets API. National Library of Medicine.",
+       "url": "https://www.ncbi.nlm.nih.gov/datasets/docs/v2/"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Cardiovascular safety",
+   "slug": "cardiovascular-safety",
+   "methods": [
+    {
+     "title": "Change from baseline and from vehicle (within-animal, crossover): mean, 95% CI and p-value by Student's t",
+     "id": "cv.change_from_baseline",
+     "version": "1.0.0",
+     "assumptions": [
+      "each animal receives every treatment (Latin-square crossover); differences are approximately normal"
+     ],
+     "limits": [
+      "one test per timepoint; no multiplicity adjustment"
+     ],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      },
+      {
+       "text": "Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.",
+       "url": "https://doi.org/10.2307/2331554"
+      }
+     ]
+    },
+    {
+     "title": "Mean animal Cmax / stated high clinical Cmax",
+     "id": "cv.exposure_multiple",
+     "version": "1.0.0",
+     "assumptions": [
+      "same analyte and binding basis (total or free) in both"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      }
+     ]
+    },
+    {
+     "title": "QTc by Bazett: QT / RR^(1/2), RR in seconds",
+     "id": "cv.qtc_bazett",
+     "version": "1.0.0",
+     "assumptions": [
+      "formula as stated in Vandenberk 2016; Bazett's 1920 paper could not be read and the corrected-QT form is attributed to Taran and Szilagyi 1947 (Cobos Gil 2008)"
+     ],
+     "limits": [
+      "a fixed rate-correction coefficient (S7B Q&A 3.3)"
+     ],
+     "references": [
+      {
+       "text": "Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.)",
+       "url": "https://doi.org/10.1161/JAHA.116.003264"
+      },
+      {
+       "text": "Cobos Gil MA, Garcia Rubira JC. Who was the creator of Bazett's formula? Rev Esp Cardiol (Engl Ed). 2008;61(8):896-897. (Attribution caveat: the corrected-QT form is due to Taran and Szilagyi 1947.)",
+       "url": "https://doi.org/10.1016/S1885-5857(08)60243-1"
+      },
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+       "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "QTc by Fridericia: QT / RR^(1/3), RR in seconds",
+     "id": "cv.qtc_fridericia",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "a fixed rate-correction coefficient; S7B Q&A 3.3 prefers individual correction when the drug affects heart rate"
+     ],
+     "references": [
+      {
+       "text": "Fridericia LS. Die Systolendauer im Elektrokardiogramm bei normalen Menschen und bei Herzkranken. Acta Med Scand. 1920;53(1):469-486. English translation: Ann Noninvasive Electrocardiol. 2003;8(4):343-351, doi:10.1046/j.1542-474X.2003.08413.x.",
+       "url": "https://doi.org/10.1111/j.0954-6820.1920.tb18266.x"
+      },
+      {
+       "text": "Vandenberk B, Vandael E, Robyns T, et al. Which QT correction formulae to use for QT monitoring? J Am Heart Assoc. 2016;5(6):e003264. (Readable statement of the Bazett and Fridericia formulae.)",
+       "url": "https://doi.org/10.1161/JAHA.116.003264"
+      },
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+       "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Individual-animal QT correction: QT - b_i (RR - RR_ref), b_i the slope of each animal's QT on RR fitted on its vehicle-treatment data",
+     "id": "cv.qtc_individual",
+     "version": "1.0.0",
+     "assumptions": [
+      "a linear QT-RR relationship over the observed RR range in each animal",
+      "the reference RR is stated in the protocol (published implementations differ)"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      },
+      {
+       "text": "Chui RW, Baublits J, Chandra FA, et al. Evaluation of moxifloxacin in canine and non-human primate telemetry assays. Clin Transl Sci. 2021;14(6):2379-2390. (Published individual-animal QT correction.)",
+       "url": "https://doi.org/10.1111/cts.13103"
+      },
+      {
+       "text": "Engwall MJ, Baublits J, Chandra FA, et al. Evaluation of levocetirizine in beagle dog and cynomolgus monkey telemetry assays. Clin Transl Sci. 2023;16(3):436-446. (Published individual-animal QT correction.)",
+       "url": "https://doi.org/10.1111/cts.13454"
+      }
+     ]
+    },
+    {
+     "title": "QTc-RR independence: least-squares slope with 95% CI, correlation and p-value",
+     "id": "cv.qtc_rr_independence",
+     "version": "1.0.0",
+     "assumptions": [
+      "matched QTc-RR pairs as reported (S7B Q&A 3.3)"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      },
+      {
+       "text": "Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.",
+       "url": "https://doi.org/10.2307/2331554"
+      }
+     ]
+    },
+    {
+     "title": "QTc by Van de Water: QT - 0.087 (RR - 1000), ms",
+     "id": "cv.qtc_van_de_water",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "derived in anaesthetised dogs (abstract)",
+      "a fixed rate-correction coefficient (S7B Q&A 3.3)"
+     ],
+     "references": [
+      {
+       "text": "Van de Water A, Verheyen J, Xhonneux R, Reneman RS. An improved method to correct the QT interval of the electrocardiogram for changes in heart rate. J Pharmacol Methods. 1989;22(3):207-217. (Formula from the abstract; derived in anaesthetised dogs.)",
+       "url": "https://doi.org/10.1016/0160-5402(89)90015-6"
+      },
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+       "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Digital study engine",
+   "slug": "digital-study-engine",
+   "methods": [
+    {
+     "title": "Bacterial reverse-mutation (Ames) prediction by expert DNA-reactivity alerts (ICH M7 methodology 1)",
+     "id": "digital.ames_qsar",
+     "version": "1.0.0",
+     "assumptions": [
+      "a structure carrying a well-characterised DNA-reactive alert is predicted positive for bacterial mutagenicity; a structure carrying none, and within the domain, is predicted negative"
+     ],
+     "limits": [
+      "an expert rule base (ICH M7 methodology 1); a complete assessment combines it with a statistical (Q)SAR (methodology 2) and expert review",
+      "detoxifying features and metabolism are not modelled; a positive alert is a flag for confirmation, not a verdict",
+      "alerts cover the common DNA-reactive classes, not every possible mechanism"
+     ],
+     "references": [
+      {
+       "text": "ICH M7(R2): Assessment and control of DNA reactive (mutagenic) impurities in pharmaceuticals to limit potential carcinogenic risk. Step 4, 2023. (Two complementary (Q)SAR methodologies - one expert rule-based, one statistical - with expert review; a negative prediction from both supports a non-mutagenic conclusion.)",
+       "url": "https://database.ich.org/sites/default/files/ICH_M7%28R2%29_Guideline_Step4_2023_0216.pdf"
+      },
+      {
+       "text": "Benigni R, Bossa C. Structure alerts for carcinogenicity, and the Salmonella assay system: a novel insight through the chemical relational databases. Mutat Res. 2008;659(3):248-261. (Structural alerts for DNA-reactive mutagenicity used in the Toxtree / ISS rule base.)",
+       "url": "https://doi.org/10.1016/j.mrrev.2008.05.003"
+      },
+      {
+       "text": "Ashby J, Tennant RW. Chemical structure, Salmonella mutagenicity and extent of carcinogenicity as indicators of genotoxic carcinogenesis among 222 chemicals tested in rodents by the U.S. NCI/NTP. Mutat Res. 1988;204(1):17-115. (The 'structural alerts' concept for DNA reactivity.)",
+       "url": "https://doi.org/10.1016/0165-1218(88)90114-0"
+      },
+      {
+       "text": "OECD. Guidance Document on the Validation of (Quantitative) Structure-Activity Relationship [(Q)SAR] Models. OECD Series on Testing and Assessment No. 69, ENV/JM/MONO(2007)2, 2007. (The five OECD principles for QSAR validation: defined endpoint; unambiguous algorithm; defined domain of applicability; appropriate measures of goodness-of-fit, robustness and predictivity; mechanistic interpretation where possible.)",
+       "url": "https://www.oecd.org/env/guidance-document-on-the-validation-of-quantitative-structure-activity-relationship-q-sar-models-9789264085442-en.htm"
+      }
+     ]
+    },
+    {
+     "title": "Digital preclinical study run across the derived study set with NAM credibility",
+     "id": "digital.study_run",
+     "version": "1.0.0",
+     "assumptions": [
+      "each required study is answered by the most qualified in silico method available, with a credibility case graded for the context of use"
+     ],
+     "limits": [
+      "every result is a model prediction, never a measurement; it informs a decision and never replaces a signed GxP study record on its own",
+      "where no quantitative model is qualified, the study is answered by a cited weight-of-evidence read with a targeted confirmatory recommendation"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Roadmap to Reducing Animal Testing in Preclinical Safety Studies. April 2025. (Phased adoption of New Approach Methodologies - computational modelling, organ-on-chip and human-relevant in vitro assays - beginning with monoclonal antibodies.)",
+       "url": "https://www.fda.gov/media/186092/download"
+      },
+      {
+       "text": "ASME V&V 40-2018. Assessing Credibility of Computational Modeling through Verification and Validation: Application to Medical Devices. ASME, 2018.",
+       "url": null
+      },
+      {
+       "text": "ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Expected Value of Information for preclinical experiment prioritisation (EVPI/EVSI)",
+     "id": "digital.value_of_information",
+     "version": "2.0.0",
+     "assumptions": [
+      "the first-in-human decision is a go/no-go choice under an opportunity-loss model in which a correct decision costs nothing",
+      "both losses are supplied by the programme; there is no default ratio",
+      "EVSI is computed at specificity 1 and reported as an upper bound: no cited per-study specificity exists, and for a study no worse than chance (specificity >= 1 - sensitivity) a less specific test is a garbling of a more specific one, so EVSI cannot rise as specificity falls (Blackwell 1953)",
+      "each liability's decision is treated independently, so the programme EVPI is the sum of per-liability EVPIs and an experiment's EVSI is the sum over what it probes"
+     ],
+     "limits": [
+      "EVPI/EVSI are exact for the stated loss model and posteriors; they rank what is worth learning, they do not themselves establish safety",
+      "the independence decomposition is conservative: correlated liabilities are not double-counted but joint resolution value is not modelled",
+      "absolute values scale with the loss model; the ranking depends only on its ratio"
+     ],
+     "references": [
+      {
+       "text": "Raiffa H, Schlaifer R. Applied Statistical Decision Theory. Division of Research, Harvard Business School, Boston, 1961. (Foundational treatment of the expected value of perfect and sample information.)",
+       "url": null
+      },
+      {
+       "text": "Felli JC, Hazen GB. Sensitivity analysis and the expected value of perfect information. Med Decis Making. 1998;18(1):95-109.",
+       "url": "https://doi.org/10.1177/0272989X9801800117"
+      },
+      {
+       "text": "Claxton K. The irrelevance of inference: a decision-making approach to the stochastic evaluation of health care technologies. J Health Econ. 1999;18(3):341-364.",
+       "url": "https://doi.org/10.1016/S0167-6296(98)00039-3"
+      },
+      {
+       "text": "Heath A, Manolopoulou I, Baio G. A review of methods for analysis of the expected value of information. Med Decis Making. 2017;37(7):747-758.",
+       "url": "https://doi.org/10.1177/0272989X17697692"
+      },
+      {
+       "text": "Blackwell D. Equivalent comparisons of experiments. Ann Math Stat. 1953;24(2):265-272.",
+       "url": "https://doi.org/10.1214/aoms/1177729032"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Dose projection",
+   "slug": "dose-projection",
+   "methods": [
+    {
+     "title": "Human equivalent dose by body weight: the animal dose in mg/kg, unconverted",
+     "id": "dose.hed_body_weight",
+     "version": "1.0.0",
+     "assumptions": [
+      "FDA 2005 section V.C: proteins administered intravascularly with Mr above 100,000 daltons are normalised to mg/kg rather than by surface area"
+     ],
+     "limits": [
+      "applies to the categories the guidance names; for a small molecule given systemically the surface-area conversion is the one that applies",
+      "the guidance also allows mg/kg where the NOAEL occurs at a similar mg/kg dose across species, which is a judgement about the data and is not made here"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.",
+       "url": "https://www.fda.gov/media/72309/download"
+      }
+     ]
+    },
+    {
+     "title": "Human equivalent dose by body-surface-area scaling",
+     "id": "dose.hed_bsa",
+     "version": "1.1.0",
+     "assumptions": [
+      "systemic exposure scales with body surface area across species"
+     ],
+     "limits": [
+      "not applicable where the FDA guidance directs mg/kg or exposure-based scaling, nor to biologics dosed on a MABEL basis",
+      "FDA 2005 section V.C excludes this conversion for three categories: a dose limited by local toxicity on an alternative route, a product given into an anatomical compartment it does not leave, and a protein above 100,000 daltons given intravascularly"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.",
+       "url": "https://www.fda.gov/media/72309/download"
+      }
+     ]
+    },
+    {
+     "title": "Maximum recommended starting dose from the most sensitive species",
+     "id": "dose.mrsd",
+     "version": "1.0.0",
+     "assumptions": [
+      "the NOAEL-derived HED of the most sensitive relevant species governs"
+     ],
+     "limits": [
+      "must be compared against the pharmacologically active dose and, for immune agonists and biologics, against MABEL; the lowest value governs"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.",
+       "url": "https://www.fda.gov/media/72309/download"
+      },
+      {
+       "text": "EMA. Guideline on strategies to identify and mitigate risks for first-in-human and early clinical trials with investigational medicinal products. EMEA/CHMP/SWP/28367/07 Rev. 1, July 2017.",
+       "url": "https://www.ema.europa.eu/en/documents/scientific-guideline/guideline-strategies-identify-and-mitigate-risks-first-human-and-early-clinical-trials-investigational-medicinal-products-revision-1_en.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Genetic toxicology",
+   "slug": "genetic-toxicology",
+   "methods": [
+    {
+     "title": "Mean revertants divided by the concurrent vehicle-control mean",
+     "id": "genetox.fold_over_vehicle",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "displayed for information: neither OECD TG 471 nor ICH S2(R1) sets a fold threshold for a positive result"
+     ],
+     "references": [
+      {
+       "text": "OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020.",
+       "url": "https://doi.org/10.1787/9789264071247-en"
+      }
+     ]
+    },
+    {
+     "title": "Revertant colonies per plate: mean and SD per strain, metabolic activation and concentration (OECD TG 471 paragraphs 32-33)",
+     "id": "genetox.revertant_summary",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020.",
+       "url": "https://doi.org/10.1787/9789264071247-en"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Historical and virtual controls",
+   "slug": "historical-and-virtual-controls",
+   "methods": [
+    {
+     "title": "Time-forward certification of a virtual-control comparison: false-positive rate on held-out control groups and agreement with concurrent controls on treated groups, replayed in archive order",
+     "id": "controls.time_forward_certification",
+     "version": "1.0.0",
+     "assumptions": [
+      "each study is scored using only studies earlier in the archive order, as a new study would be",
+      "the false-positive rate is counted on control groups, which carry no treatment effect by construction; its interval is Clopper-Pearson",
+      "agreement and sensitivity take the concurrent-control result as the reference"
+     ],
+     "limits": [
+      "holds for the pack's design space (species, strain, sex, route, regimen, time point) and endpoints only",
+      "a public pack is not a sponsor's historical controls; the EMA draft opinion expects matched test facility, strain, sex and supplier"
+     ],
+     "references": [
+      {
+       "text": "European Medicines Agency. Draft Qualification Opinion for Virtual Control Groups (VCG) to replace Concurrent Control Groups (CCG) in non-clinical rat non-GLP dose range finding (DRF) studies. Published for consultation 31 March 2026.",
+       "url": "https://www.ema.europa.eu/en/documents/other/draft-qualification-opinion-virtual-control-groups-vcg-replace-concurrent-control-groups-ccg-rat-non-glp-dose-range-finding-drf-studies_en.pdf"
+      },
+      {
+       "text": "DerSimonian R, Laird N. Meta-analysis in clinical trials. Control Clin Trials. 1986;7(3):177-188.",
+       "url": "https://doi.org/10.1016/0197-2456(86)90046-2"
+      },
+      {
+       "text": "Schmidli H, Gsteiger S, Roychoudhury S, O'Hagan A, Spiegelhalter D, Neuenschwander B. Robust meta-analytic-predictive priors in clinical trials with historical control information. Biometrics. 2014;70(4):1023-1032.",
+       "url": "https://doi.org/10.1111/biom.12242"
+      },
+      {
+       "text": "Clopper CJ, Pearson ES. The use of confidence or fiducial limits illustrated in the case of the binomial. Biometrika. 1934;26(4):404-413.",
+       "url": "https://doi.org/10.1093/biomet/26.4.404"
+      },
+      {
+       "text": "Igarashi Y, Nakatsu N, Yamashita T, et al. Open TG-GATEs: a large-scale toxicogenomics database. Nucleic Acids Res. 2015;43(D1):D921-D927.",
+       "url": "https://doi.org/10.1093/nar/gku955"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "In silico study design",
+   "slug": "in-silico-study-design",
+   "methods": [
+    {
+     "title": "Structural change indicated by a failing predicted property",
+     "id": "insilico.design_recommendation",
+     "version": "1.0.0",
+     "assumptions": [
+      "a tactic is proposed only where the cited literature ties it to the specific property that failed"
+     ],
+     "limits": [
+      "the direction of the expected change is given; the magnitude is not predicted and must come from re-measuring or re-computing the modified structure",
+      "a tactic is a hypothesis for a chemist to test, never an instruction"
+     ],
+     "references": [
+      {
+       "text": "Leeson PD, Springthorpe B. The influence of drug-like concepts on decision-making in medicinal chemistry. Nat Rev Drug Discov. 2007;6(11):881-890.",
+       "url": "https://doi.org/10.1038/nrd2445"
+      },
+      {
+       "text": "Gleeson MP. Generation of a set of simple, interpretable ADMET rules of thumb. J Med Chem. 2008;51(4):817-834.",
+       "url": "https://doi.org/10.1021/jm701122q"
+      },
+      {
+       "text": "Meanwell NA. Synopsis of some recent tactical application of bioisosteres in drug design. J Med Chem. 2011;54(8):2529-2591.",
+       "url": "https://doi.org/10.1021/jm1013693"
+      },
+      {
+       "text": "Stepan AF, Walker DP, Bauman J, et al. Structural alert/reactive metabolite concept as applied in medicinal chemistry to mitigate the risk of idiosyncratic drug toxicity. Chem Res Toxicol. 2011;24(9):1345-1410.",
+       "url": "https://doi.org/10.1021/tx200168d"
+      },
+      {
+       "text": "Young RJ, Green DVS, Luscombe CN, Hill AP. Getting physical in drug discovery II: the impact of chromatographic hydrophobicity measurements and aromaticity. Drug Discov Today. 2011;16(17-18):822-830.",
+       "url": "https://doi.org/10.1016/j.drudis.2011.06.001"
+      }
+     ]
+    },
+    {
+     "title": "Projected repeat-dose study: exposure per group and the findings it would provoke",
+     "id": "insilico.virtual_repeat_dose",
+     "version": "1.0.0",
+     "assumptions": [
+      "a group reports an adverse finding when its projected exposure reaches the endpoint's critical exposure interval",
+      "exposure at each group is predicted by the mechanistic model, not interpolated from a dose-normalised constant"
+     ],
+     "limits": [
+      "a projection of what the study would report; it is not the study and cannot stand in its place in a regulatory submission",
+      "an endpoint a species cannot physiologically express is excluded, not projected",
+      "every projected NOAEL is interval-censored by the dose spacing of the design"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+       "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf"
+      },
+      {
+       "text": "OECD. Test No. 408: Repeated Dose 90-Day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Revised 2018.",
+       "url": "https://doi.org/10.1787/9789264070707-en"
+      },
+      {
+       "text": "U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.)",
+       "url": "https://www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf"
+      },
+      {
+       "text": "ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "In silico triage",
+   "slug": "in-silico-triage",
+   "methods": [
+    {
+     "title": "Class precedent: organ x finding counts across approved labels of one pharmacologic class (21 CFR 201.57 sections 13 and 8.1; members from FDA SPL class indexing via RxClass, labels from DailyMed)",
+     "id": "triage.class_record",
+     "version": "1.0.0",
+     "assumptions": [
+      "on-target toxicity recurs across drugs of one pharmacologic class, so what approved members showed in animals is a prior for a new member",
+      "class membership is the FDA's own label indexing (EPC or MoA) as RxClass serves it; only direct members of the named class are read",
+      "each ingredient is counted once, from its most recently published NDA/BLA single-substance label; a generic (ANDA) label is read only when no NDA/BLA label is listed, and is marked as such; combination products are not read",
+      "a finding is read from one label sentence; organ and finding labels are this method's reading of that sentence and are shown beside it"
+     ],
+     "limits": [
+      "a count over quotations, not a model: no probability or accuracy is claimed",
+      "off-target and chemotype-specific toxicity is not a class property and is not covered",
+      "labels summarise; findings a sponsor judged minor may not be stated, so absence from the labels is not evidence of absence",
+      "a first-in-class target has no approved members and returns no precedent",
+      "exposure multiples are as stated by each label, relative to that drug's own human dose; they are not transferable as doses to a new compound"
+     ],
+     "references": [
+      {
+       "text": "21 CFR 201.57 - Specific requirements on content and format of labeling for human prescription drug and biological products described in 201.56(b)(1). Paragraph (c)(14): 13 Nonclinical toxicology (13.1 Carcinogenesis, mutagenesis, impairment of fertility; 13.2 Animal toxicology and/or pharmacology). Paragraph (c)(9)(i): 8.1 Pregnancy (Risk Summary; Data).",
+       "url": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-201/subpart-B/section-201.57"
+      },
+      {
+       "text": "US Food and Drug Administration. Pharmacologic Class: Established Pharmacologic Class (EPC) and the Mechanism of Action, Physiologic Effect and Chemical Structure terms indexed in Structured Product Labeling. Structured Product Labeling Resources.",
+       "url": "https://www.fda.gov/industry/structured-product-labeling-resources/pharmacologic-class"
+      },
+      {
+       "text": "National Library of Medicine. RxClass API (class membership from FDA SPL pharmacologic class indexing, relaSource FDASPL). RxNav APIs.",
+       "url": "https://lhncbc.nlm.nih.gov/RxNav/APIs/RxClassAPIs.html"
+      },
+      {
+       "text": "National Library of Medicine. DailyMed web services, version 2 (current Structured Product Labels as submitted to the FDA).",
+       "url": "https://dailymed.nlm.nih.gov/dailymed/app-support-web-services.cfm"
+      }
+     ]
+    },
+    {
+     "title": "KESTREL: the kill-early study order. Each required study is an imperfect test of the liabilities it covers, with cited detection sensitivity; its kill probability is the noisy-OR chance of a decisive finding; studies are ordered by increasing cost (or time) per unit kill probability (the series-system ratio rule), subject to the ICH precedence between studies",
+     "id": "triage.kestrel_sequence",
+     "version": "1.0.0",
+     "assumptions": [
+      "a programme clears only if no disqualifying liability fires: a series system, for which the expected-cost-minimising order of INDEPENDENT tests is increasing cost/P_kill (Mitten 1960; Unluyurt 2004)",
+      "P_kill(study) = 1 - product over covered liabilities k of (1 - pi_k * se_k), with pi_k the liability posterior and se_k the study's cited detection sensitivity for k (a lower bound: it counts only true decisive findings, as a negative animal result is near-uninformative, Bailey 2013)",
+      "study cost and duration are USER_SUPPLIED per CRO; where absent, flagged defaults are used and the order is reported as provisional",
+      "ICH precedence (dose range-finding before pivotal repeat-dose; bioanalytical validation before toxicokinetics) is a forest/series-parallel order, scheduled by a precedence-feasible greedy on the ratio (exact for series-parallel precedence by decomposition; Sidney 1975)"
+     ],
+     "limits": [
+      "decision support only: it never commissions, waives or reorders a study of record, and never enters a submission",
+      "the ratio rule is provably optimal only for INDEPENDENT tests; the ICH studies share latent liabilities (general-tox range-finding and the pivotal cover the same organ panel), so under that dependence the order is a well-motivated heuristic, not a proven optimum, and no accuracy is claimed",
+      "the order is only as good as the cited sensitivities and the liability posteriors; both abstain rather than guess, and a study whose liabilities all abstain is listed without a ratio",
+      "general precedence-constrained sequencing is NP-hard (Lawler 1978); the ICH constraint set is series-parallel, so the greedy is exact for it"
+     ],
+     "references": [
+      {
+       "text": "Mitten LG. An analytic solution to the least cost testing sequence problem. J Ind Eng. 1960;11(1):17. For a series system of independent pass/fail tests, expected cost is minimised by testing in increasing order of cost/failure-probability.",
+       "url": null
+      },
+      {
+       "text": "Unluyurt T. Sequential testing of complex systems: a review. Discrete Appl Math. 2004;142(1-3):189-205. Reviews the ratio rule for series/parallel systems and the complexity of precedence-constrained sequencing.",
+       "url": "https://doi.org/10.1016/j.dam.2003.09.008"
+      },
+      {
+       "text": "Sidney JB. Decomposition algorithms for single-machine sequencing with precedence relations and deferral costs. Oper Res. 1975;23(2):283-298. For series-parallel precedence the ratio-optimal order is obtained by decomposition.",
+       "url": "https://doi.org/10.1287/opre.23.2.283"
+      },
+      {
+       "text": "Lawler EL. Sequencing jobs to minimize total weighted completion time subject to precedence constraints. Ann Discrete Math. 1978;2:75-90. Minimizing weighted completion time under general precedence is NP-hard; series-parallel precedence is solved in polynomial time by decomposition.",
+       "url": "https://doi.org/10.1016/S0167-5060(08)70323-6"
+      },
+      {
+       "text": "Olson H, Betton G, Robinson D, et al. Concordance of the toxicity of pharmaceuticals in humans and in animals. Regul Toxicol Pharmacol. 2000;32(1):56-67. 150 compounds, 221 human toxicities; true-positive concordance 71% overall, non-rodent 63%, rodent 43%; per-system Table 3.",
+       "url": "https://doi.org/10.1006/rtph.2000.1399"
+      },
+      {
+       "text": "Bailey J, Thew M, Balls M. An analysis of the use of dogs in predicting human toxicology and drug safety. Altern Lab Anim. 2013;41(5):335-350. A positive dog finding carries a large positive likelihood ratio (median approx. 28) while a negative finding is near-uninformative (inverse LR approx. 1.1).",
+       "url": "https://doi.org/10.1177/026119291304100504"
+      }
+     ]
+    },
+    {
+     "title": "Posterior probability of a per-organ/mechanism safety liability, pooled in log-odds from the triage evidence the system already holds: class-precedent rates (Beta-Binomial over approved-label counts), cited physicochemical odds ratios, read-across/measured hERG potency, and cited modality class-effects",
+     "id": "triage.liability_graph",
+     "version": "1.0.0",
+     "assumptions": [
+      "liabilities are organ/mechanism nodes; each cited piece of evidence shifts a node's log-odds by a term whose weight comes from a cited odds or likelihood ratio, or from the Beta-Binomial posterior of a class-precedence rate",
+      "the base rate is a weakly-informative prior from candidate-attrition data (Roberts 2014), not a measurement, and is overridable",
+      "a class rate at or below the base rate carries no positive evidence and contributes no term; the base rate alone never produces a posterior",
+      "terms are pooled additively (sum of log-likelihood-ratios); they are not assumed independent, so where several load one node the posterior can over-concentrate and is read as an ordinal prior, not a calibrated probability"
+     ],
+     "limits": [
+      "decision support only: a liability posterior is never evidence, never a study record and never part of a submission (docs/04 section 4.26)",
+      "a node with no cited evidence term is omitted (abstains) rather than reporting a base-rate-only number",
+      "an expert-set term (hERG/potency prior, a modality class-effect weight) is marked as requiring verification and is not a number stated by its citation",
+      "no sensitivity, specificity or calibration is claimed until a pre-registered, held-out validation is published"
+     ],
+     "references": [
+      {
+       "text": "Roberts RA, Kavanagh SL, Mellor HR, et al. Reducing attrition in drug development: smart loading preclinical safety assessment. Drug Discov Today. 2014;19(3):341-347. Of AstraZeneca candidates halted for safety, >=40% showed target-organ histopathology within two weeks of repeat dosing.",
+       "url": "https://doi.org/10.1016/j.drudis.2013.11.014"
+      },
+      {
+       "text": "Hughes JD, Blagg J, Price DA, et al. Physiochemical drug properties associated with in vivo toxicological outcomes. Bioorg Med Chem Lett. 2008;18(17):4872-4875. Compounds with ClogP>3 and TPSA<75 are approx. 6-fold more likely to show an in vitro toxicity finding (the 'Pfizer 3/75' rule).",
+       "url": "https://doi.org/10.1016/j.bmcl.2008.07.071"
+      },
+      {
+       "text": "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical cardiac electrophysiology, clinical QT interval prolongation and torsade de pointes for a broad range of drugs. Cardiovasc Res. 2003;58(1):32-45.",
+       "url": "https://doi.org/10.1016/S0008-6363(02)00846-5"
+      },
+      {
+       "text": "21 CFR 201.57 - Specific requirements on content and format of labeling for human prescription drug and biological products described in 201.56(b)(1). Paragraph (c)(14): 13 Nonclinical toxicology (13.1 Carcinogenesis, mutagenesis, impairment of fertility; 13.2 Animal toxicology and/or pharmacology). Paragraph (c)(9)(i): 8.1 Pregnancy (Risk Summary; Data).",
+       "url": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-201/subpart-B/section-201.57"
+      }
+     ]
+    },
+    {
+     "title": "Recurrent nonclinical liabilities expected for a drug modality, from cited toxicologic-pathology reviews (e.g. ASO complement and thrombocytopenia; GalNAc-siRNA hepatic; AAV hepatic and dorsal-root-ganglion; ADC payload classes; T-cell-engager cytokine release)",
+     "id": "triage.modality_class_effects",
+     "version": "1.0.0",
+     "assumptions": [
+      "a modality's mechanism and chemistry recur across its members, so published class effects are a prior for a new member of that modality"
+     ],
+     "limits": [
+      "decision support only; a modality with no cited class-effect in the table contributes nothing rather than a guess",
+      "off-target and chemotype-specific toxicity is not covered by a modality rule"
+     ],
+     "references": [
+      {
+       "text": "Frazier KS. Antisense oligonucleotide therapies: the promise and the challenges from a toxicologic pathologist's perspective. Toxicol Pathol. 2015;43(1):78-89. ASO class effects: pro-inflammatory change, complement activation in primates, thrombocytopenia, renal tubular and hepatic accumulation.",
+       "url": "https://doi.org/10.1177/0192623314551840"
+      },
+      {
+       "text": "Janas MM, Harbison CE, Perry VK, et al. The nonclinical safety profile of GalNAc-conjugated RNAi therapeutics in subacute studies. Toxicol Pathol. 2018;46(7):735-745. Dose-dependent hepatocellular effects as the principal finding for GalNAc-siRNA.",
+       "url": "https://doi.org/10.1177/0192623318792537"
+      },
+      {
+       "text": "Hinderer C, Katz N, Buza EL, et al. Severe toxicity in nonhuman primates and piglets following high-dose intravenous administration of an AAV vector expressing human SMN. Hum Gene Ther. 2018;29(3):285-298. Dose-dependent hepatotoxicity and thrombocytopenia; sensory neuron (DRG) degeneration.",
+       "url": "https://doi.org/10.1089/hum.2018.015"
+      },
+      {
+       "text": "Hordeaux J, Buza EL, Dyer C, et al. Adeno-associated virus-induced dorsal root ganglion pathology. Hum Gene Ther. 2020;31(15-16):808-818. Dorsal-root-ganglion degeneration is a recurrent finding of systemic and intrathecal AAV in primates.",
+       "url": "https://doi.org/10.1089/hum.2020.167"
+      },
+      {
+       "text": "Donaghy H. Effects of antibody, drug and linker on the preclinical and clinical toxicities of antibody-drug conjugates. mAbs. 2016;8(4):659-671. Payload-class toxicities: auristatin (MMAE) neutropenia and peripheral neuropathy, maytansinoid ocular and hepatic, thrombocytopenia.",
+       "url": "https://doi.org/10.1080/19420862.2016.1156829"
+      },
+      {
+       "text": "Shimabukuro-Vornhagen A, Godel P, Subklewe M, et al. Cytokine release syndrome. J Immunother Cancer. 2018;6(1):56. CRS is the principal acute toxicity of T-cell-engaging therapies (CAR-T, bispecific T-cell engagers, immune agonists).",
+       "url": "https://doi.org/10.1186/s40425-018-0343-9"
+      }
+     ]
+    },
+    {
+     "title": "Ranked forecast of the organ-system observations a repeat-dose study is most likely to report, assembled per modality from class precedent (on-target recurrence), cited physicochemical rules (off-target) and cited modality class-effects; each row carries its evidence and claims no accuracy",
+     "id": "triage.observation_forecast",
+     "version": "1.0.0",
+     "assumptions": [
+      "a finding is forecast only where a cited evidence source places it: a class member's label, a physicochemical rule, or a modality class-effect review",
+      "likelihood is reported as an ordinal band (watch / likely / expected), not a calibrated probability"
+     ],
+     "limits": [
+      "decision support only; abstains per organ where no cited evidence exists",
+      "forecasts where a finding may appear, not whether it will; no accuracy is claimed until a pre-registered, held-out validation is published"
+     ],
+     "references": [
+      {
+       "text": "21 CFR 201.57 - Specific requirements on content and format of labeling for human prescription drug and biological products described in 201.56(b)(1). Paragraph (c)(14): 13 Nonclinical toxicology (13.1 Carcinogenesis, mutagenesis, impairment of fertility; 13.2 Animal toxicology and/or pharmacology). Paragraph (c)(9)(i): 8.1 Pregnancy (Risk Summary; Data).",
+       "url": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-201/subpart-B/section-201.57"
+      },
+      {
+       "text": "Hughes JD, Blagg J, Price DA, et al. Physiochemical drug properties associated with in vivo toxicological outcomes. Bioorg Med Chem Lett. 2008;18(17):4872-4875. Compounds with ClogP>3 and TPSA<75 are approx. 6-fold more likely to show an in vitro toxicity finding (the 'Pfizer 3/75' rule).",
+       "url": "https://doi.org/10.1016/j.bmcl.2008.07.071"
+      },
+      {
+       "text": "Frazier KS. Antisense oligonucleotide therapies: the promise and the challenges from a toxicologic pathologist's perspective. Toxicol Pathol. 2015;43(1):78-89. ASO class effects: pro-inflammatory change, complement activation in primates, thrombocytopenia, renal tubular and hepatic accumulation.",
+       "url": "https://doi.org/10.1177/0192623314551840"
+      },
+      {
+       "text": "Donaghy H. Effects of antibody, drug and linker on the preclinical and clinical toxicities of antibody-drug conjugates. mAbs. 2016;8(4):659-671. Payload-class toxicities: auristatin (MMAE) neutropenia and peripheral neuropathy, maytansinoid ocular and hepatic, thrombocytopenia.",
+       "url": "https://doi.org/10.1080/19420862.2016.1156829"
+      },
+      {
+       "text": "Roberts RA, Kavanagh SL, Mellor HR, et al. Reducing attrition in drug development: smart loading preclinical safety assessment. Drug Discov Today. 2014;19(3):341-347. Of AstraZeneca candidates halted for safety, >=40% showed target-organ histopathology within two weeks of repeat dosing.",
+       "url": "https://doi.org/10.1016/j.drudis.2013.11.014"
+      }
+     ]
+    },
+    {
+     "title": "Pharmacologically active dose by steady-state reverse dosimetry: daily dose = (EC50 x MW / fu) x CL x 24 h / F",
+     "id": "triage.pad_reverse_dosimetry",
+     "version": "1.0.0",
+     "assumptions": [
+      "average steady-state concentration Css = F x dose rate / CL (linear pharmacokinetics)",
+      "the unbound plasma concentration is the concentration at the target (free-drug hypothesis)",
+      "the species' target has the potency measured in the assay",
+      "where the record holds several values, the one giving the lower dose is used (highest fu, lowest intravenous clearance, highest F, most potent primary assay)"
+     ],
+     "limits": [
+      "estimates where on-target pharmacology begins; it is not a NOAEL and predicts no toxicity",
+      "applicability: inside the domain only when the potency is interpolated, clearance is measured in vivo, and the target concentration lies within the exposures measured; otherwise the value is flagged out of domain",
+      "no accuracy is claimed until a pre-registered, held-out validation is published"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.",
+       "url": "https://www.fda.gov/media/72309/download"
+      },
+      {
+       "text": "Wetmore BA, Wambaugh JF, Ferguson SS, et al. Integration of dosimetry, exposure, and high-throughput screening data in chemical toxicity assessment. Toxicol Sci. 2012;125(1):157-174.",
+       "url": "https://doi.org/10.1093/toxsci/kfr254"
+      },
+      {
+       "text": "Smith DA, Di L, Kerns EH. The effect of plasma protein binding on in vivo efficacy: misconceptions in drug discovery. Nat Rev Drug Discov. 2010;9(12):929-939.",
+       "url": "https://doi.org/10.1038/nrd3287"
+      }
+     ]
+    },
+    {
+     "title": "Similarity-weighted read-across over measured analogue values (GenRA-style)",
+     "id": "triage.read_across",
+     "version": "2.1.0",
+     "assumptions": [
+      "structurally similar compounds have similar measured values for the endpoint",
+      "analogue values are weighted by ECFP4 Tanimoto similarity to the query, raised to the method's weighting power so the nearest analogues dominate",
+      "potency values are averaged on the logarithmic (pIC50) scale"
+     ],
+     "limits": [
+      "requires a stated minimum number of analogues above the similarity threshold; otherwise the value is UNAVAILABLE and nothing is predicted. The threshold and count were set on a held-out fold against a bar fixed beforehand; how often the method can answer at all is bounded by how many compounds have been measured for the endpoint",
+      "censored values (reported as a bound) are excluded, so a compound with only bounded measurements contributes no analogue value",
+      "the analogue set reflects the external database at the time of retrieval; the analogues used are recorded with the result",
+      "averaging shrinks an estimate toward the mean of its neighbourhood, so the point estimate under-states the potency of potent compounds; a screening decision is taken on the endpoint's calibrated interval instead",
+      "no accuracy is claimed until a pre-registered, held-out validation is published for the endpoint"
+     ],
+     "references": [
+      {
+       "text": "Shah I, Liu J, Judson RS, Thomas RS, Patlewicz G. Systematically evaluating read-across prediction and performance using a local validity approach characterized by chemical structure and bioactivity information. Regul Toxicol Pharmacol. 2016;79:12-24.",
+       "url": "https://doi.org/10.1016/j.yrtph.2016.05.008"
+      },
+      {
+       "text": "Helman G, Shah I, Patlewicz G. Transitioning the generalised read-across approach (GenRA) to quantitative predictions: a case study using acute oral toxicity data. Comput Toxicol. 2019;12:100097.",
+       "url": "https://doi.org/10.1016/j.comtox.2019.100097"
+      },
+      {
+       "text": "Rogers D, Hahn M. Extended-connectivity fingerprints. J Chem Inf Model. 2010;50(5):742-754.",
+       "url": "https://doi.org/10.1021/ci100050t"
+      }
+     ]
+    },
+    {
+     "title": "Substructure screen against a published structural-alert set (RDKit FilterCatalog)",
+     "id": "triage.structural_alerts",
+     "version": "1.0.0",
+     "assumptions": [
+      "an alert is a substructure match in the published set, not a measurement and not a prediction of any in vivo outcome"
+     ],
+     "limits": [
+      "alert sets differ in purpose and were derived for screening-library triage, not for regulatory hazard classification",
+      "a structure with no alert is not thereby shown to be safe: the sets cover only the functionality their authors catalogued",
+      "no sensitivity or specificity is claimed for any endpoint"
+     ],
+     "references": [
+      {
+       "text": "Brenk R, Schipani A, James D, et al. Lessons learnt from assembling screening libraries for drug discovery for neglected diseases. ChemMedChem. 2008;3(3):435-444.",
+       "url": "https://doi.org/10.1002/cmdc.200700139"
+      },
+      {
+       "text": "Baell JB, Holloway GA. New substructure filters for removal of pan assay interference compounds (PAINS) from screening libraries and for their exclusion in bioassays. J Med Chem. 2010;53(7):2719-2740.",
+       "url": "https://doi.org/10.1021/jm901137j"
+      },
+      {
+       "text": "Jadhav A, Ferreira RS, Klumpp C, et al. Quantitative analyses of aggregation, autofluorescence, and reactivity artifacts in a screen for inhibitors of a thiol protease. J Med Chem. 2010;53(1):37-51.",
+       "url": "https://doi.org/10.1021/jm901070c"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Mechanistic pharmacokinetics (PBPK)",
+   "slug": "mechanistic-pharmacokinetics-pbpk",
+   "methods": [
+    {
+     "title": "Clearance projected between species by simple allometry on body weight",
+     "id": "pbpk.cl_allometric_scaling",
+     "version": "1.0.0",
+     "assumptions": [
+      "clearance scales with body weight to the power 0.75, so clearance per kilogram scales as body weight to the power -0.25",
+      "body weights are read from the cited physiology table, not from literals"
+     ],
+     "limits": [
+      "simple allometry carries no information about the target species' enzymes or transporters, so a species-divergent metabolic route is not represented",
+      "it is used only where the target species has no measured clearance",
+      "no accuracy is claimed until a pre-registered, held-out validation is published for the projection"
+     ],
+     "references": [
+      {
+       "text": "Boxenbaum H. Interspecies scaling, allometry, physiological time, and the ground plan of pharmacokinetics. J Pharmacokinet Biopharm. 1982;10(2):201-227.",
+       "url": "https://doi.org/10.1007/BF01062336"
+      },
+      {
+       "text": "Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11.",
+       "url": "https://doi.org/10.2165/00003088-199936010-00001"
+      }
+     ]
+    },
+    {
+     "title": "Renal clearance as glomerular filtration of the unbound drug",
+     "id": "pbpk.cl_renal_filtration",
+     "version": "1.0.0",
+     "assumptions": [
+      "the drug is filtered and neither secreted nor reabsorbed"
+     ],
+     "limits": [
+      "a lower bound on renal clearance: active secretion raises it and tubular reabsorption lowers it, and neither is predicted here",
+      "refused for a molecule above the glomerular filtration cut-off"
+     ],
+     "references": [
+      {
+       "text": "Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095.",
+       "url": "https://doi.org/10.1023/A:1018943613122"
+      }
+     ]
+    },
+    {
+     "title": "Minimal physiologically based model: blood, liver, rapidly and slowly equilibrating tissue",
+     "id": "pbpk.minimal_model",
+     "version": "1.0.0",
+     "assumptions": [
+      "each compartment is well stirred and perfusion-limited",
+      "hepatic elimination follows the well-stirred model on unbound blood concentration",
+      "distribution is linear: no saturable tissue binding over the simulated range"
+     ],
+     "limits": [
+      "a reduced structure: it predicts plasma exposure, not tissue-specific exposure in any organ other than the liver",
+      "linear kinetics only; saturable metabolism, transporter involvement and enterohepatic recycling are not represented and are flagged when suspected"
+     ],
+     "references": [
+      {
+       "text": "Cao Y, Jusko WJ. Applications of minimal physiologically-based pharmacokinetic models. J Pharmacokinet Pharmacodyn. 2012;39(6):711-723.",
+       "url": "https://doi.org/10.1007/s10928-012-9280-2"
+      },
+      {
+       "text": "Rowland M, Peck C, Tucker G. Physiologically-based pharmacokinetics in drug development and regulatory science. Annu Rev Pharmacol Toxicol. 2011;51:45-73.",
+       "url": "https://doi.org/10.1146/annurev-pharmtox-010510-100540"
+      },
+      {
+       "text": "Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.",
+       "url": "https://doi.org/10.1002/cpt1975184377"
+      }
+     ]
+    },
+    {
+     "title": "Parameter uncertainty propagated by Monte Carlo sampling",
+     "id": "pbpk.monte_carlo",
+     "version": "1.0.0",
+     "assumptions": [
+      "each uncertain input is sampled from the distribution the caller declared, independently unless a correlation is supplied"
+     ],
+     "limits": [
+      "propagates only the uncertainty that was declared; it does not discover structural error in the model",
+      "the seed is recorded so a run is reproducible exactly"
+     ],
+     "references": [
+      {
+       "text": "Metropolis N, Ulam S. The Monte Carlo method. J Am Stat Assoc. 1949;44(247):335-341.",
+       "url": "https://doi.org/10.1080/01621459.1949.10483310"
+      },
+      {
+       "text": "ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Numerical solution of the compartmental system",
+     "id": "pbpk.ode_solution",
+     "version": "1.0.0",
+     "assumptions": [
+      "the system is non-stiff at the tolerances used, with LSODA as fallback"
+     ],
+     "limits": [
+      "solution carries the solver tolerance; the mass-balance residual and the analytic cross-check are reported with every run"
+     ],
+     "references": [
+      {
+       "text": "Dormand JR, Prince PJ. A family of embedded Runge-Kutta formulae. J Comput Appl Math. 1980;6(1):19-26.",
+       "url": "https://doi.org/10.1016/0771-050X(80)90013-3"
+      },
+      {
+       "text": "Hindmarsh AC. ODEPACK, a systematized collection of ODE solvers. In: Scientific Computing. North-Holland; 1983:55-64. (LSODA, the stiff/non-stiff switching solver exposed by SciPy as method='LSODA'.)",
+       "url": null
+      }
+     ]
+    },
+    {
+     "title": "Oral bioavailability as the product of fraction absorbed, gut and hepatic availability",
+     "id": "pbpk.oral_absorption",
+     "version": "1.0.0",
+     "assumptions": [
+      "F = Fa x Fg x Fh with first-order appearance into the portal circulation"
+     ],
+     "limits": [
+      "Fa from permeability and solubility is a classification, not a measurement",
+      "no transit-time, precipitation or food-effect model; a low-solubility compound is flagged rather than assigned a number"
+     ],
+     "references": [
+      {
+       "text": "Amidon GL, Lennernas H, Shah VP, Crison JR. A theoretical basis for a biopharmaceutic drug classification: the correlation of in vitro drug product dissolution and in vivo bioavailability. Pharm Res. 1995;12(3):413-420.",
+       "url": "https://doi.org/10.1023/a:1016212804288"
+      },
+      {
+       "text": "Yu LX, Amidon GL. A compartmental absorption and transit model for estimating oral drug absorption. Int J Pharm. 1999;186(2):119-125.",
+       "url": "https://doi.org/10.1016/s0378-5173(99)00147-7"
+      },
+      {
+       "text": "Wilkinson GR, Shand DG. Commentary: a physiological approach to hepatic drug clearance. Clin Pharmacol Ther. 1975;18(4):377-390.",
+       "url": "https://doi.org/10.1002/cpt1975184377"
+      }
+     ]
+    },
+    {
+     "title": "Species physiological parameter scaled from a reference animal",
+     "id": "pbpk.physiology",
+     "version": "1.0.0",
+     "assumptions": [
+      "the per-kilogram value is the tabulated absolute value divided by the reference body weight stated in that table's column heading"
+     ],
+     "limits": [
+      "a reference-animal mean, not a strain-, sex- or age-specific value",
+      "scaling a flow linearly with body weight within a species is an approximation; the allometric alternative is offered where a table supports it"
+     ],
+     "references": [
+      {
+       "text": "Davies B, Morris T. Physiological parameters in laboratory animals and humans. Pharm Res. 1993;10(7):1093-1095.",
+       "url": "https://doi.org/10.1023/A:1018943613122"
+      },
+      {
+       "text": "Brown RP, Delp MD, Lindstedt SL, Rhomberg LR, Beliles RP. Physiological parameter values for physiologically based pharmacokinetic models. Toxicol Ind Health. 1997;13(4):407-484.",
+       "url": "https://doi.org/10.1177/074823379701300401"
+      }
+     ]
+    },
+    {
+     "title": "Steady-state volume of distribution from plasma and tissue unbound fractions",
+     "id": "pbpk.vss_oie_tozer",
+     "version": "1.0.0",
+     "assumptions": [
+      "drug distributes into plasma water, extracellular water and a remainder compartment, with binding to extravascular protein in fixed proportion to plasma"
+     ],
+     "limits": [
+      "the published parameter set is human; applying it to another species requires that species' fluid volumes and is refused without them"
+     ],
+     "references": [
+      {
+       "text": "Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205.",
+       "url": "https://doi.org/10.1002/jps.2600680948"
+      }
+     ]
+    },
+    {
+     "title": "Steady-state volume of distribution projected between species by unbound fraction",
+     "id": "pbpk.vss_single_species_scaling",
+     "version": "1.0.0",
+     "assumptions": [
+      "tissue affinity for the unbound drug is conserved across species, so Vss/fu is the invariant"
+     ],
+     "limits": [
+      "fails for a drug with a species-divergent transporter or tissue-binding protein",
+      "reported with the observed fold-error of the method on its own validation set where one exists; otherwise the projection is refused"
+     ],
+     "references": [
+      {
+       "text": "Obach RS, Baxter JG, Liston TE, et al. The prediction of human pharmacokinetic parameters from preclinical and in vitro metabolism data. J Pharmacol Exp Ther. 1997;283(1):46-58.",
+       "url": null
+      },
+      {
+       "text": "Oie S, Tozer TN. Effect of altered plasma protein binding on apparent volume of distribution. J Pharm Sci. 1979;68(9):1203-1205.",
+       "url": "https://doi.org/10.1002/jps.2600680948"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Molecular descriptors",
+   "slug": "molecular-descriptors",
+   "methods": [
+    {
+     "title": "Aromatic ring count",
+     "id": "descr.aromatic_rings",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Crippen octanol/water logP",
+     "id": "descr.clogp",
+     "version": "1.0.0",
+     "assumptions": [
+      "atom-contribution model fitted to a neutral-species training set"
+     ],
+     "limits": [
+      "not a measured logD; ionisation at physiological pH is not modelled"
+     ],
+     "references": [
+      {
+       "text": "Wildman SA, Crippen GM. Prediction of physicochemical parameters by atomic contributions. J Chem Inf Comput Sci. 1999;39(5):868-873.",
+       "url": "https://doi.org/10.1021/ci990307l"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Fraction of sp3-hybridised carbons",
+     "id": "descr.fsp3",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Hydrogen-bond acceptor count (Lipinski)",
+     "id": "descr.hba",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Adv Drug Deliv Rev. 2001;46(1-3):3-26.",
+       "url": "https://doi.org/10.1016/S0169-409X(00)00129-0"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Hydrogen-bond donor count (Lipinski)",
+     "id": "descr.hbd",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Adv Drug Deliv Rev. 2001;46(1-3):3-26.",
+       "url": "https://doi.org/10.1016/S0169-409X(00)00129-0"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Heavy atom count",
+     "id": "descr.heavy_atoms",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Molar refractivity (Crippen)",
+     "id": "descr.mr",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Wildman SA, Crippen GM. Prediction of physicochemical parameters by atomic contributions. J Chem Inf Comput Sci. 1999;39(5):868-873.",
+       "url": "https://doi.org/10.1021/ci990307l"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Molecular weight (RDKit)",
+     "id": "descr.mw",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Quantitative estimate of drug-likeness",
+     "id": "descr.qed",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "a desirability score trained on oral drugs; not a potency or safety measure"
+     ],
+     "references": [
+      {
+       "text": "Bickerton GR, Paolini GV, Besnard J, Muresan S, Hopkins AL. Quantifying the chemical beauty of drugs. Nat Chem. 2012;4(2):90-98.",
+       "url": "https://doi.org/10.1038/nchem.1243"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Ring count",
+     "id": "descr.rings",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Rotatable bond count",
+     "id": "descr.rotb",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Veber DF, Johnson SR, Cheng HY, Smith BR, Ward KW, Kopple KD. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45(12):2615-2623.",
+       "url": "https://doi.org/10.1021/jm020017n"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    },
+    {
+     "title": "Topological polar surface area",
+     "id": "descr.tpsa",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "fragment-based 2D estimate; conformation-independent"
+     ],
+     "references": [
+      {
+       "text": "Ertl P, Rohde B, Selzer P. Fast calculation of molecular polar surface area as a sum of fragment-based contributions and its application to the prediction of drug transport properties. J Med Chem. 2000;43(20):3714-3717.",
+       "url": "https://doi.org/10.1021/jm000942e"
+      },
+      {
+       "text": "RDKit: Open-source cheminformatics. https://www.rdkit.org",
+       "url": "https://www.rdkit.org"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "NAM credibility (ASME V&V40)",
+   "slug": "nam-credibility-asme-v-v40",
+   "methods": [
+    {
+     "title": "Applicability-domain determination for a model prediction (OECD principle 3)",
+     "id": "nam.applicability_domain",
+     "version": "1.0.0",
+     "assumptions": [
+      "a prediction is trustworthy only for substances within the chemical and biological space the model was built and validated on"
+     ],
+     "limits": [
+      "a substance outside the domain is flagged out-of-domain and its prediction is carried as hypothesis-generating, not as a quantified result"
+     ],
+     "references": [
+      {
+       "text": "OECD. Guidance Document on the Validation of (Quantitative) Structure-Activity Relationship [(Q)SAR] Models. OECD Series on Testing and Assessment No. 69, ENV/JM/MONO(2007)2, 2007. (The five OECD principles for QSAR validation: defined endpoint; unambiguous algorithm; defined domain of applicability; appropriate measures of goodness-of-fit, robustness and predictivity; mechanistic interpretation where possible.)",
+       "url": "https://www.oecd.org/env/guidance-document-on-the-validation-of-quantitative-structure-activity-relationship-q-sar-models-9789264085442-en.htm"
+      }
+     ]
+    },
+    {
+     "title": "Risk-informed credibility gradation of a computational model result (ASME V&V40)",
+     "id": "nam.credibility_assessment",
+     "version": "2.0.0",
+     "assumptions": [
+      "each of verification, validation, applicability and uncertainty quantification is graded on V&V40's ordinal gradation of rigor (low / medium / high) with a written basis",
+      "the rigor every factor must reach equals the model-risk level (V&V40: rigor commensurate with model risk); no numeric index, weighting or cut-off is used",
+      "tier rule: adequate when every factor meets the required rigor; exploratory when validation or applicability falls short (OECD (Q)SAR principles 3-4); supportive otherwise"
+     ],
+     "limits": [
+      "a credibility tier records whether the assembled evidence meets the goal for the stated context of use; it is not a probability that the prediction is correct",
+      "it never upgrades a prediction to a measurement, and never authorises a signed GxP record on its own"
+     ],
+     "references": [
+      {
+       "text": "ASME V&V 40-2018. Assessing Credibility of Computational Modeling through Verification and Validation: Application to Medical Devices. ASME, 2018.",
+       "url": null
+      },
+      {
+       "text": "U.S. Food and Drug Administration. Assessing the Credibility of Computational Modeling and Simulation in Medical Device Submissions: Guidance for Industry and FDA Staff. Finalised November 2023. (Adapts the ASME V&V40 risk-informed credibility framework for regulatory submissions.)",
+       "url": "https://www.fda.gov/media/154985/download"
+      },
+      {
+       "text": "ICH M15: General Principles for Model-Informed Drug Development. Step 4 final guideline, adopted 29 January 2026; adopted by FDA as final guidance June 2026.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M15_Step4_Final_Guideline_2026_0129.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Model risk from model influence and decision consequence (ASME V&V40)",
+     "id": "nam.model_risk",
+     "version": "2.0.0",
+     "assumptions": [
+      "model risk rises with how much the decision relies on the model (influence) and with the harm of an incorrect decision (consequence)",
+      "the level is read from the FDA 2025 risk matrix (Fig. 1), shared with hos.validation.credibility so the platform grades risk one way"
+     ],
+     "limits": [
+      "risk is a gradation to size the credibility evidence, not a probability",
+      "influence and consequence are assigned for a stated context of use and do not transfer to a different decision"
+     ],
+     "references": [
+      {
+       "text": "ASME V&V 40-2018. Assessing Credibility of Computational Modeling through Verification and Validation: Application to Medical Devices. ASME, 2018.",
+       "url": null
+      },
+      {
+       "text": "U.S. Food and Drug Administration. Assessing the Credibility of Computational Modeling and Simulation in Medical Device Submissions: Guidance for Industry and FDA Staff. Finalised November 2023. (Adapts the ASME V&V40 risk-informed credibility framework for regulatory submissions.)",
+       "url": "https://www.fda.gov/media/154985/download"
+      },
+      {
+       "text": "U.S. Food and Drug Administration. Considerations for the Use of Artificial Intelligence to Support Regulatory Decision-Making for Drug and Biological Products. Draft guidance, January 2025 (docket FDA-2024-D-4689).",
+       "url": "https://www.fda.gov/media/184830/download"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Non-compartmental analysis",
+   "slug": "non-compartmental-analysis",
+   "methods": [
+    {
+     "title": "AUC extrapolated to infinity, AUC(0-t) + Clast/lambda_z (observed Clast)",
+     "id": "nca.auc_inf",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "depends on the selected terminal phase"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "AUC from time zero to the last measurable concentration (trapezoidal rule as stated)",
+     "id": "nca.auc_last",
+     "version": "1.0.0",
+     "assumptions": [
+      "actual sampling times (ICH M13A 2.2.2.2)",
+      "BLQ at or before the first quantifiable concentration = 0; later BLQ excluded"
+     ],
+     "limits": [
+      "no extrapolation beyond the last measurable concentration",
+      "a profile without a time-zero sample has no AUC(0-t)"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      },
+      {
+       "text": "ICH Harmonised Guideline M13A: Bioequivalence for Immediate-Release Solid Oral Dosage Forms. Final version, adopted 23 July 2024.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M13A_Step4_Final_Guideline_2024_0723.pdf"
+      },
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "Purves RD. Optimum numerical integration methods for estimation of area-under-the-curve (AUC) and area-under-the-moment-curve (AUMC). J Pharmacokinet Biopharm. 1992;20(3):211-226.",
+       "url": "https://doi.org/10.1007/BF01062525"
+      }
+     ]
+    },
+    {
+     "title": "Percentage of AUCinf extrapolated beyond Tlast",
+     "id": "nca.auc_pct_extrap",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "European Medicines Agency, CHMP. Guideline on the Investigation of Bioequivalence. CPMP/EWP/QWP/1401/98 Rev. 1/Corr**. 20 January 2010.",
+       "url": "https://www.ema.europa.eu/en/documents/scientific-guideline/guideline-investigation-bioequivalence-rev1_en.pdf"
+      },
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      }
+     ]
+    },
+    {
+     "title": "AUC over the dosing interval, from a quantifiable end-of-interval sample",
+     "id": "nca.auc_tau",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "not reported when the end-of-interval sample is BLQ (no extrapolation)"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      },
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "Absolute bioavailability from dose-normalised group mean AUCinf, extravascular / intravenous",
+     "id": "nca.bioavailability",
+     "version": "1.0.0",
+     "assumptions": [
+      "linear pharmacokinetics between the two doses when they differ"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "Shang H, Dai X, Li M, Kai Y, Liu Z, Wang M, Li Q, Gu Y, Liu C, Si D. Absolute bioavailability, dose proportionality, and tissue distribution of rotundic acid in rats based on validated LC-QqQ-MS/MS method. J Pharm Anal. 2022;12(2):278-286.",
+       "url": "https://doi.org/10.1016/j.jpha.2021.03.008"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "IV bolus concentration at dose time by log-linear back-extrapolation of the first two quantifiable points",
+     "id": "nca.c0_back_extrapolation",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "unavailable when the first two points do not decline (no substitution)"
+     ],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      }
+     ]
+    },
+    {
+     "title": "Clearance Dose/AUCinf (CL/F after extravascular dosing)",
+     "id": "nca.clearance",
+     "version": "1.0.0",
+     "assumptions": [
+      "linear disposition; complete dose delivered"
+     ],
+     "limits": [
+      "after extravascular dosing this is apparent clearance CL/F"
+     ],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "Benet LZ. Benet LZ and Galeazzi RL: noncompartmental determination of the steady-state volume of distribution, J Pharm Sci 68, 1071-1074, 1979 - the backstory. AAPS J. 2012;14(2):164-167.",
+       "url": "https://doi.org/10.1208/s12248-012-9326-9"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "Maximum observed concentration and its time",
+     "id": "nca.cmax_tmax",
+     "version": "1.0.0",
+     "assumptions": [
+      "taken directly from the data without interpolation (FDA 2022 III.A.9.a); the first occurrence is used when the maximum is tied"
+     ],
+     "limits": [
+      "with a monitoring design (1-3 samples per interval) the observed maximum estimates Cmax only roughly (ICH S3A Note 1)"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "Terminal half-life ln2/lambda_z",
+     "id": "nca.half_life",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "Terminal rate constant by least squares of ln C on t over the selected terminal points",
+     "id": "nca.lambda_z",
+     "version": "1.0.0",
+     "assumptions": [
+      "the terminal phase is selected by the scientist (start time); at least three declining points (FDA 2022 Appendix A; ICH M13A 2.1.8)"
+     ],
+     "limits": [
+      "the vendor 'best fit' (largest adjusted R-squared) is shown as a suggestion only"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      },
+      {
+       "text": "ICH Harmonised Guideline M13A: Bioequivalence for Immediate-Release Solid Oral Dosage Forms. Final version, adopted 23 July 2024.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M13A_Step4_Final_Guideline_2024_0723.pdf"
+      },
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      }
+     ]
+    },
+    {
+     "title": "AUMC by the stated trapezoidal rule, AUMCinf and MRTinf (minus half the infusion time for an infusion)",
+     "id": "nca.moments",
+     "version": "1.0.0",
+     "assumptions": [
+      "linear disposition"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "Benet LZ. Benet LZ and Galeazzi RL: noncompartmental determination of the steady-state volume of distribution, J Pharm Sci 68, 1071-1074, 1979 - the backstory. AAPS J. 2012;14(2):164-167.",
+       "url": "https://doi.org/10.1208/s12248-012-9326-9"
+      }
+     ]
+    },
+    {
+     "title": "Terminal-phase volume Dose/(lambda_z AUCinf) (Vz/F extravascular)",
+     "id": "nca.volume_z",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      }
+     ]
+    },
+    {
+     "title": "Steady-state volume CL x MRTinf, intravenous dosing only",
+     "id": "nca.vss",
+     "version": "1.0.0",
+     "assumptions": [
+      "linear disposition with elimination from the sampled compartment (Benet 2012)"
+     ],
+     "limits": [
+      "not computed after extravascular dosing: MRT then includes absorption"
+     ],
+     "references": [
+      {
+       "text": "Certara USA, Inc. Phoenix 8.3 User Documentation: NCA parameter formulas; Partial area calculation; NCA computation rules; Lambda Z or Slope Estimation settings. 2020. (Vendor documentation; a secondary source for the NCA equations.)",
+       "url": "https://onlinehelp.certara.com/phoenix/8.3/topics/Partial_area_calculation.htm"
+      },
+      {
+       "text": "Benet LZ. Benet LZ and Galeazzi RL: noncompartmental determination of the steady-state volume of distribution, J Pharm Sci 68, 1071-1074, 1979 - the backstory. AAPS J. 2012;14(2):164-167.",
+       "url": "https://doi.org/10.1208/s12248-012-9326-9"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Peptides",
+   "slug": "peptides",
+   "methods": [
+    {
+     "title": "First-order depletion of intact peptide: ln-linear regression of percent remaining on time; k = -slope, t1/2 = ln(2)/k, 95% interval from the slope's t-interval (n - 2 degrees of freedom), transformed monotonically",
+     "id": "peptide.first_order_decay",
+     "version": "1.0.0",
+     "assumptions": [
+      "complete first-order loss (plateau zero)",
+      "replicates pooled after normalising each to its own time zero"
+     ],
+     "limits": [
+      "a half-life longer than the last sampling time is an extrapolation and is not reported (censored)",
+      "incomplete degradation biases k; checked with the one-phase decay model"
+     ],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      },
+      {
+       "text": "Cavaco M, Valle J, Flores I, Andreu D, Castanho MARB. Estimating peptide half-life in serum from tunable, sequence-related physicochemical properties. Clin Transl Sci. 2021;14(4):1349-1358.",
+       "url": "https://doi.org/10.1111/cts.12985"
+      },
+      {
+       "text": "Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.",
+       "url": "https://doi.org/10.2307/2331554"
+      }
+     ]
+    },
+    {
+     "title": "One-phase exponential decay with a plateau, Y = (Y0 - Plateau) exp(-K t) + Plateau, by nonlinear least squares; t1/2 = ln(2)/K; 95% intervals from the asymptotic covariance with the t distribution on n - 3 degrees of freedom",
+     "id": "peptide.one_phase_decay",
+     "version": "1.0.0",
+     "assumptions": [
+      "independent, equally weighted residuals on the percent scale"
+     ],
+     "limits": [
+      "needs at least four observations; the intervals are asymptotic (Wald)",
+      "a plateau above zero means part of the peptide is not degraded and the half-life describes only the degrading part"
+     ],
+     "references": [
+      {
+       "text": "GraphPad Software. Equation: One phase decay. GraphPad Prism 11 Curve Fitting Guide (vendor documentation; equation form and half-life = ln(2)/K).",
+       "url": "https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_exponential_decay_1phase.htm"
+      },
+      {
+       "text": "Cavaco M, Valle J, Flores I, Andreu D, Castanho MARB. Estimating peptide half-life in serum from tunable, sequence-related physicochemical properties. Clin Transl Sci. 2021;14(4):1349-1358.",
+       "url": "https://doi.org/10.1111/cts.12985"
+      },
+      {
+       "text": "Student. The probable error of a mean. Biometrika. 1908;6(1):1-25.",
+       "url": "https://doi.org/10.2307/2331554"
+      }
+     ]
+    },
+    {
+     "title": "Intact peptide remaining as a percentage of the time-zero sample of the same replicate",
+     "id": "peptide.percent_of_time_zero",
+     "version": "1.0.0",
+     "assumptions": [
+      "the parent response is proportional to the amount of intact peptide"
+     ],
+     "limits": [
+      "a sample below the quantitation limit is excluded, not imputed"
+     ],
+     "references": [
+      {
+       "text": "B\u00f6ttger R, Hoffmann R, Knappe D. Differential stability of therapeutic peptides with different proteolytic cleavage sites in blood, plasma and serum. PLoS One. 2017;12(6):e0178943.",
+       "url": "https://doi.org/10.1371/journal.pone.0178943"
+      },
+      {
+       "text": "Cavaco M, Valle J, Flores I, Andreu D, Castanho MARB. Estimating peptide half-life in serum from tunable, sequence-related physicochemical properties. Clin Transl Sci. 2021;14(4):1349-1358.",
+       "url": "https://doi.org/10.1111/cts.12985"
+      },
+      {
+       "text": "Nguyen LT, Chau JK, Perry NA, de Boer L, Zaat SAJ, Vogel HJ. Serum stabilities of short tryptophan- and arginine-rich antimicrobial peptide analogs. PLoS One. 2010;5(9):e12684.",
+       "url": "https://doi.org/10.1371/journal.pone.0012684"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Pharmacology",
+   "slug": "pharmacology",
+   "methods": [
+    {
+     "title": "Four-parameter logistic (Hill) concentration-response fit",
+     "id": "pharm.hill_4pl",
+     "version": "1.0.0",
+     "assumptions": [
+      "a single sigmoidal transition between two asymptotes"
+     ],
+     "limits": [
+      "an inflection point outside the tested concentration range yields an extrapolated potency which is flagged rather than reported as measured"
+     ],
+     "references": [
+      {
+       "text": "DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102.",
+       "url": "https://doi.org/10.1152/ajpendo.1978.235.2.E97"
+      }
+     ]
+    },
+    {
+     "title": "Molar to mass concentration (IC50 in ng/mL)",
+     "id": "pharm.molar_to_mass_concentration",
+     "version": "1.0.0",
+     "assumptions": [
+      "molecular weight of the registered structure (free form, not a salt)"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Per-cell fractional current inhibition with background subtraction",
+     "id": "pharm.percent_inhibition",
+     "version": "1.0.0",
+     "assumptions": [
+      "residual current after a saturating selective blocker is non-hERG background (E14/S7B Q&A 2.1 item 2)",
+      "drug effect measured at steady state"
+     ],
+     "limits": [
+      "rundown during the recording is not corrected; vehicle controls show its magnitude"
+     ],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      },
+      {
+       "text": "Ridder BJ, Leishman DJ, Bridgland-Taylor M, et al. A systematic strategy for estimating hERG block potency and its implications in a new cardiac safety paradigm. Toxicol Appl Pharmacol. 2020;394:114961.",
+       "url": "https://doi.org/10.1016/j.taap.2020.114961"
+      }
+     ]
+    },
+    {
+     "title": "Relative potency: ratio of fitted 50% effective concentrations (off-target / primary)",
+     "id": "pharm.relative_potency",
+     "version": "1.0.0",
+     "assumptions": [
+      "the two curves are fitted independently; the standard error is the first-order delta method for a ratio of independent estimates"
+     ],
+     "limits": [
+      "the ratio holds at the 50% effect level; with non-parallel curves it changes with the effect level (Ritz et al. 2015)",
+      "IC50s from assays at different substrate or ligand concentrations are not affinities; no Ki conversion is applied"
+     ],
+     "references": [
+      {
+       "text": "Ritz C, Baty F, Streibig JC, Gerhard D. Dose-response analysis using R. PLoS One. 2015;10(12):e0146021.",
+       "url": "https://doi.org/10.1371/journal.pone.0146021"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Plasma protein binding",
+   "slug": "plasma-protein-binding",
+   "methods": [
+    {
+     "title": "Fraction unbound by equilibrium dialysis: buffer-chamber / plasma-chamber concentration at equilibrium; replicate mean and SD",
+     "id": "ppb.fraction_unbound",
+     "version": "1.0.0",
+     "assumptions": [
+      "equilibrium was reached at the stated incubation time",
+      "buffer and plasma samples are matrix-matched before analysis"
+     ],
+     "limits": [
+      "no volume-shift correction",
+      "a buffer concentration below the LLOQ bounds fu from above only"
+     ],
+     "references": [
+      {
+       "text": "Thermo Fisher Scientific. Pierce RED Device Inserts User Guide (Cat. 89809, 89810). Pub. No. MAN0011571, Rev. C.0, 16 June 2023. (Manufacturer instructions; a secondary source for the fraction-unbound calculation.)",
+       "url": "https://assets.thermofisher.com/TFS-Assets/LSG/manuals/MAN0011571_RED_Device_Insert_UG.pdf"
+      },
+      {
+       "text": "Waters NJ, Jones R, Williams G, Sohal B. Validation of a rapid equilibrium dialysis approach for the measurement of plasma protein binding. J Pharm Sci. 2008;97(10):4586-4595.",
+       "url": "https://doi.org/10.1002/jps.21317"
+      }
+     ]
+    },
+    {
+     "title": "In-study positive control within 3-fold of the mean fu,p from assay qualification",
+     "id": "ppb.positive_control_m12",
+     "version": "1.0.0",
+     "assumptions": [
+      "the qualified mean fu,p comes from the laboratory's assay qualification"
+     ],
+     "limits": [
+      "ICH M12 states the rule for human plasma in drug-interaction work; it is applied to any species for which the protocol declares a positive control"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M12: Drug Interaction Studies. Final version, adopted 21 May 2024.",
+       "url": "https://database.ich.org/sites/default/files/ICH_M12_Step4_Guideline_2024_0521.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Protein",
+   "slug": "protein",
+   "methods": [
+    {
+     "title": "Absorbance at 280 nm of a 1 g/L solution through 1 cm: extinction coefficient divided by molecular mass",
+     "id": "protein.a280_01_percent",
+     "version": "1.0.0",
+     "assumptions": [
+      "the mass used is the polypeptide mass of the same chain"
+     ],
+     "limits": [
+      "a glycosylated product weighs more than its polypeptide, so its measured A280 per mg/mL is lower than this value"
+     ],
+     "references": [
+      {
+       "text": "Pace CN, Vajdos F, Fee L, Grimsley G, Gray T. How to measure and predict the molar absorption coefficient of a protein. Protein Sci. 1995;4(11):2411-2423.",
+       "url": "https://doi.org/10.1002/pro.5560041120"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      }
+     ]
+    },
+    {
+     "title": "Aliphatic index: relative volume of aliphatic side chains (Ikai 1980)",
+     "id": "protein.aliphatic_index",
+     "version": "1.0.0",
+     "assumptions": [
+      "mole percent of Ala, Val, Ile and Leu, with the coefficients 2.9 and 3.9 as ExPASy ProtParam states Ikai's index; the 1980 paper defines the index in words and the coefficients are taken from ProtParam's statement of it"
+     ],
+     "limits": [
+      "correlated with thermostability across globular proteins; it is not a melting temperature and does not apply to a specific formulation",
+      "implementations differ over mole percent versus raw counts; this one uses mole percent, so an all-alanine chain scores exactly 100"
+     ],
+     "references": [
+      {
+       "text": "Ikai A. Thermostability and aliphatic index of globular proteins. J Biochem. 1980;88(6):1895-1898.",
+       "url": "https://doi.org/10.1093/oxfordjournals.jbchem.a133168"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      }
+     ]
+    },
+    {
+     "title": "Molar absorption coefficient at 280 nm in water from tryptophan, tyrosine and cystine content (Pace et al. 1995)",
+     "id": "protein.extinction_280",
+     "version": "1.0.0",
+     "assumptions": [
+      "absorbance in water at 280 nm",
+      "the number of disulfide bonds is supplied by the caller; the sequence does not say which cysteines are paired"
+     ],
+     "limits": [
+      "against 116 measured values the paper reports a mean deviation of 3.2 per cent for proteins containing tryptophan and 6.5 per cent for those without it, with individual errors above 10 per cent among the latter",
+      "the paper recommends measuring the coefficient rather than predicting it where the value matters",
+      "non-protein chromophores, including conjugated payloads, are not counted"
+     ],
+     "references": [
+      {
+       "text": "Pace CN, Vajdos F, Fee L, Grimsley G, Gray T. How to measure and predict the molar absorption coefficient of a protein. Protein Sci. 1995;4(11):2411-2423.",
+       "url": "https://doi.org/10.1002/pro.5560041120"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    },
+    {
+     "title": "Grand average of hydropathy: mean Kyte-Doolittle hydropathy per residue",
+     "id": "protein.gravy",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "a composition average; it does not locate hydrophobic patches, which is what aggregation and non-specific clearance actually track",
+      "defined only for the 20 standard residues"
+     ],
+     "references": [
+      {
+       "text": "Kyte J, Doolittle RF. A simple method for displaying the hydropathic character of a protein. J Mol Biol. 1982;157(1):105-132.",
+       "url": "https://doi.org/10.1016/0022-2836(82)90515-0"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    },
+    {
+     "title": "Instability index from dipeptide composition (Guruprasad et al. 1990)",
+     "id": "protein.instability_index",
+     "version": "1.0.0",
+     "assumptions": [
+      "the dipeptide instability weights were fitted to 12 unstable and 32 stable proteins classified by their in vivo (metabolic) stability"
+     ],
+     "limits": [
+      "the cut-off of 40 below which a protein is called stable is ExPASy ProtParam's statement of the method, not a figure quoted here from the 1990 paper, and it is not a specification limit for a biologic drug substance",
+      "the index was built for intracellular stability, not for the stability of a purified protein in a formulation, which is what matters to a drug product",
+      "no information about the formulation, which dominates real stability"
+     ],
+     "references": [
+      {
+       "text": "Guruprasad K, Reddy BVB, Pandit MW. Correlation between stability of a protein and its dipeptide composition: a novel approach for predicting in vivo stability of a protein from its primary sequence. Protein Eng. 1990;4(2):155-161.",
+       "url": "https://doi.org/10.1093/protein/4.2.155"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    },
+    {
+     "title": "Theoretical isoelectric point from the amino-acid sequence (Bjellqvist pK set, as implemented by Biopython ProtParam)",
+     "id": "protein.isoelectric_point",
+     "version": "1.0.0",
+     "assumptions": [
+      "free, unmodified N- and C-termini",
+      "charge of the unfolded chain; the folded structure shifts individual pK values"
+     ],
+     "limits": [
+      "post-translational modification, bound counter-ions and the formulation buffer are not represented",
+      "defined only for the 20 standard residues; a sequence containing an ambiguity code has no value"
+     ],
+     "references": [
+      {
+       "text": "Bjellqvist B, Hughes GJ, Pasquali C, et al. The focusing positions of polypeptides in immobilized pH gradients can be predicted from their amino acid sequences. Electrophoresis. 1993;14(10):1023-1031.",
+       "url": "https://doi.org/10.1002/elps.11501401163"
+      },
+      {
+       "text": "Bjellqvist B, Basse B, Olsen E, Celis JE. Reference points for comparisons of two-dimensional maps of proteins from different human cell types defined in a pH scale where isoelectric points correlate with polypeptide compositions. Electrophoresis. 1994;15(3-4):529-539.",
+       "url": "https://doi.org/10.1002/elps.1150150171"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    },
+    {
+     "title": "Average polypeptide mass less two hydrogen atoms per declared disulfide bond",
+     "id": "protein.mass_disulfide_corrected",
+     "version": "1.0.0",
+     "assumptions": [
+      "the number of disulfide bonds is declared by the sponsor"
+     ],
+     "limits": [
+      "glycans and other post-translational modification are not included, so for a glycoprotein this is the polypeptide mass and not the product's mass"
+     ],
+     "references": [
+      {
+       "text": "SIB Swiss Institute of Bioinformatics, ExPASy. Protein Identification Tools - Mass values used (FindMod): average and monoisotopic amino-acid residue masses and water.",
+       "url": "https://web.expasy.org/findmod/findmod_masses.html"
+      },
+      {
+       "text": "Prohaska T, Irrgeher J, Benefield J, et al. Standard atomic weights of the elements 2021 (IUPAC Technical Report). Pure Appl Chem. 2022;94(5):573-600.",
+       "url": "https://doi.org/10.1515/pac-2019-0603"
+      }
+     ]
+    },
+    {
+     "title": "Net charge of a polypeptide at a stated pH (Bjellqvist pK set, Biopython ProtParam)",
+     "id": "protein.net_charge",
+     "version": "1.0.0",
+     "assumptions": [
+      "free, unmodified termini; charge of the unfolded chain"
+     ],
+     "limits": [
+      "ignores the folded structure, ion pairing and the formulation buffer",
+      "defined only for the 20 standard residues"
+     ],
+     "references": [
+      {
+       "text": "Bjellqvist B, Hughes GJ, Pasquali C, et al. The focusing positions of polypeptides in immobilized pH gradients can be predicted from their amino acid sequences. Electrophoresis. 1993;14(10):1023-1031.",
+       "url": "https://doi.org/10.1002/elps.11501401163"
+      },
+      {
+       "text": "Bjellqvist B, Basse B, Olsen E, Celis JE. Reference points for comparisons of two-dimensional maps of proteins from different human cell types defined in a pH scale where isoelectric points correlate with polypeptide compositions. Electrophoresis. 1994;15(3-4):529-539.",
+       "url": "https://doi.org/10.1002/elps.1150150171"
+      },
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      },
+      {
+       "text": "Cock PJA, Antao T, Chang JT, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics. 2009;25(11):1422-1423.",
+       "url": "https://doi.org/10.1093/bioinformatics/btp163"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Rule-based filters",
+   "slug": "rule-based-filters",
+   "methods": [
+    {
+     "title": "Lipinski rule-of-five violation count",
+     "id": "rule.lipinski_ro5",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "an oral-absorption heuristic from a 1997 dataset; not a pass/fail gate"
+     ],
+     "references": [
+      {
+       "text": "Lipinski CA, Lombardo F, Dominy BW, Feeney PJ. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. Adv Drug Deliv Rev. 2001;46(1-3):3-26.",
+       "url": "https://doi.org/10.1016/S0169-409X(00)00129-0"
+      }
+     ]
+    },
+    {
+     "title": "Veber oral bioavailability criteria",
+     "id": "rule.veber",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "derived from rat oral bioavailability data"
+     ],
+     "references": [
+      {
+       "text": "Veber DF, Johnson SR, Cheng HY, Smith BR, Ward KW, Kopple KD. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45(12):2615-2623.",
+       "url": "https://doi.org/10.1021/jm020017n"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Safety pharmacology",
+   "slug": "safety-pharmacology",
+   "methods": [
+    {
+     "title": "Free high clinical exposure with the 1% unbound-fraction floor",
+     "id": "safety.free_cmax_qa12",
+     "version": "1.0.0",
+     "assumptions": [
+      "fu,p below 1% is set to 1% because of protein-binding measurement uncertainty (S7B Q&A 1.2)"
+     ],
+     "limits": [
+      "the clinical Cmax,ss is an input; its uncertainty is not propagated"
+     ],
+     "references": [
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      }
+     ]
+    },
+    {
+     "title": "hERG safety margin over free therapeutic exposure",
+     "id": "safety.herg_margin",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "a single-channel in vitro margin; it is not a proarrhythmia prediction"
+     ],
+     "references": [
+      {
+       "text": "Redfern WS, Carlsson L, Davis AS, et al. Relationships between preclinical cardiac electrophysiology, clinical QT interval prolongation and torsade de pointes for a broad range of drugs. Cardiovasc Res. 2003;58(1):32-45.",
+       "url": "https://doi.org/10.1016/S0008-6363(02)00846-5"
+      },
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+       "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf"
+      },
+      {
+       "text": "ICH E14/S7B Implementation Working Group. Clinical and Nonclinical Evaluation of QT/QTc Interval Prolongation and Proarrhythmic Potential: Questions and Answers. Adopted 21 February 2022.",
+       "url": "https://database.ich.org/sites/default/files/E14-S7B_QAs_Step4_2022_0221.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Minute volume as tidal volume x respiratory rate, per animal and timepoint, summarised by group",
+     "id": "safety.minute_volume",
+     "version": "1.0.0",
+     "assumptions": [
+      "tidal volume as reported by the acquisition system, with its own corrections"
+     ],
+     "limits": [
+      "a derived measure; ICH S7A 2.7.3 names respiratory rate and, as examples, tidal volume or haemoglobin oxygen saturation"
+     ],
+     "references": [
+      {
+       "text": "Lim R, Zavou MJ, Milton PL, et al. Measuring respiratory function in mice using unrestrained whole-body plethysmography. J Vis Exp. 2014;(90):e51755. (Secondary statement of minute volume = tidal volume x frequency.)",
+       "url": "https://doi.org/10.3791/51755"
+      }
+     ]
+    },
+    {
+     "title": "Animals with a finding (a score other than the protocol's normal score) per group and timepoint",
+     "id": "safety.observation_incidence",
+     "version": "1.0.0",
+     "assumptions": [
+      "dose-response and time course are described per S7A 2.4.1; the observation list and scoring are protocol inputs"
+     ],
+     "limits": [
+      "descriptive: no statistical test for incidence is applied (none is verified for S7A core-battery endpoints)"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+       "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Sequence entities",
+   "slug": "sequence-entities",
+   "methods": [
+    {
+     "title": "Average molecular mass of a polypeptide chain: the sum of the average residue masses plus one water (ExPASy Compute pI/Mw)",
+     "id": "seq.average_mass",
+     "version": "1.0.0",
+     "assumptions": [
+      "one linear chain with free termini"
+     ],
+     "limits": [
+      "post-translational modifications, disulfide bonds and glycans are not included",
+      "ambiguity codes (B, Z) and X have no defined mass, so no mass is computed",
+      "the table's selenocysteine average uses an older selenium atomic weight (about 0.011 Da low per residue against the 2024 value)"
+     ],
+     "references": [
+      {
+       "text": "Gasteiger E, Hoogland C, Gattiker A, Duvaud S, Wilkins MR, Appel RD, Bairoch A. Protein identification and analysis tools on the ExPASy server. In: Walker JM, ed. The Proteomics Protocols Handbook. Humana Press; 2005:571-607.",
+       "url": "https://doi.org/10.1385/1-59259-890-0:571"
+      },
+      {
+       "text": "SIB Swiss Institute of Bioinformatics, ExPASy. Protein Identification Tools - Mass values used (FindMod): average and monoisotopic amino-acid residue masses and water.",
+       "url": "https://web.expasy.org/findmod/findmod_masses.html"
+      }
+     ]
+    },
+    {
+     "title": "Number of residues in a chain, from one-letter codes",
+     "id": "seq.residue_count",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "IUPAC-IUB Joint Commission on Biochemical Nomenclature. Nomenclature and symbolism for amino acids and peptides (Recommendations 1983). Pure Appl Chem. 1984;56(5):595-624.",
+       "url": "https://doi.org/10.1351/pac198456050595"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Simulation",
+   "slug": "simulation",
+   "methods": [
+    {
+     "title": "Simulated revertant counts from declared expected values per strain, activation and concentration (exact or Poisson-sampled)",
+     "id": "sim.ames_counts",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "OECD. Test No. 471: Bacterial Reverse Mutation Test. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 21 July 1997; corrected 26 June 2020.",
+       "url": "https://doi.org/10.1787/9789264071247-en"
+      }
+     ]
+    },
+    {
+     "title": "Simulated chromatographic responses from a declared linear response model with multiplicative noise",
+     "id": "sim.bioanalytical_runs",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+       "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Simulated functional-observation scores and continuous CNS measures from declared incidences and effects",
+     "id": "sim.cns_declared",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+       "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Simulated dose range-finding data from declared endpoint effects, clinical-sign incidences and deaths",
+     "id": "sim.drf_declared_effects",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "OECD. Test No. 407: Repeated Dose 28-day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 2008.",
+       "url": "https://doi.org/10.1787/9789264070684-en"
+      }
+     ]
+    },
+    {
+     "title": "Simulated microsomal depletion from a declared first-order model with multiplicative analytical noise",
+     "id": "sim.first_order_depletion",
+     "version": "1.0.0",
+     "assumptions": [
+      "first-order depletion at the declared half-life"
+     ],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "Obach RS. Prediction of human clearance of twenty-nine drugs from hepatic microsomal intrinsic clearance data: an examination of in vitro half-life approach and nonspecific binding to microsomes. Drug Metab Dispos. 1999;27(11):1350-1359.",
+       "url": "https://doi.org/10.1016/S0090-9556(24)14938-0"
+      }
+     ]
+    },
+    {
+     "title": "Simulated concentration-response from a declared 4PL model with additive noise",
+     "id": "sim.four_parameter_logistic",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "DeLean A, Munson PJ, Rodbard D. Simultaneous analysis of families of sigmoidal curves: application to bioassay, radioligand assay, and physiological dose-response curves. Am J Physiol. 1978;235(2):E97-E102.",
+       "url": "https://doi.org/10.1152/ajpendo.1978.235.2.E97"
+      }
+     ]
+    },
+    {
+     "title": "Simulated intact-peptide responses from declared true half-life and plateau per condition, with proportional log-normal noise",
+     "id": "sim.peptide_decay_declared",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "GraphPad Software. Equation: One phase decay. GraphPad Prism 11 Curve Fitting Guide (vendor documentation; equation form and half-life = ln(2)/K).",
+       "url": "https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_exponential_decay_1phase.htm"
+      }
+     ]
+    },
+    {
+     "title": "Simulated single-dose concentrations from declared true group profiles with log-normal between-animal and residual variability",
+     "id": "sim.pk_declared_profile",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration, CDER. Bioavailability Studies Submitted in NDAs or INDs - General Considerations. Guidance for Industry. April 2022.",
+       "url": "https://www.fda.gov/media/121311/download"
+      }
+     ]
+    },
+    {
+     "title": "Simulated equilibrium-dialysis chamber concentrations from declared true fu values with log-normal analytical variability",
+     "id": "sim.ppb_declared_fu",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "Thermo Fisher Scientific. Pierce RED Device Inserts User Guide (Cat. 89809, 89810). Pub. No. MAN0011571, Rev. C.0, 16 June 2023. (Manufacturer instructions; a secondary source for the fraction-unbound calculation.)",
+       "url": "https://assets.thermofisher.com/TFS-Assets/LSG/manuals/MAN0011571_RED_Device_Insert_UG.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Simulated individual-animal endpoint values from declared normal distributions",
+     "id": "sim.repeat_dose_normal",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "Dunnett CW. A multiple comparison procedure for comparing several treatments with a control. J Am Stat Assoc. 1955;50(272):1096-1121.",
+       "url": "https://doi.org/10.1080/01621459.1955.10501294"
+      }
+     ]
+    },
+    {
+     "title": "Simulated respiratory rate, tidal volume and oxygen saturation from declared group means and effects with normal variability",
+     "id": "sim.respiratory_declared",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+       "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Simulated telemetry from declared per-animal QT-RR relationships, heart-rate and QTc effects with normal variability",
+     "id": "sim.telemetry_declared",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+       "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Simulated concentrations from a declared reference profile scaled by the power model, with declared day and sex factors and log-normal variability",
+     "id": "sim.tk_power_profile",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "for software verification and workflow demonstration only; never admissible as evidence"
+     ],
+     "references": [
+      {
+       "text": "Smith BP, Vandenhende FR, DeSante KA, Farid NA, Welch PA, Callaghan JT, Forgue ST. Confidence interval criteria for assessment of dose proportionality. Pharm Res. 2000;17(10):1278-1283.",
+       "url": "https://doi.org/10.1023/A:1026451721686"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Solubility",
+   "slug": "solubility",
+   "methods": [
+    {
+     "title": "Aqueous solubility estimated from structure (ESOL)",
+     "id": "solubility.esol",
+     "version": "1.0.0",
+     "assumptions": [
+      "the Delaney regression on logP, molecular weight, rotatable-bond count and aromatic proportion"
+     ],
+     "limits": [
+      "root-mean-square error about 0.8 log units on the published test set",
+      "fitted on neutral organic compounds; salts and permanently charged species are outside the domain and are refused"
+     ],
+     "references": [
+      {
+       "text": "Delaney JS. ESOL: estimating aqueous solubility directly from molecular structure. J Chem Inf Comput Sci. 2004;44(3):1000-1005.",
+       "url": "https://doi.org/10.1021/ci034243x"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Statistics",
+   "slug": "statistics",
+   "methods": [
+    {
+     "title": "Test of Dunnett's assumptions before use: Brown-Forsythe variance homogeneity and Shapiro-Wilk normality of within-group residuals",
+     "id": "stats.assumption_gate",
+     "version": "1.0.0",
+     "assumptions": [
+      "the assumption tests are run at 0.05 unless the protocol states otherwise, independently of the level the comparison itself is judged at",
+      "Levene's test is centred on the group median (the Brown-Forsythe form)"
+     ],
+     "limits": [
+      "with small group sizes both tests have little power, so an assumption can fail to be rejected simply because n is small",
+      "a gate that cannot be evaluated sends the data to the rank-based test, which needs neither assumption, rather than passing by default"
+     ],
+     "references": [
+      {
+       "text": "Levene H. Robust tests for equality of variances. In: Olkin I, Ghurye SG, Hoeffding W, Madow WG, Mann HB, eds. Contributions to Probability and Statistics: Essays in Honor of Harold Hotelling. Stanford University Press; 1960:278-292.",
+       "url": null
+      },
+      {
+       "text": "Brown MB, Forsythe AB. Robust tests for the equality of variances. J Am Stat Assoc. 1974;69(346):364-367.",
+       "url": "https://doi.org/10.1080/01621459.1974.10482955"
+      },
+      {
+       "text": "Shapiro SS, Wilk MB. An analysis of variance test for normality (complete samples). Biometrika. 1965;52(3-4):591-611.",
+       "url": "https://doi.org/10.1093/biomet/52.3-4.591"
+      },
+      {
+       "text": "Hamada C. Statistical analysis for toxicity studies. J Toxicol Pathol. 2018;31(1):15-22.",
+       "url": "https://doi.org/10.1293/tox.2017-0050"
+      }
+     ]
+    },
+    {
+     "title": "Cochran-Armitage score test for a linear trend in finding incidence across ordered dose groups",
+     "id": "stats.cochran_armitage",
+     "version": "1.0.0",
+     "assumptions": [
+      "dose scores are the group doses unless the protocol states other spacing (e.g. ranks); the score spacing changes the statistic and is recorded",
+      "the statistic is referred to the standard normal (large-sample approximation)"
+     ],
+     "limits": [
+      "the normal approximation is unreliable when expected affected or unaffected counts are very small; it is not the exact permutation trend test",
+      "it does not select a significance level by tumour rarity: the Haseman 1983 rule is a cited decision framework applied against a historical-control context this method is not given",
+      "statistical significance is not adversity (FDA 2005 glossary, NOAEL)"
+     ],
+     "references": [
+      {
+       "text": "Cochran WG. Some methods for strengthening the common chi-square tests. Biometrics. 1954;10(4):417-451.",
+       "url": "https://doi.org/10.2307/3001616"
+      },
+      {
+       "text": "Armitage P. Tests for linear trends in proportions and frequencies. Biometrics. 1955;11(3):375-386.",
+       "url": "https://doi.org/10.2307/3001775"
+      }
+     ]
+    },
+    {
+     "title": "Dunn rank-sum comparison of each dose group with control, with Holm's step-down adjustment",
+     "id": "stats.dunn_holm",
+     "version": "1.0.0",
+     "assumptions": [
+      "observations are ranked across all groups together, so the comparisons form one family",
+      "the tie correction of Dunn 1964 is applied"
+     ],
+     "limits": [
+      "Steel's 1959 many-to-one rank test is the exact non-parametric analogue of Dunnett for this design and is not implemented; Dunn with Holm controls the family-wise error rate but is more conservative, so a real effect can be missed",
+      "the normal approximation to the rank-sum distribution is poor at very small group sizes",
+      "statistical significance is not adversity"
+     ],
+     "references": [
+      {
+       "text": "Dunn OJ. Multiple comparisons using rank sums. Technometrics. 1964;6(3):241-252.",
+       "url": "https://doi.org/10.1080/00401706.1964.10490181"
+      },
+      {
+       "text": "Holm S. A simple sequentially rejective multiple test procedure. Scand J Stat. 1979;6(2):65-70.",
+       "url": null
+      },
+      {
+       "text": "Hamada C. Statistical analysis for toxicity studies. J Toxicol Pathol. 2018;31(1):15-22.",
+       "url": "https://doi.org/10.1293/tox.2017-0050"
+      },
+      {
+       "text": "Steel RGD. A multiple comparison rank sum test: treatments versus control. Biometrics. 1959;15(4):560-572.",
+       "url": "https://doi.org/10.2307/2527654"
+      }
+     ]
+    },
+    {
+     "title": "Dunnett many-to-one comparison of each dose group with control",
+     "id": "stats.dunnett",
+     "version": "1.1.0",
+     "assumptions": [
+      "approximately normal residuals within groups",
+      "homogeneous variances across groups",
+      "both are tested before this method is used (stats.assumption_gate); where either fails the rank-based comparison is run instead"
+     ],
+     "limits": [
+      "statistical significance is not adversity; biologically significant effects can be non-significant (FDA 2005 glossary, NOAEL)",
+      "no data transformation is applied; choosing one is a judgement about the endpoint and is left to the study's statistician"
+     ],
+     "references": [
+      {
+       "text": "Dunnett CW. A multiple comparison procedure for comparing several treatments with a control. J Am Stat Assoc. 1955;50(272):1096-1121.",
+       "url": "https://doi.org/10.1080/01621459.1955.10501294"
+      },
+      {
+       "text": "Jaki T, Hothorn LA. Statistical evaluation of toxicological assays: Dunnett or Williams test - take both. Arch Toxicol. 2013;87(11):1901-1910.",
+       "url": "https://doi.org/10.1007/s00204-013-1065-x"
+      }
+     ]
+    },
+    {
+     "title": "Fisher's exact test of a dose group's finding incidence against the concurrent control (2x2 affected/unaffected x group/control)",
+     "id": "stats.fisher_exact",
+     "version": "1.0.0",
+     "assumptions": [
+      "the two margins are treated as the basis of the exact hypergeometric distribution; the test is exact for any cell count, including zeros",
+      "one-sided 'greater' tests for a higher incidence in the treated group, the direction of toxicological concern, unless two-sided is stated"
+     ],
+     "limits": [
+      "no multiplicity adjustment across dose groups is applied here; whether and how to correct the family is the study statistician's decision",
+      "statistical significance is not adversity (FDA 2005 glossary, NOAEL)",
+      "a dose-response trend is tested by stats.cochran_armitage, not by pairwise comparisons"
+     ],
+     "references": [
+      {
+       "text": "Fisher RA. On the interpretation of chi-square from contingency tables, and the calculation of P. J R Stat Soc. 1922;85(1):87-94.",
+       "url": "https://doi.org/10.2307/2340521"
+      },
+      {
+       "text": "Fisher RA. The logic of inductive inference. J R Stat Soc. 1935;98(1):39-82.",
+       "url": "https://doi.org/10.2307/2342435"
+      }
+     ]
+    },
+    {
+     "title": "Group mean and standard deviation per dose level",
+     "id": "stats.group_summary",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "descriptive only"
+     ],
+     "references": [
+      {
+       "text": "OECD. Test No. 408: Repeated Dose 90-Day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Revised 2018.",
+       "url": "https://doi.org/10.1787/9789264070707-en"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Toxicokinetics",
+   "slug": "toxicokinetics",
+   "methods": [
+    {
+     "title": "Exposure divided by the administered dose",
+     "id": "tk.dose_normalised",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+       "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf"
+      },
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      }
+     ]
+    },
+    {
+     "title": "Power-model slope with a confidence interval against a pre-stated acceptance interval",
+     "id": "tk.dose_proportionality_power",
+     "version": "1.0.0",
+     "assumptions": [
+      "PK = beta0 * Dose^beta1, fitted on ln-ln scale by least squares over individual animals (parallel groups)",
+      "the acceptance limits theta_L/theta_H and confidence level are stated before analysis"
+     ],
+     "limits": [
+      "control animals and unquantifiable exposure are excluded (log of zero)",
+      "the interval form is the exact algebraic consequence of the power model; Smith 2000 is cited from its abstract"
+     ],
+     "references": [
+      {
+       "text": "Smith BP, Vandenhende FR, DeSante KA, Farid NA, Welch PA, Callaghan JT, Forgue ST. Confidence interval criteria for assessment of dose proportionality. Pharm Res. 2000;17(10):1278-1283.",
+       "url": "https://doi.org/10.1023/A:1026451721686"
+      },
+      {
+       "text": "Hummel J, McKendrick S, Brindley C, French R. Exploratory assessment of dose proportionality: review of current approaches and proposal for a practical criterion. Pharm Stat. 2009;8(1):38-49.",
+       "url": "https://doi.org/10.1002/pst.326"
+      },
+      {
+       "text": "Braeckman R, Guenther S, Mickle TC, Barrett AC, Smith A, Oh C. Dose proportionality and steady-state pharmacokinetics of serdexmethylphenidate/dexmethylphenidate, a novel prodrug combination to treat attention-deficit/hyperactivity disorder. J Child Adolesc Psychopharmacol. 2022;32(5):288-295.",
+       "url": "https://doi.org/10.1089/cap.2022.0015"
+      },
+      {
+       "text": "Shang H, Dai X, Li M, Kai Y, Liu Z, Wang M, Li Q, Gu Y, Liu C, Si D. Absolute bioavailability, dose proportionality, and tissue distribution of rotundic acid in rats based on validated LC-QqQ-MS/MS method. J Pharm Anal. 2022;12(2):278-286.",
+       "url": "https://doi.org/10.1016/j.jpha.2021.03.008"
+      }
+     ]
+    },
+    {
+     "title": "Animal exposure divided by the stated human exposure",
+     "id": "tk.exposure_multiple",
+     "version": "1.0.0",
+     "assumptions": [
+      "the human exposure is an input with its own provenance (measured or predicted) and the same matrix and analyte"
+     ],
+     "limits": [
+      "total, not unbound, exposure unless both inputs are unbound (ICH S3A section 2)"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+       "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Observed ratio of group mean exposure on a later profile day to the first",
+     "id": "tk.exposure_ratio_days",
+     "version": "1.0.0",
+     "assumptions": [],
+     "limits": [
+      "an observed ratio; it is an accumulation ratio at steady state only if steady state is established, which is a judgement (CDISC ARAUC)"
+     ],
+     "references": [
+      {
+       "text": "CDISC SDTM Pharmacokinetic Parameters controlled terminology (PKPARM/PKPARMCD), published in the NCI Thesaurus, version 26.09d (2026-09-28).",
+       "url": "https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/C85565"
+      },
+      {
+       "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+       "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Group mean, SD, median and range of individual exposure parameters",
+     "id": "tk.group_summary",
+     "version": "1.0.0",
+     "assumptions": [
+      "descriptive statistics per dose, sex and day (ICH S3A 3.9)"
+     ],
+     "limits": [
+      "small groups give low precision; individual data may be more informative (ICH S3A 3.9)"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+       "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Toxicology",
+   "slug": "toxicology",
+   "methods": [
+    {
+     "title": "Exposure margin: animal group-mean exposure at the top dose / clinical exposure",
+     "id": "tox.exposure_margin_m3r2",
+     "version": "1.0.0",
+     "assumptions": [
+      "'exposure' generally means group mean AUC; Cmax may be more appropriate for acute cardiovascular or CNS effects (M3(R2) Note 1)"
+     ],
+     "limits": [
+      "both exposures are inputs with their own provenance"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+       "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Per-group counts of animals at start, unscheduled deaths and animals showing each clinical sign",
+     "id": "tox.incidence",
+     "version": "1.0.0",
+     "assumptions": [
+      "tabulated as OECD TG 407 paragraph 50 describes for each test group"
+     ],
+     "limits": [],
+     "references": [
+      {
+       "text": "OECD. Test No. 407: Repeated Dose 28-day Oral Toxicity Study in Rodents. OECD Guidelines for the Testing of Chemicals, Section 4. Adopted 2008.",
+       "url": "https://doi.org/10.1787/9789264070684-en"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Virtual-study projection",
+   "slug": "virtual-study-projection",
+   "methods": [
+    {
+     "title": "Interval-censored critical effect exposure from a study's NOAEL and LOAEL",
+     "id": "virtual.critical_exposure_interval",
+     "version": "1.0.0",
+     "assumptions": [
+      "the true threshold for the endpoint lies above the exposure at the NOAEL and at or below the exposure at the lowest adverse dose"
+     ],
+     "limits": [
+      "a NOAEL is bounded by the dose spacing of the study that produced it; the interval, not a point, is the inferential object",
+      "an interval is open above when the top dose produced no adverse effect"
+     ],
+     "references": [
+      {
+       "text": "U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.)",
+       "url": "https://www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf"
+      },
+      {
+       "text": "Slob W. Dose-response modeling of continuous endpoints. Toxicol Sci. 2002;66(2):298-312.",
+       "url": "https://doi.org/10.1093/toxsci/66.2.298"
+      }
+     ]
+    },
+    {
+     "title": "Duration extrapolation of a critical effect level by default assessment factors",
+     "id": "virtual.duration_extrapolation",
+     "version": "1.0.0",
+     "assumptions": [
+      "default factors: 14 to 28 days 1.5, 28 to 90 days 3, 90 days to chronic 2"
+     ],
+     "limits": [
+      "defaults are regulatory conventions, not compound-specific measurements",
+      "no factor is applied for shortening a duration; the shorter study's level is carried unchanged and flagged"
+     ],
+     "references": [
+      {
+       "text": "European Chemicals Agency. Guidance on information requirements and chemical safety assessment, Chapter R.8: Characterisation of dose [concentration]-response for human health. Version 2.1, November 2012. (Default duration extrapolation assessment factors: subacute to subchronic 3, subchronic to chronic 2.)",
+       "url": "https://echa.europa.eu/documents/10162/13632/information_requirements_r8_en.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Interspecies exposure projection by allometric clearance scaling",
+     "id": "virtual.exposure_allometric",
+     "version": "1.0.0",
+     "assumptions": [
+      "clearance scales with body weight to the power 0.75"
+     ],
+     "limits": [
+      "used only when observed toxicokinetics are absent in the target species",
+      "observed fold-error against measured values is reported with every projection"
+     ],
+     "references": [
+      {
+       "text": "Mahmood I, Balian JD. The pharmacokinetic principles behind scaling from preclinical results to phase I protocols. Clin Pharmacokinet. 1999;36(1):1-11.",
+       "url": "https://doi.org/10.2165/00003088-199936010-00001"
+      },
+      {
+       "text": "U.S. Food and Drug Administration. Guidance for Industry: Estimating the Maximum Safe Starting Dose in Initial Clinical Trials for Therapeutics in Adult Healthy Volunteers. CDER, July 2005.",
+       "url": "https://www.fda.gov/media/72309/download"
+      }
+     ]
+    },
+    {
+     "title": "Systemic exposure at a dose from observed dose-normalised toxicokinetics",
+     "id": "virtual.exposure_from_dose",
+     "version": "1.0.0",
+     "assumptions": [
+      "exposure is proportional to dose over the interpolated range",
+      "the dose-normalised value is taken from toxicokinetics in the same study design (species, strain, route, vehicle) wherever one exists"
+     ],
+     "limits": [
+      "linearity is checked against the observed dose levels and the value is refused outside the observed range by more than fivefold",
+      "saturable metabolite formation (for example ALA to PpIX) is not linear and is handled by its own metabolite relation, never by this one"
+     ],
+     "references": [
+      {
+       "text": "Pharmaceuticals and Medical Devices Agency (Japan). Review Report: Alaglio Oral 1.5 g (aminolevulinic acid hydrochloride). 25 January 2013. (Rat 4-week and 13-week and dog 4-week oral toxicity studies with toxicokinetics.)",
+       "url": "https://www.pmda.go.jp/files/000153482.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Absolute exposure reconstructed from a reported dose-ratio and an anchor value",
+     "id": "virtual.exposure_from_reported_ratio",
+     "version": "1.0.0",
+     "assumptions": [
+      "the ratio and the anchor come from the same study population and assay"
+     ],
+     "limits": [
+      "the reconstructed value inherits the precision of the reported ratio, which is usually given to two significant figures"
+     ],
+     "references": [
+      {
+       "text": "U.S. Food and Drug Administration. Clinical Pharmacology and Biopharmaceutics Review, NDA 208630 (Gleolan). 2017. (Dose-ranging study MC-ALS.8-I: relative to 0.2 mg/kg, AUC rose 6.2-fold at 2 mg/kg and 49.9-fold at 20 mg/kg.)",
+       "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2017/208630Orig1s000ClinPharmR.pdf"
+      }
+     ]
+    },
+    {
+     "title": "Protoporphyrin IX accumulation from exogenous 5-aminolevulinic acid",
+     "id": "virtual.ppix_accumulation",
+     "version": "1.0.0",
+     "assumptions": [
+      "exogenous ALA bypasses haem feedback inhibition of ALA synthase so PpIX accumulates where ferrochelatase capacity is exceeded"
+     ],
+     "limits": [
+      "PpIX formation is saturable: a tenfold ALA dose raised human PpIX exposure about threefold, so PpIX is never scaled linearly with ALA dose",
+      "tissue PpIX is not predicted; only the plasma relation that was measured"
+     ],
+     "references": [
+      {
+       "text": "Wachowska M, Muchowicz A, Firczuk M, et al. Aminolevulinic acid (ALA) as a prodrug in photodynamic therapy of cancer. Molecules. 2011;16(5):4140-4164.",
+       "url": "https://doi.org/10.3390/molecules16054140"
+      },
+      {
+       "text": "Yang X, Palasuberniam P, Kraus D, Chen B. Aminolevulinic acid-based tumor detection and therapy: molecular mechanisms and strategies for enhancement. Int J Mol Sci. 2015;16(10):25865-25880.",
+       "url": "https://doi.org/10.3390/ijms161025865"
+      }
+     ]
+    },
+    {
+     "title": "Cross-species projection of an endpoint's critical exposure",
+     "id": "virtual.species_projection",
+     "version": "1.0.0",
+     "assumptions": [
+      "for an endpoint with no cited species difference, the critical systemic exposure is conserved across species",
+      "an endpoint that a species physiologically cannot express is excluded for that species rather than projected into it"
+     ],
+     "limits": [
+      "exposure conservation is an assumption, not a law; its observed fold-error on the programme's own validation set is reported with every projection",
+      "a species-specific sensitivity factor is applied only where a cited mechanism supports it"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+       "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf"
+      },
+      {
+       "text": "Horn CC, Kimball BA, Wang H, et al. Why can't rodents vomit? A comparative behavioral, anatomical, and physiological study. PLoS One. 2013;8(4):e60537.",
+       "url": "https://doi.org/10.1371/journal.pone.0060537"
+      }
+     ]
+    },
+    {
+     "title": "Projected findings and NOAEL of a proposed repeat-dose study",
+     "id": "virtual.study_projection",
+     "version": "1.0.0",
+     "assumptions": [
+      "the study reports an adverse finding at a dose whose projected exposure reaches the endpoint's critical exposure interval"
+     ],
+     "limits": [
+      "a projection of what a study would report; it is not the study and cannot substitute for it in a regulatory submission",
+      "endpoints with no cited evidence in the programme are not projected"
+     ],
+     "references": [
+      {
+       "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+       "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf"
+      },
+      {
+       "text": "U.S. Environmental Protection Agency. Benchmark Dose Technical Guidance. EPA/100/R-12/001, June 2012. (A NOAEL is bounded by the spacing of the dose groups; benchmark-dose modelling estimates the response level directly.)",
+       "url": "https://www.epa.gov/sites/default/files/2015-01/documents/benchmark_dose_guidance.pdf"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "standing": "**In silico triage.** In silico triage is decision support for choosing and designing studies. It is not evidence and is never part of a study record or a submission. Where a method has been validated against a held-out set of real measured values its measured performance is shown with the signal and in its model card (docs/validation); where it has not, no accuracy is claimed for it.\n\n**KESTREL study order.** KESTREL is decision support for the order in which to run studies to reach a go/kill decision at the lowest expected spend. It never commissions, waives or reorders a study of record, is never part of a submission, and claims no accuracy until a pre-registered, held-out validation is published. Cost and duration are the programme's own CRO inputs; where defaulted they are flagged and the order is provisional."
+}

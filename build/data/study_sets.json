@@ -1,0 +1,3283 @@
+{
+ "engine": "hos.core.regulatory.engine.derive_study_set",
+ "generated": "2026-10-22",
+ "sets": {
+  "antibody-drug-conjugate": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "advanced_cancer",
+    "intended_clinical_duration_days": 180,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 21,
+    "modality": "antibody_drug_conjugate",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [
+     "cynomolgus monkey"
+    ],
+    "populations": [
+     "patients"
+    ],
+    "route": "intravenous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Intravenous",
+    "Advanced cancer (ICH S9)",
+    "21-day cycle",
+    "Patients",
+    "Relevant species: cynomolgus monkey"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s6r1",
+     "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+     "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+     "year": 2011
+    },
+    {
+     "doi": null,
+     "key": "ich_s9",
+     "text": "ICH Harmonised Tripartite Guideline S9: Nonclinical Evaluation for Anticancer Pharmaceuticals. Step 4, 29 October 2009.",
+     "url": "https://database.ich.org/sites/default/files/S9_Guideline.pdf",
+     "year": 2009
+    }
+   ],
+   "label": "Antibody\u2013drug conjugate",
+   "notes": [
+    "ADCs: the conjugate is the primary test article; the linker-payload is assessed for genotoxicity and hERG separately.",
+    "ICH S9 applies (advanced cancer): abbreviated package; starting dose from 1/10 rodent STD10 or 1/6 non-rodent HNSTD rather than the NOAEL."
+   ],
+   "requirements": [
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.immunogenicity",
+     "name": "Anti-drug antibody assessment in toxicity studies",
+     "pending_fact": null,
+     "rationale": "ADA must be measured to interpret exposure and findings; animal immunogenicity does not predict human immunogenicity",
+     "section": "S6(R1) section 3.6; Addendum section 4",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "bio.species_relevance",
+     "name": "Pharmacologically relevant species selection",
+     "pending_fact": null,
+     "rationale": "Toxicity studies must use species in which the product is pharmacologically active, established by target homology, binding and functional activity",
+     "section": "S6(R1) section 3.3; Addendum section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.tissue_cross_reactivity",
+     "name": "Human tissue cross-reactivity (IHC panel)",
+     "pending_fact": null,
+     "rationale": "Recommended for monoclonal antibodies before first human dosing",
+     "section": "S6(R1) section 3.3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.repeat_dose",
+     "name": "Repeat-dose toxicity in relevant species",
+     "pending_fact": null,
+     "rationale": "S6(R1) section 4.4: duration follows the intended clinical use \u2014 generally 1 to 3 months, with 6 months supporting chronic use. S6(R1) gives no threshold that fixes one of those, so the duration is set by the programme rather than derived here (one relevant species identified: a single-species programme is acceptable)",
+     "section": "S6(R1) section 4.4; Addendum section 3.2",
+     "species": [
+      "cynomolgus monkey"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.battery",
+     "name": "Standard genotoxicity battery",
+     "pending_fact": "linker-payload genotoxicity data",
+     "rationale": "Not applicable to biotechnology-derived proteins; for ADCs the small-molecule linker-payload is assessed for genotoxicity",
+     "section": "S6(R1) section 4.7",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology endpoints (within tox studies)",
+     "pending_fact": null,
+     "rationale": "Safety pharmacology endpoints may be incorporated into toxicity studies",
+     "section": "S6(R1) section 4.1",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.biologic",
+     "name": "Reproductive toxicity in a relevant species (ePPND if NHP-only)",
+     "pending_fact": null,
+     "rationale": "Conducted in a pharmacologically relevant species; where only NHP are relevant an enhanced pre/postnatal study can replace separate EFD/PPND",
+     "section": "S6(R1) Addendum section 5",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "carc.bioassay",
+     "name": "Rodent carcinogenicity bioassay",
+     "pending_fact": null,
+     "rationale": "Standard bioassays are generally inappropriate; carcinogenic potential is addressed by a product-specific weight-of-evidence assessment",
+     "section": "S6(R1) section 4.8; Addendum section 6",
+     "species": [],
+     "status": "not_required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 1,
+    "not_required": 1,
+    "required": 6
+   }
+  },
+  "cell-therapy": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "advanced_cancer",
+    "intended_clinical_duration_days": 1,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 1,
+    "modality": "cell_therapy",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "patients"
+    ],
+    "route": "intravenous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Intravenous, single infusion",
+    "Advanced cancer",
+    "Patients"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "fda_cber_cgt_2013",
+     "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+     "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+     "year": 2013
+    },
+    {
+     "doi": null,
+     "key": "ich_s9",
+     "text": "ICH Harmonised Tripartite Guideline S9: Nonclinical Evaluation for Anticancer Pharmaceuticals. Step 4, 29 October 2009.",
+     "url": "https://database.ich.org/sites/default/files/S9_Guideline.pdf",
+     "year": 2009
+    }
+   ],
+   "label": "Cell therapy",
+   "notes": [
+    "Cell and gene therapies fall outside ICH M3(R2); requirements follow FDA CBER and EMA ATMP guidance. A product-specific pre-IND (INTERACT) meeting is strongly advised.",
+    "ICH S9 applies (advanced cancer): abbreviated package; starting dose from 1/10 rodent STD10 or 1/6 non-rodent HNSTD rather than the NOAEL."
+   ],
+   "requirements": [
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "atmp.biodistribution",
+     "name": "Biodistribution including germline tissues",
+     "pending_fact": null,
+     "rationale": "Distribution and persistence in target and non-target tissues, body fluids and gonads must be characterised before first human dosing",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "atmp.insertional_mutagenesis",
+     "name": "Insertional mutagenesis assessment",
+     "pending_fact": "whether the vector integrates",
+     "rationale": "Required for integrating vectors",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "atmp.species_relevance",
+     "name": "Species-relevance assessment submitted in the IND",
+     "pending_fact": null,
+     "rationale": "Biologically responsive species and disease models are preferred over healthy animals and standard tox species",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "atmp.tumorigenicity",
+     "name": "Tumorigenicity assessment with the clinical product",
+     "pending_fact": null,
+     "rationale": "Uses the clinical product at the maximum feasible dose by the clinical route",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    }
+   ],
+   "summary": {
+    "conditional": 1,
+    "not_required": 0,
+    "required": 3
+   }
+  },
+  "gene-therapy": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "rare_genetic",
+    "intended_clinical_duration_days": 1,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": false,
+    "max_trial_duration_days": 1,
+    "modality": "gene_therapy",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "patients"
+    ],
+    "route": "intravenous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Intravenous, single dose",
+    "Rare genetic disease",
+    "Non-integrating vector",
+    "Patients"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "fda_cber_cgt_2013",
+     "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+     "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+     "year": 2013
+    }
+   ],
+   "label": "Gene therapy",
+   "notes": [
+    "Cell and gene therapies fall outside ICH M3(R2); requirements follow FDA CBER and EMA ATMP guidance. A product-specific pre-IND (INTERACT) meeting is strongly advised."
+   ],
+   "requirements": [
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "atmp.biodistribution",
+     "name": "Biodistribution including germline tissues",
+     "pending_fact": null,
+     "rationale": "Distribution and persistence in target and non-target tissues, body fluids and gonads must be characterised before first human dosing",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "atmp.species_relevance",
+     "name": "Species-relevance assessment submitted in the IND",
+     "pending_fact": null,
+     "rationale": "Biologically responsive species and disease models are preferred over healthy animals and standard tox species",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "advanced_therapy_specific",
+     "citation": {
+      "doi": null,
+      "key": "fda_cber_cgt_2013",
+      "text": "U.S. Food and Drug Administration, CBER. Guidance for Industry: Preclinical Assessment of Investigational Cellular and Gene Therapy Products. November 2013.",
+      "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/preclinical-assessment-investigational-cellular-and-gene-therapy-products",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "atmp.tumorigenicity",
+     "name": "Tumorigenicity assessment with the clinical product",
+     "pending_fact": null,
+     "rationale": "Uses the clinical product at the maximum feasible dose by the clinical route",
+     "section": "FDA CBER CGT preclinical guidance (2013)",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    }
+   ],
+   "summary": {
+    "conditional": 1,
+    "not_required": 0,
+    "required": 2
+   }
+  },
+  "monoclonal-antibody": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "chronic_non_oncology",
+    "intended_clinical_duration_days": 365,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "monoclonal_antibody",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [
+     "cynomolgus monkey"
+    ],
+    "populations": [
+     "patients"
+    ],
+    "route": "intravenous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Intravenous",
+    "Chronic, non-oncology",
+    "28-day trial",
+    "Intended use: 12 months",
+    "Patients",
+    "Relevant species: cynomolgus monkey"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s6r1",
+     "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+     "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+     "year": 2011
+    }
+   ],
+   "label": "Monoclonal antibody",
+   "notes": [],
+   "requirements": [
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.immunogenicity",
+     "name": "Anti-drug antibody assessment in toxicity studies",
+     "pending_fact": null,
+     "rationale": "ADA must be measured to interpret exposure and findings; animal immunogenicity does not predict human immunogenicity",
+     "section": "S6(R1) section 3.6; Addendum section 4",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "bio.species_relevance",
+     "name": "Pharmacologically relevant species selection",
+     "pending_fact": null,
+     "rationale": "Toxicity studies must use species in which the product is pharmacologically active, established by target homology, binding and functional activity",
+     "section": "S6(R1) section 3.3; Addendum section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.tissue_cross_reactivity",
+     "name": "Human tissue cross-reactivity (IHC panel)",
+     "pending_fact": null,
+     "rationale": "Recommended for monoclonal antibodies before first human dosing",
+     "section": "S6(R1) section 3.3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.repeat_dose",
+     "name": "Repeat-dose toxicity in relevant species",
+     "pending_fact": null,
+     "rationale": "S6(R1) section 4.4: duration follows the intended clinical use \u2014 generally 1 to 3 months, with 6 months supporting chronic use. S6(R1) gives no threshold that fixes one of those, so the duration is set by the programme rather than derived here (one relevant species identified: a single-species programme is acceptable)",
+     "section": "S6(R1) section 4.4; Addendum section 3.2",
+     "species": [
+      "cynomolgus monkey"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.battery",
+     "name": "Standard genotoxicity battery",
+     "pending_fact": null,
+     "rationale": "The standard battery is not applicable to biotechnology-derived pharmaceuticals",
+     "section": "S6(R1) section 4.7",
+     "species": [],
+     "status": "not_required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology endpoints (within tox studies)",
+     "pending_fact": null,
+     "rationale": "Safety pharmacology endpoints may be incorporated into toxicity studies",
+     "section": "S6(R1) section 4.1",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.biologic",
+     "name": "Reproductive toxicity in a relevant species (ePPND if NHP-only)",
+     "pending_fact": null,
+     "rationale": "Conducted in a pharmacologically relevant species; where only NHP are relevant an enhanced pre/postnatal study can replace separate EFD/PPND",
+     "section": "S6(R1) Addendum section 5",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "carc.bioassay",
+     "name": "Rodent carcinogenicity bioassay",
+     "pending_fact": null,
+     "rationale": "Standard bioassays are generally inappropriate; carcinogenic potential is addressed by a product-specific weight-of-evidence assessment",
+     "section": "S6(R1) section 4.8; Addendum section 6",
+     "species": [],
+     "status": "not_required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 0,
+    "not_required": 2,
+    "required": 6
+   }
+  },
+  "oligonucleotide": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "rare_genetic",
+    "intended_clinical_duration_days": 365,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "oligonucleotide",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "patients"
+    ],
+    "route": "subcutaneous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Subcutaneous",
+    "Rare genetic disease",
+    "28-day trial",
+    "Intended use: 12 months",
+    "Patients"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s2r1",
+     "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+     "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+     "year": 2011
+    },
+    {
+     "doi": null,
+     "key": "ich_s7a",
+     "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+     "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+     "year": 2000
+    },
+    {
+     "doi": null,
+     "key": "ich_s7b",
+     "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+     "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+     "year": 2005
+    },
+    {
+     "doi": "10.1089/nat.2015.0534",
+     "key": "oswg_genotox_2016",
+     "text": "Berman CL, Barros SA, Galloway SM, et al. OSWG recommendations for genotoxicity testing of novel oligonucleotide-based therapeutics. Nucleic Acid Ther. 2016;26(2):73-85.",
+     "url": null,
+     "year": 2016
+    }
+   ],
+   "label": "Oligonucleotide",
+   "notes": [
+    "Synthetic oligonucleotide: the ICH small-molecule battery applies (OSWG), with the oligonucleotide class effects below assessed in addition. Repeat-dose tox is normally conducted in a rodent and a non-rodent (frequently non-human primate for antisense).",
+    "Genotoxicity: the standard ICH S2(R1) battery applies to synthetic oligonucleotides (OSWG 2013); backbone/sugar chemistry is considered when interpreting results."
+   ],
+   "requirements": [
+    {
+     "category": "bioanalytical",
+     "citation": {
+      "doi": null,
+      "key": "ich_m10",
+      "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+      "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf",
+      "year": 2022
+     },
+     "components": [],
+     "ctd_section": "4.2.2.1",
+     "driver_id": "bioanalytical_validation",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bioanalytical.validation",
+     "name": "Validated bioanalytical method for TK samples",
+     "pending_fact": null,
+     "rationale": "Concentrations supporting regulatory decisions require a validated method",
+     "section": "M10 section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": "10.1177/0192623314551840",
+      "key": "frazier_2015",
+      "text": "Frazier KS. Antisense oligonucleotide therapies: the promise and the challenges from a toxicologic pathologist's perspective. Toxicol Pathol. 2015;43(1):78-89.",
+      "url": null,
+      "year": 2015
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "oligo.tissue_accumulation",
+     "name": "Tissue accumulation and reversibility (kidney, liver)",
+     "pending_fact": null,
+     "rationale": "Oligonucleotides accumulate in highly perfused clearing organs; repeat-dose studies must characterise accumulation, the associated histopathology (e.g. basophilic granules, tubular changes) and its reversibility",
+     "section": "Frazier 2015; OSWG points-to-consider",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "dose_range_finding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "tox.dose_range_finding",
+     "name": "Dose range-finding / MTD studies",
+     "pending_fact": null,
+     "rationale": "Dose selection for the pivotal repeat-dose studies",
+     "section": "M3(R2) sections 1.5, 4",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_nonrodent",
+     "name": "Repeat-dose toxicity (non-rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_rodent",
+     "name": "Repeat-dose toxicity (rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3.1",
+     "driver_id": "ames",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.ames",
+     "name": "Bacterial reverse mutation assay (Ames)",
+     "pending_fact": null,
+     "rationale": "A gene mutation assay is generally considered sufficient to support single-dose clinical trials",
+     "section": "M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "local_tolerance",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.6",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.local_tolerance",
+     "name": "Local tolerance at the clinical route",
+     "pending_fact": null,
+     "rationale": "Local tolerance is evaluated, preferably within general toxicity studies, by the intended clinical route",
+     "section": "M3(R2) section 8",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": "metabolic_stability",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolic_stability",
+     "name": "In vitro metabolic stability (liver microsomes)",
+     "pending_fact": null,
+     "rationale": "In vitro metabolic data across species are expected before human exposure to support species selection and human clearance prediction",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.3",
+     "driver_id": "plasma_protein_binding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.plasma_protein_binding",
+     "name": "Plasma protein binding across species",
+     "pending_fact": null,
+     "rationale": "Unbound fractions are needed to compare exposures across species and to compute free-drug safety margins",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_s3a",
+      "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+      "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf",
+      "year": 1994
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "toxicokinetics",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.toxicokinetics",
+     "name": "Toxicokinetics within repeat-dose studies",
+     "pending_fact": null,
+     "rationale": "Systemic exposure must be measured in toxicity studies to relate findings to exposure; reported with the toxicity study (ICH M4S(R2) 4.2.3.2, 'including supportive toxicokinetics evaluations')",
+     "section": "S3A",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacology",
+     "citation": {
+      "doi": "10.1038/nbt.2376",
+      "key": "lindow_2012",
+      "text": "Lindow M, Vornlocher HP, Riley D, et al. Assessing unintended hybridization-induced biological effects of oligonucleotides. Nat Biotechnol. 2012;30(10):920-923.",
+      "url": null,
+      "year": 2012
+     },
+     "components": [],
+     "ctd_section": "4.2.1.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "oligo.hybridization_offtarget",
+     "name": "Hybridization-dependent off-target assessment (in silico + in vitro)",
+     "pending_fact": null,
+     "rationale": "Sequence-complementary off-target transcripts are predicted in silico against the transcriptome and the credible candidates confirmed in vitro, so hybridization-dependent effects are understood before dosing humans",
+     "section": "Lindow et al. 2012",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": "in_vitro_potency",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "pharm.primary",
+     "name": "Primary pharmacodynamics (in vitro and in vivo)",
+     "pending_fact": null,
+     "rationale": "Mechanism and pharmacologically active dose are needed to set the starting dose and to interpret toxicity",
+     "section": "M3(R2) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": "10.1177/0192623314551840",
+      "key": "frazier_2015",
+      "text": "Frazier KS. Antisense oligonucleotide therapies: the promise and the challenges from a toxicologic pathologist's perspective. Toxicol Pathol. 2015;43(1):78-89.",
+      "url": null,
+      "year": 2015
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "oligo.proinflammatory",
+     "name": "Pro-inflammatory and complement activation potential",
+     "pending_fact": null,
+     "rationale": "Phosphorothioate oligonucleotides can activate complement and provoke pro-inflammatory responses; assess in vitro (complement split products, cytokines) and in the repeat-dose studies",
+     "section": "Frazier 2015 (phosphorothioate class effects)",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7a",
+      "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+      "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+      "year": 2000
+     },
+     "components": [
+      "cns",
+      "cardiovascular",
+      "respiratory"
+     ],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology core battery: CNS, cardiovascular, respiratory",
+     "pending_fact": null,
+     "rationale": "The core battery must be completed before first administration in humans; it covers the central nervous (2.7.1), cardiovascular (2.7.2) and respiratory (2.7.3) systems",
+     "section": "S7A sections 2.7, 2.10.1",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "herg_patch_clamp",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.herg",
+     "name": "In vitro hERG (IKr) assay",
+     "pending_fact": null,
+     "rationale": "An in vitro IKr assay is part of the S7B integrated risk assessment for delayed ventricular repolarisation",
+     "section": "S7B sections 2.3.1, 3.1.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "in_vivo_qt_telemetry",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.in_vivo_qt",
+     "name": "In vivo QT assessment in a non-rodent (telemetry)",
+     "pending_fact": null,
+     "rationale": "An in vivo QT assay complements the in vitro IKr result; together they form the S7B integrated risk assessment",
+     "section": "S7B sections 2.3.2, 3.1.3",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.chromosomal",
+     "name": "Chromosomal damage assay (in vitro or in vivo micronucleus)",
+     "pending_fact": null,
+     "rationale": "An assessment of chromosomal damage in mammalian systems is added to support multiple-dose trials",
+     "section": "M3(R2) section 9; S2(R1) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_multiple_dose_trials"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.full_battery",
+     "name": "Complete genotoxicity battery (S2(R1) option 1 or 2)",
+     "pending_fact": null,
+     "rationale": "The complete standard battery should be finished before Phase 2",
+     "section": "S2(R1) section 2.2; M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_2"
+    },
+    {
+     "category": "immunotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s8",
+      "text": "ICH Harmonised Tripartite Guideline S8: Immunotoxicity Studies for Human Pharmaceuticals. Step 4, 15 September 2005.",
+      "url": "https://database.ich.org/sites/default/files/S8_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "immunotox.weight_of_evidence",
+     "name": "Immunotoxicity weight-of-evidence review",
+     "pending_fact": null,
+     "rationale": "Standard toxicity data are evaluated for immunotoxic signals; dedicated studies such as TDAR are added only if signals are found",
+     "section": "S8 sections 2.1, 2.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.2",
+     "driver_id": "in_vivo_pk",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.in_vivo_pk",
+     "name": "In vivo pharmacokinetics (ADME) in test species",
+     "pending_fact": null,
+     "rationale": "Further information on pharmacokinetics (absorption, distribution, metabolism and excretion) in test species should be available before exposing large numbers of human subjects or treating for long duration (generally before Phase III); exposure in the tox species before first-in-human is covered by toxicokinetics (ICH S3A)",
+     "section": "M3(R2) section 3",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolite_profiling",
+     "name": "Metabolite profiling and human metabolite comparison",
+     "pending_fact": null,
+     "rationale": "Human metabolites at >10% of total drug-related exposure that are disproportionate to animals require nonclinical characterisation",
+     "section": "M3(R2) section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "photosafety",
+     "citation": {
+      "doi": null,
+      "key": "ich_s10",
+      "text": "ICH Harmonised Guideline S10: Photosafety Evaluation of Pharmaceuticals. Step 4, 13 November 2013.",
+      "url": "https://database.ich.org/sites/default/files/S10_Guideline.pdf",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "photo.assessment",
+     "name": "Photosafety assessment",
+     "pending_fact": "UV-visible absorption spectrum",
+     "rationale": "Triggered if the molecule has a molar extinction coefficient greater than 1000 L/mol/cm at any wavelength between 290 and 700 nm",
+     "section": "S10 sections 2, 5.1.1",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.efd",
+     "name": "Embryo-fetal development (rat and rabbit)",
+     "pending_fact": null,
+     "rationale": "Embryo-fetal assessment is required before inclusion of women of childbearing potential beyond the limited exposure M3(R2) permits (regional differences apply: EU and Japan expect it before any WOCBP exposure)",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat",
+      "rabbit"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.fertility",
+     "name": "Fertility and early embryonic development",
+     "pending_fact": null,
+     "rationale": "Male reproductive organs are evaluated in repeat-dose studies; a dedicated fertility study is expected before large-scale trials",
+     "section": "M3(R2) sections 11.1, 11.3",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": "10.1089/nat.2014.0490",
+      "key": "oswg_dart_2014",
+      "text": "Cavagnaro J, Berman C, Kornbrust D, et al. Considerations for the assessment of reproductive and developmental toxicity of oligonucleotide-based therapeutics. Nucleic Acid Ther. 2014;24(5):313-325.",
+      "url": null,
+      "year": 2014
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "oligo.dart",
+     "name": "Reproductive and developmental toxicity (oligonucleotide-adapted)",
+     "pending_fact": null,
+     "rationale": "DART follows ICH S5(R3) adapted for oligonucleotides: species selection by pharmacological relevance and placental transfer, with class accumulation considered",
+     "section": "OSWG DART recommendations 2014; ICH S5(R3)",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s1a",
+      "text": "ICH Harmonised Tripartite Guideline S1A: Guideline on the Need for Carcinogenicity Studies of Pharmaceuticals. Step 4, 29 November 1995.",
+      "url": "https://database.ich.org/sites/default/files/S1A_Guideline.pdf",
+      "year": 1995
+     },
+     "components": [],
+     "ctd_section": "4.2.3.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "carc.bioassay",
+     "name": "Carcinogenicity assessment (2-year rat or S1B(R1) weight of evidence + rasH2 mouse)",
+     "pending_fact": null,
+     "rationale": "S1A: carcinogenicity studies are performed for any pharmaceutical whose expected clinical use is continuous for at least 6 months; M3(R2) places them before the marketing application; under S1B(R1) a weight-of-evidence assessment may replace the 2-year rat study",
+     "section": "S1A section 4.1; M3(R2) section 10; S1B(R1)",
+     "species": [],
+     "status": "required",
+     "timing": "marketing_application"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s5r3",
+      "text": "ICH Harmonised Guideline S5(R3): Detection of Reproductive and Developmental Toxicity for Human Pharmaceuticals. Step 4, 18 February 2020.",
+      "url": "https://database.ich.org/sites/default/files/S5-R3_Step4_Guideline_2020_0218_1.pdf",
+      "year": 2020
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.ppnd",
+     "name": "Pre- and postnatal development",
+     "pending_fact": null,
+     "rationale": "Pre/postnatal development is submitted for marketing approval",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 2,
+    "not_required": 0,
+    "required": 25
+   }
+  },
+  "peptide": {
+   "classification": {
+    "amino_acids": 31,
+    "citations": [
+     {
+      "doi": null,
+      "key": "cfr21_600_3",
+      "text": "U.S. Code of Federal Regulations, Title 21, Section 600.3: Definitions (paragraph (h)(6), protein). eCFR, current as of 7 October 2026.",
+      "url": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-F/part-600/subpart-A/section-600.3",
+      "year": null
+     },
+     {
+      "doi": null,
+      "key": "fda_biological_product_rule_2020",
+      "text": "U.S. Food and Drug Administration. Definition of the Term \"Biological Product\". Final rule. Fed Regist. 2020;85(35):10057-10063. FR Doc. 2020-03505; Docket FDA-2018-N-2732; effective 23 March 2020.",
+      "url": "https://www.govinfo.gov/content/pkg/FR-2020-02-21/pdf/2020-03505.pdf",
+      "year": 2020
+     },
+     {
+      "doi": null,
+      "key": "fda_peptide_clinpharm_draft_2023",
+      "text": "U.S. Food and Drug Administration, CDER. Clinical Pharmacology Considerations for Peptide Drug Products. Draft guidance for industry, December 2023 (not for implementation).",
+      "url": "https://www.fda.gov/media/171901/download",
+      "year": 2023
+     }
+    ],
+    "counted": "one chain",
+    "outcome": "not_protein",
+    "pending_fact": null,
+    "section": "21 CFR 600.3(h)(6)",
+    "statement": "31 amino acids (one chain): 40 or fewer, so not a protein under 21 CFR 600.3(h)(6). FDA's draft peptide guidance (December 2023) calls such a polymer a peptide, regulated as a drug unless it meets another biological-product or device definition."
+   },
+   "context": {
+    "amino_acid_chains": [
+     31
+    ],
+    "chains_naturally_associated": null,
+    "indication": "chronic_non_oncology",
+    "intended_clinical_duration_days": 365,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "peptide",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": "chemical_synthesis",
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "healthy_volunteers",
+     "patients"
+    ],
+    "route": "subcutaneous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Subcutaneous",
+    "Chronic, non-oncology",
+    "28-day trial",
+    "Chemically synthesised, 31 amino acids",
+    "S6(R1) applicability not yet determined"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s2r1",
+     "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+     "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+     "year": 2011
+    },
+    {
+     "doi": null,
+     "key": "ich_s7a",
+     "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+     "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+     "year": 2000
+    },
+    {
+     "doi": null,
+     "key": "ich_s7b",
+     "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+     "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+     "year": 2005
+    },
+    {
+     "doi": null,
+     "key": "ich_s6r1",
+     "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+     "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+     "year": 2011
+    }
+   ],
+   "label": "Peptide",
+   "notes": [
+    "Chemically synthesised peptide: ICH M3(R2) governs. ICH S6(R1) principles 'may also be applicable' (section 1.3); whether they apply is the responsible scientist's signed determination, which decides the S6(R1) items below.",
+    "US classification: 31 amino acids (one chain): 40 or fewer, so not a protein under 21 CFR 600.3(h)(6). FDA's draft peptide guidance (December 2023) calls such a polymer a peptide, regulated as a drug unless it meets another biological-product or device definition."
+   ],
+   "requirements": [
+    {
+     "category": "bioanalytical",
+     "citation": {
+      "doi": null,
+      "key": "ich_m10",
+      "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+      "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf",
+      "year": 2022
+     },
+     "components": [],
+     "ctd_section": "4.2.2.1",
+     "driver_id": "bioanalytical_validation",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bioanalytical.validation",
+     "name": "Validated bioanalytical method for TK samples",
+     "pending_fact": null,
+     "rationale": "Concentrations supporting regulatory decisions require a validated method",
+     "section": "M10 section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.immunogenicity",
+     "name": "Anti-drug antibody assessment in toxicity studies",
+     "pending_fact": "responsible scientist's signed determination whether ICH S6(R1) principles apply to this chemically synthesised peptide (S6(R1) section 1.3)",
+     "rationale": "ADA must be measured to interpret exposure and findings; animal immunogenicity does not predict human immunogenicity",
+     "section": "S6(R1) section 3.6; Addendum section 4",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "bio.species_relevance",
+     "name": "Pharmacologically relevant species selection",
+     "pending_fact": "responsible scientist's signed determination whether ICH S6(R1) principles apply to this chemically synthesised peptide (S6(R1) section 1.3)",
+     "rationale": "Toxicity studies must use species in which the product is pharmacologically active, established by target homology, binding and functional activity",
+     "section": "S6(R1) section 3.3; Addendum section 2",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "dose_range_finding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "tox.dose_range_finding",
+     "name": "Dose range-finding / MTD studies",
+     "pending_fact": null,
+     "rationale": "Dose selection for the pivotal repeat-dose studies",
+     "section": "M3(R2) sections 1.5, 4",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_nonrodent",
+     "name": "Repeat-dose toxicity (non-rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_rodent",
+     "name": "Repeat-dose toxicity (rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3.1",
+     "driver_id": "ames",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.ames",
+     "name": "Bacterial reverse mutation assay (Ames)",
+     "pending_fact": null,
+     "rationale": "A gene mutation assay is generally considered sufficient to support single-dose clinical trials",
+     "section": "M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "local_tolerance",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.6",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.local_tolerance",
+     "name": "Local tolerance at the clinical route",
+     "pending_fact": null,
+     "rationale": "Local tolerance is evaluated, preferably within general toxicity studies, by the intended clinical route",
+     "section": "M3(R2) section 8",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": "peptide_stability",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolic_stability",
+     "name": "In vitro metabolic stability (proteolysis in blood, serum or plasma)",
+     "pending_fact": null,
+     "rationale": "In vitro metabolic data across species are expected before human exposure to support species selection and human clearance prediction; peptides are generally degraded by peptidases, and hepatic metabolism rarely plays a significant role in their clearance (FDA draft peptide guidance, December 2023)",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.3",
+     "driver_id": "plasma_protein_binding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.plasma_protein_binding",
+     "name": "Plasma protein binding across species",
+     "pending_fact": null,
+     "rationale": "Unbound fractions are needed to compare exposures across species and to compute free-drug safety margins",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_s3a",
+      "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+      "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf",
+      "year": 1994
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "toxicokinetics",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.toxicokinetics",
+     "name": "Toxicokinetics within repeat-dose studies",
+     "pending_fact": null,
+     "rationale": "Systemic exposure must be measured in toxicity studies to relate findings to exposure; reported with the toxicity study (ICH M4S(R2) 4.2.3.2, 'including supportive toxicokinetics evaluations')",
+     "section": "S3A",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": "in_vitro_potency",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "pharm.primary",
+     "name": "Primary pharmacodynamics (in vitro and in vivo)",
+     "pending_fact": null,
+     "rationale": "Mechanism and pharmacologically active dose are needed to set the starting dose and to interpret toxicity",
+     "section": "M3(R2) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7a",
+      "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+      "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+      "year": 2000
+     },
+     "components": [
+      "cns",
+      "cardiovascular",
+      "respiratory"
+     ],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology core battery: CNS, cardiovascular, respiratory",
+     "pending_fact": null,
+     "rationale": "The core battery must be completed before first administration in humans; it covers the central nervous (2.7.1), cardiovascular (2.7.2) and respiratory (2.7.3) systems",
+     "section": "S7A sections 2.7, 2.10.1",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "herg_patch_clamp",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.herg",
+     "name": "In vitro hERG (IKr) assay",
+     "pending_fact": null,
+     "rationale": "An in vitro IKr assay is part of the S7B integrated risk assessment for delayed ventricular repolarisation",
+     "section": "S7B sections 2.3.1, 3.1.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "in_vivo_qt_telemetry",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.in_vivo_qt",
+     "name": "In vivo QT assessment in a non-rodent (telemetry)",
+     "pending_fact": null,
+     "rationale": "An in vivo QT assay complements the in vitro IKr result; together they form the S7B integrated risk assessment",
+     "section": "S7B sections 2.3.2, 3.1.3",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.chromosomal",
+     "name": "Chromosomal damage assay (in vitro or in vivo micronucleus)",
+     "pending_fact": null,
+     "rationale": "An assessment of chromosomal damage in mammalian systems is added to support multiple-dose trials",
+     "section": "M3(R2) section 9; S2(R1) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_multiple_dose_trials"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.full_battery",
+     "name": "Complete genotoxicity battery (S2(R1) option 1 or 2)",
+     "pending_fact": null,
+     "rationale": "The complete standard battery should be finished before Phase 2",
+     "section": "S2(R1) section 2.2; M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_2"
+    },
+    {
+     "category": "immunotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s8",
+      "text": "ICH Harmonised Tripartite Guideline S8: Immunotoxicity Studies for Human Pharmaceuticals. Step 4, 15 September 2005.",
+      "url": "https://database.ich.org/sites/default/files/S8_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "immunotox.weight_of_evidence",
+     "name": "Immunotoxicity weight-of-evidence review",
+     "pending_fact": null,
+     "rationale": "Standard toxicity data are evaluated for immunotoxic signals; dedicated studies such as TDAR are added only if signals are found",
+     "section": "S8 sections 2.1, 2.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.2",
+     "driver_id": "in_vivo_pk",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.in_vivo_pk",
+     "name": "In vivo pharmacokinetics (ADME) in test species",
+     "pending_fact": null,
+     "rationale": "Further information on pharmacokinetics (absorption, distribution, metabolism and excretion) in test species should be available before exposing large numbers of human subjects or treating for long duration (generally before Phase III); exposure in the tox species before first-in-human is covered by toxicokinetics (ICH S3A)",
+     "section": "M3(R2) section 3",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolite_profiling",
+     "name": "Metabolite profiling and human metabolite comparison",
+     "pending_fact": null,
+     "rationale": "Human metabolites at >10% of total drug-related exposure that are disproportionate to animals require nonclinical characterisation",
+     "section": "M3(R2) section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "photosafety",
+     "citation": {
+      "doi": null,
+      "key": "ich_s10",
+      "text": "ICH Harmonised Guideline S10: Photosafety Evaluation of Pharmaceuticals. Step 4, 13 November 2013.",
+      "url": "https://database.ich.org/sites/default/files/S10_Guideline.pdf",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "photo.assessment",
+     "name": "Photosafety assessment",
+     "pending_fact": "UV-visible absorption spectrum",
+     "rationale": "Triggered if the molecule has a molar extinction coefficient greater than 1000 L/mol/cm at any wavelength between 290 and 700 nm",
+     "section": "S10 sections 2, 5.1.1",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.efd",
+     "name": "Embryo-fetal development (rat and rabbit)",
+     "pending_fact": null,
+     "rationale": "Embryo-fetal assessment is required before inclusion of women of childbearing potential beyond the limited exposure M3(R2) permits (regional differences apply: EU and Japan expect it before any WOCBP exposure)",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat",
+      "rabbit"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.fertility",
+     "name": "Fertility and early embryonic development",
+     "pending_fact": null,
+     "rationale": "Male reproductive organs are evaluated in repeat-dose studies; a dedicated fertility study is expected before large-scale trials",
+     "section": "M3(R2) sections 11.1, 11.3",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s1a",
+      "text": "ICH Harmonised Tripartite Guideline S1A: Guideline on the Need for Carcinogenicity Studies of Pharmaceuticals. Step 4, 29 November 1995.",
+      "url": "https://database.ich.org/sites/default/files/S1A_Guideline.pdf",
+      "year": 1995
+     },
+     "components": [],
+     "ctd_section": "4.2.3.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "carc.bioassay",
+     "name": "Carcinogenicity assessment (2-year rat or S1B(R1) weight of evidence + rasH2 mouse)",
+     "pending_fact": null,
+     "rationale": "S1A: carcinogenicity studies are performed for any pharmaceutical whose expected clinical use is continuous for at least 6 months; M3(R2) places them before the marketing application; under S1B(R1) a weight-of-evidence assessment may replace the 2-year rat study",
+     "section": "S1A section 4.1; M3(R2) section 10; S1B(R1)",
+     "species": [],
+     "status": "required",
+     "timing": "marketing_application"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s5r3",
+      "text": "ICH Harmonised Guideline S5(R3): Detection of Reproductive and Developmental Toxicity for Human Pharmaceuticals. Step 4, 18 February 2020.",
+      "url": "https://database.ich.org/sites/default/files/S5-R3_Step4_Guideline_2020_0218_1.pdf",
+      "year": 2020
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.ppnd",
+     "name": "Pre- and postnatal development",
+     "pending_fact": null,
+     "rationale": "Pre/postnatal development is submitted for marketing approval",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 3,
+    "not_required": 0,
+    "required": 22
+   }
+  },
+  "recombinant-protein": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "chronic_non_oncology",
+    "intended_clinical_duration_days": 365,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "recombinant_protein",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [
+     "rat",
+     "cynomolgus monkey"
+    ],
+    "populations": [
+     "patients"
+    ],
+    "route": "subcutaneous",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Subcutaneous",
+    "Chronic, non-oncology",
+    "28-day trial",
+    "Patients",
+    "Relevant species: rat, cynomolgus monkey"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s6r1",
+     "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+     "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+     "year": 2011
+    }
+   ],
+   "label": "Recombinant protein",
+   "notes": [],
+   "requirements": [
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.immunogenicity",
+     "name": "Anti-drug antibody assessment in toxicity studies",
+     "pending_fact": null,
+     "rationale": "ADA must be measured to interpret exposure and findings; animal immunogenicity does not predict human immunogenicity",
+     "section": "S6(R1) section 3.6; Addendum section 4",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "bio.species_relevance",
+     "name": "Pharmacologically relevant species selection",
+     "pending_fact": null,
+     "rationale": "Toxicity studies must use species in which the product is pharmacologically active, established by target homology, binding and functional activity",
+     "section": "S6(R1) section 3.3; Addendum section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "biologics_specific",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bio.tissue_cross_reactivity",
+     "name": "Human tissue cross-reactivity (IHC panel)",
+     "pending_fact": null,
+     "rationale": "Recommended for monoclonal antibodies before first human dosing",
+     "section": "S6(R1) section 3.3",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.repeat_dose",
+     "name": "Repeat-dose toxicity in relevant species",
+     "pending_fact": null,
+     "rationale": "S6(R1) section 4.4: duration follows the intended clinical use \u2014 generally 1 to 3 months, with 6 months supporting chronic use. S6(R1) gives no threshold that fixes one of those, so the duration is set by the programme rather than derived here (two relevant species: short-term studies in both; longer studies may use one if findings are concordant)",
+     "section": "S6(R1) section 4.4; Addendum section 3.2",
+     "species": [
+      "rat",
+      "cynomolgus monkey"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.battery",
+     "name": "Standard genotoxicity battery",
+     "pending_fact": null,
+     "rationale": "The standard battery is not applicable to biotechnology-derived pharmaceuticals",
+     "section": "S6(R1) section 4.7",
+     "species": [],
+     "status": "not_required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology endpoints (within tox studies)",
+     "pending_fact": null,
+     "rationale": "Safety pharmacology endpoints may be incorporated into toxicity studies",
+     "section": "S6(R1) section 4.1",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.biologic",
+     "name": "Reproductive toxicity in a relevant species (ePPND if NHP-only)",
+     "pending_fact": null,
+     "rationale": "Conducted in a pharmacologically relevant species; where only NHP are relevant an enhanced pre/postnatal study can replace separate EFD/PPND",
+     "section": "S6(R1) Addendum section 5",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s6r1",
+      "text": "ICH Harmonised Tripartite Guideline S6(R1): Preclinical Safety Evaluation of Biotechnology-Derived Pharmaceuticals. Step 4 16 July 1997; Addendum Step 4, 12 June 2011.",
+      "url": "https://database.ich.org/sites/default/files/S6_R1_Guideline_0.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": null,
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "carc.bioassay",
+     "name": "Rodent carcinogenicity bioassay",
+     "pending_fact": null,
+     "rationale": "Standard bioassays are generally inappropriate; carcinogenic potential is addressed by a product-specific weight-of-evidence assessment",
+     "section": "S6(R1) section 4.8; Addendum section 6",
+     "species": [],
+     "status": "not_required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 1,
+    "not_required": 2,
+    "required": 5
+   }
+  },
+  "small-molecule": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "chronic_non_oncology",
+    "intended_clinical_duration_days": 365,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "small_molecule",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "healthy_volunteers",
+     "patients"
+    ],
+    "route": "oral",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Oral",
+    "Chronic, non-oncology",
+    "28-day trial",
+    "Intended use: 12 months",
+    "Healthy volunteers and patients"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "ich_m3r2",
+     "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+     "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+     "year": 2009
+    },
+    {
+     "doi": null,
+     "key": "ich_s2r1",
+     "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+     "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+     "year": 2011
+    },
+    {
+     "doi": null,
+     "key": "ich_s7a",
+     "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+     "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+     "year": 2000
+    },
+    {
+     "doi": null,
+     "key": "ich_s7b",
+     "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+     "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+     "year": 2005
+    }
+   ],
+   "label": "Small molecule",
+   "notes": [],
+   "requirements": [
+    {
+     "category": "bioanalytical",
+     "citation": {
+      "doi": null,
+      "key": "ich_m10",
+      "text": "ICH Harmonised Guideline M10: Bioanalytical Method Validation and Study Sample Analysis. Step 4, 24 May 2022.",
+      "url": "https://database.ich.org/sites/default/files/M10_Guideline_Step4_2022_0524.pdf",
+      "year": 2022
+     },
+     "components": [],
+     "ctd_section": "4.2.2.1",
+     "driver_id": "bioanalytical_validation",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "bioanalytical.validation",
+     "name": "Validated bioanalytical method for TK samples",
+     "pending_fact": null,
+     "rationale": "Concentrations supporting regulatory decisions require a validated method",
+     "section": "M10 section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "dose_range_finding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "tox.dose_range_finding",
+     "name": "Dose range-finding / MTD studies",
+     "pending_fact": null,
+     "rationale": "Dose selection for the pivotal repeat-dose studies",
+     "section": "M3(R2) sections 1.5, 4",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_nonrodent",
+     "name": "Repeat-dose toxicity (non-rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": 4.0,
+     "glp": true,
+     "id": "tox.repeat_dose_rodent",
+     "name": "Repeat-dose toxicity (rodent)",
+     "pending_fact": null,
+     "rationale": "M3(R2) Table 1: trials between 2 weeks and 6 months are supported by studies of at least the same duration as the trial",
+     "section": "M3(R2) section 5.1, Table 1",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3.1",
+     "driver_id": "ames",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.ames",
+     "name": "Bacterial reverse mutation assay (Ames)",
+     "pending_fact": null,
+     "rationale": "A gene mutation assay is generally considered sufficient to support single-dose clinical trials",
+     "section": "M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": "metabolic_stability",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolic_stability",
+     "name": "In vitro metabolic stability (liver microsomes)",
+     "pending_fact": null,
+     "rationale": "In vitro metabolic data across species are expected before human exposure to support species selection and human clearance prediction",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.3",
+     "driver_id": "plasma_protein_binding",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.plasma_protein_binding",
+     "name": "Plasma protein binding across species",
+     "pending_fact": null,
+     "rationale": "Unbound fractions are needed to compare exposures across species and to compute free-drug safety margins",
+     "section": "M3(R2) section 3",
+     "species": [
+      "human",
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_s3a",
+      "text": "ICH Harmonised Tripartite Guideline S3A: Note for Guidance on Toxicokinetics: The Assessment of Systemic Exposure in Toxicity Studies. Step 4, 27 October 1994.",
+      "url": "https://database.ich.org/sites/default/files/S3A_Guideline.pdf",
+      "year": 1994
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "toxicokinetics",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "tox.toxicokinetics",
+     "name": "Toxicokinetics within repeat-dose studies",
+     "pending_fact": null,
+     "rationale": "Systemic exposure must be measured in toxicity studies to relate findings to exposure; reported with the toxicity study (ICH M4S(R2) 4.2.3.2, 'including supportive toxicokinetics evaluations')",
+     "section": "S3A",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": "in_vitro_potency",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "pharm.primary",
+     "name": "Primary pharmacodynamics (in vitro and in vivo)",
+     "pending_fact": null,
+     "rationale": "Mechanism and pharmacologically active dose are needed to set the starting dose and to interpret toxicity",
+     "section": "M3(R2) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7a",
+      "text": "ICH Harmonised Tripartite Guideline S7A: Safety Pharmacology Studies for Human Pharmaceuticals. Step 4, 8 November 2000.",
+      "url": "https://database.ich.org/sites/default/files/S7A_Guideline.pdf",
+      "year": 2000
+     },
+     "components": [
+      "cns",
+      "cardiovascular",
+      "respiratory"
+     ],
+     "ctd_section": "4.2.1.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.core_battery",
+     "name": "Safety pharmacology core battery: CNS, cardiovascular, respiratory",
+     "pending_fact": null,
+     "rationale": "The core battery must be completed before first administration in humans; it covers the central nervous (2.7.1), cardiovascular (2.7.2) and respiratory (2.7.3) systems",
+     "section": "S7A sections 2.7, 2.10.1",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "herg_patch_clamp",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.herg",
+     "name": "In vitro hERG (IKr) assay",
+     "pending_fact": null,
+     "rationale": "An in vitro IKr assay is part of the S7B integrated risk assessment for delayed ventricular repolarisation",
+     "section": "S7B sections 2.3.1, 3.1.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "safety_pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s7b",
+      "text": "ICH Harmonised Tripartite Guideline S7B: The Nonclinical Evaluation of the Potential for Delayed Ventricular Repolarization (QT Interval Prolongation) by Human Pharmaceuticals. Step 4, 12 May 2005.",
+      "url": "https://database.ich.org/sites/default/files/S7B_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.3",
+     "driver_id": "in_vivo_qt_telemetry",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "safety.in_vivo_qt",
+     "name": "In vivo QT assessment in a non-rodent (telemetry)",
+     "pending_fact": null,
+     "rationale": "An in vivo QT assay complements the in vitro IKr result; together they form the S7B integrated risk assessment",
+     "section": "S7B sections 2.3.2, 3.1.3",
+     "species": [
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.chromosomal",
+     "name": "Chromosomal damage assay (in vitro or in vivo micronucleus)",
+     "pending_fact": null,
+     "rationale": "An assessment of chromosomal damage in mammalian systems is added to support multiple-dose trials",
+     "section": "M3(R2) section 9; S2(R1) section 2",
+     "species": [],
+     "status": "required",
+     "timing": "before_multiple_dose_trials"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s2r1",
+      "text": "ICH Harmonised Tripartite Guideline S2(R1): Guidance on Genotoxicity Testing and Data Interpretation for Pharmaceuticals Intended for Human Use. Step 4, 9 November 2011.",
+      "url": "https://database.ich.org/sites/default/files/S2_R1_Guideline.pdf",
+      "year": 2011
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "genotox.full_battery",
+     "name": "Complete genotoxicity battery (S2(R1) option 1 or 2)",
+     "pending_fact": null,
+     "rationale": "The complete standard battery should be finished before Phase 2",
+     "section": "S2(R1) section 2.2; M3(R2) section 9",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_2"
+    },
+    {
+     "category": "immunotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s8",
+      "text": "ICH Harmonised Tripartite Guideline S8: Immunotoxicity Studies for Human Pharmaceuticals. Step 4, 15 September 2005.",
+      "url": "https://database.ich.org/sites/default/files/S8_Guideline.pdf",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "immunotox.weight_of_evidence",
+     "name": "Immunotoxicity weight-of-evidence review",
+     "pending_fact": null,
+     "rationale": "Standard toxicity data are evaluated for immunotoxic signals; dedicated studies such as TDAR are added only if signals are found",
+     "section": "S8 sections 2.1, 2.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.2",
+     "driver_id": "in_vivo_pk",
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.in_vivo_pk",
+     "name": "In vivo pharmacokinetics (ADME) in test species",
+     "pending_fact": null,
+     "rationale": "Further information on pharmacokinetics (absorption, distribution, metabolism and excretion) in test species should be available before exposing large numbers of human subjects or treating for long duration (generally before Phase III); exposure in the tox species before first-in-human is covered by toxicokinetics (ICH S3A)",
+     "section": "M3(R2) section 3",
+     "species": [
+      "rat",
+      "dog"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.2.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "adme.metabolite_profiling",
+     "name": "Metabolite profiling and human metabolite comparison",
+     "pending_fact": null,
+     "rationale": "Human metabolites at >10% of total drug-related exposure that are disproportionate to animals require nonclinical characterisation",
+     "section": "M3(R2) section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "photosafety",
+     "citation": {
+      "doi": null,
+      "key": "ich_s10",
+      "text": "ICH Harmonised Guideline S10: Photosafety Evaluation of Pharmaceuticals. Step 4, 13 November 2013.",
+      "url": "https://database.ich.org/sites/default/files/S10_Guideline.pdf",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": "4.2.3.7.7",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "photo.assessment",
+     "name": "Photosafety assessment",
+     "pending_fact": "UV-visible absorption spectrum",
+     "rationale": "Triggered if the molecule has a molar extinction coefficient greater than 1000 L/mol/cm at any wavelength between 290 and 700 nm",
+     "section": "S10 sections 2, 5.1.1",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.2",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.efd",
+     "name": "Embryo-fetal development (rat and rabbit)",
+     "pending_fact": null,
+     "rationale": "Embryo-fetal assessment is required before inclusion of women of childbearing potential beyond the limited exposure M3(R2) permits (regional differences apply: EU and Japan expect it before any WOCBP exposure)",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat",
+      "rabbit"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_m3r2",
+      "text": "ICH Harmonised Tripartite Guideline M3(R2): Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals. Step 4, 11 June 2009.",
+      "url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "year": 2009
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.fertility",
+     "name": "Fertility and early embryonic development",
+     "pending_fact": null,
+     "rationale": "Male reproductive organs are evaluated in repeat-dose studies; a dedicated fertility study is expected before large-scale trials",
+     "section": "M3(R2) sections 11.1, 11.3",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_phase_3"
+    },
+    {
+     "category": "carcinogenicity",
+     "citation": {
+      "doi": null,
+      "key": "ich_s1a",
+      "text": "ICH Harmonised Tripartite Guideline S1A: Guideline on the Need for Carcinogenicity Studies of Pharmaceuticals. Step 4, 29 November 1995.",
+      "url": "https://database.ich.org/sites/default/files/S1A_Guideline.pdf",
+      "year": 1995
+     },
+     "components": [],
+     "ctd_section": "4.2.3.4",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "carc.bioassay",
+     "name": "Carcinogenicity assessment (2-year rat or S1B(R1) weight of evidence + rasH2 mouse)",
+     "pending_fact": null,
+     "rationale": "S1A: carcinogenicity studies are performed for any pharmaceutical whose expected clinical use is continuous for at least 6 months; M3(R2) places them before the marketing application; under S1B(R1) a weight-of-evidence assessment may replace the 2-year rat study",
+     "section": "S1A section 4.1; M3(R2) section 10; S1B(R1)",
+     "species": [],
+     "status": "required",
+     "timing": "marketing_application"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "ich_s5r3",
+      "text": "ICH Harmonised Guideline S5(R3): Detection of Reproductive and Developmental Toxicity for Human Pharmaceuticals. Step 4, 18 February 2020.",
+      "url": "https://database.ich.org/sites/default/files/S5-R3_Step4_Guideline_2020_0218_1.pdf",
+      "year": 2020
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "dart.ppnd",
+     "name": "Pre- and postnatal development",
+     "pending_fact": null,
+     "rationale": "Pre/postnatal development is submitted for marketing approval",
+     "section": "M3(R2) section 11.3; S5(R3)",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "marketing_application"
+    }
+   ],
+   "summary": {
+    "conditional": 1,
+    "not_required": 0,
+    "required": 21
+   }
+  },
+  "vaccine": {
+   "classification": null,
+   "context": {
+    "amino_acid_chains": [],
+    "chains_naturally_associated": null,
+    "indication": "acute_non_oncology",
+    "intended_clinical_duration_days": 28,
+    "intended_pediatric_use": false,
+    "is_immunomodulatory_agonist": false,
+    "is_integrating_vector": null,
+    "max_trial_duration_days": 28,
+    "modality": "vaccine",
+    "molar_extinction_coefficient_ge_1000": null,
+    "notes": {},
+    "peptide_origin": null,
+    "pharmacologically_relevant_species": [],
+    "populations": [
+     "healthy_volunteers"
+    ],
+    "route": "intramuscular",
+    "s6_determination": null,
+    "supports_marketing": false
+   },
+   "facts": [
+    "Intramuscular",
+    "Prophylactic, two doses within 28 days",
+    "Healthy volunteers"
+   ],
+   "governing_guidelines": [
+    {
+     "doi": null,
+     "key": "who_vaccine_2005",
+     "text": "World Health Organization. WHO guidelines on nonclinical evaluation of vaccines. WHO Technical Report Series No. 927, Annex 1, 2005.",
+     "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccines-annex-1-trs-no-927",
+     "year": 2005
+    },
+    {
+     "doi": null,
+     "key": "fda_vaccine_devtox_2006",
+     "text": "U.S. Food and Drug Administration. Guidance for Industry: Considerations for Developmental Toxicity Studies for Preventive and Therapeutic Vaccines for Infectious Disease Indications. February 2006.",
+     "url": "https://www.fda.gov/media/73986/download",
+     "year": 2006
+    }
+   ],
+   "label": "Vaccine",
+   "notes": [
+    "Vaccine: evaluated under WHO TRS 927 and FDA vaccine guidance, largely outside the ICH S-series. Genotoxicity and carcinogenicity are not required for the antigen; a novel adjuvant is assessed separately (WHO 2013)."
+   ],
+   "requirements": [
+    {
+     "category": "general_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "who_vaccine_2005",
+      "text": "World Health Organization. WHO guidelines on nonclinical evaluation of vaccines. WHO Technical Report Series No. 927, Annex 1, 2005.",
+      "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccines-annex-1-trs-no-927",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.3.2",
+     "driver_id": "repeat_dose_toxicity",
+     "duration_weeks": null,
+     "glp": true,
+     "id": "vaccine.repeat_dose",
+     "name": "Repeat-dose toxicity (full vaccination course + recovery)",
+     "pending_fact": null,
+     "rationale": "One relevant species, the full clinical immunisation schedule plus one additional dose, with a recovery period and safety-pharmacology endpoints included",
+     "section": "WHO TRS 927 Annex 1, section 4; FDA vaccine guidance",
+     "species": [
+      "rat"
+     ],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "genotoxicity",
+     "citation": {
+      "doi": null,
+      "key": "who_adjuvant_2013",
+      "text": "World Health Organization. Guidelines on the nonclinical evaluation of vaccine adjuvants and adjuvanted vaccines. 2013.",
+      "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccine-adjuvants-and-adjuvanted-vaccines",
+      "year": 2013
+     },
+     "components": [],
+     "ctd_section": "4.2.3.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "genotox.battery",
+     "name": "Genotoxicity (antigen exempt; novel adjuvant/excipient only)",
+     "pending_fact": null,
+     "rationale": "Genotoxicity is not required for the antigen; a novel adjuvant or novel excipient is assessed on its own merits",
+     "section": "WHO adjuvant guidance 2013",
+     "species": [],
+     "status": "not_required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "local_tolerance",
+     "citation": {
+      "doi": null,
+      "key": "who_vaccine_2005",
+      "text": "World Health Organization. WHO guidelines on nonclinical evaluation of vaccines. WHO Technical Report Series No. 927, Annex 1, 2005.",
+      "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccines-annex-1-trs-no-927",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.3.6",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "vaccine.local_tolerance",
+     "name": "Local tolerance at the injection site",
+     "pending_fact": null,
+     "rationale": "Injection-site reactogenicity is evaluated, usually within the repeat-dose study rather than as a stand-alone study",
+     "section": "WHO TRS 927 Annex 1, section 4.2",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacokinetics",
+     "citation": {
+      "doi": null,
+      "key": "who_vaccine_2005",
+      "text": "World Health Organization. WHO guidelines on nonclinical evaluation of vaccines. WHO Technical Report Series No. 927, Annex 1, 2005.",
+      "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccines-annex-1-trs-no-927",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.2.3",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "vaccine.biodistribution",
+     "name": "Biodistribution (nucleic-acid or vectored constructs)",
+     "pending_fact": null,
+     "rationale": "DNA, mRNA/LNP and vectored vaccines require a biodistribution study; classical protein/polysaccharide antigens do not",
+     "section": "WHO TRS 927 Annex 1; FDA guidance for DNA/vectored vaccines",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "pharmacology",
+     "citation": {
+      "doi": null,
+      "key": "who_vaccine_2005",
+      "text": "World Health Organization. WHO guidelines on nonclinical evaluation of vaccines. WHO Technical Report Series No. 927, Annex 1, 2005.",
+      "url": "https://www.who.int/publications/m/item/nonclinical-evaluation-of-vaccines-annex-1-trs-no-927",
+      "year": 2005
+     },
+     "components": [],
+     "ctd_section": "4.2.1.1",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": false,
+     "id": "pharm.primary",
+     "name": "Immunogenicity (proof of immune response)",
+     "pending_fact": null,
+     "rationale": "The nonclinical immune response (humoral and, where relevant, cell-mediated) in a relevant species is the primary pharmacology supporting a vaccine",
+     "section": "WHO TRS 927 Annex 1, section 3",
+     "species": [],
+     "status": "required",
+     "timing": "before_first_in_human"
+    },
+    {
+     "category": "reproductive_toxicology",
+     "citation": {
+      "doi": null,
+      "key": "fda_vaccine_devtox_2006",
+      "text": "U.S. Food and Drug Administration. Guidance for Industry: Considerations for Developmental Toxicity Studies for Preventive and Therapeutic Vaccines for Infectious Disease Indications. February 2006.",
+      "url": "https://www.fda.gov/media/73986/download",
+      "year": 2006
+     },
+     "components": [],
+     "ctd_section": "4.2.3.5",
+     "driver_id": null,
+     "duration_weeks": null,
+     "glp": true,
+     "id": "vaccine.dart",
+     "name": "Developmental toxicity (DART) before women of child-bearing potential",
+     "pending_fact": null,
+     "rationale": "A developmental toxicity study covering the full gestation window is expected before enrolling women of child-bearing potential",
+     "section": "FDA 2006 vaccine developmental-toxicity guidance; ICH S5(R3)",
+     "species": [],
+     "status": "conditional",
+     "timing": "before_inclusion_of_wocbp"
+    }
+   ],
+   "summary": {
+    "conditional": 2,
+    "not_required": 1,
+    "required": 3
+   }
+  }
+ }
+}

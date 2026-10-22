@@ -1,0 +1,35 @@
+# Hakase BioSim
+
+> BioSim is preclinical development software from Hakase AI. It plans the nonclinical studies a drug candidate needs from ICH, FDA and WHO guidance, orders them so the studies most likely to stop a programme run first, runs them with any contract lab, and assembles the nonclinical part of the IND (CTD Module 4 and SEND). Every value records its source; people sign every decision.
+
+## Product
+- [How BioSim works](https://hakase-ai.github.io/biosim/product/)
+- [Plan](https://hakase-ai.github.io/biosim/product/plan/)
+- [Prioritise](https://hakase-ai.github.io/biosim/product/prioritise/)
+- [Run](https://hakase-ai.github.io/biosim/product/run/)
+- [Submit](https://hakase-ai.github.io/biosim/product/submit/)
+
+## Science
+- [Our approach to provenance](https://hakase-ai.github.io/biosim/science/)
+- [Validation on approved drugs](https://hakase-ai.github.io/biosim/science/validation/)
+- [Methods registry](https://hakase-ai.github.io/biosim/science/methods/)
+- [Glossary](https://hakase-ai.github.io/biosim/glossary/)
+
+## Study plans by modality
+- [Small molecule](https://hakase-ai.github.io/biosim/modalities/small-molecule/)
+- [Monoclonal antibody](https://hakase-ai.github.io/biosim/modalities/monoclonal-antibody/)
+- [Peptide](https://hakase-ai.github.io/biosim/modalities/peptide/)
+- [Oligonucleotide](https://hakase-ai.github.io/biosim/modalities/oligonucleotide/)
+- [Recombinant protein](https://hakase-ai.github.io/biosim/modalities/recombinant-protein/)
+- [Antibody–drug conjugate](https://hakase-ai.github.io/biosim/modalities/antibody-drug-conjugate/)
+- [Cell therapy](https://hakase-ai.github.io/biosim/modalities/cell-therapy/)
+- [Gene therapy](https://hakase-ai.github.io/biosim/modalities/gene-therapy/)
+- [Vaccine](https://hakase-ai.github.io/biosim/modalities/vaccine/)
+
+## Company
+- [Investors](https://hakase-ai.github.io/biosim/investors/)
+- [Company and team](https://hakase-ai.github.io/biosim/company/)
+- [Security and compliance](https://hakase-ai.github.io/biosim/security/)
+- [Contact](https://hakase-ai.github.io/biosim/contact/)
+
+Contact: info@hakase.ai

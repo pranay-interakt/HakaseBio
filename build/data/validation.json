@@ -1,0 +1,486 @@
+{
+ "e2e": {
+  "intro": "40 approved small-molecule drugs (9 since withdrawn) were each registered by structure alone and run through the whole pipeline. Every measurement of the drug itself was removed from the screening reference set first, so each prediction was made without the answer. The drug's own measured hERG potency is the ground truth.",
+  "summary": {
+   "completed": "40/40",
+   "reconciles": "40/40",
+   "no_prov": "0",
+   "answered": "15/40",
+   "declined": "25",
+   "median_fold": "8.8x",
+   "within10": "8/15 within 10-fold",
+   "bias": "+0.50",
+   "interval": "8/15",
+   "sensitivity": "90%",
+   "specificity": "0%",
+   "missed": "OLANZAPINE",
+   "overcalled": "BEDAQUILINE, CHLORPROMAZINE, CLARITHROMYCIN, FEXOFENADINE, FLUOXETINE",
+   "sensitivity_n": "9/10 truly potent drugs caught",
+   "specificity_n": "0/5"
+  },
+  "rows": [
+   {
+    "drug": "Cetirizine",
+    "measured": "30,200 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Bepridil",
+    "measured": "550 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Imipramine",
+    "measured": "3,388 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Halofantrine",
+    "measured": "195 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Droperidol (withdrawn)",
+    "measured": "32 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Alosetron",
+    "measured": "3,218 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Sertindole (withdrawn)",
+    "measured": "14 nM",
+    "estimated": "307 nM",
+    "interval": "31-3,007 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Quinidine",
+    "measured": "402 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Pimozide",
+    "measured": "32 nM",
+    "estimated": "486 nM",
+    "interval": "50-4,761 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Ketoconazole (withdrawn)",
+    "measured": "1,905 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Terfenadine (withdrawn)",
+    "measured": "129 nM",
+    "estimated": "1,472 nM",
+    "interval": "150-14,414 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Cisapride (withdrawn)",
+    "measured": "40 nM",
+    "estimated": "89 nM",
+    "interval": "9-870 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Clarithromycin",
+    "measured": "58,884 nM",
+    "estimated": "6,711 nM",
+    "interval": "685-65,705 nM",
+    "called": "yes",
+    "truly": "no"
+   },
+   {
+    "drug": "Rilpivirine",
+    "measured": "500 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Sildenafil",
+    "measured": "3,311 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Diltiazem",
+    "measured": "17,378 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Astemizole (withdrawn)",
+    "measured": "8 nM",
+    "estimated": "109 nM",
+    "interval": "11-1,066 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Bedaquiline",
+    "measured": "1,600 nM",
+    "estimated": "4,389 nM",
+    "interval": "448-42,970 nM",
+    "called": "yes",
+    "truly": "no"
+   },
+   {
+    "drug": "Fluoxetine",
+    "measured": "1,514 nM",
+    "estimated": "2,263 nM",
+    "interval": "231-22,153 nM",
+    "called": "yes",
+    "truly": "no"
+   },
+   {
+    "drug": "Clozapine",
+    "measured": "324 nM",
+    "estimated": "3,888 nM",
+    "interval": "397-38,069 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Mibefradil (withdrawn)",
+    "measured": "1,400 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Dofetilide",
+    "measured": "14 nM",
+    "estimated": "53 nM",
+    "interval": "5-520 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Thioridazine (withdrawn)",
+    "measured": "58 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Chlorpheniramine",
+    "measured": "20,893 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Disopyramide",
+    "measured": "91,201 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Ibutilide",
+    "measured": "10 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Haloperidol",
+    "measured": "29 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Grepafloxacin (withdrawn)",
+    "measured": "50,119 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Amitriptyline",
+    "measured": "10,000 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Azelastine",
+    "measured": "100 nM",
+    "estimated": "204 nM",
+    "interval": "21-1,997 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Diphenhydramine",
+    "measured": "26,915 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Verapamil",
+    "measured": "232 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Ziprasidone",
+    "measured": "125 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "yes"
+   },
+   {
+    "drug": "Chlorpromazine",
+    "measured": "1,479 nM",
+    "estimated": "2,481 nM",
+    "interval": "253-24,286 nM",
+    "called": "yes",
+    "truly": "no"
+   },
+   {
+    "drug": "Olanzapine",
+    "measured": "204 nM",
+    "estimated": "11,797 nM",
+    "interval": "1,205-115,497 nM",
+    "called": "no",
+    "truly": "yes"
+   },
+   {
+    "drug": "Desipramine",
+    "measured": "1,390 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Carvedilol",
+    "measured": "10,471 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Risperidone",
+    "measured": "167 nM",
+    "estimated": "971 nM",
+    "interval": "99-9,511 nM",
+    "called": "yes",
+    "truly": "yes"
+   },
+   {
+    "drug": "Sparfloxacin",
+    "measured": "26,303 nM",
+    "estimated": "declined",
+    "interval": "-",
+    "called": "-",
+    "truly": "no"
+   },
+   {
+    "drug": "Fexofenadine",
+    "measured": "22,954 nM",
+    "estimated": "270 nM",
+    "interval": "28-2,641 nM",
+    "called": "yes",
+    "truly": "no"
+   }
+  ]
+ },
+ "cards": [
+  {
+   "title": "hERG potency by read-across",
+   "id": "triage.herg_read_across",
+   "risk": "medium",
+   "question": "Before a hERG assay is commissioned, is this compound likely to block the hERG (Kv11.1) channel, and at roughly what potency?",
+   "role": "Decision support for study selection and design only. It never becomes a study record, a readiness count or part of a submission, and it never substitutes for the in vitro hERG assay required by ICH S7B.",
+   "out_of_scope": "peptides, antibodies and other biologics; compounds with no near analogues; and any use as evidence of safety or of a safety margin",
+   "validation": "Validated on 2263 held-out compounds from CardioSafe multi-channel cardiac ion-channel benchmark (v1 labels, tan70 split) (19266 reference, 812 calibration), source https://github.com/AppliedScientific/CardioSafe-benchmark. Applicability-domain coverage: predicted 756 of 2263 (33.4%); the rest declined (too few close analogues). External predictivity (in-domain): RMSE 0.6787 (95% CI 0.6163 to 0.742) pIC50, MAE 0.4437, R\u00b2 0.381 (95% CI 0.2719 to 0.4697), Spearman 0.6462. Golbraikh-Tropsha: R\u00b2 0.381, slope 0.9914, criterion -0.0073 \u2014 does not pass. Y-randomisation (labels shuffled): R\u00b2 -0.7091, RMSE 1.1278 \u2014 predictivity collapses, so the signal is not chance correlation. Conformal prediction intervals: 80% interval \u00b10.6578 covers 76.2%, 90% interval \u00b10.9908 covers 88.5%. Downstream binary gate (blocker at the stated cut): sensitivity 0.832, specificity 0.7164, balanced accuracy 0.7742, MCC 0.5457, AUROC 0.8204.",
+   "validated": true
+  },
+  {
+   "title": "Organ-system liability posteriors",
+   "id": "triage.liability_graph",
+   "risk": "medium",
+   "question": "Which organ-system liabilities is this compound most likely to show in animals, before any study is run?",
+   "role": "An ordinal prior for prioritising studies and reading results. Never a finding, a readiness count, or part of a submission.",
+   "out_of_scope": "use as a calibrated probability, or as evidence of safety",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Observation forecast",
+   "id": "triage.observation_forecast",
+   "risk": "medium",
+   "question": "Which specific organ-system observations is a repeat-dose study most likely to report for this compound?",
+   "role": "Decision support for study design and result review. Never a finding or a submission; each row is placed only where a cited source puts it.",
+   "out_of_scope": "use as a calibrated probability, or any claim a finding will occur",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Aqueous solubility estimated from structure (ESOL)",
+   "id": "solubility.esol",
+   "risk": "low",
+   "question": "Roughly how soluble in water is this structure, before any measurement?",
+   "role": "A developability read and a formulation flag; never a specification.",
+   "out_of_scope": "salts and permanently charged species, and any use as a measured value",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Predicted microsomal unbound fraction from lipophilicity",
+   "id": "adme.fu_mic_predicted",
+   "risk": "medium",
+   "question": "What fraction of compound is free in a microsomal incubation, so apparent clearance can be corrected for non-specific binding?",
+   "role": "One correction term inside the in vitro to in vivo clearance chain; off unless a study selects it.",
+   "out_of_scope": "hepatocyte, S9 or plasma matrices, and any compound whose lipophilicity sits outside the cited range, where it should be measured",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Steady-state volume of distribution from plasma and tissue unbound fractions",
+   "id": "pbpk.vss_oie_tozer",
+   "risk": "medium",
+   "question": "What steady-state volume of distribution follows from this compound's plasma and tissue binding?",
+   "role": "A disposition input to the exposure simulation when no measured volume exists.",
+   "out_of_scope": "species whose physiological volumes are not held, where it is refused rather than approximated",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Clearance projected between species by simple allometry on body weight",
+   "id": "pbpk.cl_allometric_scaling",
+   "risk": "high",
+   "question": "What clearance would this compound have in a species that has not been dosed?",
+   "role": "A disposition input where that species has no measured clearance; the exposure simulated from it is marked as projected.",
+   "out_of_scope": "species-divergent enzymes or transporters, and any species with a measured clearance of its own",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Steady-state volume of distribution projected between species by unbound fraction",
+   "id": "pbpk.vss_single_species_scaling",
+   "risk": "high",
+   "question": "What volume of distribution would this compound have in another species?",
+   "role": "A disposition input where that species has no measured volume; it carries the projection, not a measurement.",
+   "out_of_scope": "drugs with a species-divergent transporter or tissue-binding protein",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Minimal physiologically based model: blood, liver, rapidly and slowly equilibrating tissue",
+   "id": "pbpk.minimal_model",
+   "risk": "high",
+   "question": "What plasma exposure would a given dose produce in a given species?",
+   "role": "The exposure a study is sized against before any animal is dosed; it does not set a dose.",
+   "out_of_scope": "tissue exposure outside the liver, saturable metabolism, transporters, and enterohepatic recycling",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Parameter uncertainty propagated by Monte Carlo sampling",
+   "id": "pbpk.monte_carlo",
+   "risk": "medium",
+   "question": "How far does declared input uncertainty move the simulated exposure?",
+   "role": "Shows the spread the declared inputs imply; it widens or narrows confidence, it does not add information.",
+   "out_of_scope": "uncertainty that was not declared, and structural error in the model itself",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Systemic exposure at a dose from observed dose-normalised toxicokinetics",
+   "id": "virtual.exposure_from_dose",
+   "risk": "high",
+   "question": "What exposure does a given dose produce in a species where toxicokinetics were observed at other doses?",
+   "role": "Places a projected effect on an exposure scale so studies can be compared; it is not measured toxicokinetics.",
+   "out_of_scope": "doses beyond the observed range, and any endpoint whose formation is saturable",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Cross-species projection of an endpoint's critical exposure",
+   "id": "virtual.species_projection",
+   "risk": "high",
+   "question": "At what exposure would this endpoint appear in a species that has not been dosed?",
+   "role": "Sizes and prioritises a study in a new species; it never stands in for running it.",
+   "out_of_scope": "endpoints a species cannot express, and any case where exposure conservation is known to fail",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Pharmacologically active dose by steady-state reverse dosimetry: daily dose = (EC50 x MW / fu) x CL x 24 h / F",
+   "id": "triage.pad_reverse_dosimetry",
+   "risk": "high",
+   "question": "At roughly what daily dose does on-target pharmacology begin?",
+   "role": "Orients where pharmacology starts when planning a dose range; it is not a NOAEL and sets no starting dose.",
+   "out_of_scope": "any toxicity prediction, and any use as a safety limit",
+   "validation": "not yet externally validated.",
+   "validated": false
+  },
+  {
+   "title": "Structural change indicated by a failing predicted property",
+   "id": "insilico.design_recommendation",
+   "risk": "medium",
+   "question": "Which structural change does the literature tie to the property that failed?",
+   "role": "A hypothesis for a chemist to test; never an instruction and never a predicted potency.",
+   "out_of_scope": "the magnitude of any change, and any property with no cited tactic",
+   "validation": "not yet externally validated.",
+   "validated": false
+  }
+ ]
+}
