@@ -38,43 +38,6 @@ def short_ref(q):
 def before_fih(slug):
     return [q for q in SETS[slug]["requirements"] if q["timing"] == "before_first_in_human" and q["status"] != "not_required"]
 
-NUM_WORDS = {n: w for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
-
-# Clinical milestones for the home-page pipeline. Each timing in the engine output lands in exactly one.
-PIPE_STAGES = [("First human dose", ("before_first_in_human",)),
-               ("Wider trials", ("before_multiple_dose_trials", "before_inclusion_of_wocbp")),
-               ("Phase 2", ("before_phase_2",)),
-               ("Phase 3", ("before_phase_3",)),
-               ("Marketing", ("marketing_application",))]
-
-def pipeline(c: Ctx) -> str:
-    """Per drug type: the studies the engine derives as due before each clinical milestone."""
-    head = "".join(f'<span>{e(name)}</span>' for name, _ in PIPE_STAGES)
-    rows = []
-    for slug in MOD_ORDER:
-        s = SETS[slug]
-        live = [q for q in s["requirements"] if q["status"] != "not_required"]
-        counts = [sum(q["timing"] in keys for q in live) for _, keys in PIPE_STAGES]
-        assert sum(counts) == len(live), f"{slug}: a requirement timing is missing from PIPE_STAGES"
-        last = max(i for i, n in enumerate(counts) if n)
-        cells = []
-        for i, ((name, _), n) in enumerate(zip(PIPE_STAGES, counts)):
-            value = f'{n}<span class="sr"> {"study" if n == 1 else "studies"}</span>' if n else '–<span class="sr"> none</span>'
-            cells.append(f'<div class="pipe-cell{" is-after" if i > last else ""}"><dt>{e(name)}</dt><dd>{value}</dd></div>')
-        cells = "".join(cells)
-        cited = collections.Counter(q["citation"]["key"] for q in live).most_common(1)  # the guideline the plan leans on most
-        guide = GUIDE_SHORT.get(cited[0][0], "") if cited else ""
-        rows.append(f'''<li class="pipe-row">
-  <div class="pipe-name"><h3><a href="{c.url(f"/modalities/{slug}/")}">{e(s["label"])}</a></h3><p>{e(" · ".join(s["facts"][:2]))}</p></div>
-  <p class="pipe-guide">{e(guide)}</p>
-  <div class="pipe-track reach-{last + 1}"><span class="pipe-bar" aria-hidden="true"></span><dl>{cells}</dl></div>
-</li>''')
-    return f'''<div class="pipe">
-  <div class="pipe-head" aria-hidden="true"><span>Drug type</span><span>Main guidance</span><span class="pipe-stages">{head}</span></div>
-  <ol class="pipe-rows">{"".join(rows)}</ol>
-  <p class="pipe-note">Numbers are new studies due before each stage for the typical programme shown; the bar runs to the last stage with a new requirement. Wider trials means before multiple-dose trials or before including women who could become pregnant.</p>
-</div>'''
-
 # ---------------------------------------------------------------- INSIDE BIOSIM
 ENGINES = [
     ("Regulatory engine", "The study plan, derived and cited",
@@ -175,10 +138,6 @@ def icon(name: str) -> str:
         "lab": '<path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M14 10h5a1 1 0 0 1 1 1v10"/><path d="M3 21h18M7.5 9h3M7.5 13h3M7.5 17h3"/>',
         "trace": '<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="12" r="2.4"/><circle cx="6" cy="18" r="2.4"/><path d="m8.2 7.1 7.6 3.8M8.2 16.9l7.6-3.8"/>',
         "file": '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14 2 2 4-4"/>',
-        "plan": '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
-        "order": '<path d="M4 6h16M4 12h11M4 18h6"/>',
-        "flask": '<path d="M9 3h6M10 3v6.5L4.6 18.4A1.8 1.8 0 0 0 6.2 21h11.6a1.8 1.8 0 0 0 1.6-2.6L14 9.5V3"/><path d="M7.5 15h9"/>',
-        "send": '<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>',
     }
     return f'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{paths[name]}</svg>'
 
@@ -197,7 +156,7 @@ def home(c: Ctx, preview_root=False):
         ("flask", "Run", "Test each study in the virtual lab, then send protocols to any contract lab. Results come back checked and analysed.", "/product/run/", "How studies run"),
         ("send", "Submit", "BioSim assembles the nonclinical part of the IND, CTD Module 4 and SEND datasets, ready to review and sign.", "/product/submit/", "What you submit"),
     ]
-    steps_html = "".join(f'<li class="flow-step"><span class="flow-n">{i + 1:02d}</span><span class="flow-ico">{icon(ic)}</span><h3>{e(t)}</h3><p>{e(d)}</p><a href="{c.url(u)}">{e(l)}</a></li>'
+    steps_html = "".join(f'<li class="flow-step"><span class="flow-n">{i + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p><a href="{c.url(u)}">{e(l)}</a></li>'
                          for i, (ic, t, d, u, l) in enumerate(steps))
     img, img_sm = c.asset("assets/img/hero-protein.webp"), c.asset("assets/img/hero-protein-960.webp")
     body = f'''
@@ -220,7 +179,7 @@ def home(c: Ctx, preview_root=False):
 </section>
 
 
-<section class="section" id="how"><div class="wrap flow">
+<section class="section" id="how"><div class="wrap">
   <div class="head">
     <h2 class="h2">Four steps, one record.</h2>
     <p class="lead">You stay in charge of every scientific decision. BioSim does the planning, the paperwork and the checking.</p>
@@ -228,16 +187,6 @@ def home(c: Ctx, preview_root=False):
   <ol class="flow-steps">{steps_html}</ol>
 </div></section>
 
-<section class="section section--card" id="pipeline"><div class="wrap">
-  <div class="head head--split">
-    <h2 class="h2">What each drug type needs, and when.</h2>
-    <div>
-      <p class="lead">For {NUM_WORDS.get(len(MOD_ORDER), len(MOD_ORDER))} types of drug, the studies the ICH, FDA and WHO guidelines require before each stage of clinical development, as BioSim derives them for a typical programme.</p>
-      <a class="textlink" href="{c.url('/modalities/')}">See every plan in full {ARROW}</a>
-    </div>
-  </div>
-  {pipeline(c)}
-</div></section>
 
 <section class="section" id="inside"><div class="wrap">
   <div class="head">
