@@ -10,7 +10,7 @@ src/       static assets: stylesheet, script, self-hosted fonts, the Hakase logo
 
 ## Hosting
 
-GitHub Pages serves the `docs/` folder of the `landing-page` branch of pranay-interakt/HakaseBio at **https://pranay-interakt.github.io/HakaseBio/**. In the repository go to Settings → Pages, set Source to "Deploy from a branch", branch `landing-page`, folder `/docs`, and save. The site is live a minute later.
+GitHub Pages serves the `docs/` folder of the `master` branch of pranay-interakt/HakaseBio at **https://pranay-interakt.github.io/HakaseBio/**. In the repository go to Settings → Pages, set Source to "Deploy from a branch", branch `master`, folder `/docs`, and save. The site is live a minute later.
 
 To move it to **hakase.bio** later: add the domain under Settings → Pages → Custom domain (GitHub writes a `CNAME` file into `docs/`), point the domain's DNS at GitHub Pages, then rebuild with `SITE_URL=https://hakase.bio SITE_BASE=/` so canonical links and the sitemap use the new address.
 
