@@ -57,7 +57,7 @@ ARROW_DOWN = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="f
 ARROW_OUT = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M5 11 11 5M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 def hakase_img(c: Ctx, h=15, alt="Hakase", cls="", on_dark=False) -> str:
-    w = round(1001 / 294 * h)
+    w = round(4.2215 * h)  # the wordmark's aspect ratio
     name = "hakase-logo-dark" if on_dark else "hakase-logo"
     src = c.asset(f"assets/img/{name}.webp"); src2 = c.asset(f"assets/img/{name}@2x.webp")
     return f'<img class="{cls}" src="{src}" srcset="{src} 1x, {src2} 2x" alt="{e(alt)}" width="{w}" height="{h}">'
