@@ -182,8 +182,6 @@ def icon(name: str) -> str:
     }
     return f'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{paths[name]}</svg>'
 
-# Public sources the product's own data clients and toolkits read (backend/hos/data_sources, RDKit).
-DATA_SOURCES = ["ChEMBL", "PubChem", "UniProt", "NCBI Gene", "DailyMed", "RDKit"]
 
 def home(c: Ctx, preview_root=False):
     cards = [
@@ -201,7 +199,6 @@ def home(c: Ctx, preview_root=False):
     ]
     steps_html = "".join(f'<li class="flow-step"><span class="flow-n">{i + 1:02d}</span><span class="flow-ico">{icon(ic)}</span><h3>{e(t)}</h3><p>{e(d)}</p><a href="{c.url(u)}">{e(l)}</a></li>'
                          for i, (ic, t, d, u, l) in enumerate(steps))
-    sources_html = "".join(f"<li>{e(n)}</li>" for n in DATA_SOURCES)
     img, img_sm = c.asset("assets/img/hero-protein.webp"), c.asset("assets/img/hero-protein-960.webp")
     body = f'''
 <section class="hero hero--band hero--photo">
@@ -222,10 +219,6 @@ def home(c: Ctx, preview_root=False):
   <div class="wrap wrap--wide"><ul class="hero-cards">{cards_html}</ul></div>
 </section>
 
-<section class="strip" aria-label="Data sources"><div class="wrap wrap--wide">
-  <p class="strip-label">Built on public scientific data</p>
-  <ul class="strip-list">{sources_html}<li class="strip-more">and ICH, FDA, OECD and WHO guidance</li></ul>
-</div></section>
 
 <section class="section" id="how"><div class="wrap flow">
   <div class="head">
