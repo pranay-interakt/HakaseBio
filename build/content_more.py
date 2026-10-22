@@ -1,7 +1,7 @@
 """Investors, contact, security, glossary and 404."""
 from __future__ import annotations
 import json, pathlib, re
-from lib import (Ctx, e, ARROW, ARROW_DOWN, ARROW_OUT, intro, closing, sources, faq_html, faq_ld, page, EMAIL, LINKEDIN, X_URL, PARENT, SITE, BASE)
+from lib import (Ctx, e, ARROW, ARROW_DOWN, ARROW_OUT, intro, closing, sources, faq_html, faq_ld, page, EMAIL, PARENT, SITE, BASE)
 from content_core import engines_grid, DRIVERS, MOD_ORDER
 
 DATA = pathlib.Path(__file__).parent / "data"

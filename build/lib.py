@@ -10,8 +10,6 @@ SITE_NAME = "Hakase BioSim"
 _SRC = pathlib.Path(__file__).parent.parent / "src/assets"
 ASSET_V = hashlib.sha1((_SRC / "css/site.css").read_bytes() + (_SRC / "js/site.js").read_bytes()).hexdigest()[:8]
 EMAIL = "info@hakase.ai"
-LINKEDIN = "https://www.linkedin.com/company/hakase-ai/"
-X_URL = "https://x.com/HakaseAI_"
 PARENT = "https://hakase.ai"
 
 def e(s) -> str:
@@ -120,7 +118,7 @@ def footer(c: Ctx) -> str:
     </div>
     <div class="footer-base">
       <p>BioSim supports qualified scientific and regulatory review. Its outputs do not by themselves establish experimental, clinical or regulatory outcomes.</p>
-      <p>© 2026 Hakase AI · <a href="{PARENT}/privacy/" rel="noopener">Privacy</a> · <a href="{PARENT}/terms/" rel="noopener">Terms</a> · <a href="{LINKEDIN}" rel="noopener">LinkedIn</a> · <a href="{X_URL}" rel="noopener">X</a></p>
+      <p>© 2026 Hakase AI · <a href="{PARENT}/privacy/" rel="noopener">Privacy</a> · <a href="{PARENT}/terms/" rel="noopener">Terms</a> · <a href="{PARENT}" rel="noopener">hakase.ai</a></p>
     </div>
   </div>
 </footer>'''
@@ -166,7 +164,7 @@ def sources(items, title="Sources") -> str:
 # ---------- JSON-LD ----------
 ORG = {
     "@type": "Organization", "@id": f"{PARENT}/#organization", "name": "Hakase AI", "url": PARENT,
-    "logo": f"{SITE}{BASE.rstrip('/')}/assets/img/hakase-ai-logo.png", "email": EMAIL, "sameAs": [LINKEDIN, X_URL],
+    "logo": f"{SITE}{BASE.rstrip('/')}/assets/img/hakase-ai-logo.png", "email": EMAIL,
 }
 ROOT = SITE + BASE.rstrip("/")
 WEBSITE = {"@type": "WebSite", "@id": f"{ROOT}/#website", "url": f"{ROOT}/", "name": SITE_NAME, "publisher": {"@id": f"{PARENT}/#organization"}, "inLanguage": "en-GB"}
@@ -217,7 +215,6 @@ def page(c: Ctx, *, title, description, body, trail=None, ld=None, og_type="webs
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="{e(title)}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:site" content="@HakaseAI_">
 <link rel="icon" href="{c.asset('favicon.ico')}" sizes="16x16 32x32 48x48">
 <link rel="icon" href="{c.asset('assets/img/favicon-32.png')}" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="{c.asset('assets/img/apple-touch-icon.png')}">
