@@ -1,6 +1,6 @@
 """Run the real BioSim regulatory engine for nine stated reference programmes.
 
-The output (data/study_sets.json) is what the modality pages and the homepage explorer render.
+The output (data/study_sets.json) is what the modality pages and the homepage pipeline render.
 Nothing here is edited by hand: re-run this script whenever a rule set changes.
 """
 import json, sys, pathlib, hashlib, datetime

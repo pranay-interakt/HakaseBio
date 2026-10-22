@@ -3,34 +3,32 @@
 > BioSim is preclinical development software from Hakase AI. It plans the nonclinical studies a drug candidate needs from ICH, FDA and WHO guidance, orders them so the studies most likely to stop a programme run first, runs them with any contract lab, and assembles the nonclinical part of the IND (CTD Module 4 and SEND). Every value records its source; people sign every decision.
 
 ## Product
-- [How BioSim works](https://hakase-ai.github.io/biosim/product/)
-- [Inside BioSim: the engines and HAIOps](https://hakase-ai.github.io/biosim/product/inside/)
-- [Plan](https://hakase-ai.github.io/biosim/product/plan/)
-- [Prioritise](https://hakase-ai.github.io/biosim/product/prioritise/)
-- [Run](https://hakase-ai.github.io/biosim/product/run/)
-- [Submit](https://hakase-ai.github.io/biosim/product/submit/)
+- [How BioSim works](https://pranay-interakt.github.io/HakaseBio/product/)
+- [Inside BioSim: the engines and HAIOps](https://pranay-interakt.github.io/HakaseBio/product/inside/)
+- [Plan](https://pranay-interakt.github.io/HakaseBio/product/plan/)
+- [Prioritise](https://pranay-interakt.github.io/HakaseBio/product/prioritise/)
+- [Run](https://pranay-interakt.github.io/HakaseBio/product/run/)
+- [Submit](https://pranay-interakt.github.io/HakaseBio/product/submit/)
 
 ## Science
-- [Our approach to provenance](https://hakase-ai.github.io/biosim/science/)
-- [Validation on approved drugs](https://hakase-ai.github.io/biosim/science/validation/)
-- [Methods registry](https://hakase-ai.github.io/biosim/science/methods/)
-- [Glossary](https://hakase-ai.github.io/biosim/glossary/)
+- [Our approach to provenance](https://pranay-interakt.github.io/HakaseBio/science/)
+- [Methods registry](https://pranay-interakt.github.io/HakaseBio/science/methods/)
+- [Glossary](https://pranay-interakt.github.io/HakaseBio/glossary/)
 
 ## Study plans by modality
-- [Small molecule](https://hakase-ai.github.io/biosim/modalities/small-molecule/)
-- [Monoclonal antibody](https://hakase-ai.github.io/biosim/modalities/monoclonal-antibody/)
-- [Peptide](https://hakase-ai.github.io/biosim/modalities/peptide/)
-- [Oligonucleotide](https://hakase-ai.github.io/biosim/modalities/oligonucleotide/)
-- [Recombinant protein](https://hakase-ai.github.io/biosim/modalities/recombinant-protein/)
-- [Antibody–drug conjugate](https://hakase-ai.github.io/biosim/modalities/antibody-drug-conjugate/)
-- [Cell therapy](https://hakase-ai.github.io/biosim/modalities/cell-therapy/)
-- [Gene therapy](https://hakase-ai.github.io/biosim/modalities/gene-therapy/)
-- [Vaccine](https://hakase-ai.github.io/biosim/modalities/vaccine/)
+- [Small molecule](https://pranay-interakt.github.io/HakaseBio/modalities/small-molecule/)
+- [Monoclonal antibody](https://pranay-interakt.github.io/HakaseBio/modalities/monoclonal-antibody/)
+- [Peptide](https://pranay-interakt.github.io/HakaseBio/modalities/peptide/)
+- [Oligonucleotide](https://pranay-interakt.github.io/HakaseBio/modalities/oligonucleotide/)
+- [Recombinant protein](https://pranay-interakt.github.io/HakaseBio/modalities/recombinant-protein/)
+- [Antibody–drug conjugate](https://pranay-interakt.github.io/HakaseBio/modalities/antibody-drug-conjugate/)
+- [Cell therapy](https://pranay-interakt.github.io/HakaseBio/modalities/cell-therapy/)
+- [Gene therapy](https://pranay-interakt.github.io/HakaseBio/modalities/gene-therapy/)
+- [Vaccine](https://pranay-interakt.github.io/HakaseBio/modalities/vaccine/)
 
 ## Company
-- [Investors](https://hakase-ai.github.io/biosim/investors/)
-- [Company and team](https://hakase-ai.github.io/biosim/company/)
-- [Security and compliance](https://hakase-ai.github.io/biosim/security/)
-- [Contact](https://hakase-ai.github.io/biosim/contact/)
+- [Investors](https://pranay-interakt.github.io/HakaseBio/investors/)
+- [Security and compliance](https://pranay-interakt.github.io/HakaseBio/security/)
+- [Contact](https://pranay-interakt.github.io/HakaseBio/contact/)
 
 Contact: info@hakase.ai

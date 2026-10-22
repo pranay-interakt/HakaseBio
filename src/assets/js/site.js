@@ -3,6 +3,8 @@
   "use strict";
   document.documentElement.classList.add("js");
 
+  var header = document.querySelector(".site-header");
+
   // Mobile navigation
   var btn = document.querySelector(".menu-btn");
   var nav = document.getElementById("site-nav");
@@ -11,35 +13,41 @@
       var open = nav.classList.toggle("is-open");
       btn.setAttribute("aria-expanded", open ? "true" : "false");
       btn.textContent = open ? "Close" : "Menu";
+      if (header) header.classList.toggle("is-menu-open", open);
     });
   }
 
-  // Study-plan explorer: tabs over panels that are all present in the HTML
-  document.querySelectorAll("[data-explorer]").forEach(function (root) {
-    var tabs = Array.prototype.slice.call(root.querySelectorAll('[role="tab"]'));
-    var panels = tabs.map(function (t) { return document.getElementById(t.getAttribute("aria-controls")); });
-    function select(i, focus) {
-      tabs.forEach(function (t, j) {
-        var on = i === j;
-        t.setAttribute("aria-selected", on ? "true" : "false");
-        t.tabIndex = on ? 0 : -1;
-        if (panels[j]) panels[j].hidden = !on;
-      });
-      if (focus) tabs[i].focus();
-    }
-    tabs.forEach(function (t, i) {
-      t.addEventListener("click", function () { select(i, false); });
-      t.addEventListener("keydown", function (e) {
-        var k = e.key, n = tabs.length, next = null;
-        if (k === "ArrowDown" || k === "ArrowRight") next = (i + 1) % n;
-        if (k === "ArrowUp" || k === "ArrowLeft") next = (i - 1 + n) % n;
-        if (k === "Home") next = 0;
-        if (k === "End") next = n - 1;
-        if (next !== null) { e.preventDefault(); select(next, true); }
-      });
-    });
-    select(0, false);
-  });
+  // Header over the opening hero or band: clear at the very top, joined to it while it is
+  // under the header, solid and light once it has scrolled away. One read per frame at most.
+  var band = header && header.classList.contains("is-overlay") ? document.querySelector("main > section:first-child") : null;
+  var art = band ? band.querySelector(".hero-art img") : null;
+  var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (band) {
+    var ticking = false;
+    var update = function () {
+      ticking = false;
+      header.classList.toggle("is-top", window.scrollY < 8);
+      var rect = band.getBoundingClientRect();
+      header.classList.toggle("is-past-band", rect.bottom <= header.offsetHeight);
+      // the hero render drifts down at 6% of the scroll while the hero is on screen: depth, not decoration
+      if (art && !still && rect.bottom > 0 && window.innerWidth >= 900) art.style.transform = "scale(1.1) translate3d(0," + Math.round(-rect.top * 0.06) + "px,0)";
+    };
+    var request = function () { if (!ticking) { ticking = true; window.requestAnimationFrame(update); } };
+    update();
+    window.addEventListener("scroll", request, { passive: true });
+    window.addEventListener("resize", request);
+  }
+
+  // Pipeline bars grow in once, when the table first scrolls into view
+  var pipes = document.querySelectorAll(".pipe");
+  if (!("IntersectionObserver" in window) || still) {
+    pipes.forEach(function (p) { p.classList.add("is-in"); });
+  } else {
+    var seen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("is-in"); seen.unobserve(en.target); } });
+    }, { rootMargin: "0px 0px -15% 0px" });
+    pipes.forEach(function (p) { seen.observe(p); });
+  }
 
   // Request forms: compose the message for the visitor's own email app.
   // Nothing is sent from this page; the visitor sends it, or copies it.

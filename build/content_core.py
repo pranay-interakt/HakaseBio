@@ -1,12 +1,11 @@
 """Home, product, science and modality pages."""
 from __future__ import annotations
-import json, pathlib, re
+import collections, json, pathlib, re
 from lib import (Ctx, e, ARROW, ARROW_DOWN, ARROW_OUT, intro, closing, sources, faq_html, faq_ld, APP, SITE, page, EMAIL)
 
 DATA = pathlib.Path(__file__).parent / "data"
 SETS = json.load(open(DATA / "study_sets.json"))["sets"]
 METHODS = json.load(open(DATA / "methods.json"))
-VALID = json.load(open(DATA / "validation.json"))
 DRIVERS = json.load(open(DATA / "drivers.json"))
 
 MOD_ORDER = ["small-molecule", "monoclonal-antibody", "peptide", "oligonucleotide", "recombinant-protein",
@@ -39,24 +38,41 @@ def short_ref(q):
 def before_fih(slug):
     return [q for q in SETS[slug]["requirements"] if q["timing"] == "before_first_in_human" and q["status"] != "not_required"]
 
-def explorer(c: Ctx) -> str:
-    tabs, panels = [], []
-    for i, slug in enumerate(MOD_ORDER):
+NUM_WORDS = {n: w for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())}
+
+# Clinical milestones for the home-page pipeline. Each timing in the engine output lands in exactly one.
+PIPE_STAGES = [("First human dose", ("before_first_in_human",)),
+               ("Wider trials", ("before_multiple_dose_trials", "before_inclusion_of_wocbp")),
+               ("Phase 2", ("before_phase_2",)),
+               ("Phase 3", ("before_phase_3",)),
+               ("Marketing", ("marketing_application",))]
+
+def pipeline(c: Ctx) -> str:
+    """Per drug type: the studies the engine derives as due before each clinical milestone."""
+    head = "".join(f'<span>{e(name)}</span>' for name, _ in PIPE_STAGES)
+    rows = []
+    for slug in MOD_ORDER:
         s = SETS[slug]
-        tabs.append(f'<button class="explorer-tab" type="button" role="tab" id="tab-{slug}" aria-controls="panel-{slug}" aria-selected="{"true" if i == 0 else "false"}">{e(s["label"])}</button>')
-        rows = []
-        for q in before_fih(slug):
-            tag = '<span class="tag">Conditional</span> ' if q["status"] == "conditional" else ""
-            rows.append(f'<li><span>{tag}{e(q["name"])}</span><span class="ref">{e(short_ref(q))}</span></li>')
-        panels.append(f'''<div class="explorer-panel" role="tabpanel" id="panel-{slug}" aria-labelledby="tab-{slug}"{"" if i == 0 else " hidden"}>
-  <h3>{e(s["label"])}: required before the first human dose</h3>
-  <p class="ctx">Reference programme: {e(" · ".join(s["facts"]))}</p>
-  <ul class="req-list">{"".join(rows)}</ul>
-  <p class="explorer-note"><a class="textlink" href="{c.url(f"/modalities/{slug}/")}">Full plan for {e(MOD_PLURAL[slug])}, with the reason for each study {ARROW}</a></p>
-</div>''')
-    return f'''<div class="explorer" data-explorer>
-  <div class="explorer-tabs" role="tablist" aria-label="Drug type" aria-orientation="vertical">{"".join(tabs)}</div>
-  <div class="explorer-panels">{"".join(panels)}</div>
+        live = [q for q in s["requirements"] if q["status"] != "not_required"]
+        counts = [sum(q["timing"] in keys for q in live) for _, keys in PIPE_STAGES]
+        assert sum(counts) == len(live), f"{slug}: a requirement timing is missing from PIPE_STAGES"
+        last = max(i for i, n in enumerate(counts) if n)
+        cells = []
+        for i, ((name, _), n) in enumerate(zip(PIPE_STAGES, counts)):
+            value = f'{n}<span class="sr"> {"study" if n == 1 else "studies"}</span>' if n else '–<span class="sr"> none</span>'
+            cells.append(f'<div class="pipe-cell{" is-after" if i > last else ""}"><dt>{e(name)}</dt><dd>{value}</dd></div>')
+        cells = "".join(cells)
+        cited = collections.Counter(q["citation"]["key"] for q in live).most_common(1)  # the guideline the plan leans on most
+        guide = GUIDE_SHORT.get(cited[0][0], "") if cited else ""
+        rows.append(f'''<li class="pipe-row">
+  <div class="pipe-name"><h3><a href="{c.url(f"/modalities/{slug}/")}">{e(s["label"])}</a></h3><p>{e(" · ".join(s["facts"][:2]))}</p></div>
+  <p class="pipe-guide">{e(guide)}</p>
+  <div class="pipe-track reach-{last + 1}"><span class="pipe-bar" aria-hidden="true"></span><dl>{cells}</dl></div>
+</li>''')
+    return f'''<div class="pipe">
+  <div class="pipe-head" aria-hidden="true"><span>Drug type</span><span>Main guidance</span><span class="pipe-stages">{head}</span></div>
+  <ol class="pipe-rows">{"".join(rows)}</ol>
+  <p class="pipe-note">Numbers are new studies due before each stage for the typical programme shown; the bar runs to the last stage with a new requirement. Wider trials means before multiple-dose trials or before including women who could become pregnant.</p>
 </div>'''
 
 # ---------------------------------------------------------------- INSIDE BIOSIM
@@ -72,7 +88,7 @@ ENGINES = [
      "/product/prioritise/"),
     ("Digital study engine", "In silico answers, graded for credibility",
      "Answers each required study with the most qualified computational method available and grades the credibility of that answer for its context of use under ASME V&V 40. A prediction informs a decision; it never replaces a signed study.",
-     "/science/validation/"),
+     "/product/inside/#digital-study-engine"),
     ("Study drivers", "One study type, end to end",
      "Fourteen study types, from microsomal stability to GLP repeat-dose toxicology, each packaged with its protocol, data checks, cited analysis and report, so every lab is held to the same standard.",
      "/product/run/"),
@@ -87,12 +103,34 @@ ENGINES = [
      "/product/inside/#haiops"),
 ]
 
+# The same eight parts in plain words, for the grids on the home, product and investor pages.
+# The Inside BioSim page keeps the full technical description above.
+ENGINES_PLAIN = {
+    "Regulatory engine": ("Study plan", "Every study your drug needs",
+        "Lists the studies the ICH, FDA and WHO guidelines require for your drug, each linked to the section that asks for it. A missing fact marks a study as conditional; it is never assumed."),
+    "KESTREL": ("Study order", "Find the deal-breakers early",
+        "Puts the studies most likely to stop the programme first, weighing each one’s cost and time, within the order the guidelines allow."),
+    "SEXTANT": ("Study value", "Know which experiments are worth it",
+        "Ranks studies by how much their result could change your go or no-go decision, and by what each one costs."),
+    "Digital study engine": ("Virtual lab", "Run every study in silico first",
+        "Predicts the outcome of each required study with computer models and says how far each prediction can be trusted. Predictions guide the programme; signed studies make the submission."),
+    "Study drivers": ("Lab studies", "The same standard at every lab",
+        f"{len(DRIVERS)} study types, each with its protocol, data checks, analysis and report built in, so every contract lab is held to the same standard."),
+    "Provenance ledger": ("Audit trail", "Every number shows where it came from",
+        "Each value is labelled as measured, from the literature, calculated or predicted. Nothing is guessed, and every change is logged."),
+    "Offline verifier": ("Package check", "Reviewers can check it without us",
+        "Every exported package can re-run its own analyses from the raw files and confirm nothing was changed, without BioSim or an internet connection."),
+    "HAIOps": ("Rules for AI", "AI that stays accountable",
+        "Hakase’s six rules for AI in regulated work: every answer traceable, its confidence stated, and people make every safety decision."),
+}
+
 def engines_grid(c: Ctx, items=None, dark=False) -> str:
     items = items or ENGINES
     cards = []
     for name, title, desc, href in items:
+        label, title, desc = ENGINES_PLAIN.get(name, (name, title, desc))
         cards.append(f'''<li class="engine"><a href="{c.url(href)}">
-  <span class="engine-name">{e(name)}</span>
+  <span class="engine-name">{e(label)}</span>
   <strong>{e(title)}</strong>
   <p>{e(desc)}</p>
   <span class="more">More {ARROW}</span>
@@ -124,70 +162,100 @@ def product_inside(c: Ctx):
     <div class="head"><p class="engine-name">HAIOps</p><h2 class="h2">Healthcare AI Operations: the discipline BioSim is built to.</h2><p class="lead">Machine-learning operations was built for systems where a wrong answer costs a click. HAIOps is Hakase’s operating discipline for systems where a wrong answer reaches a patient. Six requirements, and how BioSim meets each.</p></div>
     <div class="table-wrap"><table class="data"><thead><tr><th scope="col">Requirement</th><th scope="col">In BioSim</th></tr></thead><tbody>{rows}</tbody></table></div>
   </div>
-</div></section>''' + closing(c, "See every one of these on a real candidate.", [("How it works", "/product/"), ("Validation", "/science/validation/"), ("Security", "/security/")])
+</div></section>''' + closing(c, "See every one of these on a real candidate.", [("How it works", "/product/"), ("Methods", "/science/methods/"), ("Security", "/security/")])
     return page(c, title="Inside BioSim: the engines · Hakase BioSim",
                 description="The regulatory engine, KESTREL, SEXTANT, the digital study engine, study drivers, the provenance ledger, the offline verifier and HAIOps: what BioSim is made of.",
                 body=body, trail=[("Product", "/product/"), ("Inside BioSim", "/product/inside/")], ld=[APP])
 
 # ---------------------------------------------------------------- HOME
+# Line icons for the home page (24-unit grid, drawn with the current text colour).
+def icon(name: str) -> str:
+    paths = {
+        "screen": '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+        "lab": '<path d="M4 21V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M14 10h5a1 1 0 0 1 1 1v10"/><path d="M3 21h18M7.5 9h3M7.5 13h3M7.5 17h3"/>',
+        "trace": '<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="12" r="2.4"/><circle cx="6" cy="18" r="2.4"/><path d="m8.2 7.1 7.6 3.8M8.2 16.9l7.6-3.8"/>',
+        "file": '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14 2 2 4-4"/>',
+        "plan": '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+        "order": '<path d="M4 6h16M4 12h11M4 18h6"/>',
+        "flask": '<path d="M9 3h6M10 3v6.5L4.6 18.4A1.8 1.8 0 0 0 6.2 21h11.6a1.8 1.8 0 0 0 1.6-2.6L14 9.5V3"/><path d="M7.5 15h9"/>',
+        "send": '<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>',
+    }
+    return f'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{paths[name]}</svg>'
+
+# Public sources the product's own data clients and toolkits read (backend/hos/data_sources, RDKit).
+DATA_SOURCES = ["ChEMBL", "PubChem", "UniProt", "NCBI Gene", "DailyMed", "RDKit"]
+
 def home(c: Ctx, preview_root=False):
+    cards = [
+        ("screen", "A virtual lab", "Every required study run in silico first, with how far each answer can be trusted."),
+        ("lab", "Your contract labs", "Protocols out, results back, checked line by line and analysed with published methods."),
+        ("trace", "Traceable evidence", "Every value linked to its source, its method and the person who approved it."),
+        ("file", "IND-ready output", "Module 4 and SEND datasets, ready for your team to review and sign."),
+    ]
+    cards_html = "".join(f'<li class="hero-card"><span class="ico">{icon(i)}</span><strong>{e(t)}</strong><p>{e(d)}</p></li>' for i, t, d in cards)
+    steps = [
+        ("plan", "Plan", "Enter your drug and clinical plan. BioSim lists every study the ICH and FDA guidelines require, with the reason for each.", "/product/plan/", "How planning works"),
+        ("order", "Prioritise", "The studies most likely to stop a programme run first, before the long and expensive ones.", "/product/prioritise/", "How prioritising works"),
+        ("flask", "Run", "Test each study in the virtual lab, then send protocols to any contract lab. Results come back checked and analysed.", "/product/run/", "How studies run"),
+        ("send", "Submit", "BioSim assembles the nonclinical part of the IND, CTD Module 4 and SEND datasets, ready to review and sign.", "/product/submit/", "What you submit"),
+    ]
+    steps_html = "".join(f'<li class="flow-step"><span class="flow-n">{i + 1:02d}</span><span class="flow-ico">{icon(ic)}</span><h3>{e(t)}</h3><p>{e(d)}</p><a href="{c.url(u)}">{e(l)}</a></li>'
+                         for i, (ic, t, d, u, l) in enumerate(steps))
+    sources_html = "".join(f"<li>{e(n)}</li>" for n in DATA_SOURCES)
+    img, img_sm = c.asset("assets/img/hero-protein.webp"), c.asset("assets/img/hero-protein-960.webp")
     body = f'''
-<section class="hero hero--band"><div class="wrap">
-  <div class="hero-copy hero-copy--wide">
-    <p class="product-name"><span class="dot" aria-hidden="true"></span>BioSim <span>by Hakase</span></p>
-    <h1 class="h1">From drug candidate to IND.</h1>
-    <p class="lead">BioSim is preclinical development software. It plans the studies your drug needs, runs them with the labs you choose and assembles the IND package for FDA. Every result traces back to its source.</p>
-    <div class="actions"><a class="btn btn--on-band" href="{c.url('/contact/')}">Book a demo {ARROW}</a><a class="textlink" href="#how">See how it works {ARROW_DOWN}</a></div>
+<section class="hero hero--band hero--photo">
+  <div class="hero-art"><img src="{img}" srcset="{img_sm} 960w, {img} 1672w" sizes="(max-width: 899px) 100vw, 64vw" alt="" width="1672" height="941" fetchpriority="high"></div>
+  <div class="wrap wrap--wide hero-main">
+    <div class="hero-copy">
+      <p class="eyebrow">BioSim <span>/</span> Preclinical development</p>
+      <h1 class="h1">From drug candidate <em>to IND.</em></h1>
+      <p class="lead">BioSim is preclinical development software. It works out the studies your drug needs, tests them in a virtual lab, runs them with your contract labs and assembles the IND package. Every result traces back to its source.</p>
+      <div class="actions"><a class="btn btn--on-band" href="{c.url('/contact/')}">Book a demo {ARROW}</a><a class="textlink" href="#how">See how it works {ARROW_DOWN}</a></div>
+    </div>
   </div>
+  <ul class="hero-notes">
+    <li class="note-1"><span>Physicochemistry</span>Solubility, lipophilicity and polar surface area</li>
+    <li class="note-2"><span>Exposure</span>PBPK across rat, dog and human</li>
+    <li class="note-3"><span>Safety signals</span>hERG and DNA-reactivity alerts</li>
+  </ul>
+  <div class="wrap wrap--wide"><ul class="hero-cards">{cards_html}</ul></div>
+</section>
+
+<section class="strip" aria-label="Data sources"><div class="wrap wrap--wide">
+  <p class="strip-label">Built on public scientific data</p>
+  <ul class="strip-list">{sources_html}<li class="strip-more">and ICH, FDA, OECD and WHO guidance</li></ul>
 </div></section>
 
-<section class="section" id="how"><div class="wrap">
+<section class="section" id="how"><div class="wrap flow">
   <div class="head">
-    <p class="kicker">How it works</p>
     <h2 class="h2">Four steps, one record.</h2>
     <p class="lead">You stay in charge of every scientific decision. BioSim does the planning, the paperwork and the checking.</p>
   </div>
-  <ol class="steps">
-    <li class="step"><span class="step-n">1</span><h3 class="h3">Plan</h3><p>Enter your drug and clinical plan. BioSim lists every study the ICH and FDA guidelines require, with the reason for each.</p><a href="{c.url('/product/plan/')}">How planning works</a></li>
-    <li class="step"><span class="step-n">2</span><h3 class="h3">Prioritise</h3><p>The studies most likely to stop a programme run first, before the long and expensive ones.</p><a href="{c.url('/product/prioritise/')}">How prioritising works</a></li>
-    <li class="step"><span class="step-n">3</span><h3 class="h3">Run</h3><p>Send protocols to any contract lab. Results come back into BioSim, are checked and are analysed with published methods.</p><a href="{c.url('/product/run/')}">How studies run</a></li>
-    <li class="step"><span class="step-n">4</span><h3 class="h3">Submit</h3><p>BioSim assembles the nonclinical part of the IND, CTD Module 4 and SEND datasets, ready for your team to review and sign.</p><a href="{c.url('/product/submit/')}">What you submit</a></li>
-  </ol>
+  <ol class="flow-steps">{steps_html}</ol>
 </div></section>
 
-<section class="section section--card"><div class="wrap">
-  <div class="head">
-    <p class="kicker">Why BioSim</p>
-    <h2 class="h2">Built for teams that answer to FDA.</h2>
+<section class="section section--card" id="pipeline"><div class="wrap">
+  <div class="head head--split">
+    <h2 class="h2">What each drug type needs, and when.</h2>
+    <div>
+      <p class="lead">For {NUM_WORDS.get(len(MOD_ORDER), len(MOD_ORDER))} types of drug, the studies the ICH, FDA and WHO guidelines require before each stage of clinical development, as BioSim derives them for a typical programme.</p>
+      <a class="textlink" href="{c.url('/modalities/')}">See every plan in full {ARROW}</a>
+    </div>
   </div>
-  <ul class="values">
-    <li class="value"><h3 class="h3">The right studies, the first time</h3><p>Requirements come straight from the guidelines and name the section that creates them. Your toxicologist reviews and signs off the plan.</p></li>
-    <li class="value"><h3 class="h3">Every number has a source</h3><p>Each value links to its raw data, the method that produced it and the person who approved it.</p></li>
-    <li class="value"><h3 class="h3">Your labs, your data</h3><p>BioSim works with any contract lab. You keep the data, the protocols and the full record.</p></li>
-  </ul>
+  {pipeline(c)}
 </div></section>
 
 <section class="section" id="inside"><div class="wrap">
   <div class="head">
-    <p class="kicker">Inside BioSim</p>
-    <h2 class="h2">Built in-house, from the planning rules to the verifier.</h2>
-    <p class="lead">Eight capabilities no one else packages together. Each one is working software today.</p>
+    <h2 class="h2">What’s inside BioSim.</h2>
+    <p class="lead">Eight parts, all built by Hakase. Each one is working software today.</p>
   </div>
   {engines_grid(c)}
 </div></section>
 
-<section class="section"><div class="wrap">
-  <div class="head">
-    <p class="kicker">See it</p>
-    <h2 class="h2">See what your drug will need.</h2>
-    <p class="lead">Pick a drug type. This is the plan BioSim derives for a typical programme, before the first human dose.</p>
-  </div>
-  {explorer(c)}
-</div></section>
-
 <section class="section band"><div class="wrap">
   <div class="head">
-    <p class="kicker">Built to HAIOps, Hakase’s discipline for regulated AI</p>
     <h2 class="h2">Scientists stay in charge.</h2>
   </div>
   <ul class="points">
@@ -195,12 +263,11 @@ def home(c: Ctx, preview_root=False):
     <li><h3 class="h3">Nothing is guessed</h3><p>If a value is missing, BioSim says so and why. It never fills the gap with a default.</p></li>
     <li><h3 class="h3">A record you can check</h3><p>Every change is logged with who, when and why, and any rewrite is detected. Signatures follow 21 CFR Part 11.</p></li>
   </ul>
-  <p style="margin-top:40px"><a class="textlink" href="{c.url('/product/inside/#haiops')}">The six HAIOps requirements, and how BioSim meets them {ARROW}</a></p>
+  <p class="band-more"><a class="textlink" href="{c.url('/product/inside/#haiops')}">How BioSim keeps its AI accountable {ARROW}</a></p>
 </div></section>
 
 <section class="section"><div class="wrap">
   <div class="head">
-    <p class="kicker">Get started</p>
     <h2 class="h2">Start with the work you already have.</h2>
   </div>
   <ul class="options">
@@ -217,7 +284,7 @@ def home(c: Ctx, preview_root=False):
 </div></section>
 '''
     return page(c, title="Hakase BioSim · From drug candidate to IND",
-                description="BioSim plans the preclinical studies your drug needs, runs them with the labs you choose and assembles the IND package for FDA, with every result traceable.",
+                description="BioSim plans the preclinical studies your drug needs, tests them in its virtual lab, runs them with the labs you choose and assembles the IND package for FDA, with every result traceable.",
                 body=body, ld=[APP], preview_root=preview_root)
 
 # ---------------------------------------------------------------- PRODUCT
@@ -248,7 +315,7 @@ def product(c: Ctx):
 <section class="section section--card"><div class="wrap">
   <div class="head"><p class="kicker">What BioSim is not</p><h2 class="h2">Clear lines, so you know what you are buying.</h2></div>
   <ul class="values">
-    <li class="value"><h3 class="h3">Not a lab</h3><p>BioSim runs no animal or bench work. It works with the contract labs and in-house teams you already use.</p></li>
+    <li class="value"><h3 class="h3">Not a wet lab</h3><p>BioSim runs no animal or bench work. Its virtual lab predicts results; the studies that count run at the contract labs and in-house teams you already use.</p></li>
     <li class="value"><h3 class="h3">Not a notebook</h3><p>An electronic notebook records what happened. BioSim plans the work, checks what comes back and builds the submission from it.</p></li>
     <li class="value"><h3 class="h3">Not a replacement for your experts</h3><p>Toxicologists, study directors and regulatory leads make and sign the decisions. BioSim gives them everything they need to do it.</p></li>
   </ul>
@@ -353,11 +420,11 @@ def product_prioritise(c: Ctx):
   <div class="block">
     <div><p class="kicker">Limits</p><h2 class="h3">Decision support, stated as such.</h2></div>
     <div class="prose">
-      <p>The suggested order never adds, removes or waives a required study, and it never enters a submission. It claims no accuracy until a pre-registered validation against known programme outcomes is published. Without your lab quotes, BioSim uses a flagged default duration and marks the order provisional.</p>
+      <p>The suggested order never adds, removes or waives a required study, and it never enters a submission. Without your lab quotes, BioSim uses a flagged default duration and marks the order provisional.</p>
     </div>
   </div>
   {sources(["Mitten LG. An analytic solution to the least cost testing sequence problem. Journal of Industrial Engineering 1960;11(1):17.", "Sidney JB. Decomposition algorithms for single-machine sequencing with precedence relations and deferral costs. Operations Research 1975;23(2):283–298."])}
-</div></section>''' + closing(c, "See the order for your own molecule.", [("Run", "/product/run/"), ("Validation", "/science/validation/"), ("Plan", "/product/plan/")])
+</div></section>''' + closing(c, "See the order for your own molecule.", [("Run", "/product/run/"), ("Methods", "/science/methods/"), ("Plan", "/product/plan/")])
     return page(c, title="Prioritise preclinical studies · Hakase BioSim",
                 description="BioSim orders your preclinical studies so the ones most likely to stop a programme run first, inside the sequence the guidelines require.",
                 body=body, trail=[("Product", "/product/"), ("Prioritise", "/product/prioritise/")], ld=[APP])
@@ -408,11 +475,7 @@ def product_submit(c: Ctx):
     <div><p class="kicker">What you get</p><h2 class="h2">Built from the record, not retyped.</h2></div>
     <ul class="list-plain">{lis}</ul>
   </div>
-  <div class="block">
-    <div><p class="kicker">Current scope</p><h2 class="h3">What is not built yet.</h2></div>
-    <div class="note-box"><p>SEND clinical-observation and pathology domains (CL, MA, MI) and the SEND domains for safety pharmacology and reproductive studies are next. SEND packages are checked by BioSim’s own pre-export checks; the FDA validator is not run inside BioSim.</p></div>
-  </div>
-</div></section>''' + closing(c, "Start with a readiness review of the studies you have.", [("Security", "/security/"), ("Validation", "/science/validation/"), ("Plan", "/product/plan/")])
+</div></section>''' + closing(c, "Start with a readiness review of the studies you have.", [("Security", "/security/"), ("Modalities", "/modalities/"), ("Plan", "/product/plan/")])
     return page(c, title="Assemble your IND, Module 4 and SEND · Hakase BioSim",
                 description="BioSim assembles IND readiness, Module 2 summaries, CTD Module 4 and SEND datasets from a signed record that can be verified offline.",
                 body=body, trail=[("Product", "/product/"), ("Submit", "/product/submit/")], ld=[APP])
@@ -433,7 +496,7 @@ def science(c: Ctx):
     <ul class="defs">{kinds}</ul>
   </div>
   <div class="block">
-    <div><p class="kicker">Principles</p><h2 class="h2">How the record stays honest.</h2></div>
+    <div><p class="kicker">Principles</p><h2 class="h2">How the record stays reliable.</h2></div>
     <ul class="list-plain">
       <li><strong>Nothing is guessed</strong><p>If a value cannot be obtained, BioSim returns it as unavailable with the reason: a database that did not answer, a study not yet run, a fact not yet decided.</p></li>
       <li><strong>Simulated stays simulated</strong><p>Results derived from simulated data stay marked as simulated, cannot be approved and never enter Module 4.</p></li>
@@ -445,58 +508,14 @@ def science(c: Ctx):
   <div>
     <div class="head"><p class="kicker">Go deeper</p><h2 class="h2">The evidence, in full.</h2></div>
     <ul class="cards">
-      <li><a class="card-link" href="{c.url('/science/validation/')}"><strong>Validation</strong><span>End-to-end runs on approved drugs, and model cards with where each model stops.</span><span class="more">Read the validation</span></a></li>
       <li><a class="card-link" href="{c.url('/science/methods/')}"><strong>Methods registry</strong><span>{sum(len(a["methods"]) for a in METHODS["areas"])} methods across {len(METHODS["areas"])} areas, each with assumptions, limits and references.</span><span class="more">Browse the methods</span></a></li>
       <li><a class="card-link" href="{c.url('/glossary/')}"><strong>Glossary</strong><span>The terms used across BioSim and IND-enabling work.</span><span class="more">Open the glossary</span></a></li>
     </ul>
   </div>
-</div></section>''' + closing(c, "Trace any number in a live demo.", [("Validation", "/science/validation/"), ("Security", "/security/"), ("Product", "/product/")])
+</div></section>''' + closing(c, "Trace any number in a live demo.", [("Methods", "/science/methods/"), ("Security", "/security/"), ("Product", "/product/")])
     return page(c, title="How BioSim keeps results trustworthy · Hakase BioSim",
                 description="Every value in BioSim records where it came from. Nothing is guessed, simulated data stays simulated, and people sign every decision.",
                 body=body, trail=[("Science", "/science/")], ld=[{"@type": "TechArticle", "headline": "Every result can be checked", "about": "Data provenance in preclinical drug development", "author": {"@id": "https://hakase.ai/#organization"}}])
-
-def validation(c: Ctx):
-    v = VALID["e2e"]; s = v["summary"]
-    rows = "".join(f'<tr><td>{e(r["drug"])}</td><td class="num">{e(r["measured"])}</td><td class="num">{e(r["estimated"])}</td><td class="num">{e(r["interval"])}</td><td class="num">{e(r["called"])}</td><td class="num">{e(r["truly"])}</td></tr>' for r in v["rows"])
-    cards = "".join(f'<tr><td>{e(cd["title"])}<span class="note">{e(cd["question"] or "")}</span></td><td class="num">{e(cd["risk"] or "")}</td><td>{"Validated on held-out data" if cd["validated"] else "Not yet externally validated"}</td></tr>' for cd in VALID["cards"])
-    herg = next(cd for cd in VALID["cards"] if cd["validated"])
-    body = intro(c, [("Science", "/science/"), ("Validation", "/science/validation/")], "Science · Validation", "Tested on drugs with known answers.",
-                 "We validate BioSim the way a reviewer would: on approved drugs whose answers are known, with each drug’s own data held out. Results are published here in full, including where the system falls short.") + f'''
-<section class="section" style="padding-top:0"><div class="wrap stack">
-  <div class="block">
-    <div><p class="kicker">End-to-end run</p><h2 class="h2">40 approved drugs, run as if they were new.</h2></div>
-    <div class="prose">
-      <p>{e(v["intro"])}</p>
-      <ul>
-        <li>Runs completed without error: {e(s["completed"])}. The provenance ledger reconciled after every run: {e(s["reconciles"])}. Values returned without provenance: {e(s["no_prov"])}.</li>
-        <li>hERG potency by read-across answered for {e(s["answered"])} drugs and declined {e(s["declined"])}. Declining is the designed behaviour when fewer than two close, measured analogues exist.</li>
-        <li>When it answered, the median fold error was {e(s["median_fold"])} ({e(s["within10"])}); the stated interval contained the measured value in {e(s["interval"])} cases.</li>
-        <li>As a screen for potent blockers (IC50 at or below 1,000 nM, judged on the interval’s lower end), sensitivity was {e(s["sensitivity"])} ({e(s["sensitivity_n"])}) and specificity {e(s["specificity"])} ({e(s["specificity_n"])}). Missed: {e(s["missed"].title())}. Over-called: {e(s["overcalled"].title())}.</li>
-      </ul>
-      <p class="callout">Read-across is decision support for choosing and designing studies. It never replaces the hERG assay that ICH S7B requires, and it never enters a submission.</p>
-    </div>
-  </div>
-  <div>
-    <div class="table-wrap"><table class="data"><caption>Every drug in the run: measured hERG IC50, the estimate, its interval and the screening call.</caption><thead><tr><th scope="col">Drug</th><th scope="col">Measured</th><th scope="col">Estimated</th><th scope="col">Interval</th><th scope="col">Called potent</th><th scope="col">Truly potent</th></tr></thead><tbody>{rows}</tbody></table></div>
-  </div>
-  <div class="block">
-    <div><p class="kicker">Model card</p><h2 class="h2">{e(herg["title"])}.</h2></div>
-    <div class="prose">
-      <p><strong>Question.</strong> {e(herg["question"])}</p>
-      <p><strong>Role.</strong> {e(herg["role"])}</p>
-      <p><strong>Validation.</strong> Tested on 2,263 held-out compounds from a public cardiac ion-channel benchmark. It answered for 756 and declined the rest; for calling potent blockers, AUROC was 0.82, sensitivity 0.83 and specificity 0.72.</p><details class="why"><summary>Full statistics</summary><p>{e(herg["validation"])}</p></details>
-      <p><strong>Out of scope.</strong> {e(herg["out_of_scope"][:1].upper() + herg["out_of_scope"][1:])}</p>
-    </div>
-  </div>
-  <div>
-    <div class="head"><p class="kicker">All model cards</p><h2 class="h2">Where each model stands.</h2><p class="lead">Each predictive method has a card that states its question, its role, its model risk under FDA’s 2025 draft framework for AI credibility, and its validation status.</p></div>
-    <div class="table-wrap"><table class="data"><thead><tr><th scope="col">Method</th><th scope="col">Model risk</th><th scope="col">Status</th></tr></thead><tbody>{cards}</tbody></table></div>
-  </div>
-</div></section>''' + closing(c, "Ask us to run a drug you know well.", [("Methods", "/science/methods/"), ("Our approach", "/science/"), ("Security", "/security/")])
-    return page(c, title="Validation on approved drugs · Hakase BioSim",
-                description="BioSim validated end to end on 40 approved drugs run as new compounds, with model cards that state each model’s question, risk and validation status.",
-                body=body, trail=[("Science", "/science/"), ("Validation", "/science/validation/")],
-                ld=[{"@type": "TechArticle", "headline": "Validation on approved drugs", "author": {"@id": "https://hakase.ai/#organization"}}])
 
 def methods_index(c: Ctx):
     cards = "".join(f'<li><a class="card-link" href="{c.url(f"/science/methods/{a["slug"]}/")}"><strong>{e(a["name"])}</strong><span>{len(a["methods"])} method{"s" if len(a["methods"]) != 1 else ""}: {e(", ".join(m["title"] for m in a["methods"][:2]))}{"…" if len(a["methods"]) > 2 else ""}</span><span class="more">Open</span></a></li>' for a in METHODS["areas"])
@@ -504,9 +523,8 @@ def methods_index(c: Ctx):
     body = intro(c, [("Science", "/science/"), ("Methods", "/science/methods/")], "Science · Methods", "Methods registry.",
                  f"Every calculation in BioSim uses a published method, recorded with its version, assumptions, limits and references. {total} methods across {len(METHODS['areas'])} areas, generated from the registry itself.") + f'''
 <section class="section" style="padding-top:0"><div class="wrap stack">
-  <div class="note-box"><p class="kicker">Standing limitations</p><p>{e(re.sub(r"[*]", "", METHODS["standing"]).replace(chr(10)+chr(10), " "))}</p></div>
   <ul class="cards">{cards}</ul>
-</div></section>''' + closing(c, "Want a method we don’t list? Ask us.", [("Validation", "/science/validation/"), ("Glossary", "/glossary/"), ("Our approach", "/science/")])
+</div></section>''' + closing(c, "Want a method we don’t list? Ask us.", [("Product", "/product/"), ("Glossary", "/glossary/"), ("Our approach", "/science/")])
     return page(c, title="Methods registry · Hakase BioSim",
                 description=f"The {total} published methods BioSim uses, from IVIVE and NCA to dose projection and safety statistics, each with assumptions, limits and references.",
                 body=body, trail=[("Science", "/science/"), ("Methods", "/science/methods/")])
@@ -526,7 +544,7 @@ def methods_area(c: Ctx, a):
     trail = [("Science", "/science/"), ("Methods", "/science/methods/"), (a["name"], f"/science/methods/{a['slug']}/")]
     body = intro(c, trail, "Methods registry", f"{e(a['name'])} methods.",
                  f"{len(a['methods'])} method{'s' if len(a['methods']) != 1 else ''} in this area. Each lists the assumptions it makes and the limits outside which its result is not valid.") + f'''
-<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem">{"".join(ms)}</div></div></section>''' + closing(c, "See these methods at work on your data.", [("All methods", "/science/methods/"), ("Validation", "/science/validation/"), ("Glossary", "/glossary/")])
+<section class="section" style="padding-top:0"><div class="wrap"><div style="max-width:72rem">{"".join(ms)}</div></div></section>''' + closing(c, "See these methods at work on your data.", [("All methods", "/science/methods/"), ("Glossary", "/glossary/"), ("Product", "/product/")])
     first = ", ".join(m["title"] for m in a["methods"][:2])
     desc = f"{a['name']} methods in BioSim: {first}. Versions, assumptions, limits and primary references."
     return page(c, title=f"{a['name']} methods · Hakase BioSim", description=desc[:158], body=body, trail=trail,

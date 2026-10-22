@@ -56,14 +56,20 @@ ARROW = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"
 ARROW_DOWN = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.5v10M4.5 9 8 12.5 11.5 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 ARROW_OUT = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M5 11 11 5M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
-def hakase_img(c: Ctx, h=15, alt="Hakase", cls="") -> str:
+def hakase_img(c: Ctx, h=15, alt="Hakase", cls="", on_dark=False) -> str:
     w = round(1001 / 294 * h)
-    src = c.asset("assets/img/hakase-logo.webp"); src2 = c.asset("assets/img/hakase-logo@2x.webp")
+    name = "hakase-logo-dark" if on_dark else "hakase-logo"
+    src = c.asset(f"assets/img/{name}.webp"); src2 = c.asset(f"assets/img/{name}@2x.webp")
     return f'<img class="{cls}" src="{src}" srcset="{src} 1x, {src2} 2x" alt="{e(alt)}" width="{w}" height="{h}">'
 
-NAV = [("Product", "/product/"), ("Science", "/science/"), ("Modalities", "/modalities/"), ("Investors", "/investors/"), ("Company", "/company/")]
+NAV = [("Product", "/product/"), ("Science", "/science/"), ("Modalities", "/modalities/"), ("Investors", "/investors/")]
 
-def header(c: Ctx) -> str:
+def header(c: Ctx, opening=None) -> str:
+    """opening: what the page opens with under the header.
+    "band"  -> a navy band: the header starts navy and joins it.
+    "photo" -> a light full-bleed hero: the header starts clear over it.
+    site.js makes the header solid and light once the opening has scrolled away."""
+    on_band = opening == "band"
     links = []
     for label, href in NAV:
         cur = ""
@@ -72,10 +78,13 @@ def header(c: Ctx) -> str:
         elif c.path.startswith(href):
             cur = ' class="is-section"'
         links.append(f'<a href="{c.url(href)}"{cur}>{label}</a>')
+    logo = hakase_img(c, 30, "Hakase, home", "brand-logo brand-logo--light")
+    if on_band:
+        logo += hakase_img(c, 30, "Hakase, home", "brand-logo brand-logo--dark", on_dark=True)
     return f'''<a class="skip" href="#main">Skip to content</a>
-<header class="site-header">
-  <div class="wrap">
-    <a class="brand" href="{c.url('/')}">{hakase_img(c, 30, "Hakase, home", "brand-logo")}</a>
+<header class="site-header{" is-overlay" if opening else ""}{" is-on-band" if on_band else ""}">
+  <div class="wrap wrap--wide">
+    <a class="brand" href="{c.url('/')}">{logo}</a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav id="site-nav" class="nav" aria-label="Primary">
       {"".join(links)}
@@ -86,14 +95,14 @@ def header(c: Ctx) -> str:
 
 FOOTER_COLS = [
     ("Product", [("How it works", "/product/"), ("Inside BioSim", "/product/inside/"), ("Plan", "/product/plan/"), ("Prioritise", "/product/prioritise/"), ("Run", "/product/run/"), ("Submit", "/product/submit/")]),
-    ("Science", [("Our approach", "/science/"), ("Validation", "/science/validation/"), ("Methods", "/science/methods/"), ("Glossary", "/glossary/")]),
+    ("Science", [("Our approach", "/science/"), ("Methods", "/science/methods/"), ("Glossary", "/glossary/")]),
     ("Modalities", [("Small molecules", "/modalities/small-molecule/"), ("Monoclonal antibodies", "/modalities/monoclonal-antibody/"), ("Peptides", "/modalities/peptide/"), ("All nine", "/modalities/")]),
-    ("Company", [("About and team", "/company/"), ("Investors", "/investors/"), ("Security", "/security/"), ("Contact", "/contact/")]),
+    ("Company", [("Hakase AI", PARENT), ("Investors", "/investors/"), ("Security", "/security/"), ("Contact", "/contact/")]),
 ]
 
 def footer(c: Ctx) -> str:
     cols = "".join(
-        f'<div class="footer-col"><h2>{h}</h2><ul>' + "".join(f'<li><a href="{c.url(u)}">{e(t)}</a></li>' for t, u in items) + '</ul></div>'
+        f'<div class="footer-col"><h2>{h}</h2><ul>' + "".join(f'<li><a href="{u}" rel="noopener">{e(t)} {ARROW_OUT}</a></li>' if u.startswith("http") else f'<li><a href="{c.url(u)}">{e(t)}</a></li>' for t, u in items) + '</ul></div>'
         for h, items in FOOTER_COLS)
     return f'''<footer class="site-footer">
   <div class="wrap">
@@ -215,7 +224,8 @@ def page(c: Ctx, *, title, description, body, trail=None, ld=None, og_type="webs
 <link rel="stylesheet" href="{c.asset('assets/css/site.css')}">
 <script defer src="{c.asset('assets/js/site.js')}"></script>
 <script type="application/ld+json">{ld_json}</script>'''
-    content = f'''{header(c)}
+    opening = re.match(r'\s*<section class="(?:hero|intro) (?:hero|intro)--(band|photo)', body)
+    content = f'''{header(c, opening and opening.group(1))}
 <main id="main">
 {body}
 </main>

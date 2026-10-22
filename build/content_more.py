@@ -1,8 +1,8 @@
-"""Investors, company, contact, security, glossary and 404."""
+"""Investors, contact, security, glossary and 404."""
 from __future__ import annotations
 import json, pathlib, re
 from lib import (Ctx, e, ARROW, ARROW_DOWN, ARROW_OUT, intro, closing, sources, faq_html, faq_ld, page, EMAIL, LINKEDIN, X_URL, PARENT, SITE, BASE)
-from content_core import engines_grid
+from content_core import engines_grid, DRIVERS, MOD_ORDER
 
 DATA = pathlib.Path(__file__).parent / "data"
 
@@ -26,10 +26,6 @@ def _people(c: Ctx, people) -> str:
 def team_html(c: Ctx) -> str:
     return (f'<div class="team-group"><p class="kicker">Leadership</p><ul class="team team--lead">{_people(c, TEAM[:3])}</ul></div>'
             f'<div class="team-group"><p class="kicker">Advisors and team</p><ul class="team">{_people(c, TEAM[3:])}</ul></div>')
-
-def team_ld():
-    return [{"@type": "Person", "name": n, "jobTitle": r, "worksFor": {"@id": f"{PARENT}/#organization"}, "sameAs": [li],
-             "image": f"{SITE}{BASE.rstrip(chr(47))}/assets/img/team/{slug}.webp"} for n, r, slug, li in TEAM]
 
 def form_html(form_id, subject, fields, button, help_text):
     out = []
@@ -72,7 +68,7 @@ def form_html(form_id, subject, fields, button, help_text):
 INVESTOR_FAQ = [
     ("Do you run labs?", "No. BioSim works with contract labs and in-house teams. Owning animal facilities is capital-heavy and slow to scale; orchestrating them is not."),
     ("Does the AI make regulatory decisions?", "No. Models draft, rank and check. A named person makes and signs every scientific decision. Simulated values never enter a submission, and any predicted value is labelled as predicted."),
-    ("What is built today?", "The study planning engine across nine drug types, study prioritisation, study drivers from lab assays to GLP toxicology, the signed audit trail, Module 4 assembly and SEND export. Validation against approved drugs is published on our science pages."),
+    ("What is built today?", "The study planning engine across nine drug types, study prioritisation, study drivers from lab assays to GLP toxicology, the signed audit trail, Module 4 assembly and SEND export."),
     ("Why can’t a CRO or an incumbent do this?", "A contract lab sells its own capacity, so it cannot credibly route work to competitors. Document tools stop at the paperwork. BioSim is lab-neutral and built around a traceable record from the first plan to the IND."),
     ("What is KESTREL?", "Our kill-early study sequencer. It orders a programme’s studies so that, if the candidate is going to fail, it fails as early and as cheaply as possible, using cited detection rates and the programme’s own costs, inside the order the guidelines require. It is decision support; the sponsor’s team decides what to commission."),
     ("What is HAIOps?", "Hakase’s operating discipline for AI in regulated healthcare work: traceability, quantified confidence, human authority over safety decisions, applicability monitoring, model governance and integrity of evidence. BioSim is built to it."),
@@ -102,7 +98,7 @@ def investors(c: Ctx):
       <div><dt>Product</dt><dd>BioSim: from drug candidate to IND</dd></div>
       <div><dt>Customer</dt><dd>Biotechs preparing an IND</dd></div>
       <div><dt>Model</dt><dd>Priced per drug programme</dd></div>
-      <div><dt>Status</dt><dd>Product built; end-to-end test on 40 approved drugs published</dd></div>
+      <div><dt>Status</dt><dd>Product built: {len(MOD_ORDER)} drug types, {len(DRIVERS)} study types</dd></div>
       <div><dt>Round</dt><dd class="signal">Details and deck on request</dd></div>
     </dl>
   </div>
@@ -143,7 +139,7 @@ def investors(c: Ctx):
     <li><h3 class="h3">The study workflow</h3><p>Study drivers from lab assays to GLP toxicology: protocols, data checks, analysis and signed reports.</p></li>
     <li><h3 class="h3">The submission</h3><p>IND readiness, Module 4 and SEND export, with an audit trail and signatures that can be verified offline.</p></li>
   </ul>
-  <p style="margin-top:40px"><a class="textlink" href="{c.url('/science/validation/')}">Validation on approved drugs {ARROW}</a></p>
+  <p style="margin-top:40px"><a class="textlink" href="{c.url('/product/inside/')}">What is inside BioSim {ARROW}</a></p>
 </div></section>
 
 <section class="section"><div class="wrap">
@@ -171,7 +167,7 @@ def investors(c: Ctx):
 </div></section>
 
 <section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">This round</p><h2 class="h2">The round funds paid design-partner programmes.</h2><p class="lead">It also funds the validation that regulated buyers require. Size, terms, milestones and the data room are shared with the deck.</p></div>
+  <div class="head"><p class="kicker">This round</p><h2 class="h2">The round funds paid design-partner programmes.</h2><p class="lead">Size, terms, milestones and the data room are shared with the deck.</p></div>
 </div></section>
 
 <section class="section section--card" id="team"><div class="wrap">
@@ -198,32 +194,6 @@ def investors(c: Ctx):
     return page(c, title="Investors · Hakase BioSim",
                 description="Hakase BioSim is building the software layer for preclinical drug development: from drug candidate to IND, lab-neutral and traceable. Request the deck.",
                 body=body, trail=[("Investors", "/investors/")], ld=[faq_ld(INVESTOR_FAQ)])
-
-# ---------------------------------------------------------------- COMPANY
-def company(c: Ctx):
-    body = intro(c, [("Company", "/company/")], "Company", "We put our names to the work.",
-                 "Hakase AI builds software for drug development where every number may end up in front of a regulator. BioSim is our product for the preclinical stage.") + f'''
-<section class="section" style="padding-top:0"><div class="wrap stack">
-  <div class="block">
-    <div><p class="kicker">How we work</p><h2 class="h2">Clear purpose, traceable foundations, stated limits.</h2></div>
-    <ul class="list-plain">
-      <li><strong>Science guides the engineering</strong><p>Each workflow starts from the question it supports and the evidence needed to answer it responsibly.</p></li>
-      <li><strong>Disciplines work to one standard</strong><p>Scientific context, system design and day-to-day lab realities are considered together throughout development.</p></li>
-      <li><strong>Limits are stated as clearly as capabilities</strong><p>When evidence is incomplete or a task is out of scope, we say so, and keep improving the work.</p></li>
-    </ul>
-  </div>
-  <div id="team">
-    <div class="head"><p class="kicker">Team and advisors</p><h2 class="h2">The people behind Hakase AI.</h2></div>
-    {team_html(c)}
-  </div>
-  <div class="block">
-    <div><p class="kicker">Hakase AI</p><h2 class="h3">One company, several products.</h2></div>
-    <div class="prose"><p>BioSim is one of the products Hakase AI builds across discovery, preclinical, clinical and regulatory work. <a href="{PARENT}" rel="noopener">Visit hakase.ai</a>.</p></div>
-  </div>
-</div></section>''' + closing(c, "Work with us.", [("Investors", "/investors/"), ("Contact", "/contact/"), ("Science", "/science/")])
-    return page(c, title="Company and team · Hakase BioSim",
-                description="Hakase AI builds software for regulated drug development. Meet the team and advisors behind Hakase BioSim.",
-                body=body, trail=[("Company", "/company/")], ld=team_ld())
 
 # ---------------------------------------------------------------- CONTACT
 CONTACT_FAQ = [

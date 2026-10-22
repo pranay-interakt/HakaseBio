@@ -14,4 +14,4 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://hakase-ai.github.io/biosim/sitemap.xml
+Sitemap: https://pranay-interakt.github.io/HakaseBio/sitemap.xml
