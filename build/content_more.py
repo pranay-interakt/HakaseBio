@@ -50,9 +50,9 @@ def investors(c: Ctx):
 <section class="hero hero--band"><div class="wrap hero-grid">
   <div class="hero-copy">
     <p class="kicker">Investors</p>
-    <h1 class="h1 h1--page">The software layer for preclinical drug development.</h1>
-    <p class="lead">Every new drug needs a package of preclinical studies before its first human trial. Today that work is planned in spreadsheets and coordinated by email across contract labs. BioSim plans it, runs it with any lab and assembles the IND, with every result traceable.</p>
-    <div class="actions"><a class="btn btn--on-band" href="#request">Request the deck {ARROW}</a><a class="textlink" href="#thesis">Read the thesis {ARROW_DOWN}</a></div>
+    <h1 class="h1 h1--page">Software for the preclinical stage of drug development.</h1>
+    <p class="lead">Every new drug needs a set of preclinical studies before its first human trial. BioSim plans those studies, runs them with any contract lab and assembles the regulatory package, with every result traceable to its source.</p>
+    <div class="actions"><a class="btn btn--on-band" href="#request">Request the deck {ARROW}</a><a class="textlink" href="#overview">Overview {ARROW_DOWN}</a></div>
   </div>
   <div class="glance">
     <p class="glance-head kicker" style="color:var(--band-ink-2)">At a glance</p>
@@ -67,22 +67,22 @@ def investors(c: Ctx):
   </div>
 </div></section>
 
-<section class="section" id="thesis"><div class="wrap">
-  <div class="head"><p class="kicker">Thesis</p><h2 class="h2">Sell the outcome. Own no labs. Keep the record.</h2></div>
+<section class="section" id="overview"><div class="wrap">
+  <div class="head"><p class="kicker">Overview</p><h2 class="h2">Preclinical development, run as software.</h2></div>
   <ul class="values">
-    <li class="value"><h3 class="h3">What we sell</h3><p>Preclinical development as an outcome. A biotech brings a drug candidate and gets back the planned studies, the analysed results and the nonclinical package for its IND, instead of managing several labs by email.</p></li>
-    <li class="value"><h3 class="h3">How we deliver it</h3><p>A core that holds the study lifecycle, the audit trail and the human sign-offs, plus study drivers that each run one study type end to end with published methods.</p></li>
-    <li class="value"><h3 class="h3">Why it compounds</h3><p>We coordinate lab capacity and sell the outcome. Every programme adds structured, comparable data across labs to one record, an asset that grows with each programme.</p></li>
+    <li class="value"><h3 class="h4">The problem</h3><p>A preclinical programme is spread across several contract labs, planned in spreadsheets and coordinated by email. Errors and delays surface late, often at the point of submission.</p></li>
+    <li class="value"><h3 class="h4">The product</h3><p>BioSim works out which studies the guidelines require, runs them with the labs the sponsor chooses and assembles the IND package. Every value is linked to its source and signed by a named person.</p></li>
+    <li class="value"><h3 class="h4">The business model</h3><p>Priced per drug programme. Sponsors start with a review of studies they have already run, then move to full programmes from candidate to IND.</p></li>
   </ul>
 </div></section>
 
 <section class="section section--tint" id="request"><div class="wrap split">
-  <div class="split-aside"><p class="kicker">Request</p><h2 class="h2">Request the deck.</h2><p>Tell us about your fund. We reply with the deck, the round’s size, terms and milestones, the data room, and a time for a live walkthrough on a real programme.</p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p></div>
+  <div class="split-aside"><p class="kicker">Deck</p><h2 class="h2">Request the deck.</h2><p>Tell us about your fund. We will send the deck and the round details, and arrange a walkthrough of the product.</p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p></div>
   {form_html("investor", "Investor deck request", [("text", "name", "Name", True), ("text", "organisation", "Fund or firm", True), ("email", "email", "Email", True), ("select", "focus", "Stage focus", False, ["Pre-seed and seed", "Series A", "Growth", "Strategic"]), ("textarea", "message", "Note", False)], "Request the deck", "This prepares an email to us. Nothing is sent until you send it.")}
 </div></section>
 '''
     return page(c, title="Investors · Hakase BioSim",
-                description="Hakase BioSim is building the software layer for preclinical drug development: from drug candidate to IND, lab-neutral and traceable. Request the deck.",
+                description="Hakase BioSim is software for the preclinical stage of drug development: it plans the required studies, runs them with any contract lab and assembles the IND package. Request the investor deck.",
                 body=body, trail=[("Investors", "/investors/")])
 
 # ---------------------------------------------------------------- CONTACT
