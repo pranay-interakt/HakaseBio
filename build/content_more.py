@@ -46,13 +46,6 @@ def form_html(form_id, subject, fields, button, help_text):
 # ---------------------------------------------------------------- INVESTORS
 
 def investors(c: Ctx):
-    events = [
-        ("Apr 2025", "FDA publishes its roadmap to reduce animal testing in preclinical safety studies.", 1),
-        ("Mar 2026", "FDA publishes draft guidance on how new approach methodologies can be validated for use in drug development submissions.", 2),
-        ("Sep 2026", "FDA opens an expedited IND pilot for first-in-human trials, noting that US first-in-human studies can take up to two years.", 3),
-        ("Sep 2026", "A final rule writes “nonclinical” in place of “animal” across FDA’s regulations.", 4),
-    ]
-    tl = "".join(f'<li><time>{e(d)}</time><p>{e(t)}<sup class="fn"><a href="#src-{n}">{n}</a></sup></p></li>' for d, t, n in events)
     body = f'''
 <section class="hero hero--band"><div class="wrap hero-grid">
   <div class="hero-copy">
@@ -80,31 +73,6 @@ def investors(c: Ctx):
     <li class="value"><h3 class="h3">What we sell</h3><p>Preclinical development as an outcome. A biotech brings a drug candidate and gets back the planned studies, the analysed results and the nonclinical package for its IND, instead of managing several labs by email.</p></li>
     <li class="value"><h3 class="h3">How we deliver it</h3><p>A core that holds the study lifecycle, the audit trail and the human sign-offs, plus study drivers that each run one study type end to end with published methods.</p></li>
     <li class="value"><h3 class="h3">Why it compounds</h3><p>We coordinate lab capacity and sell the outcome. Every programme adds structured, comparable data across labs to one record, an asset that grows with each programme.</p></li>
-  </ul>
-</div></section>
-
-<section class="section section--card"><div class="wrap">
-  <div class="head"><p class="kicker">What we built</p><h2 class="h2">Eight capabilities, built in-house.</h2><p class="lead">From the planning rules to the verifier that checks the finished package, the parts of BioSim are our own. Each is working software today.</p></div>
-  {engines_grid(c)}
-</div></section>
-
-<section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">Why now</p><h2 class="h2">The rules for reaching first-in-human are changing.</h2><p class="lead">Each change rewards a plan that is cited, versioned and right the first time, and a record that can be checked.</p></div>
-  <ol class="timeline">{tl}</ol>
-  <div style="margin-top:40px">{sources([
-      ("FDA press announcement on year-one progress against its April 2025 Roadmap to Reducing Animal Testing in Preclinical Safety Studies, 20 April 2026.", "https://www.fda.gov/news-events/press-announcements/fda-achieves-year-1-goals-reducing-animal-testing-drug-development"),
-      ("Federal Register 91(53), 19 March 2026. Draft guidance: General Considerations for the Use of New Approach Methodologies in Drug Development.", "https://www.govinfo.gov/content/pkg/FR-2026-03-19/pdf/2026-05390.pdf"),
-      ("RAPS. FDA to test new approach to expediting Phase 1 trials, 15 September 2026.", "https://www.raps.org/resource/fda-to-test-new-approach-to-expediting-phase-1-trials.html"),
-      ("PharmTech. FDA finalizes rule recognizing non-animal testing methods, 22 September 2026.", "https://www.pharmtech.com/view/the-fda-finalizes-rule-recognizing-non-animal-testing-methods-building-on-year-long-reduction-push"),
-  ])}</div>
-</div></section>
-
-<section class="section"><div class="wrap">
-  <div class="head"><p class="kicker">Business model</p><h2 class="h2">Start with studies already run. Expand to the full programme.</h2></div>
-  <ul class="model">
-    <li><p class="kicker">Start</p><h3 class="h3">Readiness review</h3><p>A review of studies a sponsor has already run, against what its IND needs. No lab cooperation required.</p></li>
-    <li class="is-key"><p class="kicker">Expand</p><h3 class="h3">Full programme</h3><p>From candidate to IND: the plan, the order, lab dispatch, data intake and the submission package.</p></li>
-    <li><p class="kicker">Compound</p><h3 class="h3">Data across labs</h3><p>Each programme adds structured, comparable data across labs: an asset no single lab or document tool builds.</p></li>
   </ul>
 </div></section>
 
