@@ -263,7 +263,7 @@ def contact(c: Ctx):
 # ---------------------------------------------------------------- SECURITY
 def security(c: Ctx):
     body = intro(c, [("Security", "/security/")], "Security and compliance", "Built for regulated records.",
-                 "BioSim is designed for regulated work: electronic records and signatures that follow 21 CFR Part 11, an audit trail where any rewrite is detected, and access limited to the people on each programme.") + f'''
+                 "BioSim is designed for regulated work: electronic records and signatures that follow 21 CFR Part 11, an audit trail where any rewrite is detected, and access limited to the people on each programme.", dark=True) + f'''
 <section class="section" style="padding-top:0"><div class="wrap stack">
   <div class="block"><div><p class="kicker">Signatures</p><h2 class="h2">People sign, and sign again.</h2></div>
     <div class="prose"><p>The legal sign-offs in nonclinical work belong to people: the GLP Study Director, quality assurance, the IACUC or attending veterinarian and, for EU GMP release, the qualified person. BioSim assembles what they need and records their signature. It never signs on their behalf.</p><p>Every signature asks for the password again, as 21 CFR 11.200 requires. GLP approval needs both the Study Director and QA signatures on the current version of the report.</p></div></div>

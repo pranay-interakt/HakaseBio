@@ -3,33 +3,6 @@
   "use strict";
   document.documentElement.classList.add("js");
 
-  // Theme: light by default; the toggle stores a choice for this browser only
-  var root = document.documentElement;
-  function applyTheme(t) {
-    root.setAttribute("data-theme", t);
-    document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
-      b.setAttribute("aria-label", t === "dark" ? "Switch to light theme" : "Switch to dark theme");
-    });
-  }
-  var stored = null;
-  try { stored = localStorage.getItem("hakase-theme"); } catch (e) {}
-  applyTheme(stored === "dark" ? "dark" : "light");
-  document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
-    b.addEventListener("click", function () {
-      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      try { localStorage.setItem("hakase-theme", next); } catch (e) {}
-      applyTheme(next);
-    });
-  });
-  if (window.MutationObserver) {
-    new MutationObserver(function () {
-      var want = null;
-      try { want = localStorage.getItem("hakase-theme"); } catch (e) {}
-      want = want === "dark" ? "dark" : "light";
-      if (root.getAttribute("data-theme") !== want) root.setAttribute("data-theme", want);
-    }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-  }
-
   // Mobile navigation
   var btn = document.querySelector(".menu-btn");
   var nav = document.getElementById("site-nav");

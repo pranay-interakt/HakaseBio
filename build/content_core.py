@@ -117,7 +117,7 @@ def product_inside(c: Ctx):
 </div>''')
     rows = "".join(f'<tr><td><strong>{e(a)}</strong></td><td>{e(b)}</td></tr>' for a, b in HAIOPS)
     body = intro(c, [("Product", "/product/"), ("Inside BioSim", "/product/inside/")], "Product · Inside", "Inside BioSim.",
-                 "Seven capabilities we built in-house, and the discipline they are built to. Together they are what makes a BioSim package traceable, defensible and fast to produce.") + f'''
+                 "Seven capabilities we built in-house, and the discipline they are built to. Together they are what makes a BioSim package traceable, defensible and fast to produce.", dark=True) + f'''
 <section class="section" style="padding-top:0"><div class="wrap stack">
   {"".join(blocks)}
   <div id="haiops">
@@ -131,24 +131,14 @@ def product_inside(c: Ctx):
 
 # ---------------------------------------------------------------- HOME
 def home(c: Ctx, preview_root=False):
-    sm = before_fih("small-molecule")
-    shown = [q for q in sm if q["name"].startswith(("Repeat-dose", "Safety pharmacology", "In vitro hERG", "Bacterial", "Validated bioanalytical"))][:6]
-    rest = len(sm) - len(shown)
-    plan_rows = "".join(f'<li><span>{e(q["name"])}</span><span class="ref">{e(short_ref(q))}</span></li>' for q in shown)
     body = f'''
-<section class="hero"><div class="wrap hero-grid">
-  <div class="hero-copy">
+<section class="hero hero--band"><div class="wrap">
+  <div class="hero-copy hero-copy--wide">
     <p class="product-name"><span class="dot" aria-hidden="true"></span>BioSim <span>by Hakase</span></p>
     <h1 class="h1">From drug candidate to IND.</h1>
     <p class="lead">BioSim is preclinical development software. It plans the studies your drug needs, runs them with the labs you choose and assembles the IND package for FDA. Every result traces back to its source.</p>
-    <div class="actions"><a class="btn" href="{c.url('/contact/')}">Book a demo {ARROW}</a><a class="textlink" href="#how">See how it works {ARROW_DOWN}</a></div>
+    <div class="actions"><a class="btn btn--on-band" href="{c.url('/contact/')}">Book a demo {ARROW}</a><a class="textlink" href="#how">See how it works {ARROW_DOWN}</a></div>
   </div>
-  <figure class="plan" aria-labelledby="plan-cap" style="margin:0">
-    <div class="plan-head"><strong id="plan-cap">BioSim study plan</strong><span class="kicker">Before first-in-human</span></div>
-    <div class="plan-facts"><span class="chip">Small molecule</span><span class="chip">Oral</span><span class="chip">Chronic, non-oncology</span><span class="chip">28-day trial</span></div>
-    <ul class="plan-list">{plan_rows}</ul>
-    <figcaption class="plan-foot">And {rest} more before the first human dose, each with the guideline section that requires it. Output of the BioSim regulatory engine for this programme.</figcaption>
-  </figure>
 </div></section>
 
 <section class="section" id="how"><div class="wrap">
@@ -247,7 +237,7 @@ def product(c: Ctx):
   </ul>
 </li>''' for n, t, u, a, b, s in steps)
     body = intro(c, [("Product", "/product/")], "Product", "From candidate to IND, in four steps.",
-                 "BioSim is the software your team uses to plan, run and document the preclinical studies that come before a first human trial. It keeps one record from the first plan to the IND.") + f'''
+                 "BioSim is the software your team uses to plan, run and document the preclinical studies that come before a first human trial. It keeps one record from the first plan to the IND.", dark=True) + f'''
 <section class="section" style="padding-top:0"><div class="wrap">
   <ol class="stack" style="list-style:none">{rows}</ol>
 </div></section>
@@ -436,7 +426,7 @@ KINDS = [("Measured", "From a study you ran, linked to its raw file."), ("Litera
 def science(c: Ctx):
     kinds = "".join(f'<li><strong>{e(k)}</strong><span>{e(d)}</span></li>' for k, d in KINDS)
     body = intro(c, [("Science", "/science/")], "Science", "Every result can be checked.",
-                 "A number in a submission is only as good as its origin. BioSim records where every value came from, and refuses to produce one it cannot support.") + f'''
+                 "A number in a submission is only as good as its origin. BioSim records where every value came from, and refuses to produce one it cannot support.", dark=True) + f'''
 <section class="section" style="padding-top:0"><div class="wrap stack">
   <div class="block">
     <div><p class="kicker">Where values come from</p><h2 class="h2">Every value carries its origin.</h2><p class="small muted">There are eight. A guess is not one of them.</p></div>
@@ -551,7 +541,7 @@ def modalities_index(c: Ctx):
         gov = ", ".join(GUIDE_SHORT.get(g["key"], g["key"]) for g in s["governing_guidelines"]) or "—"
         rows.append(f'<tr><td><a href="{c.url(f"/modalities/{slug}/")}">{e(s["label"])}</a></td><td>{e(gov)}</td><td>{e(", ".join(s["facts"][:3]))}</td></tr>')
     body = intro(c, [("Modalities", "/modalities/")], "Modalities", "Study plans by drug type.",
-                 "Different drug types follow different guidance. Each page below shows the plan BioSim derives for a typical programme of that type, with the reason for every study.") + f'''
+                 "Different drug types follow different guidance. Each page below shows the plan BioSim derives for a typical programme of that type, with the reason for every study.", dark=True) + f'''
 <section class="section" style="padding-top:0"><div class="wrap">
   <div class="table-wrap"><table class="data"><thead><tr><th scope="col">Drug type</th><th scope="col">Governing guidance</th><th scope="col">Reference programme</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>
 </div></section>''' + closing(c, "Bring a programme. Leave with its plan.", [("Plan", "/product/plan/"), ("Science", "/science/"), ("Product", "/product/")])

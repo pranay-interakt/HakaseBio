@@ -1,6 +1,6 @@
 # hakase.bio — the Hakase BioSim website
 
-A static, multi-page site for BioSim. It has 51 crawlable pages plus a 404, with no framework, cookies or third-party requests. Light theme by default, with a dark theme the visitor can switch to.
+A static, multi-page site for BioSim. It has 51 crawlable pages plus a 404, with no framework, cookies or third-party requests. It is a light site with deep-navy opening bands on the main section pages (home, product, science, modalities, security, investors).
 
 ```
 docs/      the built website, served by GitHub Pages
@@ -44,7 +44,7 @@ Lighthouse scores for the home and investors pages: 98–99 performance, 100 acc
 - **Forms.** The demo form (`/contact/`) and the investor form (`/investors/#request`) prepare an email to info@hakase.ai in the visitor's own mail app, so nothing is stored. To collect submissions directly, point them at Formspree, Netlify Forms or your own endpoint.
 - **Legal pages.** Privacy and terms link to hakase.ai/privacy/ and hakase.ai/terms/. Check that those pages exist and cover this site.
 - **Team photos** come from hakase.ai/team. Replace the files in `src/assets/img/team/` and rebuild if any change.
-- **Branding.** The header and footer use the Hakase logo (`src/assets/img/hakase-logo*.png/webp`, with a light-on-dark variant for dark mode). BioSim is named as the product on the homepage. The favicon is the Hakase “h” with its cap.
+- **Branding.** The header and footer use the Hakase logo (`src/assets/img/hakase-logo*.png/webp`). BioSim is named as the product on the homepage. The favicon is the Hakase “h” with its cap.
 
 ## Design
 

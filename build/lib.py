@@ -58,11 +58,8 @@ ARROW_OUT = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true" focusable="fa
 
 def hakase_img(c: Ctx, h=15, alt="Hakase", cls="") -> str:
     w = round(1001 / 294 * h)
-    out = []
-    for variant, mode in (("hakase-logo", "on-light"), ("hakase-logo-dark", "on-dark")):
-        src = c.asset(f"assets/img/{variant}.webp"); src2 = c.asset(f"assets/img/{variant}@2x.webp")
-        out.append(f'<img class="{mode} {cls}" src="{src}" srcset="{src} 1x, {src2} 2x" alt="{e(alt)}" width="{w}" height="{h}">')
-    return "".join(out)
+    src = c.asset("assets/img/hakase-logo.webp"); src2 = c.asset("assets/img/hakase-logo@2x.webp")
+    return f'<img class="{cls}" src="{src}" srcset="{src} 1x, {src2} 2x" alt="{e(alt)}" width="{w}" height="{h}">'
 
 NAV = [("Product", "/product/"), ("Science", "/science/"), ("Modalities", "/modalities/"), ("Investors", "/investors/"), ("Company", "/company/")]
 
@@ -84,7 +81,6 @@ def header(c: Ctx) -> str:
       {"".join(links)}
       <a class="btn btn--sm" href="{c.url('/contact/')}">Book a demo {ARROW}</a>
     </nav>
-    <button class="theme-btn" type="button" aria-label="Switch to dark theme" data-theme-toggle><svg class="sun" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2.2M10 16v2.2M1.8 10H4M16 10h2.2M4.2 4.2l1.6 1.6M14.2 14.2l1.6 1.6M4.2 15.8l1.6-1.6M14.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"/></svg></button>
   </div>
 </header>'''
 
@@ -126,8 +122,8 @@ def crumbs(c: Ctx, trail) -> str:
             items.append(f'<li><a href="{c.url(href)}">{e(label)}</a></li>')
     return f'<nav aria-label="Breadcrumb"><ol class="crumbs">{"".join(items)}</ol></nav>'
 
-def intro(c: Ctx, trail, kicker, h1, standfirst, extra="") -> str:
-    return f'''<section class="intro"><div class="wrap">
+def intro(c: Ctx, trail, kicker, h1, standfirst, extra="", dark=False) -> str:
+    return f'''<section class="intro{" intro--band" if dark else ""}"><div class="wrap">
   {crumbs(c, trail)}
   <div class="intro-grid">
     <p class="kicker">{e(kicker)}</p>
@@ -197,8 +193,7 @@ def page(c: Ctx, *, title, description, body, trail=None, ld=None, og_type="webs
 <meta name="description" content="{e(description)}">
 <link rel="canonical" href="{canonical}">
 <meta name="robots" content="{robots}">
-<meta name="theme-color" content="#F4F6F9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0B1324" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F6F9">
 <meta property="og:type" content="{og_type}">
 <meta property="og:site_name" content="{SITE_NAME}">
 <meta property="og:locale" content="en_GB">
@@ -217,7 +212,6 @@ def page(c: Ctx, *, title, description, body, trail=None, ld=None, og_type="webs
 <link rel="manifest" href="{c.asset('site.webmanifest')}">
 <link rel="preload" href="{c.asset('assets/fonts/newsreader.woff2')}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{c.asset('assets/fonts/schibsted-grotesk-var.woff2')}" as="font" type="font/woff2" crossorigin>
-<script>(function(){{var t;try{{t=localStorage.getItem("hakase-theme")}}catch(e){{}}document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")}})();</script>
 <link rel="stylesheet" href="{c.asset('assets/css/site.css')}">
 <script defer src="{c.asset('assets/js/site.js')}"></script>
 <script type="application/ld+json">{ld_json}</script>'''
