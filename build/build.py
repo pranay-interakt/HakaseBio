@@ -17,7 +17,7 @@ HERE = pathlib.Path(__file__).parent
 SRC = HERE.parent / "src"
 
 def routes():
-    r = [("/", lambda c: cc.home(c)), ("/product/", cc.product), ("/product/plan/", cc.product_plan),
+    r = [("/", lambda c: cc.home(c)), ("/product/", cc.product), ("/product/inside/", cc.product_inside), ("/product/plan/", cc.product_plan),
          ("/product/prioritise/", cc.product_prioritise), ("/product/run/", cc.product_run), ("/product/submit/", cc.product_submit),
          ("/science/", cc.science), ("/science/validation/", cc.validation), ("/science/methods/", cc.methods_index)]
     for a in cc.METHODS["areas"]:
@@ -69,7 +69,7 @@ def llms(pages):
     SITE_ = SITE + BASE.rstrip("/")
     lines = ["# Hakase BioSim", "",
              "> BioSim is preclinical development software from Hakase AI. It plans the nonclinical studies a drug candidate needs from ICH, FDA and WHO guidance, orders them so the studies most likely to stop a programme run first, runs them with any contract lab, and assembles the nonclinical part of the IND (CTD Module 4 and SEND). Every value records its source; people sign every decision.", "",
-             "## Product", f"- [How BioSim works]({SITE_}/product/)", f"- [Plan]({SITE_}/product/plan/)", f"- [Prioritise]({SITE_}/product/prioritise/)",
+             "## Product", f"- [How BioSim works]({SITE_}/product/)", f"- [Inside BioSim: the engines and HAIOps]({SITE_}/product/inside/)", f"- [Plan]({SITE_}/product/plan/)", f"- [Prioritise]({SITE_}/product/prioritise/)",
              f"- [Run]({SITE_}/product/run/)", f"- [Submit]({SITE_}/product/submit/)", "",
              "## Science", f"- [Our approach to provenance]({SITE_}/science/)", f"- [Validation on approved drugs]({SITE_}/science/validation/)",
              f"- [Methods registry]({SITE_}/science/methods/)", f"- [Glossary]({SITE_}/glossary/)", "",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json, pathlib, re
 from lib import (Ctx, e, ARROW, ARROW_DOWN, ARROW_OUT, intro, closing, sources, faq_html, faq_ld, page, EMAIL, LINKEDIN, X_URL, PARENT, SITE, BASE)
+from content_core import engines_grid
 
 DATA = pathlib.Path(__file__).parent / "data"
 
@@ -73,6 +74,8 @@ INVESTOR_FAQ = [
     ("Does the AI make regulatory decisions?", "No. Models draft, rank and check. A named person makes and signs every scientific decision. Simulated values never enter a submission, and any predicted value is labelled as predicted."),
     ("What is built today?", "The study planning engine across nine drug types, study prioritisation, study drivers from lab assays to GLP toxicology, the signed audit trail, Module 4 assembly and SEND export. Validation against approved drugs is published on our science pages."),
     ("Why can’t a CRO or an incumbent do this?", "A contract lab sells its own capacity, so it cannot credibly route work to competitors. Document tools stop at the paperwork. BioSim is lab-neutral and built around a traceable record from the first plan to the IND."),
+    ("What is KESTREL?", "Our kill-early study sequencer. It orders a programme’s studies so that, if the candidate is going to fail, it fails as early and as cheaply as possible, using cited detection rates and the programme’s own costs, inside the order the guidelines require. It is decision support; the sponsor’s team decides what to commission."),
+    ("What is HAIOps?", "Hakase’s operating discipline for AI in regulated healthcare work: traceability, quantified confidence, human authority over safety decisions, applicability monitoring, model governance and integrity of evidence. BioSim is built to it."),
     ("How do you make money?", "Per drug programme, priced against the services budget a sponsor already has for preclinical work. A readiness review, the entry point, is priced per study reviewed."),
 ]
 
@@ -115,6 +118,11 @@ def investors(c: Ctx):
 </div></section>
 
 <section class="section section--card"><div class="wrap">
+  <div class="head"><p class="kicker">What we built</p><h2 class="h2">Eight capabilities, built in-house.</h2><p class="lead">From the planning rules to the verifier that checks the finished package, the parts of BioSim are our own. Each is working software today.</p></div>
+  {engines_grid(c)}
+</div></section>
+
+<section class="section"><div class="wrap">
   <div class="head"><p class="kicker">The problem</p><h2 class="h2">The path to a first human dose is slow and fragmented.</h2></div>
   <ul class="values">
     <li class="value"><h3 class="h3">Fragmented</h3><p>A single programme runs studies across several contract labs. Each returns its own reports and data formats, and the sponsor stitches them together.</p></li>

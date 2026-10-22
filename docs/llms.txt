@@ -4,6 +4,7 @@
 
 ## Product
 - [How BioSim works](https://hakase-ai.github.io/biosim/product/)
+- [Inside BioSim: the engines and HAIOps](https://hakase-ai.github.io/biosim/product/inside/)
 - [Plan](https://hakase-ai.github.io/biosim/product/plan/)
 - [Prioritise](https://hakase-ai.github.io/biosim/product/prioritise/)
 - [Run](https://hakase-ai.github.io/biosim/product/run/)

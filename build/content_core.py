@@ -59,6 +59,76 @@ def explorer(c: Ctx) -> str:
   <div class="explorer-panels">{"".join(panels)}</div>
 </div>'''
 
+# ---------------------------------------------------------------- INSIDE BIOSIM
+ENGINES = [
+    ("Regulatory engine", "The study plan, derived and cited",
+     "Reads a programme’s facts and derives every study the ICH, FDA and WHO guidelines require, for nine drug types, each line cited to its section. An unknown fact leaves a study conditional, never assumed.",
+     "/product/plan/"),
+    ("KESTREL", "Kill-early study sequencing",
+     "Orders the study battery so a programme-ending finding surfaces at the lowest expected spend: each study’s chance of a decisive result, from cited detection rates, against its cost and time, inside the order the guidelines set.",
+     "/product/prioritise/"),
+    ("SEXTANT", "The value of an experiment",
+     "Prices each candidate study by how much it could change the go or no-go decision, using the programme’s own costs of a wrong go and a wrong stop. Experiments are ranked by value, and by value per unit cost.",
+     "/product/prioritise/"),
+    ("Digital study engine", "In silico answers, graded for credibility",
+     "Answers each required study with the most qualified computational method available and grades the credibility of that answer for its context of use under ASME V&V 40. A prediction informs a decision; it never replaces a signed study.",
+     "/science/validation/"),
+    ("Study drivers", "One study type, end to end",
+     "Fourteen study types, from microsomal stability to GLP repeat-dose toxicology, each packaged with its protocol, data checks, cited analysis and report, so every lab is held to the same standard.",
+     "/product/run/"),
+    ("Provenance ledger", "Every value with its origin",
+     "Eight ways a number can exist, none of them guessed. An append-only, hash-chained record of every change, with signatures only people can give, and simulated data that can never become evidence.",
+     "/science/"),
+    ("Offline verifier", "The package checks itself",
+     "Every Module 4 export carries what is needed to re-run each analysis from the raw files and check every fingerprint, ledger entry and signature, without BioSim, a database or a network.",
+     "/product/submit/"),
+    ("HAIOps", "Hakase’s discipline for regulated AI",
+     "Six requirements every workflow is built to: traceability, quantified confidence, human authority over safety decisions, applicability monitoring, model governance and integrity of evidence.",
+     "/product/inside/#haiops"),
+]
+
+def engines_grid(c: Ctx, items=None, dark=False) -> str:
+    items = items or ENGINES
+    cards = []
+    for name, title, desc, href in items:
+        cards.append(f'''<li class="engine"><a href="{c.url(href)}">
+  <span class="engine-name">{e(name)}</span>
+  <strong>{e(title)}</strong>
+  <p>{e(desc)}</p>
+  <span class="more">More {ARROW}</span>
+</a></li>''')
+    return f'<ul class="engines{" engines--dark" if dark else ""}">{"".join(cards)}</ul>'
+
+HAIOPS = [
+    ("Traceability and audit readiness", "An append-only ledger records inputs by fingerprint, method and version, reference-parameter version, software versions, actor and time. Corrections create a linked new version with a reason."),
+    ("Quantified confidence", "Every in silico answer is graded under ASME V&V 40 against the risk of its context of use, and uncertainty travels with the value."),
+    ("Human authority over safety decisions", "The signature boundaries of nonclinical development are first-class: a named person attests, and the system records exactly what was signed."),
+    ("Applicability monitoring", "Each predicted value carries its applicability-domain check; each read-across names its analogues, their values and their similarity."),
+    ("Lifecycle and model governance", "A checksum-locked method registry. Every stored result names the method version that produced it, and a method change is a versioned event."),
+    ("Integrity of evidence", "Predicted and simulated values are kept out of the evidence path by design. A study run on simulated data can be rehearsed and reported, and never approved."),
+]
+
+def product_inside(c: Ctx):
+    blocks = []
+    for name, title, desc, href in ENGINES[:-1]:
+        blocks.append(f'''<div class="block" id="{re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")}">
+  <div><p class="engine-name">{e(name)}</p><h2 class="h2">{e(title)}.</h2></div>
+  <div class="prose"><p>{e(desc)}</p><p><a class="textlink" href="{c.url(href)}">Where it works in BioSim {ARROW}</a></p></div>
+</div>''')
+    rows = "".join(f'<tr><td><strong>{e(a)}</strong></td><td>{e(b)}</td></tr>' for a, b in HAIOPS)
+    body = intro(c, [("Product", "/product/"), ("Inside BioSim", "/product/inside/")], "Product · Inside", "Inside BioSim.",
+                 "Seven capabilities we built in-house, and the discipline they are built to. Together they are what makes a BioSim package traceable, defensible and fast to produce.") + f'''
+<section class="section" style="padding-top:0"><div class="wrap stack">
+  {"".join(blocks)}
+  <div id="haiops">
+    <div class="head"><p class="engine-name">HAIOps</p><h2 class="h2">Healthcare AI Operations: the discipline BioSim is built to.</h2><p class="lead">Machine-learning operations was built for systems where a wrong answer costs a click. HAIOps is Hakase’s operating discipline for systems where a wrong answer reaches a patient. Six requirements, and how BioSim meets each.</p></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th scope="col">Requirement</th><th scope="col">In BioSim</th></tr></thead><tbody>{rows}</tbody></table></div>
+  </div>
+</div></section>''' + closing(c, "See every one of these on a real candidate.", [("How it works", "/product/"), ("Validation", "/science/validation/"), ("Security", "/security/")])
+    return page(c, title="Inside BioSim: the engines · Hakase BioSim",
+                description="The regulatory engine, KESTREL, SEXTANT, the digital study engine, study drivers, the provenance ledger, the offline verifier and HAIOps: what BioSim is made of.",
+                body=body, trail=[("Product", "/product/"), ("Inside BioSim", "/product/inside/")], ld=[APP])
+
 # ---------------------------------------------------------------- HOME
 def home(c: Ctx, preview_root=False):
     sm = before_fih("small-molecule")
@@ -107,6 +177,15 @@ def home(c: Ctx, preview_root=False):
   </ul>
 </div></section>
 
+<section class="section" id="inside"><div class="wrap">
+  <div class="head">
+    <p class="kicker">Inside BioSim</p>
+    <h2 class="h2">Built in-house, from the planning rules to the verifier.</h2>
+    <p class="lead">Eight capabilities no one else packages together. Each one is working software today.</p>
+  </div>
+  {engines_grid(c)}
+</div></section>
+
 <section class="section"><div class="wrap">
   <div class="head">
     <p class="kicker">See it</p>
@@ -118,7 +197,7 @@ def home(c: Ctx, preview_root=False):
 
 <section class="section band"><div class="wrap">
   <div class="head">
-    <p class="kicker">Built for regulated work</p>
+    <p class="kicker">Built to HAIOps, Hakase’s discipline for regulated AI</p>
     <h2 class="h2">Scientists stay in charge.</h2>
   </div>
   <ul class="points">
@@ -126,7 +205,7 @@ def home(c: Ctx, preview_root=False):
     <li><h3 class="h3">Nothing is guessed</h3><p>If a value is missing, BioSim says so and why. It never fills the gap with a default.</p></li>
     <li><h3 class="h3">A record you can check</h3><p>Every change is logged with who, when and why, and any rewrite is detected. Signatures follow 21 CFR Part 11.</p></li>
   </ul>
-  <p style="margin-top:40px"><a class="textlink" href="{c.url('/science/')}">How we keep results trustworthy {ARROW}</a></p>
+  <p style="margin-top:40px"><a class="textlink" href="{c.url('/product/inside/#haiops')}">The six HAIOps requirements, and how BioSim meets them {ARROW}</a></p>
 </div></section>
 
 <section class="section"><div class="wrap">
@@ -172,6 +251,10 @@ def product(c: Ctx):
 <section class="section" style="padding-top:0"><div class="wrap">
   <ol class="stack" style="list-style:none">{rows}</ol>
 </div></section>
+<section class="section"><div class="wrap">
+  <div class="head"><p class="kicker">Inside BioSim</p><h2 class="h2">What it is made of.</h2></div>
+  {engines_grid(c)}
+</div></section>
 <section class="section section--card"><div class="wrap">
   <div class="head"><p class="kicker">What BioSim is not</p><h2 class="h2">Clear lines, so you know what you are buying.</h2></div>
   <ul class="values">
@@ -180,7 +263,7 @@ def product(c: Ctx):
     <li class="value"><h3 class="h3">Not a replacement for your experts</h3><p>Toxicologists, study directors and regulatory leads make and sign the decisions. BioSim gives them everything they need to do it.</p></li>
   </ul>
 </div></section>
-''' + closing(c, "See BioSim on one of your own candidates.", [("Plan", "/product/plan/"), ("Security", "/security/"), ("Science", "/science/")])
+''' + closing(c, "See BioSim on one of your own candidates.", [("Inside BioSim", "/product/inside/"), ("Plan", "/product/plan/"), ("Security", "/security/")])
     return page(c, title="How BioSim works · Hakase BioSim",
                 description="Plan, prioritise, run and submit: how BioSim takes a drug candidate to an IND-ready nonclinical package, and who signs at each step.",
                 body=body, trail=[("Product", "/product/")], ld=[APP])

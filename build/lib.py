@@ -89,7 +89,7 @@ def header(c: Ctx) -> str:
 </header>'''
 
 FOOTER_COLS = [
-    ("Product", [("How it works", "/product/"), ("Plan", "/product/plan/"), ("Prioritise", "/product/prioritise/"), ("Run", "/product/run/"), ("Submit", "/product/submit/")]),
+    ("Product", [("How it works", "/product/"), ("Inside BioSim", "/product/inside/"), ("Plan", "/product/plan/"), ("Prioritise", "/product/prioritise/"), ("Run", "/product/run/"), ("Submit", "/product/submit/")]),
     ("Science", [("Our approach", "/science/"), ("Validation", "/science/validation/"), ("Methods", "/science/methods/"), ("Glossary", "/glossary/")]),
     ("Modalities", [("Small molecules", "/modalities/small-molecule/"), ("Monoclonal antibodies", "/modalities/monoclonal-antibody/"), ("Peptides", "/modalities/peptide/"), ("All nine", "/modalities/")]),
     ("Company", [("About and team", "/company/"), ("Investors", "/investors/"), ("Security", "/security/"), ("Contact", "/contact/")]),
